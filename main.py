@@ -20,12 +20,15 @@ def main():
         Policy,
         training_env,
         verbose=2,
-        batch_size=4,
+        batch_size=2,
+        n_steps=64,
         policy_kwargs={"features_extractor_class": FeaturesExtractor},
     )
-    model.learn(total_timesteps=25000)
+    model.learn(total_timesteps=200)
 
-    testing_env = Env(n_jobs=args.n_j_testing, n_machines=n_m_testing, n_features=2)
+    testing_env = Env(
+        n_jobs=args.n_j_testing, n_machines=args.n_m_testing, n_features=2
+    )
     obs = testing_env.reset()
     while True:
         action, _ = model.predict(obs)

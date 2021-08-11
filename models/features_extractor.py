@@ -59,8 +59,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             n_nodes = (observation["n_nodes"][0] == 1).nonzero(as_tuple=True)[0]
         n_nodes = n_nodes.item()
 
-        batch_size = features.shape[0]
         features = observation["features"]
+        batch_size = features.shape[0]
         edge_index = observation["edge_index"].long()
         features = features[:, 0:n_nodes]
 
@@ -69,7 +69,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             Data(x=features[i], edge_index=edge_index[i]) for i in range(batch_size)
         ]
         loader = DataLoader(data_list, batch_size=batch_size)
-        aggregated_data = loader.next()
+        aggregated_data = next(iter(loader))
         aggregated_features = aggregated_data.x
         aggregated_edge_index = aggregated_data.edge_index
 
@@ -77,14 +77,13 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             aggregated_features = self.feature_extractors[layer](
                 aggregated_features, aggregated_edge_index
             )
-        features = aggreagted_features.reshape(batch_size, n_nodes, -1)
+        features = aggregated_features.reshape(batch_size, n_nodes, -1)
 
-        # TODO : adapt this to batches
         # Create graph embedding and concatenate
         graph_pooling = torch.ones(n_nodes) / n_nodes
         graph_embedding = torch.matmul(graph_pooling, features)
         graph_and_nodes_embedding = torch.cat(
-            (graph_embedding.reshape(1, -1), features)
+            (graph_embedding.reshape(batch_size, 1, -1), features), dim=1
         )
 
         return graph_and_nodes_embedding

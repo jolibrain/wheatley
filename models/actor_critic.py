@@ -49,10 +49,12 @@ class ActorCritic(nn.Module):
         )
 
     def forward(self, nodes_and_graph_embedding):
-
         graph_embedding, nodes_embedding = torch.split(
-            nodes_and_graph_embedding, [1, nodes_and_graph_embedding.shape[0] - 1]
+            nodes_and_graph_embedding,
+            [1, nodes_and_graph_embedding.shape[1] - 1],
+            dim=1,
         )
+        batch_size = graph_embedding.shape[0]
 
         value = self.critic(graph_embedding)
 
@@ -64,18 +66,20 @@ class ActorCritic(nn.Module):
 
         # Just to test, not correct
         pi = torch.cat(
-            (pi.squeeze(), torch.zeros(MAX_N_NODES * MAX_N_NODES - pi.shape[0]))
+            (pi, torch.zeros(batch_size, MAX_N_NODES * MAX_N_NODES - pi.shape[1], 1)),
+            dim=1,
         )
-        pi = pi.reshape(1, -1)
+        pi = pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES)
 
         return pi, value
 
     def compute_possible_s_a_pairs(self, graph_embedding, nodes_embedding):
         # We create 3 tensors representing state, node 1 and node 2
         # and then stack them together to get all state action pairs
-        n_nodes = nodes_embedding.shape[0]
-        states = graph_embedding.repeat(n_nodes * n_nodes, 1)
-        nodes1 = nodes_embedding.repeat(n_nodes, 1)
-        nodes2 = nodes_embedding.repeat_interleave(n_nodes, dim=0)
-        s_a_pairs = torch.cat([states, nodes1, nodes2], dim=1)
+        n_nodes = graph_embedding.shape[1]
+
+        states = graph_embedding.repeat(1, n_nodes * n_nodes, 1)
+        nodes1 = nodes_embedding.repeat(1, n_nodes, 1)
+        nodes2 = nodes_embedding.repeat_interleave(n_nodes, dim=1)
+        s_a_pairs = torch.cat([states, nodes1, nodes2], dim=2)
         return s_a_pairs
