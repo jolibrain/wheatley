@@ -6,6 +6,7 @@ from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn.conv import GINConv
 
 from models.mlp import MLP
+from state import State
 
 from config import (
     MAX_N_NODES,
@@ -44,40 +45,20 @@ class FeaturesExtractor(BaseFeaturesExtractor):
 
     def forward(self, observation):
         """
-        Return the embedding of the graph concatenated with the embeddings of the nodes.
+        Returns the embedding of the graph concatenated with the embeddings of the nodes
         Note : the output may depend on the number of nodes, but it should not be a
         problem.
         """
-        # First determine if observation is batched or single
-        batched = True if len(list(observation["n_nodes"].shape)) > 2 else False
+        state = State.from_observation(observation)
+        batch_size = state.get_batch_size()
+        n_nodes = state.get_n_nodes()
 
-        # Convert from 1 hot encoding to actual number
-        if batched:
-            # Note : we consider n_nodes to be constant across batch
-            n_nodes = (observation["n_nodes"][0][0] == 1).nonzero(as_tuple=True)[0]
-        else:
-            n_nodes = (observation["n_nodes"][0] == 1).nonzero(as_tuple=True)[0]
-        n_nodes = n_nodes.item()
-
-        features = observation["features"]
-        batch_size = features.shape[0]
-        edge_index = observation["edge_index"].long()
-        features = features[:, 0:n_nodes]
-
-        # Extract features
-        data_list = [
-            Data(x=features[i], edge_index=edge_index[i]) for i in range(batch_size)
-        ]
-        loader = DataLoader(data_list, batch_size=batch_size)
-        aggregated_data = next(iter(loader))
-        aggregated_features = aggregated_data.x
-        aggregated_edge_index = aggregated_data.edge_index
+        graph_state = state.to_graph()
+        features, edge_index = graph_state.x, graph_state.edge_index
 
         for layer in range(self.n_layers_feature_extractor - 1):
-            aggregated_features = self.feature_extractors[layer](
-                aggregated_features, aggregated_edge_index
-            )
-        features = aggregated_features.reshape(batch_size, n_nodes, -1)
+            features = self.feature_extractors[layer](features, edge_index)
+            features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate
         graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes

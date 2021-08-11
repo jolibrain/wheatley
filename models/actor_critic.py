@@ -20,9 +20,7 @@ from config import (
 
 
 class ActorCritic(nn.Module):
-    def __init__(
-        self,
-    ):
+    def __init__(self):
         super(ActorCritic, self).__init__()
 
         self.hidden_dim_feature_extractor = HIDDEN_DIM_FEATURE_EXTRACTOR
@@ -49,6 +47,10 @@ class ActorCritic(nn.Module):
         )
 
     def forward(self, nodes_and_graph_embedding):
+        """
+        Takes nodes_and_graph_embedding as input. This should be the output of the
+        FeatureExtractor
+        """
         graph_embedding, nodes_embedding = torch.split(
             nodes_and_graph_embedding,
             [1, nodes_and_graph_embedding.shape[1] - 1],
