@@ -6,7 +6,7 @@ import torch
 from env import Env
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
-from config import args, MAX_N_JOBS, MAX_N_MACHINES
+from config import args, MAX_N_JOBS, MAX_N_MACHINES, DEVICE
 
 
 def main():
@@ -23,6 +23,7 @@ def main():
         batch_size=2,
         n_steps=64,
         policy_kwargs={"features_extractor_class": FeaturesExtractor},
+        device=DEVICE,
     )
     model.learn(total_timesteps=200)
 

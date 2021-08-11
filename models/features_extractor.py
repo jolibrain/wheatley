@@ -80,7 +80,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         features = aggregated_features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate
-        graph_pooling = torch.ones(n_nodes) / n_nodes
+        graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes
         graph_embedding = torch.matmul(graph_pooling, features)
         graph_and_nodes_embedding = torch.cat(
             (graph_embedding.reshape(batch_size, 1, -1), features), dim=1
