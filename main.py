@@ -3,7 +3,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_checker import check_env
 import torch
 
-from env import Env
+from env.env import Env
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from config import args, MAX_N_JOBS, MAX_N_MACHINES, DEVICE
