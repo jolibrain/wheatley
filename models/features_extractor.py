@@ -6,7 +6,7 @@ from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn.conv import GINConv
 
 from models.mlp import MLP
-from state import State
+from utils.state import State
 
 from config import (
     MAX_N_NODES,
@@ -58,7 +58,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
 
         for layer in range(self.n_layers_feature_extractor - 1):
             features = self.feature_extractors[layer](features, edge_index)
-            features = features.reshape(batch_size, n_nodes, -1)
+        features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate
         graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes
