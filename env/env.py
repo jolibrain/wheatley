@@ -17,9 +17,14 @@ class Env(gym.Env):
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
             {
-                "features": Box(low=0, high=1, shape=(MAX_N_NODES, n_features)),
+                "features": Box(
+                    low=0, high=1, shape=(MAX_N_NODES, n_features)
+                ),
                 "edge_index": Box(
-                    low=0, high=MAX_N_NODES, shape=(2, MAX_N_EDGES), dtype=np.int64
+                    low=0,
+                    high=MAX_N_NODES,
+                    shape=(2, MAX_N_EDGES),
+                    dtype=np.int64,
                 ),
                 "n_nodes": Discrete(MAX_N_NODES),
             }
@@ -51,4 +56,8 @@ class Env(gym.Env):
     def reset(self):
         self.transition_model.reset()
         state = State.from_graph(self.transition_model.get_graph())
-        return state.to_observation()
+        torch_observation = state.to_observation()
+        # TODO : transform torch_observation so it fits into MAX_N_NODES...
+        # And transform it to np.array
+        observation = None
+        return observation

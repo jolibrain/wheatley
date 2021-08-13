@@ -1,4 +1,6 @@
 import numpy as np
+from torch_geometric.data import Data
+import torch
 
 from env.transition_model import TransitionModel
 
@@ -44,12 +46,17 @@ class L2DTransitionModel(TransitionModel):
             )
 
         # Then compute the times at which the machine is available for the task
-        machine_availability = self.machine_occupancy.get_machine_availability(machine)
+        machine_availability = self.machine_occupancy.get_machine_availability(
+            machine
+        )
 
         # Then take the first time at which both machine is available and job is ready :
         # this will be the starting time of the considered job
         start_time = -1
-        for (availability_start_time, availability_duration) in machine_availability:
+        for (
+            availability_start_time,
+            availability_duration,
+        ) in machine_availability:
             if availability_start_time >= job_ready_time:
                 start_time = availability_start_time
                 break
@@ -78,10 +85,32 @@ class L2DTransitionModel(TransitionModel):
 
     def reset(self):
         self.task_starting_times = -1 * np.ones_like(self.affectations)
-        self.machine_occupancy = MachineOccupancy(self.n_machines, self.affectations)
+        self.machine_occupancy = MachineOccupancy(
+            self.n_machines, self.affectations
+        )
         self.number_assigned_tasks = np.zeros(self.n_jobs)
 
-        self.graph = None  # TODO : set initial graph
+        # Define initial graph
+        edges_first_node = np.concatenate(
+            [
+                [
+                    job_index * self.n_machines + i
+                    for i in range(self.n_machines - 1)
+                ]
+                for job_index in range(self.n_jobs)
+            ]
+        )
+        edges_second_node = edges_first_node + 1
+        edge_index = np.vstack((edges_first_node, edges_second_node))
+
+        scheduled = np.zeros(self.n_jobs * self.n_machines)
+        lower_bounds = np.cumsum(self.durations, axis=1).flatten()
+        features = np.vstack((scheduled, lower_bounds)).transpose()
+
+        self.graph = Data(
+            x=torch.tensor(features),
+            edge_index=torch.tensor(edge_index, dtype=torch.int64),
+        )
 
 
 class MachineOccupancy:
@@ -110,7 +139,9 @@ class MachineOccupancy:
         return availability
 
     def insert_task(self, machine, job, task_rank, start_time, duration):
-        conflicting_task_ids = self.check_conflicts(machine, start_time, duration)
+        conflicting_task_ids = self.check_conflicts(
+            machine, start_time, duration
+        )
 
         if conflicting_task_ids:
             # We solve conflicts, beginning with the last ones, so they enter in
@@ -163,7 +194,9 @@ class MachineOccupancy:
             if conflict:
                 conflicting_tasks_ids.append(i)
 
-        return conflicting_tasks_ids if len(conflicting_tasks_ids) != 0 else False
+        return (
+            conflicting_tasks_ids if len(conflicting_tasks_ids) != 0 else False
+        )
 
     def shift_task(self, machine, task_id, task_shift):
         """
@@ -178,20 +211,31 @@ class MachineOccupancy:
         for i in reversed(conflicting_task_ids):
             cur_task_start_time, _, _, _ = self.machine_occupancy[machine][i]
             cur_task_shift = (
-                task_start_time + task_shift + task_duration - cur_task_start_time
+                task_start_time
+                + task_shift
+                + task_duration
+                - cur_task_start_time
             )
             self.shift_task(machine, i, cur_task_shift)
 
-        next_job_task_id, next_job_machine = self.get_next_job_task(job, task_rank)
+        next_job_task_id, next_job_machine = self.get_next_job_task(
+            job, task_rank
+        )
         if next_job_task_id != -1:
             next_job_start_time = self.machine_tasks[next_job_machine][
                 next_job_task_id
             ][0]
-            if next_job_start_time < task_start_time + task_shift + task_duration:
+            if (
+                next_job_start_time
+                < task_start_time + task_shift + task_duration
+            ):
                 self.shift_task(
                     next_job_machine,
                     next_job_task_id,
-                    task_start_time + task_shift + task_duration - next_job_start_time,
+                    task_start_time
+                    + task_shift
+                    + task_duration
+                    - next_job_start_time,
                 )
 
     def get_next_job_task_id(self, job, task_rank):
