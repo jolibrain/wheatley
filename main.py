@@ -14,7 +14,7 @@ def main():
     if args.n_j > MAX_N_JOBS or args.n_m > MAX_N_MACHINES:
         raise Exception("MAX_N_JOBS or MAX_N_MACHINES are too low for this setup")
 
-    training_env = Env(n_jobs=args.n_j, n_machines=args.n_m, n_features=2)
+    training_env = Env(n_jobs=args.n_j, n_machines=args.n_m)
     check_env(training_env)
     model = PPO(
         Policy,

@@ -1,15 +1,23 @@
-class TransitionModel:
+from abc import ABC, abstractmethod
+
+
+class TransitionModel(ABC):
+    @abstractmethod
     def __init__(self):
-        self.graph = None
+        raise NotImplementedError()
 
+    @abstractmethod
     def step(self, action):
-        self.graph = None  # TODO change this
+        raise NotImplementedError()
 
+    @abstractmethod
     def get_graph(self):
-        return self.graph
+        raise NotImplementedError()
 
+    @abstractmethod
     def done(self):
-        return False
+        raise NotImplementedError()
 
+    @abstractmethod
     def reset(self):
-        pass
+        raise NotImplementedError()

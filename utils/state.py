@@ -15,13 +15,24 @@ class State:
         self.edge_index = edge_index
 
     @classmethod
-    def from_graph(cls, graph, batched_edge_index, batch_size):
+    def from_graph(cls, graph):
+        """
+        This function is supposed to build a state from a single graph (not a big one
+        which is the minibatching of several different graphs)
+        """
+        features = graph.x
+        n_nodes = features.shape[0]
+        edge_index = graph.edge_index
+        return cls(n_nodes=n_nodes, features=features, edge_index=edge_index)
+
+    @classmethod
+    def from_batch_graph(cls, graph, batched_edge_index, batch_size):
         """
         Here we need the batched_edge_index (the original edge_index, before mixing
         graphs together as explained in the doc of torch_geometric), since we can't
         reconstruct it from the edge_index post batching
         """
-        n_nodes = graph.x.shape[1]
+        n_nodes = int(graph.x.shape[0] / batch_size)
         return cls(
             n_nodes=n_nodes,
             features=graph.x.reshape(batch_size, n_nodes, -1),
@@ -55,7 +66,9 @@ class State:
 
         return cls(
             n_nodes=n_nodes,
-            features=observation["features"][:, 0:n_nodes],  # delete useless features
+            features=observation["features"][
+                :, 0:n_nodes, :
+            ],  # delete useless features
             edge_index=observation["edge_index"].long(),
         )
 

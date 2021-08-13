@@ -3,15 +3,17 @@ from gym.spaces import Discrete, Dict, Box
 import numpy as np
 import torch
 
-from env.transition_model import TransitionModel
+from env.l2d_transition_model import L2DTransitionModel
 from env.reward_model import RewardModel
 from utils.state import State
+from utils.utils import generate_problem
 
 from config import MAX_N_NODES, MAX_N_EDGES
 
 
 class Env(gym.Env):
-    def __init__(self, n_jobs, n_machines, n_features):
+    def __init__(self, n_jobs, n_machines):
+        n_features = 2  # This is fixed by the way we choose the nodes features
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
             {
@@ -22,11 +24,17 @@ class Env(gym.Env):
                 "n_nodes": Discrete(MAX_N_NODES),
             }
         )
-        self.n_features = n_features
         self.n_jobs = n_jobs
         self.n_machines = n_machines
         self.n_nodes = n_machines * n_jobs
-        self.transition_model = TransitionModel()
+
+        self.affectations, self.durations = generate_problem(
+            n_jobs, n_machines, low=0, high=99
+        )
+
+        self.transition_model = L2DTransitionModel(
+            n_jobs, n_machines, self.affectations, self.durations
+        )
         self.reward_model = RewardModel()
 
     def step(self, action):
@@ -38,14 +46,6 @@ class Env(gym.Env):
 
         observation = next_state.to_observation()
 
-        # observation["n_nodes"] = self.n_nodes
-        # observation["features"] = np.zeros((MAX_N_NODES, self.n_features))
-        # observation["features"][0 : self.n_nodes] = np.random.rand(
-        #    self.n_nodes, self.n_features
-        # )
-        # observation["edge_index"] = np.random.randint(
-        #    0, self.n_nodes, size=(2, MAX_N_EDGES)
-        # )
         return observation, reward, done, {}
 
     def reset(self):

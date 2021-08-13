@@ -1,18 +1,25 @@
 import numpy as np
 
+from env.transition_model import TransitionModel
 
-class L2DTransitionModel:
+
+class L2DTransitionModel(TransitionModel):
     def __init__(self, n_jobs, n_machines, affectations, durations):
         self.n_jobs = n_jobs
         self.n_machines = n_machines
         self.affectations = affectations
         self.durations = durations
+
         # An array to store the starting time of each task. These starting times are
         # lower bound estimates, since they can grow during execution
-        self.task_starting_times = -1 * np.ones_like(affectations)
-        self.machine_occupancy = MachineOccupancy(n_machines, affectations)
+        self.task_starting_time = None
+        self.machine_occupancy = None
         # An array to tell, for each job, how many tasks of this job were assigned
-        self.number_assigned_tasks = np.zeros(self.n_jobs)
+        self.number_assigned_tasks = None
+
+        self.graph = None
+
+        self.reset()
 
     def step(self, action):
         """
@@ -57,14 +64,24 @@ class L2DTransitionModel:
         self.tasks_starting_times[job, task_rank] = start_time
         self.number_assigned_tasks[job] += 1
 
+        # Finally, we update the graph of precedency
+        # TODO
+
     def get_graph(self):
-        pass  # TODO
+        return self.graph
 
     def done(self):
-        pass  # TODO
+        """
+        The env is done when all jobs have all their tasks assigned
+        """
+        return np.min(self.number_assigned_tasks) == self.n_machines
 
     def reset(self):
-        pass  # TODO
+        self.task_starting_times = -1 * np.ones_like(self.affectations)
+        self.machine_occupancy = MachineOccupancy(self.n_machines, self.affectations)
+        self.number_assigned_tasks = np.zeros(self.n_jobs)
+
+        self.graph = None  # TODO : set initial graph
 
 
 class MachineOccupancy:

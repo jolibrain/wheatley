@@ -8,4 +8,11 @@ repos:
     rev: 3.9.2
     hooks:
     - id: flake8
-
+-   repo: local 
+    hooks:
+    - id: pytest
+      name: pytest 
+      entry: pytest
+      language: system
+      types: [python]
+      pass_filenames: false
