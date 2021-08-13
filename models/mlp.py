@@ -10,7 +10,6 @@ class MLP(nn.Module):
             raise Exception("Number of layers must be >= 3")
         self.n_layers = n_layers
         self.layers = torch.nn.ModuleList()
-        self.device = device
         self.batch_norm = batch_norm
 
         if self.batch_norm:
@@ -28,7 +27,7 @@ class MLP(nn.Module):
                     self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
                 else:
                     self.batch_norms.append(nn.BatchNorm1d(output_dim))
-        self.to(self.device)
+        self.to(device)
 
     def forward(self, x):
         for layer in range(self.n_layers - 1):

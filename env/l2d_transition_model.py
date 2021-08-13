@@ -10,7 +10,7 @@ class L2DTransitionModel:
         # An array to store the starting time of each task. These starting times are
         # lower bound estimates, since they can grow during execution
         self.task_starting_times = -1 * np.ones_like(affectations)
-        self.machine_occupancy = MachineOccupancy(n_machines)
+        self.machine_occupancy = MachineOccupancy(n_machines, affectations)
         # An array to tell, for each job, how many tasks of this job were assigned
         self.number_assigned_tasks = np.zeros(self.n_jobs)
 
@@ -68,8 +68,9 @@ class L2DTransitionModel:
 
 
 class MachineOccupancy:
-    def __init__(self, n_machines):
+    def __init__(self, n_machines, affectations):
         self.n_machines = n_machines
+        self.affectations = affectations
         # The machine occupancy tab stores all tasks that are assigned to the machine
         # with their starting time and duration. Note : the tasks should always be
         # ordered by increasing starting time
@@ -165,17 +166,27 @@ class MachineOccupancy:
             self.shift_task(machine, i, cur_task_shift)
 
         next_job_task_id, next_job_machine = self.get_next_job_task(job, task_rank)
-        next_job_start_time = self.machine_tasks[next_job_machine][next_job_task_id][0]
-        if next_job_start_time < task_start_time + task_shift + task_duration:
-            self.shift_task(
-                next_job_machine,
-                next_job_task_id,
-                task_start_time + task_shift + task_duration - next_job_start_time,
-            )
+        if next_job_task_id != -1:
+            next_job_start_time = self.machine_tasks[next_job_machine][
+                next_job_task_id
+            ][0]
+            if next_job_start_time < task_start_time + task_shift + task_duration:
+                self.shift_task(
+                    next_job_machine,
+                    next_job_task_id,
+                    task_start_time + task_shift + task_duration - next_job_start_time,
+                )
 
-    def get_next_job_task_id(self, job, task_id):
+    def get_next_job_task_id(self, job, task_rank):
         """
         This function returns the task_id (in the list of machine occupancy) of the next
         task of the job
         """
-        pass  # TODO
+        task_id = -1
+        machine = self.affectations[job, task_rank]
+        for cur_task_id, cur_task in enumerate(self.machine_tasks[machine]):
+            cur_job, cur_task_rank = cur_task[2], cur_task[3]
+            if cur_job == job and cur_task_rank == task_rank:
+                task_id = cur_task_id
+                break
+        return task_id, machine

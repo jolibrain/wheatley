@@ -10,10 +10,10 @@ from utils.state import State
 
 from config import (
     MAX_N_NODES,
-    HIDDEN_DIM_FEATURE_EXTRACTOR,
-    N_LAYERS_FEATURE_EXTRACTOR,
-    N_MLP_LAYERS_FEATURE_EXTRACTOR,
-    INPUT_DIM_FEATURE_EXTRACTOR,
+    HIDDEN_DIM_FEATURES_EXTRACTOR,
+    N_LAYERS_FEATURES_EXTRACTOR,
+    N_MLP_LAYERS_FEATURES_EXTRACTOR,
+    INPUT_DIM_FEATURES_EXTRACTOR,
     DEVICE,
 )
 
@@ -24,19 +24,19 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             observation_space=observation_space, features_dim=1
         )  # Only so it's not 0. Cf stable_baselines3 implementation
 
-        self.n_layers_feature_extractor = N_LAYERS_FEATURE_EXTRACTOR
-        self.feature_extractors = nn.ModuleList()
+        self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
+        self.features_extractors = nn.ModuleList()
 
-        for layer in range(self.n_layers_feature_extractor - 1):
-            self.feature_extractors.append(
+        for layer in range(self.n_layers_features_extractor - 1):
+            self.features_extractors.append(
                 GINConv(
                     MLP(
-                        n_layers=N_MLP_LAYERS_FEATURE_EXTRACTOR,
-                        input_dim=INPUT_DIM_FEATURE_EXTRACTOR
+                        n_layers=N_MLP_LAYERS_FEATURES_EXTRACTOR,
+                        input_dim=INPUT_DIM_FEATURES_EXTRACTOR
                         if layer == 0
-                        else HIDDEN_DIM_FEATURE_EXTRACTOR,
-                        hidden_dim=HIDDEN_DIM_FEATURE_EXTRACTOR,
-                        output_dim=HIDDEN_DIM_FEATURE_EXTRACTOR,
+                        else HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         batch_norm=True,
                         device=DEVICE,
                     )
@@ -56,8 +56,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         graph_state = state.to_graph()
         features, edge_index = graph_state.x, graph_state.edge_index
 
-        for layer in range(self.n_layers_feature_extractor - 1):
-            features = self.feature_extractors[layer](features, edge_index)
+        for layer in range(self.n_layers_features_extractor - 1):
+            features = self.features_extractors[layer](features, edge_index)
         features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate

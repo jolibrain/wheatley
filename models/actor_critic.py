@@ -6,10 +6,7 @@ from torch_geometric.nn.conv import GINConv
 from models.mlp import MLP
 
 from config import (
-    N_MLP_LAYERS_FEATURE_EXTRACTOR,
-    N_LAYERS_FEATURE_EXTRACTOR,
-    INPUT_DIM_FEATURE_EXTRACTOR,
-    HIDDEN_DIM_FEATURE_EXTRACTOR,
+    HIDDEN_DIM_FEATURES_EXTRACTOR,
     N_MLP_LAYERS_ACTOR,
     HIDDEN_DIM_ACTOR,
     N_MLP_LAYERS_CRITIC,
@@ -23,15 +20,13 @@ class ActorCritic(nn.Module):
     def __init__(self):
         super(ActorCritic, self).__init__()
 
-        self.hidden_dim_feature_extractor = HIDDEN_DIM_FEATURE_EXTRACTOR
-
         # This is necessary because of stable_baselines3 API
         self.latent_dim_pi = MAX_N_NODES ** 2
         self.latent_dim_vf = 1
 
         self.actor = MLP(
             n_layers=N_MLP_LAYERS_ACTOR,
-            input_dim=HIDDEN_DIM_FEATURE_EXTRACTOR * 3,
+            input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * 3,
             hidden_dim=HIDDEN_DIM_ACTOR,
             output_dim=1,
             batch_norm=False,
@@ -39,7 +34,7 @@ class ActorCritic(nn.Module):
         )
         self.critic = MLP(
             n_layers=N_MLP_LAYERS_CRITIC,
-            input_dim=HIDDEN_DIM_FEATURE_EXTRACTOR,
+            input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
             hidden_dim=HIDDEN_DIM_CRITIC,
             output_dim=1,
             batch_norm=False,
