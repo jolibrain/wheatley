@@ -6,13 +6,16 @@ import torch
 from env.env import Env
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
-from config import args, MAX_N_JOBS, MAX_N_MACHINES, DEVICE
+from config import MAX_N_JOBS, MAX_N_MACHINES, DEVICE
+from args import args
 
 
 def main():
 
     if args.n_j > MAX_N_JOBS or args.n_m > MAX_N_MACHINES:
-        raise Exception("MAX_N_JOBS or MAX_N_MACHINES are too low for this setup")
+        raise Exception(
+            "MAX_N_JOBS or MAX_N_MACHINES are too low for this setup"
+        )
 
     training_env = Env(n_jobs=args.n_j, n_machines=args.n_m)
     check_env(training_env)
