@@ -3,6 +3,7 @@ from torch_geometric.data import Data
 import torch
 
 from env.transition_model import TransitionModel
+from utils.torch_geometric_utils import find_edge, add_edge, remove_edge
 
 
 class L2DTransitionModel(TransitionModel):
@@ -15,10 +16,13 @@ class L2DTransitionModel(TransitionModel):
         # An array to store the starting time of each task. These starting times are
         # lower bound estimates, since they can grow during execution
         self.task_starting_time = None
+        # An entire class to determine how machine are used, and insert tasks on the
+        # schedules
         self.machine_occupancy = None
         # An array to tell, for each job, how many tasks of this job were assigned
         self.number_assigned_tasks = None
 
+        # The pre-representation of the state
         self.graph = None
 
         self.reset()
@@ -67,15 +71,25 @@ class L2DTransitionModel(TransitionModel):
             start_time = job_ready_time
 
         # And now that we choose the starting_time for our job, we need to insert it in
-        # the timeline
-        self.machine_occupancy.insert_task(
-            machine, task_rank, job, start_time, duration
-        )
+        # the timeline. We get at the same time the previous and next task, in order to
+        # update the graph of precedency
         self.tasks_starting_times[job, task_rank] = start_time
         self.number_assigned_tasks[job] += 1
+        previous_task, next_task = self.machine_occupancy.insert_task(
+            machine, task_rank, job, start_time, duration
+        )
 
         # Finally, we update the graph of precedency
-        # TODO
+        if previous_task is None and next_task is None:
+            return
+        elif previous_task is not None and next_task is None:
+            self.graph = add_edge(self.graph, edge)  # TODO
+        elif previous_task is None and next_task is not None:
+            self.graph = add_edge(self.graph, edge)  # TODO
+        else:
+            self.graph = remove_edge(self.graph, edge)  # TODO
+            self.graph = add_edge(self.graph, edge)  # TODO
+            self.graph = add_edge(self.graph, edge)  # TODO
 
     def get_graph(self):
         return self.graph

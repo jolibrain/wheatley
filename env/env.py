@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from env.l2d_transition_model import L2DTransitionModel
-from env.reward_model import RewardModel
+from env.l2d_reward_model import L2DRewardModel
 from utils.state import State
 from utils.utils import generate_problem
 
@@ -43,7 +43,7 @@ class Env(gym.Env):
         self.transition_model = L2DTransitionModel(
             n_jobs, n_machines, self.affectations, self.durations
         )
-        self.reward_model = RewardModel()
+        self.reward_model = L2DRewardModel()
 
     def step(self, action):
         state = State.from_graph(self.transition_model.get_graph())
