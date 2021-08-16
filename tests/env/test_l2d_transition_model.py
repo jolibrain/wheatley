@@ -11,4 +11,5 @@ def test_get_next_job_task_id():
 
 
 def test_other():
+    pass
     # TODO : write the rest of the tests for l2d_transition_model

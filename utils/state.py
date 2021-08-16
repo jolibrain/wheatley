@@ -1,4 +1,7 @@
+import torch
 from torch_geometric.data import Data, DataLoader
+
+from config import MAX_N_NODES, MAX_N_EDGES
 
 
 class State:
@@ -20,9 +23,9 @@ class State:
         This function is supposed to build a state from a single graph (not a big one
         which is the minibatching of several different graphs)
         """
-        features = graph.x
-        n_nodes = features.shape[0]
-        edge_index = graph.edge_index
+        features = torch.unsqueeze(graph.x, 0)
+        n_nodes = features.shape[1]
+        edge_index = torch.unsqueeze(graph.edge_index, 0)
         return cls(n_nodes=n_nodes, features=features, edge_index=edge_index)
 
     @classmethod
@@ -59,9 +62,13 @@ class State:
             # because the shape of the vector is different. Then, we take care of passing
             # from 1-hot encoding to regular numbers
             if batched:
-                n_nodes = (observation["n_nodes"][0][0] == 1).nonzero(as_tuple=True)[0]
+                n_nodes = (observation["n_nodes"][0][0] == 1).nonzero(
+                    as_tuple=True
+                )[0]
             else:
-                n_nodes = (observation["n_nodes"][0] == 1).nonzero(as_tuple=True)[0]
+                n_nodes = (observation["n_nodes"][0] == 1).nonzero(
+                    as_tuple=True
+                )[0]
             n_nodes = n_nodes.item()
 
         return cls(
@@ -82,11 +89,29 @@ class State:
         return graph
 
     def to_observation(self):
-        return {
+        """
+        This function should not be used if we handle batched states. So we are going to
+        suppose that batch_size is 1 here. If not, we throw an error.
+        """
+        if self.get_batch_size() > 1:
+            raise Exception(
+                "The to_observation function should not be used with "
+                "batched state"
+            )
+        filled_features = torch.zeros(MAX_N_NODES, 2)
+        filled_features[0 : self.n_nodes, :] = self.features.reshape(
+            self.n_nodes, -1
+        )
+        filled_edge_index = torch.zeros(2, MAX_N_EDGES)
+        filled_edge_index[
+            :, 0 : self.edge_index.shape[2]
+        ] = self.edge_index.reshape(2, -1)
+        observation = {
+            "features": filled_features.numpy(),
+            "edge_index": filled_edge_index.numpy(),
             "n_nodes": self.n_nodes,
-            "features": self.features,
-            "edge_index": self.edge_index,
         }
+        return observation
 
     def get_batch_size(self):
         return self.features.shape[0]

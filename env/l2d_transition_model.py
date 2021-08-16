@@ -28,7 +28,10 @@ class L2DTransitionModel(TransitionModel):
         Unlike the step function of an env, this function doesn't return any state. The
         state is indeed computed in the get_graph function
         """
-        job = action.get_node_coordinates()
+        # Filled up actions don't make the transition model evolve
+        if action > self.n_jobs:
+            return
+        job = action
         task_rank = self.number_assigned_tasks[job]
         machine = self.affectations[job, task_rank]
         duration = self.durations[job, task_rank]
@@ -81,7 +84,8 @@ class L2DTransitionModel(TransitionModel):
         """
         The env is done when all jobs have all their tasks assigned
         """
-        return np.min(self.number_assigned_tasks) == self.n_machines
+        done = int(np.min(self.number_assigned_tasks)) == self.n_machines
+        return done
 
     def reset(self):
         self.task_starting_times = -1 * np.ones_like(self.affectations)

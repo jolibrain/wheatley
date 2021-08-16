@@ -18,7 +18,10 @@ class Env(gym.Env):
         self.observation_space = Dict(
             {
                 "features": Box(
-                    low=0, high=1, shape=(MAX_N_NODES, n_features)
+                    # high is 99*n_machines due to lower bound method of calculation
+                    low=0,
+                    high=99 * n_machines,
+                    shape=(MAX_N_NODES, n_features),
                 ),
                 "edge_index": Box(
                     low=0,
@@ -46,7 +49,7 @@ class Env(gym.Env):
         state = State.from_graph(self.transition_model.get_graph())
         self.transition_model.step(action)
         next_state = State.from_graph(self.transition_model.get_graph())
-        reward = self.reward_model(state, action, next_state)
+        reward = self.reward_model.evaluate(state, action, next_state)
         done = self.transition_model.done()
 
         observation = next_state.to_observation()
@@ -56,8 +59,4 @@ class Env(gym.Env):
     def reset(self):
         self.transition_model.reset()
         state = State.from_graph(self.transition_model.get_graph())
-        torch_observation = state.to_observation()
-        # TODO : transform torch_observation so it fits into MAX_N_NODES...
-        # And transform it to np.array
-        observation = None
-        return observation
+        return state.to_observation()

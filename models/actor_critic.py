@@ -66,12 +66,15 @@ class ActorCritic(nn.Module):
         # because of the size of the graph). So we convert the flattened pi to a square
         # matrix of size (n_nodes, n_nodes). We then complete the matrix to get a square
         # matrix of size (MAX_N_NODES, MAX_N_NODES) with 0, and we reflatten it.
-        pi = pi.reshape(batch_size, n_nodes * n_nodes)  # Remove the dim 2 of size 1
+        pi = pi.reshape(
+            batch_size, n_nodes * n_nodes
+        )  # Remove the dim 2 of size 1
         pi = pi.reshape(batch_size, n_nodes, n_nodes)
-        filled_pi = torch.zeros(batch_size, MAX_N_NODES, MAX_N_NODES, device=DEVICE)
+        filled_pi = torch.zeros(
+            batch_size, MAX_N_NODES, MAX_N_NODES, device=DEVICE
+        )
         filled_pi[:, 0:n_nodes, 0:n_nodes] = pi
         filled_pi = filled_pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES)
-
         return filled_pi, value
 
     def compute_possible_s_a_pairs(self, graph_embedding, nodes_embedding):
