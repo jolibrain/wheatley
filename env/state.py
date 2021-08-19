@@ -59,14 +59,14 @@ class State:
         parameter of the Data object) that should be added to the graph.
         """
         if node_encoding == "L2D":
-            x = np.zeros(self.n_jobs, self.n_machines, 2)
+            x = np.zeros((self.n_jobs, self.n_machines, 2))
             x[:, :, 0] = self.is_affected
             x[:, :, 1] = self.task_completion_times
             for node_id in range(self.n_machines * self.n_jobs):
                 job_id, task_id = node_to_job_and_task(
                     node_id, self.n_machines
                 )
-                self.graph[node_id]["x"] = x[job_id, task_id]
+                self.graph.nodes[node_id]["x"] = x[job_id, task_id]
             return torch_geometric.utils.from_networkx(self.graph)
 
         else:

@@ -13,5 +13,9 @@ parser.add_argument(
 parser.add_argument(
     "--n_m_testing", type=int, default=8, help="Number of jobs for test"
 )
+parser.add_argument(
+    "--max_duration", type=int, default=99, help="Max duration for the jobs"
+)
+
 
 args = parser.parse_args()

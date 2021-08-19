@@ -1,4 +1,4 @@
-from abstractclass import ABC, abstractmethod
+from abc import ABC, abstractmethod
 
 
 class RewardModel(ABC):

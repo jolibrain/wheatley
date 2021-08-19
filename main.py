@@ -4,8 +4,10 @@ from stable_baselines3.common.env_checker import check_env
 import torch
 
 from env.env import Env
-from models.policy import Policy
-from models.features_extractor import FeaturesExtractor
+from models.agent import Agent
+from problem.problem_description import ProblemDescription
+from utils.utils import generate_problem
+
 from config import MAX_N_JOBS, MAX_N_MACHINES, DEVICE
 from args import args
 
@@ -17,26 +19,33 @@ def main():
             "MAX_N_JOBS or MAX_N_MACHINES are too low for this setup"
         )
 
-    training_env = Env(n_jobs=args.n_j, n_machines=args.n_m)
+    training_env = Env(
+        ProblemDescription(args.n_j, args.n_m, args.max_duration, "L2D", "L2D")
+    )
     check_env(training_env)
-    model = PPO(
-        Policy,
-        training_env,
-        verbose=2,
-        batch_size=2,
-        n_steps=64,
-        policy_kwargs={"features_extractor_class": FeaturesExtractor},
-        device=DEVICE,
-    )
-    model.learn(total_timesteps=200)
 
-    testing_env = Env(
-        n_jobs=args.n_j_testing, n_machines=args.n_m_testing, n_features=2
+    problem_description = ProblemDescription(
+        args.n_j, args.n_m, args.max_duration, "L2D", "L2D"
     )
-    obs = testing_env.reset()
-    while True:
-        action, _ = model.predict(obs)
-        obs, rewards, dones, info = testing_env.step(action)
+
+    agent = Agent(training_env)
+    agent.train(problem_description)
+
+    testing_affectations, testing_durations = generate_problem(
+        args.n_j_testing, args.n_m_testing, 1, args.max_duration
+    )
+    solution = agent.predict(
+        ProblemDescription(
+            args.n_j_testing,
+            args.n_m_testing,
+            args.max_duration,
+            "L2D",
+            "L2D",
+            testing_affectations,
+            testing_durations,
+        )
+    )
+    print(solution.schedule)
 
 
 if __name__ == "__main__":
