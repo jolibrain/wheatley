@@ -16,9 +16,9 @@ from config import (
 )
 
 
-class ActorCritic(nn.Module):
+class MLPExtractor(nn.Module):
     def __init__(self):
-        super(ActorCritic, self).__init__()
+        super(MLPExtractor, self).__init__()
 
         # This is necessary because of stable_baselines3 API
         self.latent_dim_pi = MAX_N_NODES ** 2

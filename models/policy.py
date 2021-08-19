@@ -1,7 +1,7 @@
 from stable_baselines3.common.distributions import CategoricalDistribution
 from stable_baselines3.common.policies import ActorCriticPolicy
 
-from models.actor_critic import ActorCritic
+from models.mlp_extractor import MLPExtractor
 
 
 class Policy(ActorCriticPolicy):
@@ -9,7 +9,7 @@ class Policy(ActorCriticPolicy):
         super(Policy, self).__init__(*args, **kwargs)
 
     def _build_mlp_extractor(self):
-        self.mlp_extractor = ActorCritic()
+        self.mlp_extractor = MLPExtractor()
 
     def forward(self, obs, deterministic=False):
         """Forward pass in all the networks (actor and critic)
