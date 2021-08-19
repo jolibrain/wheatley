@@ -6,7 +6,7 @@ from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn.conv import GINConv
 
 from models.mlp import MLP
-from utils.state import State
+from utils.observation import Observation
 
 from config import (
     MAX_N_NODES,
@@ -43,17 +43,17 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 )
             )
 
-    def forward(self, observation):
+    def forward(self, obs):
         """
         Returns the embedding of the graph concatenated with the embeddings of the nodes
         Note : the output may depend on the number of nodes, but it should not be a
         problem.
         """
-        state = State.from_observation(observation)
-        batch_size = state.get_batch_size()
-        n_nodes = state.get_n_nodes()
+        observation = Observation(obs)
+        batch_size = observation.get_batch_size()
+        n_nodes = observation.get_n_nodes()
 
-        graph_state = state.to_graph()
+        graph_state = observation.get_graph()
         features, edge_index = graph_state.x, graph_state.edge_index
 
         for layer in range(self.n_layers_features_extractor - 1):

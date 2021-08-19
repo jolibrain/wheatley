@@ -1,7 +1,9 @@
 import torch
 
+from env.reward_model import RewardModel
 
-class L2DRewardModel:
+
+class L2DRewardModel(RewardModel):
     def __init__(self):
         pass
 

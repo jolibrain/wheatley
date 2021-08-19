@@ -1,23 +1,28 @@
 from abc import ABC, abstractmethod
 
+from env.state import State
+
 
 class TransitionModel(ABC):
-    @abstractmethod
-    def __init__(self):
-        raise NotImplementedError()
+    def __init__(self, affectations, durations, node_encoding):
+        self.affectations = affectations
+        self.durations = durations
+        self.node_encoding = node_encoding
+
+        self.n_jobs = self.affectations.shape[0]
+        self.n_machines = self.affectations.shape[1]
+
+        self.state = State(self.affectations, self.durations)
 
     @abstractmethod
-    def step(self, action):
-        raise NotImplementedError()
+    def run(self, action):
+        pass
 
-    @abstractmethod
-    def get_graph(self):
-        raise NotImplementedError()
+    def get_observation(self):
+        return self.state.to_torch_geometric(self.node_encoding)
 
-    @abstractmethod
     def done(self):
-        raise NotImplementedError()
+        return self.state.done()
 
-    @abstractmethod
     def reset(self):
-        raise NotImplementedError()
+        self.state.reset()
