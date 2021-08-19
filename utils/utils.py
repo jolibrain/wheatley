@@ -22,3 +22,11 @@ def permute_rows(x):
     ix_i = np.tile(np.arange(x.shape[0]), (x.shape[1], 1)).transpose()
     ix_j = np.random.sample(x.shape).argsort(axis=1)
     return x[ix_i, ix_j]
+
+
+def node_to_job_and_task(node_id, n_machines):
+    return node_id // n_machines, node_id % n_machines
+
+
+def job_and_task_to_node(job_id, task_id, n_machines):
+    return job_id * n_machines + task_id
