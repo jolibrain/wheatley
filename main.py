@@ -27,7 +27,7 @@ def main():
     )
 
     agent = Agent(training_env)
-    agent.train(problem_description)
+    agent.train(problem_description, total_timesteps=2000)
 
     testing_affectations, testing_durations = generate_problem(
         args.n_j_testing, args.n_m_testing, 1, args.max_duration
