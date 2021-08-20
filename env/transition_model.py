@@ -18,7 +18,7 @@ class TransitionModel(ABC):
     def run(self, action):
         pass
 
-    def get_observation(self):
+    def get_graph(self):
         return self.state.to_torch_geometric(self.node_encoding)
 
     def done(self):

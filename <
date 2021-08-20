@@ -58,13 +58,9 @@ class Env(gym.Env):
         self.reset()
 
     def step(self, action):
-        obs = Observation.from_torch_geometric(
-            self.transition_model.get_graph()
-        )
+        obs = Observation.from_torch_geometric(self.transition_model.get_graph())
         self.transition_model.run(action)
-        next_obs = Observation.from_torch_geometric(
-            self.transition_model.get_graph()
-        )
+        next_obs = Observation.from_torch_geometric(self.transition_model.get_graph())
         reward = self.reward_model.evaluate(obs, action, next_obs)
         done = self.transition_model.done()
 
@@ -78,9 +74,7 @@ class Env(gym.Env):
                 self.n_jobs, self.n_machines, self.max_duration
             )
         self._create_transition_and_reward_model()
-        observation = Observation.from_torch_geometric(
-            self.transition_model.get_graph()
-        )
+        observation = Observation.from_torch_geometric(self.transition_model.get_graph())
         return observation.to_gym_observation()
 
     def _create_transition_and_reward_model(self):

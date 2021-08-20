@@ -17,26 +17,30 @@ def test_forward():
         )
     )
     observation = {
-        "n_nodes": torch.tensor([[0, 0, 0, 0, 1, 0, 0, 0, 0, 0]], device=device),
+        "n_nodes": torch.tensor(
+            [[0, 0, 0, 0, 1, 0, 0, 0, 0, 0]], device=device
+        ),
         "features": torch.tensor(
             [
                 [
-                    [0.6, 0.3],
-                    [0.4, 0.4],
-                    [0.8, 0.1],
-                    [0.2, 0.1],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
-                    [0, 0],
+                    [2, 0.6, 0.3],
+                    [3, 0.4, 0.4],
+                    [0, 0.8, 0.1],
+                    [1, 0.2, 0.1],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
                 ]
             ],
             dtype=torch.float32,
             device=device,
         ),
         "edge_index": torch.tensor(
-            [[[1, 3, 2, 0, 1, 2], [2, 1, 3, 3, 2, 0]]], dtype=torch.int64, device=device
+            [[[1, 3, 2, 0, 1, 2], [2, 1, 3, 3, 2, 0]]],
+            dtype=torch.int64,
+            device=device,
         ),
     }
     features = fe(observation)

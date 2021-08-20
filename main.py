@@ -1,6 +1,5 @@
 import gym
 from stable_baselines3 import PPO
-from stable_baselines3.common.env_checker import check_env
 import torch
 
 from env.env import Env
@@ -22,7 +21,6 @@ def main():
     training_env = Env(
         ProblemDescription(args.n_j, args.n_m, args.max_duration, "L2D", "L2D")
     )
-    check_env(training_env)
 
     problem_description = ProblemDescription(
         args.n_j, args.n_m, args.max_duration, "L2D", "L2D"

@@ -10,6 +10,8 @@ class L2DTransitionModel(TransitionModel):
 
     def run(self, action):
         job_id = action
+        if job_id >= self.n_jobs:
+            return
         task_id = self.state.get_first_unaffected_task(job_id)
         if task_id == -1:  # If all tasks are affected on this job, do nothing
             return
