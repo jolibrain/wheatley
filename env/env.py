@@ -8,7 +8,7 @@ from env.l2d_reward_model import L2DRewardModel
 from utils.observation import Observation
 from utils.utils import generate_problem
 
-from config import MAX_N_NODES, MAX_N_EDGES
+from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES
 
 
 class Env(gym.Env):
@@ -24,7 +24,7 @@ class Env(gym.Env):
                 "features": Box(
                     # high is 99*n_machines due to lower bound method of calculation
                     low=0,
-                    high=self.max_duration * self.n_machines,
+                    high=self.max_duration * MAX_N_MACHINES,
                     shape=(MAX_N_NODES, n_features),
                 ),
                 "edge_index": Box(

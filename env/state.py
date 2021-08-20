@@ -73,31 +73,24 @@ class State:
         else:
             raise Exception("Encoding not recognized")
 
-    def get_machine_availability(self, machine_id):
+    def get_machine_occupancy(self, machine_id):
         """
         Returns a list of available period on the wanted machine, under the form
-        (availability_start_time, availability_duration)
+        (occupancy_start_time, occupancy_duration, node_id)
         """
         node_ids = self._get_machine_node_ids(machine_id)
-        availability = [(0, -1)]
-        start_times_and_durations = []
+        occupancy = []
         for node_id in node_ids:
-            job_id, task_id = node_to_job_and_task(node_id)
+            job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
             is_affected = self.is_affected[job_id, task_id]
             duration = self.durations[job_id, task_id]
-            start_time = self.task_completion_time[job_id, task_id] - duration
+            start_time = self.task_completion_times[job_id, task_id] - duration
             if is_affected == 1:
-                start_times_and_durations.append(
+                occupancy.append(
                     (start_time, duration, node_id)
                 )
-        start_times_and_durations.sort()
-        for start_time, duration in start_times_and_durations:
-            if start_time == availability[-1][0]:
-                availability[-1][0] += duration
-            else:
-                availability[-1][1] = duration - availability[-1][0]
-                availability.append((start_time + duration, -1))
-        return availability
+        occupancy.sort()
+        return occupancy
 
     def set_precedency(self, first_node_id, second_node_id):
         """
@@ -105,7 +98,7 @@ class State:
         and updates all other attributes of the State related to the graph.
         """
         # First check that second_node is not scheduled before first node
-        nodes_after_second_node = nx.algorithms.descedants(
+        nodes_after_second_node = nx.algorithms.descendants(
             self.graph, second_node_id
         )
         if first_node_id in nodes_after_second_node:
@@ -113,17 +106,17 @@ class State:
         # Then add the node into the graph
         self.graph.add_edge(first_node_id, second_node_id)
         # Finally update the task starting times
-        nodes_to_update = nx.algorithm.descendants(self.graph, first_node_id)
+        nodes_to_update = nx.algorithms.descendants(self.graph, first_node_id)
         for node_id in nodes_to_update:
             predecessors = self.graph.predecessors(node_id)
             new_completion_time = max(
                 [
-                    self.task_completion_times[node_to_job_and_task(p)]
+                    self.task_completion_times[node_to_job_and_task(p, self.n_machines)]
                     for p in predecessors
                 ]
             )
             self.task_completion_times[
-                node_to_job_and_task[node_id]
+                node_to_job_and_task(node_id, self.n_machines)
             ] = new_completion_time
         return True
 
@@ -135,7 +128,7 @@ class State:
         for the moment. Later on, it is important to check this consistency in the
         affect_node function
         """
-        self.is_affected[node_to_job_and_task(node_id)] = 1
+        self.is_affected[node_to_job_and_task(node_id, self.n_machines)] = 1
 
     def get_solution(self):
         if not self.done():
@@ -153,4 +146,6 @@ class State:
         return list(self.is_affected[job_id]).index(0)
 
     def get_job_availability(self, job_id, task_id):
-        pass
+        if task_id == 0:                                                                 
+            return 0                                                                     
+        return self.task_completion_times[job_id, task_id - 1] 

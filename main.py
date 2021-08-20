@@ -17,6 +17,8 @@ def main():
         raise Exception(
             "MAX_N_JOBS or MAX_N_MACHINES are too low for this setup"
         )
+    
+    print(f"Launching training. Problem size : {args.n_j} jobs, {args.n_m} machines")
 
     training_env = Env(
         ProblemDescription(args.n_j, args.n_m, args.max_duration, "L2D", "L2D")
@@ -27,10 +29,12 @@ def main():
     )
 
     agent = Agent(training_env)
-    agent.train(problem_description, total_timesteps=2000)
+    agent.train(problem_description, total_timesteps=50)
 
+    print(f"Launching inference. Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines")
+    
     testing_affectations, testing_durations = generate_problem(
-        args.n_j_testing, args.n_m_testing, 1, args.max_duration
+        args.n_j_testing, args.n_m_testing, args.max_duration
     )
     solution = agent.predict(
         ProblemDescription(
@@ -43,6 +47,8 @@ def main():
             testing_durations,
         )
     )
+    print(testing_affectations)
+    print(testing_durations)
     print(solution.schedule)
 
 
