@@ -6,12 +6,13 @@ from torch_geometric.data import Data
 from env.env import Env
 from env.state import State
 from problem.problem_description import ProblemDescription
+from utils.observation import Observation
 
 
 @fixture
 def graph():
     graph = Data(
-        x=torch.rand(4, 2),
+        x=torch.rand(4, 3),
         edge_index=torch.tensor(
             [[0, 1, 2, 3], [1, 2, 3, 0]], dtype=torch.int64
         ),
@@ -63,3 +64,43 @@ def durations():
 def state(affectations, durations):
     state = State(affectations, durations)
     return state
+
+
+@fixture
+def observation():
+    return Observation(
+        n_nodes=9,
+        features=torch.tensor(
+            [
+                [
+                    [0, 0, 15],
+                    [1, 1, 2],
+                    [3, 1, 5],
+                    [2, 1, 7],
+                    [4, 0, 15],
+                    [7, 0, 14],
+                    [8, 1, 4],
+                    [5, 1, 1],
+                    [6, 1, 5],
+                ],
+                [
+                    [0, 0, 15],
+                    [1, 1, 2],
+                    [3, 1, 5],
+                    [2, 1, 7],
+                    [4, 0, 15],
+                    [7, 0, 14],
+                    [8, 1, 4],
+                    [5, 1, 1],
+                    [6, 1, 5],
+                ],
+            ]
+        ),
+        edge_index=torch.tensor(
+            [
+                [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
+                [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
+            ],
+            dtype=torch.int64,
+        ),
+    )
