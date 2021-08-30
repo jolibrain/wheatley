@@ -21,6 +21,12 @@ def graph():
 
 
 @fixture
+def mask():
+    mask = torch.tensor([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    return mask
+
+
+@fixture
 def problem_description():
     problem_description = ProblemDescription(5, 5, 99, "L2D", "L2D")
     return problem_description
@@ -83,6 +89,35 @@ def observation():
                     [5, 1, 1],
                     [6, 1, 5],
                 ],
+            ]
+        ),
+        edge_index=torch.tensor(
+            [
+                [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
+            ],
+            dtype=torch.int64,
+        ),
+        mask=torch.tensor([[1, 1, 1] + [0 for i in range(78)]]),
+    )
+
+
+@fixture
+def batched_observation():
+    return Observation(
+        n_nodes=9,
+        features=torch.tensor(
+            [
+                [
+                    [0, 0, 15],
+                    [1, 1, 2],
+                    [3, 1, 5],
+                    [2, 1, 7],
+                    [4, 0, 15],
+                    [7, 0, 14],
+                    [8, 1, 4],
+                    [5, 1, 1],
+                    [6, 1, 5],
+                ],
                 [
                     [0, 0, 15],
                     [1, 1, 2],
@@ -103,4 +138,40 @@ def observation():
             ],
             dtype=torch.int64,
         ),
+        mask=torch.tensor(
+            [
+                [1, 1, 1] + [0 for i in range(78)],
+                [1, 0, 1, 1] + [0 for i in range(77)],
+            ]
+        ),
     )
+
+
+@fixture
+def gym_observation():
+    return {
+        "n_nodes": 9,
+        "features": torch.tensor(
+            [
+                [
+                    [0, 0, 15],
+                    [1, 1, 2],
+                    [3, 1, 5],
+                    [2, 1, 7],
+                    [4, 0, 15],
+                    [7, 0, 14],
+                    [8, 1, 4],
+                    [5, 1, 1],
+                    [6, 1, 5],
+                ],
+            ],
+            dtype=torch.float32,
+        ),
+        "edge_index": torch.tensor(
+            [
+                [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
+            ],
+            dtype=torch.int64,
+        ),
+        "mask": torch.tensor([[1, 1, 1] + [0 for i in range(78)]]),
+    }

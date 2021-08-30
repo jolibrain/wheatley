@@ -52,10 +52,11 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         observation = Observation.from_gym_observation(obs)
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()
+        mask = observation.get_mask()
 
         node_ids = (
             observation.drop_node_ids()
-        )  # First feature should not be procesed
+        )  # First feature should not be processed
         node_ids = node_ids.squeeze()
 
         graph_state = observation.to_torch_geometric()
@@ -77,4 +78,12 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             (graph_embedding.reshape(batch_size, 1, -1), features), dim=1
         )
 
-        return graph_and_nodes_embedding
+        mask = mask.reshape(batch_size, n_nodes, n_nodes)
+        extended_mask = torch.cat(
+            (torch.zeros(batch_size, 1, n_nodes), mask), dim=1
+        )
+        embedded_features = torch.cat(
+            (graph_and_nodes_embedding, extended_mask), dim=2
+        )
+
+        return embedded_features

@@ -11,7 +11,7 @@ def test_compute_possible_s_a_pairs():
     graph_embedding = torch.tensor([[[0, 1]], [[2, 3]]])
     nodes_embedding = torch.tensor([[[4, 5], [6, 7]], [[8, 9], [10, 11]]])
     assert torch.eq(
-        me.compute_possible_s_a_pairs(graph_embedding, nodes_embedding),
+        me._compute_possible_s_a_pairs(graph_embedding, nodes_embedding),
         torch.tensor(
             [
                 [

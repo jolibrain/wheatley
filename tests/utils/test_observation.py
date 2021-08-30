@@ -25,29 +25,29 @@ def test_from_gym_observation():
             "edge_index": torch.tensor(
                 [[[0, 1, 2, 3], [1, 2, 3, 0]]], dtype=torch.int64
             ),
+            "mask": torch.tensor([[1, 1, 1] + [0 for i in range(13)]]),
         }
     )
     assert obs.n_nodes == 4
     assert list(obs.features.shape) == [1, 4, 3]
     assert list(obs.edge_index.shape) == [1, 2, 4]
+    assert list(obs.mask.shape) == [1, 16]
 
 
-def test_from_torch_geometric(graph):
-    obs = Observation.from_torch_geometric(graph)
+def test_from_torch_geometric(graph, mask):
+    obs = Observation.from_torch_geometric(graph, mask)
     assert obs.n_nodes == 4
     assert list(obs.features.shape) == [1, 4, 3]
     assert list(obs.edge_index.shape) == [1, 2, 4]
 
 
-def test_to_torch_geometric(observation):
-    graph = observation.to_torch_geometric()
+def test_to_torch_geometric(batched_observation):
+    graph = batched_observation.to_torch_geometric()
     assert list(graph.x.shape) == [18, 3]
     assert list(graph.edge_index.shape) == [2, 16]
 
 
 def test_to_gym_observation(observation):
-    observation.features = observation.features[1:, :, :].reshape(1, 9, 3)
-    observation.edge_index = observation.edge_index[1, :, :].reshape(1, 2, 8)
     gym_obs = observation.to_gym_observation()
 
     assert gym_obs["n_nodes"] == 9
@@ -57,12 +57,12 @@ def test_to_gym_observation(observation):
     assert (gym_obs["edge_index"][:, 8:] == 0).all()
 
 
-def test_drop_nodes_ids(observation):
-    node_ids = observation.drop_node_ids()
-    assert list(observation.features.shape) == [2, 9, 2]
+def test_drop_nodes_ids(batched_observation):
+    node_ids = batched_observation.drop_node_ids()
+    assert list(batched_observation.features.shape) == [2, 9, 2]
     assert list(node_ids.shape) == [2, 9]
-    assert (observation.features[:, :, 0] <= 1).all()
-    assert (observation.features[:, :, 1] >= 0).all()
+    assert (batched_observation.features[:, :, 0] <= 1).all()
+    assert (batched_observation.features[:, :, 1] >= 0).all()
     assert torch.eq(
         node_ids,
         torch.tensor(

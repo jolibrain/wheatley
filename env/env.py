@@ -34,6 +34,7 @@ class Env(gym.Env):
                     dtype=np.int64,
                 ),
                 "n_nodes": Discrete(MAX_N_NODES),
+                "mask": Box(low=0, high=1, shape=(MAX_N_EDGES,)),
             }
         )
         self.n_nodes = self.n_machines * self.n_jobs
@@ -59,11 +60,11 @@ class Env(gym.Env):
 
     def step(self, action):
         obs = Observation.from_torch_geometric(
-            self.transition_model.get_graph()
+            self.transition_model.get_graph(), self.transition_model.get_mask()
         )
         self.transition_model.run(action)
         next_obs = Observation.from_torch_geometric(
-            self.transition_model.get_graph()
+            self.transition_model.get_graph(), self.transition_model.get_mask()
         )
         reward = self.reward_model.evaluate(obs, action, next_obs)
         done = self.transition_model.done()
@@ -79,7 +80,7 @@ class Env(gym.Env):
             )
         self._create_transition_and_reward_model()
         observation = Observation.from_torch_geometric(
-            self.transition_model.get_graph()
+            self.transition_model.get_graph(), self.transition_model.get_mask()
         )
         return observation.to_gym_observation()
 

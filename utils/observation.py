@@ -5,10 +5,11 @@ from config import MAX_N_NODES, MAX_N_EDGES
 
 
 class Observation:
-    def __init__(self, n_nodes, features, edge_index):
+    def __init__(self, n_nodes, features, edge_index, mask):
         self.n_nodes = n_nodes
         self.features = features
         self.edge_index = edge_index
+        self.mask = mask
 
     @classmethod
     def from_gym_observation(cls, gym_observation):
@@ -30,14 +31,16 @@ class Observation:
             :, 0:n_nodes, :
         ]  # delete useless features
         edge_index = gym_observation["edge_index"].long()
-        return cls(n_nodes, features, edge_index)
+        mask = gym_observation["mask"][:, 0 : n_nodes * n_nodes]
+        return cls(n_nodes, features, edge_index, mask)
 
     @classmethod
-    def from_torch_geometric(cls, graph):
+    def from_torch_geometric(cls, graph, mask):
         return cls(
             graph.x.shape[0],
             graph.x.unsqueeze(0),
             graph.edge_index.unsqueeze(0),
+            mask.unsqueeze(0),
         )
 
     def get_batch_size(self):
@@ -45,6 +48,9 @@ class Observation:
 
     def get_n_nodes(self):
         return self.n_nodes
+
+    def get_mask(self):
+        return self.mask
 
     def to_torch_geometric(self):
         """
@@ -64,16 +70,21 @@ class Observation:
         n_edges = self.edge_index.shape[2]
         filled_features = np.zeros((MAX_N_NODES, 3))
         filled_edge_index = np.zeros((2, MAX_N_EDGES))
+        filled_mask = np.zeros((MAX_N_EDGES,))
         filled_features[0 : self.n_nodes, :] = self.features.numpy().reshape(
             self.n_nodes, 3
         )
         filled_edge_index[:, 0:n_edges] = self.edge_index.numpy().reshape(
             2, n_edges
         )
+        filled_mask[
+            0 : self.n_nodes * self.n_nodes
+        ] = self.mask.numpy().reshape(self.n_nodes * self.n_nodes)
         return {
             "n_nodes": self.n_nodes,
             "features": filled_features,
             "edge_index": filled_edge_index,
+            "mask": filled_mask,
         }
 
     def drop_node_ids(self):

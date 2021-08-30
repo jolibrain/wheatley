@@ -11,11 +11,16 @@ class TransitionModel(ABC):
 
         self.n_jobs = self.affectations.shape[0]
         self.n_machines = self.affectations.shape[1]
+        self.n_nodes = self.n_jobs * self.n_machines
 
         self.state = State(self.affectations, self.durations)
 
     @abstractmethod
     def run(self, action):
+        pass
+
+    @abstractmethod
+    def get_mask(self):
         pass
 
     def get_graph(self):
