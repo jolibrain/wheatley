@@ -12,8 +12,8 @@ from config import (
     HIDDEN_DIM_ACTOR,
     N_MLP_LAYERS_CRITIC,
     HIDDEN_DIM_CRITIC,
-    DEVICE,
     MAX_N_NODES,
+    DEVICE,
 )
 
 
