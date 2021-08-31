@@ -4,6 +4,7 @@ import torch
 from torch_geometric.data import Data
 
 from env.env import Env
+from env.l2d_transition_model import L2DTransitionModel
 from env.state import State
 from problem.problem_description import ProblemDescription
 from utils.observation import Observation
@@ -175,3 +176,9 @@ def gym_observation():
         ),
         "mask": torch.tensor([[1, 1, 1] + [0 for i in range(78)]]),
     }
+
+
+@fixture
+def l2d_transition_model(affectations, durations):
+    l2d_transition_model = L2DTransitionModel(affectations, durations)
+    return l2d_transition_model

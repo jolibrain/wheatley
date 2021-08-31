@@ -15,20 +15,23 @@ class L2DTransitionModel(TransitionModel):
     def run(self, action):
         node_id = action % MAX_N_NODES
         job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
-        print(action)
-        print(node_id)
-        print(job_id)
-        print(task_id)
+
+        # To be a valid transition model, the L2DTransitionModel must accept every
+        # possible edge_id. But, for most of them, it doesn't do anything, since they
+        # don't correspond to any valid action. The model shouldn't actually propose
+        # such actions, since we apply a mask to allow only valid actions to happen.
+        # Here, we check that the proposed action is a valid one.
+
+        # Since L2D operates on nodes, and not edges, each action must correspond to
+        # an edge with the same node on both sides
+        if node_id != action // MAX_N_NODES:
+            return
+        # If the job_id is bigger that max job_id, we don't operate the action
         if job_id >= self.n_jobs:
             return
-            raise Exception(
-                f"{job_id} is too big for beeing a job_id with {self.n_jobs} jobs"
-            )
-        elif task_id == self.state.get_first_unaffected_task(job_id):
+        # Finally, if the task doesn't correspond to the available tasks, we also skip
+        elif task_id != self.state.get_first_unaffected_task(job_id):
             return
-            raise Exception(
-                "There is a problem with node_id and available tasks"
-            )
 
         machine_id = self.affectations[job_id, task_id]
         machine_occupancy = self.state.get_machine_occupancy(machine_id)

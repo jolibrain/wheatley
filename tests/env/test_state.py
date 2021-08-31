@@ -1,4 +1,4 @@
-from copy import copy
+from copy import deepcopy
 import numpy as np
 import torch
 
@@ -134,7 +134,7 @@ def test_update_completion_times(state):
 
 
 def test_set_precedency(state):
-    first_cum_sum = copy(state.task_completion_times)
+    first_cum_sum = deepcopy(state.task_completion_times)
     assert state.set_precedency(4, 0) is False
     assert state.set_precedency(0, 4)
     assert state.set_precedency(0, 0) is False
