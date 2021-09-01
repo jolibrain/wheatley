@@ -1,4 +1,5 @@
 import gym
+import numpy as np
 from stable_baselines3 import PPO
 import torch
 
@@ -40,6 +41,14 @@ def main():
     print(solution.schedule)
     print("Solution found by OR-tools solver : ")
     print(solution_or_tools.schedule)
+
+    makespan = np.max(solution.schedule + testing_durations)
+    makespan_or_tools = np.max(solution_or_tools.schedule + testing_durations)
+    print(f"Makespan for found solution : {makespan}")
+    print(f"Makespan for OR-tools solution : {makespan_or_tools}")
+    print(
+        f"Difference in percentage : {(makespan - makespan_or_tools) * 100 / makespan_or_tools:.1f}%"
+    )
 
 
 if __name__ == "__main__":
