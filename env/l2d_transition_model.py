@@ -39,8 +39,6 @@ class L2DTransitionModel(TransitionModel):
             job_id, task_id
         )
 
-        node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
-
         # If no task is affected on machine, just affect it wherever possible and returns
         if not machine_occupancy:
             self.state.affect_node(node_id)
@@ -50,16 +48,13 @@ class L2DTransitionModel(TransitionModel):
         if job_availability_time < machine_occupancy[0][0]:
             # Insert task before all other tasks
             self.state.set_precedency(node_id, machine_occupancy[0][2])
+
         else:
             # Find where there are free times, and check if we can insert task
             index = -1
             for i in range(len(machine_occupancy) - 1):
-                start_time, duration, node_id = machine_occupancy[i]
-                (
-                    next_start_time,
-                    next_duration,
-                    next_node_id,
-                ) = machine_occupancy[i + 1]
+                start_time, duration, _ = machine_occupancy[i]
+                next_start_time, next_duration, _ = machine_occupancy[i + 1]
                 if start_time + duration < next_start_time:
                     if (
                         start_time + duration <= job_availability_time

@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import networkx as nx
+import numpy as np
 import torch
 
 
@@ -22,18 +23,20 @@ def test_get_mask(l2d_transition_model):
 def test_run(l2d_transition_model):
     l2d_tm = l2d_transition_model
     l2d_tm_cp = deepcopy(l2d_tm)
-    l2d_tm_cp.run(102)
+
     # Check if unallowed actions have no effects, as they should
+    l2d_tm_cp.run(1)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
     l2d_tm_cp.run(5050)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(202)
+    l2d_tm_cp.run(101)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
 
+    # Check actions that change only affectations
     l2d_tm.run(505)
-    assert l2d_tm.state.is_affected[1, 0] == 1
     l2d_tm.run(606)
     l2d_tm.run(0)
+    assert l2d_tm.state.is_affected[1, 0] == 1
     assert l2d_tm.state.is_affected[1, 1] == 1
     assert l2d_tm.state.is_affected[0, 0] == 1
     assert nx.is_isomorphic(l2d_tm.state.graph, l2d_tm_cp.state.graph)
@@ -42,20 +45,73 @@ def test_run(l2d_transition_model):
         == l2d_tm_cp.state.task_completion_times
     ).all()
 
+    # Check actions that change graph and affectations (and btw, insertion before)
     l2d_tm.run(1515)
     assert l2d_tm.state.is_affected[3, 0] == 1
-    assert l2d_tm.state.task_completion_times[3, 0] == 5
-    assert l2d_tm.state.task_completion_times[1, 1] == 11
+    assert l2d_tm.state.graph.has_edge(15, 6)
+    assert (
+        l2d_tm.state.task_completion_times
+        == l2d_tm_cp.state.task_completion_times
+    ).all()
 
-    l2d_tm.run(2222)
-    assert l2d_tm.state.task_completion_times[4, 2] == 24
+    # Check actions that change graph, affectations and task_completion_times
+    l2d_tm.run(2020)
+    l2d_tm.run(1010)
+    l2d_tm.run(101)
+    assert l2d_tm.state.is_affected[4, 0] == 1
+    assert l2d_tm.state.is_affected[2, 0] == 1
+    assert l2d_tm.state.is_affected[0, 1] == 1
+    assert l2d_tm.state.graph.has_edge(5, 20)
+    assert l2d_tm.state.graph.has_edge(0, 10)
+    assert l2d_tm.state.graph.has_edge(20, 1)
+    assert (
+        l2d_tm.state.task_completion_times
+        == np.array(
+            [
+                [1, 19, 29, 36, 44],
+                [5, 11, 14, 17, 21],
+                [5, 9, 13, 17, 21],
+                [5, 11, 18, 26, 35],
+                [14, 22, 29, 35, 40],
+            ]
+        )
+    ).all()
 
-    l2d_tm.run(1414)
-    assert l2d_tm.state.task_completion_times[2, 4] == 20
-    assert l2d_tm.state.task_completion_times[4, 2] == 27
-
-    l2d_tm.run(404)
-    assert l2d_tm.state.task_completion_times[0, 4] == 36
+    # Check insertion between 2 nodes
+    l2d_tm.run(707)
+    l2d_tm.run(202)
+    assert l2d_tm.state.is_affected[1, 2] == 1
+    assert l2d_tm.state.is_affected[0, 2] == 1
+    assert l2d_tm.state.graph.has_edge(7, 2)
+    assert (
+        l2d_tm.state.task_completion_times
+        == np.array(
+            [
+                [1, 19, 29, 36, 44],
+                [5, 11, 14, 17, 21],
+                [5, 9, 13, 17, 21],
+                [5, 11, 18, 26, 35],
+                [14, 22, 29, 35, 40],
+            ]
+        )
+    ).all()
+    l2d_tm.run(2121)
+    assert l2d_tm.state.is_affected[4, 1] == 1
+    assert l2d_tm.state.graph.has_edge(7, 21)
+    assert l2d_tm.state.graph.has_edge(21, 2)
+    assert l2d_tm.state.graph.has_edge(7, 2)
+    assert (
+        l2d_tm.state.task_completion_times
+        == np.array(
+            [
+                [1, 19, 32, 39, 47],
+                [5, 11, 14, 17, 21],
+                [5, 9, 13, 17, 21],
+                [5, 11, 18, 26, 35],
+                [14, 22, 29, 35, 40],
+            ]
+        )
+    ).all()
 
 
 def eq(state1, state2):
