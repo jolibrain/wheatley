@@ -16,9 +16,11 @@ class Observation:
     def from_gym_observation(cls, gym_observation):
         """
         This is only used on the agent side, so it should only handle cuda observations
+        (if, and only if the machine suports cuda).
         """
-        if not gym_observation["features"].is_cuda:
-            raise Exception("Please provide a cuda observation")
+        if torch.cuda.is_available():
+            if not gym_observation["features"].is_cuda:
+                raise Exception("Please provide a cuda observation")
 
         if isinstance(gym_observation["n_nodes"], int):
             n_nodes = gym_observation["n_nodes"]
@@ -67,13 +69,15 @@ class Observation:
 
     def to_torch_geometric(self):
         """
-        Returns the batched graph associated with the observation
-        This should only hanlde cuda observations
+        Returns the batched graph associated with the observation.
+        This should only hanlde cuda observations (if and only if cuda is available on
+        the machine).
         """
-        if not self.features.is_cuda:
-            raise Exception(
-                "Please use to_torch_geometric only with cuda tensors"
-            )
+        if torch.cuda.is_available():
+            if not self.features.is_cuda:
+                raise Exception(
+                    "Please use to_torch_geometric only with cuda tensors"
+                )
 
         loader = DataLoader(
             [
