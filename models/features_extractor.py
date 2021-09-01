@@ -42,6 +42,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                     )
                 )
             )
+            self.features_extractors[-1].to(DEVICE)
 
     def forward(self, obs):
         """
@@ -80,7 +81,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
 
         mask = mask.reshape(batch_size, n_nodes, n_nodes)
         extended_mask = torch.cat(
-            (torch.zeros(batch_size, 1, n_nodes), mask), dim=1
+            (torch.zeros((batch_size, 1, n_nodes), device=DEVICE), mask), dim=1
         )
         embedded_features = torch.cat(
             (graph_and_nodes_embedding, extended_mask), dim=2

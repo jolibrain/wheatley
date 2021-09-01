@@ -80,7 +80,7 @@ class MLPExtractor(nn.Module):
         pi = F.softmax(probabilities, dim=1)
 
         # And reshape pi in ordrer to have every value corresponding to its edge index
-        shaped_pi = torch.zeros(batch_size, n_nodes * n_nodes)
+        shaped_pi = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
         for i in range(batch_size):
             shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])
 
@@ -90,7 +90,7 @@ class MLPExtractor(nn.Module):
         # matrix of size (MAX_N_NODES, MAX_N_NODES) with 0, and we reflatten it.
         shaped_pi = shaped_pi.reshape(batch_size, n_nodes, n_nodes)
         filled_pi = torch.zeros(
-            batch_size, MAX_N_NODES, MAX_N_NODES, device=DEVICE
+            (batch_size, MAX_N_NODES, MAX_N_NODES), device=DEVICE
         )
         filled_pi[:, 0:n_nodes, 0:n_nodes] = shaped_pi
         filled_pi = filled_pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES)

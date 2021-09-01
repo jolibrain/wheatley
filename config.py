@@ -1,7 +1,7 @@
 import torch
 
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 # Parameters
 N_MLP_LAYERS_FEATURES_EXTRACTOR = 3

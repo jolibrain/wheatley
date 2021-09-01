@@ -4,6 +4,8 @@ import torch
 
 from models.features_extractor import FeaturesExtractor
 
+from config import DEVICE
+
 
 def test_forward(gym_observation):
     fe = FeaturesExtractor(
@@ -16,9 +18,16 @@ def test_forward(gym_observation):
             }
         )
     )
+    gym_observation["features"] = (
+        gym_observation["features"].to(DEVICE).float()
+    )
+    gym_observation["edge_index"] = (
+        gym_observation["edge_index"].to(DEVICE).long()
+    )
+    gym_observation["mask"] = gym_observation["mask"].to(DEVICE).float()
     features = fe(gym_observation)
     assert list(features.shape) == [1, 10, 41]
-    assert list(features[0, 1, 32:35].detach().numpy()) == [
+    assert list(features[0, 1, 32:35].detach().cpu().numpy()) == [
         1,
         1,
         1,

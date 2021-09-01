@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from torch_geometric.data import Data, DataLoader
 
 from config import MAX_N_NODES, MAX_N_EDGES
@@ -13,6 +14,12 @@ class Observation:
 
     @classmethod
     def from_gym_observation(cls, gym_observation):
+        """
+        This is only used on the agent side, so it should only handle cuda observations
+        """
+        if not gym_observation["features"].is_cuda:
+            raise Exception("Please provide a cuda observation")
+
         if isinstance(gym_observation["n_nodes"], int):
             n_nodes = gym_observation["n_nodes"]
         else:
@@ -36,6 +43,12 @@ class Observation:
 
     @classmethod
     def from_torch_geometric(cls, graph, mask):
+        """
+        This is used only on torch_geometric.data.Data instances created by the Env side (within the state
+        class). So it should only be cpu tensors.
+        """
+        if graph.x.is_cuda:
+            raise Exception("Please don't use this function on cuda graph")
         return cls(
             graph.x.shape[0],
             graph.x.unsqueeze(0),
@@ -55,7 +68,13 @@ class Observation:
     def to_torch_geometric(self):
         """
         Returns the batched graph associated with the observation
+        This should only hanlde cuda observations
         """
+        if not self.features.is_cuda:
+            raise Exception(
+                "Please use to_torch_geometric only with cuda tensors"
+            )
+
         loader = DataLoader(
             [
                 Data(self.features[i], self.edge_index[i])
@@ -67,6 +86,14 @@ class Observation:
         return graph
 
     def to_gym_observation(self):
+        """
+        This function should be used only on cpu tensors, since it is only used on the env side.
+        """
+        if self.features.is_cuda:
+            raise Exception(
+                "Please don't try to convert a cuda observation to a gym_observation"
+            )
+
         n_edges = self.edge_index.shape[2]
         filled_features = np.zeros((MAX_N_NODES, 3))
         filled_edge_index = np.zeros((2, MAX_N_EDGES))

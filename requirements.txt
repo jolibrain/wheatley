@@ -1,1 +1,8 @@
 pre-commit
+pytest
+torch
+numpy
+torch_geometric
+stable_baselines3
+gym
+

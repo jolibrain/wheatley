@@ -90,7 +90,7 @@ def observation():
                     [5, 1, 1],
                     [6, 1, 5],
                 ],
-            ]
+            ],
         ),
         edge_index=torch.tensor(
             [
@@ -130,7 +130,7 @@ def batched_observation():
                     [5, 1, 1],
                     [6, 1, 5],
                 ],
-            ]
+            ],
         ),
         edge_index=torch.tensor(
             [
@@ -143,7 +143,7 @@ def batched_observation():
             [
                 [1, 1, 1] + [0 for i in range(78)],
                 [1, 0, 1, 1] + [0 for i in range(77)],
-            ]
+            ],
         ),
     )
 
@@ -166,7 +166,6 @@ def gym_observation():
                     [6, 1, 5],
                 ],
             ],
-            dtype=torch.float32,
         ),
         "edge_index": torch.tensor(
             [

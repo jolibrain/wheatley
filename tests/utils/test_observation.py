@@ -2,6 +2,8 @@ import torch
 
 from utils.observation import Observation
 
+from config import DEVICE
+
 
 def test_from_gym_observation():
     obs = Observation.from_gym_observation(
@@ -20,12 +22,17 @@ def test_from_gym_observation():
                         [0, 0, 0],
                         [0, 0, 0],
                     ]
-                ]
+                ],
+                device=DEVICE,
             ),
             "edge_index": torch.tensor(
-                [[[0, 1, 2, 3], [1, 2, 3, 0]]], dtype=torch.int64
+                [[[0, 1, 2, 3], [1, 2, 3, 0]]],
+                dtype=torch.int64,
+                device=DEVICE,
             ),
-            "mask": torch.tensor([[1, 1, 1] + [0 for i in range(13)]]),
+            "mask": torch.tensor(
+                [[1, 1, 1] + [0 for i in range(13)]], device=DEVICE
+            ),
         }
     )
     assert obs.n_nodes == 4
@@ -42,6 +49,13 @@ def test_from_torch_geometric(graph, mask):
 
 
 def test_to_torch_geometric(batched_observation):
+    batched_observation.features = batched_observation.features.to(
+        DEVICE
+    ).float()
+    batched_observation.edge_index = batched_observation.edge_index.to(
+        DEVICE
+    ).long()
+    batched_observation.mask = batched_observation.mask.to(DEVICE).float()
     graph = batched_observation.to_torch_geometric()
     assert list(graph.x.shape) == [18, 3]
     assert list(graph.edge_index.shape) == [2, 16]
@@ -58,6 +72,13 @@ def test_to_gym_observation(observation):
 
 
 def test_drop_nodes_ids(batched_observation):
+    batched_observation.features = batched_observation.features.to(
+        DEVICE
+    ).float()
+    batched_observation.edge_index = batched_observation.edge_index.to(
+        DEVICE
+    ).long()
+    batched_observation.mask = batched_observation.mask.to(DEVICE).float()
     node_ids = batched_observation.drop_node_ids()
     assert list(batched_observation.features.shape) == [2, 9, 2]
     assert list(node_ids.shape) == [2, 9]
@@ -66,6 +87,7 @@ def test_drop_nodes_ids(batched_observation):
     assert torch.eq(
         node_ids,
         torch.tensor(
-            [0, 1, 3, 2, 4, 7, 8, 5, 6, 0, 1, 3, 2, 4, 7, 8, 5, 6]
+            [0, 1, 3, 2, 4, 7, 8, 5, 6, 0, 1, 3, 2, 4, 7, 8, 5, 6],
+            device=DEVICE,
         ).reshape(2, 9),
     ).all()
