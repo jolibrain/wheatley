@@ -26,8 +26,8 @@ def test_forward(gym_observation):
     )
     gym_observation["mask"] = gym_observation["mask"].to(DEVICE).float()
     features = fe(gym_observation)
-    assert list(features.shape) == [1, 10, 41]
-    assert list(features[0, 1, 32:35].detach().cpu().numpy()) == [
+    assert list(features.shape) == [1, 10, 73]
+    assert list(features[0, 1, 64:67].detach().cpu().numpy()) == [
         1,
         1,
         1,

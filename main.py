@@ -29,7 +29,15 @@ def main():
     )
     training_env = Env(problem_description)
 
-    agent = Agent(training_env)
+    agent = Agent(
+        training_env,
+        n_epochs=args.n_epochs,
+        gamma=args.gamma,
+        clip_range=args.clip_range,
+        ent_coef=args.ent_coef,
+        vf_coef=args.vf_coef,
+        lr=args.lr,
+    )
     agent.train(problem_description, total_timesteps=args.n_timesteps)
 
     print(

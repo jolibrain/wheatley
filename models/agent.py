@@ -8,7 +8,17 @@ from config import DEVICE
 
 
 class Agent:
-    def __init__(self, env, model=None):
+    def __init__(
+        self,
+        env,
+        n_epochs,
+        gamma,
+        clip_range,
+        ent_coef,
+        vf_coef,
+        lr,
+        model=None,
+    ):
         if model is not None:
             self.model = model
             self.model.set_env(env)
@@ -16,8 +26,14 @@ class Agent:
             self.model = PPO(
                 Policy,
                 env,
+                n_epochs=n_epochs,
                 n_steps=2048,
                 batch_size=64,
+                gamma=gamma,
+                learning_rate=lr,
+                clip_range=clip_range,
+                ent_coef=ent_coef,
+                vf_coef=vf_coef,
                 verbose=1,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
