@@ -59,6 +59,7 @@ class Env(gym.Env):
         self.reset()
 
     def step(self, action):
+        print(action)
         obs = Observation.from_torch_geometric(
             self.transition_model.get_graph(), self.transition_model.get_mask()
         )
@@ -83,6 +84,9 @@ class Env(gym.Env):
             self.transition_model.get_graph(), self.transition_model.get_mask()
         )
         return observation.to_gym_observation()
+
+    def get_solution(self):
+        return self.transition_model.state.get_solution()
 
     def _create_transition_and_reward_model(self):
 

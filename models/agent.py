@@ -16,6 +16,8 @@ class Agent:
             self.model = PPO(
                 Policy,
                 env,
+                n_steps=4,
+                batch_size=4,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
             )
@@ -38,7 +40,7 @@ class Agent:
         observation = env.reset()
         done = False
         while not done:
-            action, _ = self.model.predict(observation)
+            action, _ = self.model.predict(observation, deterministic=False)
             observation, reward, done, info = env.step(action)
         solution = env.get_solution()
         return solution

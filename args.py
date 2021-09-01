@@ -8,10 +8,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument(
-    "--n_j_testing", type=int, default=8, help="Number of jobs for test"
+    "--n_j_testing", type=int, default=5, help="Number of jobs for test"
 )
 parser.add_argument(
-    "--n_m_testing", type=int, default=8, help="Number of jobs for test"
+    "--n_m_testing", type=int, default=5, help="Number of jobs for test"
 )
 parser.add_argument(
     "--max_duration", type=int, default=99, help="Max duration for the jobs"
