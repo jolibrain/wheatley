@@ -16,8 +16,9 @@ class Agent:
             self.model = PPO(
                 Policy,
                 env,
-                n_steps=4,
-                batch_size=4,
+                n_steps=2048,
+                batch_size=64,
+                verbose=1,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
             )

@@ -19,7 +19,9 @@ def main():
         )
 
     print(
-        f"Launching training. Problem size : {args.n_j} jobs, {args.n_m} machines"
+        f"Launching training\n"
+        f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
+        f"Training time : {args.n_timesteps} timesteps"
     )
 
     problem_description = ProblemDescription(
@@ -28,7 +30,7 @@ def main():
     training_env = Env(problem_description)
 
     agent = Agent(training_env)
-    agent.train(problem_description, total_timesteps=1)
+    agent.train(problem_description, total_timesteps=args.n_timesteps)
 
     print(
         f"Launching inference. Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines"

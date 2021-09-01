@@ -59,7 +59,6 @@ class Env(gym.Env):
         self.reset()
 
     def step(self, action):
-        print(action)
         obs = Observation.from_torch_geometric(
             self.transition_model.get_graph(), self.transition_model.get_mask()
         )

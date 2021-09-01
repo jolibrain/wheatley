@@ -2,4 +2,4 @@
 
 TODO:
  - Change the functions descriptions in utils/observation.py
- - Finish the tests/models/test_features_extractor.py
+ - Rechecker models/policy.py pour bien vérifier que PPO fait ce qu'on veut

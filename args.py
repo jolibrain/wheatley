@@ -8,6 +8,12 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument(
+    "--n_timesteps",
+    type=int,
+    default=int(1e4),
+    help="Number of training timesteps (corresponding to env timesteps)",
+)
+parser.add_argument(
     "--n_j_testing", type=int, default=5, help="Number of jobs for test"
 )
 parser.add_argument(
