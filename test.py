@@ -5,7 +5,7 @@ import torch
 from env.env import Env
 from models.agent import Agent
 from problem.problem_description import ProblemDescription
-from utils.ortools_solver import solve_jssp_ortools
+from utils.ortools_solver import solve_jssp
 from utils.utils import generate_problem
 
 from config import MAX_N_JOBS, MAX_N_MACHINES, DEVICE
@@ -13,28 +13,27 @@ from args import args
 
 
 def main():
-    agent = Agent.load(args.path)
+    testing_affectations, testing_durations = generate_problem(
+        args.n_j_testing, args.n_m_testing, args.max_duration
+    )
+    problem_description = ProblemDescription(
+        args.n_j_testing,
+        args.n_m_testing,
+        args.max_duration,
+        "L2D",
+        "L2D",
+        testing_affectations,
+        testing_durations,
+    )
+    testing_env = Env(problem_description)
+    agent = Agent.load(args.path, testing_env)
     print(
         f"Launching inference. Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines"
     )
 
-    testing_affectations, testing_durations = generate_problem(
-        args.n_j_testing, args.n_m_testing, args.max_duration
-    )
-    solution = agent.predict(
-        ProblemDescription(
-            args.n_j_testing,
-            args.n_m_testing,
-            args.max_duration,
-            "L2D",
-            "L2D",
-            testing_affectations,
-            testing_durations,
-        )
-    )
-    solution_or_tools = solve_jssp_ortools(
-        testing_affectations, testing_durations
-    )
+    solution = agent.predict(problem_description)
+    solution_or_tools = solve_jssp(testing_affectations, testing_durations)
+
     print(testing_affectations)
     print(testing_durations)
     print("Solution found by the model")

@@ -11,12 +11,12 @@ class Agent:
     def __init__(
         self,
         env,
-        n_epochs,
-        gamma,
-        clip_range,
-        ent_coef,
-        vf_coef,
-        lr,
+        n_epochs=None,
+        gamma=None,
+        clip_range=None,
+        ent_coef=None,
+        vf_coef=None,
+        lr=None,
         model=None,
     ):
         if model is not None:
@@ -44,7 +44,7 @@ class Agent:
 
     @classmethod
     def load(cls, path, env):
-        return cls(env, PPO.load(path, env, DEVICE))
+        return cls(env, model=PPO.load(path, env, DEVICE))
 
     def train(self, problem_description, total_timesteps):
         env = Env(problem_description)

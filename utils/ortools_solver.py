@@ -2,7 +2,7 @@
 
 import collections
 
-# Import Python wrapper for or-tools CP-SAT solver.
+import numpy as np
 from ortools.sat.python import cp_model
 
 from problem.solution import Solution
@@ -93,8 +93,6 @@ def solve_jssp(affectations, durations):
 
 
 if __name__ == "__main__":
-    import numpy as np
-
     print(
         solve_jssp(
             np.array([[0, 1, 2], [2, 0, 1], [1, 0, 2]]),
