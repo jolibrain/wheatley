@@ -41,5 +41,8 @@ parser.add_argument(
 )
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 
+parser.add_argument(
+    "--path", type=str, required=True, help="Path to saved model"
+)
 
 args = parser.parse_args()
