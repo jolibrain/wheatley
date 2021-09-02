@@ -5,6 +5,7 @@ import torch
 
 from env.env import Env
 from models.agent import Agent
+from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
 from utils.utils import generate_problem
@@ -17,6 +18,8 @@ def main():
     print("Loading agent")
     agent = Agent.load(args.path)
     agent.model.verbose = 0
+
+    random_agent = RandomAgent()
     print(
         "Launching inference.\n"
         f"Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines\n"
@@ -26,6 +29,7 @@ def main():
     diff_percentages = []
     rl_makespans = []
     or_tools_makespans = []
+    random_makespans = []
     for i in range(args.n_test_problems):
         testing_affectations, testing_durations = generate_problem(
             args.n_j_testing, args.n_m_testing, MAX_DURATION
@@ -41,16 +45,19 @@ def main():
         )
         rl_solution = agent.predict(problem_description)
         or_tools_solution = solve_jssp(testing_affectations, testing_durations)
+        random_solution = random_agent.predict(problem_description)
 
         rl_makespan = np.max(rl_solution.schedule + testing_durations)
         or_tools_makespan = np.max(
             or_tools_solution.schedule + testing_durations
         )
+        random_makespan = np.max(random_solution.schedule + testing_durations)
         diff_percentage = (
             100 * (rl_makespan - or_tools_makespan) / or_tools_makespan
         )
         rl_makespans.append(rl_makespan)
         or_tools_makespans.append(or_tools_makespan)
+        random_makespans.append(random_makespan)
         diff_percentages.append(diff_percentage)
 
     print(
@@ -60,7 +67,10 @@ def main():
         f"Makespan for OR-tools solution : {np.mean(or_tools_makespans):.0f}±{np.std(or_tools_makespans):.0f}"
     )
     print(
-        f"Difference in percentage : {np.mean(diff_percentages):.1f}±{np.std(diff_percentages):.1f}%"
+        f"Makespan for random solution : {np.mean(random_makespan):.0f}±{np.std(random_makespan):.0f}"
+    )
+    print(
+        f"Difference in percentage between OR-tools and RL : {np.mean(diff_percentages):.1f}±{np.std(diff_percentages):.1f}%"
     )
 
 

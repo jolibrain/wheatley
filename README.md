@@ -6,3 +6,4 @@ TODO:
  - Mettre à jour la doc
  - Voir si il faut pas rajouter une feature dans les nodes, qui précise quelle machine
  ils utilisent (!!!!!!!!)
+ - Ajouter un agent random pour comparer à une baseline débile
