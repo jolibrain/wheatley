@@ -7,5 +7,5 @@ class RewardModel(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, state, action, next_state):
+    def evaluate(self, obs, action, next_obs):
         pass

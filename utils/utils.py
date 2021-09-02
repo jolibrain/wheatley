@@ -10,11 +10,11 @@ def generate_problem(n_jobs, n_machines, high):
     durations = np.random.randint(low=1, high=high, size=(n_jobs, n_machines))
     affectations = np.expand_dims(np.arange(0, n_machines), axis=0)
     affectations = affectations.repeat(repeats=n_machines, axis=0)
-    affectations = permute_rows(affectations)
+    affectations = _permute_rows(affectations)
     return affectations, durations
 
 
-def permute_rows(x):
+def _permute_rows(x):
     """
     x is a bidimensional numpy array
     """

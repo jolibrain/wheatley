@@ -6,6 +6,16 @@ from config import MAX_N_NODES, MAX_N_EDGES
 
 
 class Observation:
+    """
+    This class is used to describe an observation in all the steps of the training
+    phase. So it should be able to represent the prepared observation, that will be
+    passed to the Env class; but it should also be able to represent the observation
+    the model is going to get after the gym env (and the manipulations due to PPO).
+    Because the environnement pass the observation from numpy to torch and from
+    CPU to GPU (if possible), the different functions handle different cases,
+    depending on where they are going to be used.
+    """
+
     def __init__(self, n_nodes, features, edge_index, mask):
         self.n_nodes = n_nodes
         self.features = features
@@ -15,8 +25,8 @@ class Observation:
     @classmethod
     def from_gym_observation(cls, gym_observation):
         """
-        This is only used on the agent side, so it should only handle cuda observations
-        (if, and only if the machine suports cuda).
+        This should only hanlde cuda tensors, since it is used on the agent side
+        (if and only if cuda is available on the machine).
         """
         if torch.cuda.is_available():
             if not gym_observation["features"].is_cuda:
@@ -46,11 +56,10 @@ class Observation:
     @classmethod
     def from_torch_geometric(cls, graph, mask):
         """
-        This is used only on torch_geometric.data.Data instances created by the Env side (within the state
-        class). So it should only be cpu tensors.
+        This should only hanlde cpu tensors, since it is used on the env side.
         """
         if graph.x.is_cuda:
-            raise Exception("Please don't use this function on cuda graph")
+            raise Exception("Please provide a cpu observation")
         return cls(
             graph.x.shape[0],
             graph.x.unsqueeze(0),
@@ -70,14 +79,12 @@ class Observation:
     def to_torch_geometric(self):
         """
         Returns the batched graph associated with the observation.
-        This should only hanlde cuda observations (if and only if cuda is available on
-        the machine).
+        This should only hanlde cuda tensors, since it is used on the agent side
+        (if and only if cuda is available on the machine).
         """
         if torch.cuda.is_available():
             if not self.features.is_cuda:
-                raise Exception(
-                    "Please use to_torch_geometric only with cuda tensors"
-                )
+                raise Exception("Please use this only on cuda observation")
 
         loader = DataLoader(
             [
@@ -91,12 +98,10 @@ class Observation:
 
     def to_gym_observation(self):
         """
-        This function should be used only on cpu tensors, since it is only used on the env side.
+        This should only handle cpu tensors, since it is used on the env side.
         """
         if self.features.is_cuda:
-            raise Exception(
-                "Please don't try to convert a cuda observation to a gym_observation"
-            )
+            raise Exception("Please use this only on cpu observation")
 
         n_edges = self.edge_index.shape[2]
         filled_features = np.zeros((MAX_N_NODES, 3))
