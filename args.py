@@ -13,9 +13,6 @@ parser.add_argument(
 parser.add_argument(
     "--n_m_testing", type=int, default=5, help="Number of jobs for test"
 )
-parser.add_argument(
-    "--max_duration", type=int, default=99, help="Max duration for the jobs"
-)
 
 parser.add_argument(
     "--n_timesteps",
@@ -43,6 +40,13 @@ parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 
 parser.add_argument(
     "--path", type=str, required=True, help="Path to saved model"
+)
+
+parser.add_argument(
+    "--n_test_problems",
+    type=int,
+    default=10,
+    help="Number of problems for testing",
 )
 
 args = parser.parse_args()

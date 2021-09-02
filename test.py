@@ -9,45 +9,58 @@ from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
 from utils.utils import generate_problem
 
-from config import MAX_N_JOBS, MAX_N_MACHINES, DEVICE
+from config import MAX_N_JOBS, MAX_N_MACHINES, MAX_DURATION, DEVICE
 from args import args
 
 
 def main():
-    testing_affectations, testing_durations = generate_problem(
-        args.n_j_testing, args.n_m_testing, args.max_duration
-    )
-    problem_description = ProblemDescription(
-        args.n_j_testing,
-        args.n_m_testing,
-        args.max_duration,
-        "L2D",
-        "L2D",
-        testing_affectations,
-        testing_durations,
-    )
-    testing_env = Env(problem_description)
-    agent = Agent.load(args.path, testing_env)
+    print("Loading agent")
+    agent = Agent.load(args.path)
+    agent.model.verbose = 0
     print(
-        f"Launching inference. Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines"
+        "Launching inference.\n"
+        f"Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines\n"
+        f"Number of problem tested : {args.n_test_problems}"
     )
 
-    solution = agent.predict(problem_description)
-    solution_or_tools = solve_jssp(testing_affectations, testing_durations)
+    diff_percentages = []
+    rl_makespans = []
+    or_tools_makespans = []
+    for i in range(args.n_test_problems):
+        testing_affectations, testing_durations = generate_problem(
+            args.n_j_testing, args.n_m_testing, MAX_DURATION
+        )
+        problem_description = ProblemDescription(
+            args.n_j_testing,
+            args.n_m_testing,
+            MAX_DURATION,
+            "L2D",
+            "L2D",
+            testing_affectations,
+            testing_durations,
+        )
+        rl_solution = agent.predict(problem_description)
+        or_tools_solution = solve_jssp(testing_affectations, testing_durations)
 
-    print(testing_affectations)
-    print(testing_durations)
-    print("Solution found by the model")
-    print(solution.schedule)
-    print("Solution found by OR-tools solver : ")
-    print(solution_or_tools.schedule)
+        rl_makespan = np.max(rl_solution.schedule + testing_durations)
+        or_tools_makespan = np.max(
+            or_tools_solution.schedule + testing_durations
+        )
+        diff_percentage = (
+            100 * (rl_makespan - or_tools_makespan) / or_tools_makespan
+        )
+        rl_makespans.append(rl_makespan)
+        or_tools_makespans.append(or_tools_makespan)
+        diff_percentages.append(diff_percentage)
 
-    makespan = np.max(solution.schedule + testing_durations)
-    makespan_or_tools = np.max(solution_or_tools.schedule + testing_durations)
-    print(f"Makespan for found solution : {makespan}")
-    print(f"Makespan for OR-tools solution : {makespan_or_tools}")
     print(
-        f"Difference in percentage : {(makespan - makespan_or_tools) * 100 / makespan_or_tools:.1f}%"
+        f"Makespan for RL solution : {np.mean(rl_makespans):.0f}±{np.std(rl_makespans):.0f}"
+    )
+    print(
+        f"Makespan for OR-tools solution : {np.mean(or_tools_makespans):.0f}±{np.std(or_tools_makespans):.0f}"
+    )
+    print(
+        f"Difference in percentage : {np.mean(diff_percentages):.1f}±{np.std(diff_percentages):.1f}%"
     )
 
 

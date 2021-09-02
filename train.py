@@ -7,7 +7,7 @@ from models.agent import Agent
 from problem.problem_description import ProblemDescription
 from utils.utils import generate_problem
 
-from config import MAX_N_JOBS, MAX_N_MACHINES, DEVICE
+from config import MAX_N_JOBS, MAX_N_MACHINES, MAX_DURATION, DEVICE
 from args import args
 
 
@@ -25,7 +25,7 @@ def main():
     )
 
     problem_description = ProblemDescription(
-        args.n_j, args.n_m, args.max_duration, "L2D", "L2D"
+        args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
     )
     training_env = Env(problem_description)
 

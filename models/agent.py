@@ -3,6 +3,7 @@ from stable_baselines3.ppo import PPO
 from env.env import Env
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
+from problem.problem_description import ProblemDescription
 
 from config import DEVICE
 
@@ -43,8 +44,9 @@ class Agent:
         self.model.save(path)
 
     @classmethod
-    def load(cls, path, env):
-        return cls(env, model=PPO.load(path, env, DEVICE))
+    def load(cls, path):
+        fake_env = Env(ProblemDescription(3, 3, 99, "L2D", "L2D"))
+        return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
 
     def train(self, problem_description, total_timesteps):
         env = Env(problem_description)

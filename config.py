@@ -13,6 +13,8 @@ HIDDEN_DIM_ACTOR = 32
 N_MLP_LAYERS_CRITIC = 3
 HIDDEN_DIM_CRITIC = 32
 
+MAX_DURATION = 99
+
 # Parameters that shouldn't play a role in learning
 MAX_N_JOBS = 10
 MAX_N_MACHINES = 10
