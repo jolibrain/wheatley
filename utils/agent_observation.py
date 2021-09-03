@@ -1,3 +1,7 @@
+import torch
+from torch_geometric.data import Data, DataLoader
+
+
 class AgentObservation:
     def __init__(
         self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask

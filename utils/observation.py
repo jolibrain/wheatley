@@ -71,7 +71,7 @@ class Observation:
         
         return cls(
             n_nodes,
-            features.unsqueeze(0)
+            features.unsqueeze(0),
             edge_index.unsqueeze(0),
             mask.unsqueeze(0),
         )

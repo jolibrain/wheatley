@@ -25,17 +25,17 @@ def test_run(l2d_transition_model):
     l2d_tm_cp = deepcopy(l2d_tm)
 
     # Check if unallowed actions have no effects, as they should
-    l2d_tm_cp.run(1)
+    l2d_tm_cp.run(0, 1)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(5050)
+    l2d_tm_cp.run(50, 50)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(101)
+    l2d_tm_cp.run(1, 1)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
 
     # Check actions that change only affectations
-    l2d_tm.run(505)
-    l2d_tm.run(606)
-    l2d_tm.run(0)
+    l2d_tm.run(5, 5)
+    l2d_tm.run(6, 6)
+    l2d_tm.run(0, 0)
     assert l2d_tm.state.is_affected[1, 0] == 1
     assert l2d_tm.state.is_affected[1, 1] == 1
     assert l2d_tm.state.is_affected[0, 0] == 1
@@ -46,7 +46,7 @@ def test_run(l2d_transition_model):
     ).all()
 
     # Check actions that change graph and affectations (and btw, insertion before)
-    l2d_tm.run(1515)
+    l2d_tm.run(15, 15)
     assert l2d_tm.state.is_affected[3, 0] == 1
     assert l2d_tm.state.graph.has_edge(15, 6)
     assert (
@@ -55,9 +55,9 @@ def test_run(l2d_transition_model):
     ).all()
 
     # Check actions that change graph, affectations and task_completion_times
-    l2d_tm.run(2020)
-    l2d_tm.run(1010)
-    l2d_tm.run(101)
+    l2d_tm.run(20, 20)
+    l2d_tm.run(10, 10)
+    l2d_tm.run(1, 1)
     assert l2d_tm.state.is_affected[4, 0] == 1
     assert l2d_tm.state.is_affected[2, 0] == 1
     assert l2d_tm.state.is_affected[0, 1] == 1
@@ -78,8 +78,8 @@ def test_run(l2d_transition_model):
     ).all()
 
     # Check insertion between 2 nodes
-    l2d_tm.run(707)
-    l2d_tm.run(202)
+    l2d_tm.run(7, 7)
+    l2d_tm.run(2, 2)
     assert l2d_tm.state.is_affected[1, 2] == 1
     assert l2d_tm.state.is_affected[0, 2] == 1
     assert l2d_tm.state.graph.has_edge(7, 2)
@@ -95,7 +95,7 @@ def test_run(l2d_transition_model):
             ]
         )
     ).all()
-    l2d_tm.run(2121)
+    l2d_tm.run(21, 21)
     assert l2d_tm.state.is_affected[4, 1] == 1
     assert l2d_tm.state.graph.has_edge(7, 21)
     assert l2d_tm.state.graph.has_edge(21, 2)

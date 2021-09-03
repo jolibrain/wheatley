@@ -58,7 +58,7 @@ class EnvObservation:
         edge_index = torch.zeros((2, MAX_N_EDGES))
         edge_index[:, 0 : self.get_n_edges()] = self.edge_index
         mask = torch.zeros(MAX_N_EDGES)
-        mask[0 : self.get_n_edges()] = self.mask
+        mask[0 : self.n_nodes ** 2] = self.mask
         return {
             "n_jobs": self.n_jobs,
             "n_machines": self.n_machines,

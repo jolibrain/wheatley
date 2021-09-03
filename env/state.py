@@ -2,10 +2,12 @@ from queue import PriorityQueue
 
 import networkx as nx
 import numpy as np
+import torch
 import torch_geometric
 
 from problem.solution import Solution
-from utils.utils import node_to_job_and_task
+from utils.utils import node_to_job_and_task, job_and_task_to_node
+
 
 
 class State:
@@ -14,6 +16,7 @@ class State:
         self.durations = durations
         self.n_jobs = self.affectations.shape[0]
         self.n_machines = self.affectations.shape[1]
+        self.n_nodes = self.n_jobs * self.n_machines
 
         self.graph = None
         self.task_completion_times = None
@@ -25,8 +28,8 @@ class State:
         self.graph = nx.DiGraph(
             [
                 (
-                    job_index * MAX_N_MACHINES + i,
-                    job_index * MAX_N_MACHINES + i + 1,
+                    job_index * self.n_machines + i,
+                    job_index * self.n_machines + i + 1,
                 )
                 for i in range(self.n_machines - 1)
                 for job_index in range(self.n_jobs)
@@ -88,8 +91,8 @@ class State:
             # We have to reorder features, since the networx -> torch_geometric
             # shuffles the nodes
             node_ids = graph.x[:, 0]
-            features = torch.zeros((n_nodes, graph.x[:, 1:].shape[1]))
-            features[node_ids] = graph.x[:, 1:]
+            features = torch.zeros((self.n_nodes, graph.x[:, 1:].shape[1]))
+            features[node_ids] = graph.x[:, 1:].float()
             edge_index = node_ids[graph.edge_index]
 
             return torch_geometric.data.Data(x=features, edge_index=edge_index)

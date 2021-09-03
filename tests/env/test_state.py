@@ -78,42 +78,39 @@ def test_get_machine_node_ids(state):
 
 def test_to_torch_geometric(state):
     graph = state.to_torch_geometric()
-    node_ids = graph.x[:, 0]
-    node_ids = node_ids.squeeze()
-    arg_sorted_ids = torch.argsort(node_ids)
-    features = graph.x[arg_sorted_ids]
     assert torch.eq(
-        features,
+        graph.x,
         torch.tensor(
             [
-                [0, 0, 1],
-                [1, 0, 6],
-                [2, 0, 16],
-                [3, 0, 23],
-                [4, 0, 31],
-                [5, 0, 5],
-                [6, 0, 11],
-                [7, 0, 14],
-                [8, 0, 17],
-                [9, 0, 21],
-                [10, 0, 4],
-                [11, 0, 8],
-                [12, 0, 12],
-                [13, 0, 16],
-                [14, 0, 20],
-                [15, 0, 5],
-                [16, 0, 11],
-                [17, 0, 18],
-                [18, 0, 26],
-                [19, 0, 35],
-                [20, 0, 9],
-                [21, 0, 17],
-                [22, 0, 24],
-                [23, 0, 30],
-                [24, 0, 35],
+                [0, 1],
+                [0, 6],
+                [0, 16],
+                [0, 23],
+                [0, 31],
+                [0, 5],
+                [0, 11],
+                [0, 14],
+                [0, 17],
+                [0, 21],
+                [0, 4],
+                [0, 8],
+                [0, 12],
+                [0, 16],
+                [0, 20],
+                [0, 5],
+                [0, 11],
+                [0, 18],
+                [0, 26],
+                [0, 35],
+                [0, 9],
+                [0, 17],
+                [0, 24],
+                [0, 30],
+                [0, 35],
             ]
         ),
     ).all()
+    assert set([(graph.edge_index[0, i].item(), graph.edge_index[1, i].item()) for i in range(graph.edge_index.shape[1])]) == set([(0, 1), (1, 2), (2, 3), (3, 4), (5, 6), (6, 7), (7, 8), (8, 9), (10, 11), (11, 12), (12, 13), (13, 14), (15, 16), (16, 17), (17, 18), (18, 19), (20, 21), (21, 22), (22, 23), (23, 24)])
 
 
 def test_update_completion_times(state):

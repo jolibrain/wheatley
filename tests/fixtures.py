@@ -7,7 +7,10 @@ from env.env import Env
 from env.l2d_transition_model import L2DTransitionModel
 from env.state import State
 from problem.problem_description import ProblemDescription
-from utils.observation import Observation
+from utils.env_observation import EnvObservation
+from utils.agent_observation import AgentObservation
+
+from config import DEVICE
 
 
 @fixture
@@ -74,61 +77,71 @@ def state(affectations, durations):
 
 
 @fixture
-def observation():
-    return Observation(
+def env_observation():
+    mask = torch.zeros(81)
+    mask[0] = 1
+    mask[30] = 1
+    mask[60] = 1
+    return EnvObservation(
+        n_jobs=3,
+        n_machines=3,
         n_nodes=9,
+        n_edges=8,
         features=torch.tensor(
             [
-                [
-                    [0, 0, 15],
-                    [1, 1, 2],
-                    [3, 1, 5],
-                    [2, 1, 7],
-                    [4, 0, 15],
-                    [7, 0, 14],
-                    [8, 1, 4],
-                    [5, 1, 1],
-                    [6, 1, 5],
-                ],
+                [0, 15],
+                [1, 2],
+                [1, 5],
+                [1, 7],
+                [0, 15],
+                [0, 14],
+                [1, 4],
+                [1, 1],
+                [1, 5],
             ],
         ),
         edge_index=torch.tensor(
-            [
-                [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
-            ],
+            [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
             dtype=torch.int64,
         ),
-        mask=torch.tensor([[1, 1, 1] + [0 for i in range(78)]]),
+        mask=mask
     )
 
 
 @fixture
-def batched_observation():
-    return Observation(
+def agent_observation():
+    mask = torch.zeros((2, 81))
+    mask[:, 0] = 1
+    mask[:, 30] = 1
+    mask[:, 60] = 1
+    return AgentObservation(
+        n_jobs=3,
+        n_machines=3,
         n_nodes=9,
+        n_edges=8,
         features=torch.tensor(
             [
                 [
-                    [0, 0, 15],
-                    [1, 1, 2],
-                    [3, 1, 5],
-                    [2, 1, 7],
-                    [4, 0, 15],
-                    [7, 0, 14],
-                    [8, 1, 4],
-                    [5, 1, 1],
-                    [6, 1, 5],
+                    [0, 15],
+                    [1, 2],
+                    [1, 5],
+                    [1, 7],
+                    [0, 15],
+                    [0, 14],
+                    [1, 4],
+                    [1, 1],
+                    [1, 5],
                 ],
                 [
-                    [0, 0, 15],
-                    [1, 1, 2],
-                    [3, 1, 5],
-                    [2, 1, 7],
-                    [4, 0, 15],
-                    [7, 0, 14],
-                    [8, 1, 4],
-                    [5, 1, 1],
-                    [6, 1, 5],
+                    [0, 15],
+                    [1, 2],
+                    [1, 5],
+                    [1, 7],
+                    [0, 15],
+                    [0, 14],
+                    [1, 4],
+                    [1, 1],
+                    [1, 5],
                 ],
             ],
         ),
@@ -139,41 +152,58 @@ def batched_observation():
             ],
             dtype=torch.int64,
         ),
-        mask=torch.tensor(
-            [
-                [1, 1, 1] + [0 for i in range(78)],
-                [1, 0, 1, 1] + [0 for i in range(77)],
-            ],
-        ),
+        mask=mask,
     )
 
 
 @fixture
 def gym_observation():
+    mask = torch.zeros((2, 81), device=DEVICE)
+    mask[:, 0] = 1
+    mask[:, 30] = 1
+    mask[:, 60] = 1
     return {
+        "n_jobs": 3,
+        "n_machines": 3,
         "n_nodes": 9,
+        "n_edges": 8,
         "features": torch.tensor(
             [
                 [
-                    [0, 0, 15],
-                    [1, 1, 2],
-                    [3, 1, 5],
-                    [2, 1, 7],
-                    [4, 0, 15],
-                    [7, 0, 14],
-                    [8, 1, 4],
-                    [5, 1, 1],
-                    [6, 1, 5],
+                    [0, 15],
+                    [1, 2],
+                    [1, 5],
+                    [1, 7],
+                    [0, 15],
+                    [0, 14],
+                    [1, 4],
+                    [1, 1],
+                    [1, 5],
                 ],
+                [
+                    [0, 15],
+                    [1, 2],
+                    [1, 5],
+                    [1, 7],
+                    [0, 15],
+                    [0, 14],
+                    [1, 4],
+                    [1, 1],
+                    [1, 5],
+                ],
+
             ],
+            device=DEVICE
         ),
         "edge_index": torch.tensor(
             [
                 [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
+                [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
             ],
             dtype=torch.int64,
+            device=DEVICE
         ),
-        "mask": torch.tensor([[1, 1, 1] + [0 for i in range(78)]]),
+        "mask": mask 
     }
 
 

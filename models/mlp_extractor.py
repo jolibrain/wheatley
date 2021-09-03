@@ -62,7 +62,7 @@ class MLPExtractor(nn.Module):
         )
 
         # Apply a mask
-        pairs_to_compute, indexes = apply_mask(possible_s_a_pairs, mask)
+        pairs_to_compute, indexes = self._apply_mask(possible_s_a_pairs, mask)
 
         # Compute the probabilities
         probabilities = self.actor(pairs_to_compute)
@@ -91,8 +91,8 @@ class MLPExtractor(nn.Module):
         n_nodes = nodes_embedding.shape[1]
 
         states = graph_embedding.repeat(1, n_nodes * n_nodes, 1)
-        nodes1 = nodes_embedding.repeat(1, n_nodes, 1)
-        nodes2 = nodes_embedding.repeat_interleave(n_nodes, dim=1)
+        nodes1 = nodes_embedding.repeat_interleave(n_nodes, dim=1)
+        nodes2 = nodes_embedding.repeat(1, n_nodes, 1)
 
         s_a_pairs = torch.cat([states, nodes1, nodes2], dim=2)
         return s_a_pairs
@@ -114,3 +114,17 @@ class MLPExtractor(nn.Module):
         batch_size = graph_embedding.shape[0]
         mask = extended_mask[:, 1:, :].reshape(batch_size, -1)
         return graph_embedding, nodes_embedding, mask
+
+    def _apply_mask(self, tensor, mask):
+        """
+        Returns the tensor corresponding to 1 values in the mask, and the corresponding
+        indexes. Tensor should be (A, B, C) shaped and mask (A, B) shaped
+        """
+        indexes = []
+        masked_tensors = []
+
+        for i in range(tensor.shape[0]):
+            indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
+            masked_tensors.append(tensor[i][indexes[-1]])
+        return torch.stack(masked_tensors), indexes
+

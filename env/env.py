@@ -5,7 +5,7 @@ import torch
 
 from env.l2d_transition_model import L2DTransitionModel
 from env.l2d_reward_model import L2DRewardModel
-from utils.observation import Observation
+from utils.env_observation import EnvObservation
 from utils.utils import generate_problem
 
 from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
@@ -13,7 +13,7 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 class Env(gym.Env):
     def __init__(self, problem_description):
-        n_features = 3  # This is fixed by the way we choose the nodes features
+        n_features = 2  # This is fixed by the way we choose the nodes features
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration
@@ -21,8 +21,10 @@ class Env(gym.Env):
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
             {
-                "n_jobs": DISCRETE(MAX_N_JOBS),
-                "n_machines": DISCRETE(MAX_N_MACHINES),
+                "n_jobs": Discrete(MAX_N_JOBS),
+                "n_machines": Discrete(MAX_N_MACHINES),
+                "n_nodes": Discrete(MAX_N_NODES),
+                "n_edges": Discrete(MAX_N_EDGES),
                 "features": Box(
                     # high is 99*n_machines due to lower bound method of calculation
                     low=0,
@@ -66,7 +68,8 @@ class Env(gym.Env):
             self.transition_model.get_graph(),
             self.transition_model.get_mask(),
         )
-        self.transition_model.run(self._convert_action_to_node_ids(action))
+        first_node_id, second_node_id = self._convert_action_to_node_ids(action)
+        self.transition_model.run(first_node_id, second_node_id)
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,

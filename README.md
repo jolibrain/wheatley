@@ -5,4 +5,4 @@ TODO:
  - Voir si il faut pas rajouter une feature dans les nodes, qui précise quelle machine
  ils utilisent (!!!!!!!!)
  - Implémenter un GIN Features Extractor
- - Continuer à modifier la manière dont est embedée le state, pour eviter les erreurs (surtout contniuer dans mlp_extractor.py)
+ - Implémenter les tests pour env_observation.py et agent_observation.py

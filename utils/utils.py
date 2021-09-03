@@ -25,12 +25,12 @@ def _permute_rows(x):
     return x[ix_i, ix_j]
 
 
-def node_to_job_and_task(node_id):
-    return node_id // MAX_N_MACHINES, node_id % MAX_N_MACHINES
+def node_to_job_and_task(node_id, n_machines):
+    return node_id // n_machines, node_id % n_machines
 
 
-def job_and_task_to_node(job_id, task_id):
-    return job_id * MAX_N_MACHINES + task_id
+def job_and_task_to_node(job_id, task_id, n_machines):
+    return job_id * n_machines + task_id
 
 
 def apply_mask(tensor, mask):
