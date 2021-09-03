@@ -16,7 +16,6 @@ class RandomAgent:
         while not done:
             action = self.select_action(observation)
             observation, _, done, _ = env.step(action)
-            print(env.transition_model.state.is_affected)
         solution = env.get_solution()
         return solution
 

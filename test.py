@@ -31,8 +31,8 @@ def main():
     or_tools_makespans = []
     random_makespans = []
     for i in range(args.n_test_problems):
-        if (i + 1) % (args.n_test_problems // 10) == 0:
-            print(f"{i+1}/{args.n_test_problems}")
+        # if (i + 1) % (args.n_test_problems // 10) == 0:
+        #     print(f"{i+1}/{args.n_test_problems}")
         testing_affectations, testing_durations = generate_problem(
             args.n_j_testing, args.n_m_testing, MAX_DURATION
         )
@@ -67,9 +67,9 @@ def main():
     print(
         f"Makespan for OR-tools solution : {np.mean(or_tools_makespans):.0f}±{np.std(or_tools_makespans):.0f}"
     )
-    # print(
-    #     f"Makespan for random solution : {np.mean(random_makespan):.0f}±{np.std(random_makespan):.0f}"
-    # )
+    print(
+        f"Makespan for random solution : {np.mean(random_makespan):.0f}±{np.std(random_makespan):.0f}"
+    )
     print(
         f"Difference in percentage between OR-tools and RL : {np.mean(diff_percentages):.1f}±{np.std(diff_percentages):.1f}%"
     )
