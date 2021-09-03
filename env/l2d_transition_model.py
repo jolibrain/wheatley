@@ -78,7 +78,9 @@ class L2DTransitionModel(TransitionModel):
             task_id = self.state.get_first_unaffected_task(job_id)
             if task_id == -1:
                 task_id = self.n_jobs - 1
-            available_node_ids.append(job_and_task_to_node(job_id, task_id, self.n_machines))
+            available_node_ids.append(
+                job_and_task_to_node(job_id, task_id, self.n_machines)
+            )
         mask = torch.zeros(self.n_nodes ** 2)
         for node_id in available_node_ids:
             mask[node_id + self.n_nodes * node_id] = 1

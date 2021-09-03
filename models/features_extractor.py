@@ -57,7 +57,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
 
         graph_state = observation.to_torch_geometric()
         features, edge_index = graph_state.x, graph_state.edge_index
-        
+
         # Compute graph embeddings
         for layer in range(self.n_layers_features_extractor - 1):
             features = self.features_extractors[layer](features, edge_index)

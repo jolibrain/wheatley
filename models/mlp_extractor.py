@@ -127,4 +127,3 @@ class MLPExtractor(nn.Module):
             indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
             masked_tensors.append(tensor[i][indexes[-1]])
         return torch.stack(masked_tensors), indexes
-

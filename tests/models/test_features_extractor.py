@@ -11,7 +11,7 @@ def test_forward(gym_observation):
     fe = FeaturesExtractor(
         observation_space=Dict(
             {
-                "n_jobs": Discrete(3), 
+                "n_jobs": Discrete(3),
                 "n_machines": Discrete(3),
                 "n_nodes": Discrete(9),
                 "n_edges": Discrete(81),

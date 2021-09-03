@@ -9,7 +9,6 @@ from problem.solution import Solution
 from utils.utils import node_to_job_and_task, job_and_task_to_node
 
 
-
 class State:
     def __init__(self, affectations, durations):
         self.affectations = affectations

@@ -104,7 +104,7 @@ def env_observation():
             [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
             dtype=torch.int64,
         ),
-        mask=mask
+        mask=mask,
     )
 
 
@@ -191,9 +191,8 @@ def gym_observation():
                     [1, 1],
                     [1, 5],
                 ],
-
             ],
-            device=DEVICE
+            device=DEVICE,
         ),
         "edge_index": torch.tensor(
             [
@@ -201,9 +200,9 @@ def gym_observation():
                 [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
             ],
             dtype=torch.int64,
-            device=DEVICE
+            device=DEVICE,
         ),
-        "mask": mask 
+        "mask": mask,
     }
 
 

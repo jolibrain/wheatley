@@ -110,7 +110,35 @@ def test_to_torch_geometric(state):
             ]
         ),
     ).all()
-    assert set([(graph.edge_index[0, i].item(), graph.edge_index[1, i].item()) for i in range(graph.edge_index.shape[1])]) == set([(0, 1), (1, 2), (2, 3), (3, 4), (5, 6), (6, 7), (7, 8), (8, 9), (10, 11), (11, 12), (12, 13), (13, 14), (15, 16), (16, 17), (17, 18), (18, 19), (20, 21), (21, 22), (22, 23), (23, 24)])
+    assert set(
+        [
+            (graph.edge_index[0, i].item(), graph.edge_index[1, i].item())
+            for i in range(graph.edge_index.shape[1])
+        ]
+    ) == set(
+        [
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (5, 6),
+            (6, 7),
+            (7, 8),
+            (8, 9),
+            (10, 11),
+            (11, 12),
+            (12, 13),
+            (13, 14),
+            (15, 16),
+            (16, 17),
+            (17, 18),
+            (18, 19),
+            (20, 21),
+            (21, 22),
+            (22, 23),
+            (23, 24),
+        ]
+    )
 
 
 def test_update_completion_times(state):

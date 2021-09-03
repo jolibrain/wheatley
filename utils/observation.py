@@ -59,7 +59,7 @@ class Observation:
         """
         if graph.x.is_cuda:
             raise Exception("Please provide a cpu observation")
-        
+
         # We have to reorder features, since the networx -> torch_geometric
         # shuffles the nodes
         n_nodes = graph.x.shape[0]
@@ -68,7 +68,7 @@ class Observation:
         features[node_ids] = graph.x[:, 1:]
 
         edge_index = node_ids[graph.edge_index]
-        
+
         return cls(
             n_nodes,
             features.unsqueeze(0),
@@ -118,4 +118,3 @@ class Observation:
             "edge_index": self.edge_index.numpy(),
             "mask": self.mask.numpy(),
         }
-

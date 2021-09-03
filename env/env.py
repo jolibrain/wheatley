@@ -68,7 +68,9 @@ class Env(gym.Env):
             self.transition_model.get_graph(),
             self.transition_model.get_mask(),
         )
-        first_node_id, second_node_id = self._convert_action_to_node_ids(action)
+        first_node_id, second_node_id = self._convert_action_to_node_ids(
+            action
+        )
         self.transition_model.run(first_node_id, second_node_id)
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,

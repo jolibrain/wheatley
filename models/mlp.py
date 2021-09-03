@@ -4,7 +4,9 @@ import torch.nn.functional as F
 
 
 class MLP(nn.Module):
-    def __init__(self, n_layers, input_dim, hidden_dim, output_dim, batch_norm, device):
+    def __init__(
+        self, n_layers, input_dim, hidden_dim, output_dim, batch_norm, device
+    ):
         super(MLP, self).__init__()
         if n_layers < 3:
             raise Exception("Number of layers must be >= 3")
