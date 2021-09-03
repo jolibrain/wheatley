@@ -50,15 +50,10 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         Note : the output may depend on the number of nodes, but it should not be a
         problem.
         """
-        observation = Observation.from_gym_observation(obs)
+        observation = AgentObservation.from_gym_observation(obs)
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()
         mask = observation.get_mask()
-
-        node_ids = (
-            observation.drop_node_ids()
-        )  # First feature should not be processed
-        node_ids = node_ids.squeeze()
 
         graph_state = observation.to_torch_geometric()
         features, edge_index = graph_state.x, graph_state.edge_index
@@ -66,11 +61,6 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         for layer in range(self.n_layers_features_extractor - 1):
             features = self.features_extractors[layer](features, edge_index)
         features = features.reshape(batch_size, n_nodes, -1)
-
-        # Reorder the nodes of each graph of the batch
-        for i in range(batch_size):
-            arg_sorted_ids = torch.argsort(node_ids[i])
-            features[i] = features[i][arg_sorted_ids]
 
         # Create graph embedding and concatenate
         graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes

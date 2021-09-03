@@ -8,7 +8,7 @@ from env.l2d_reward_model import L2DRewardModel
 from utils.observation import Observation
 from utils.utils import generate_problem
 
-from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES
+from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
@@ -21,6 +21,8 @@ class Env(gym.Env):
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
             {
+                "n_jobs": DISCRETE(MAX_N_JOBS),
+                "n_machines": DISCRETE(MAX_N_MACHINES),
                 "features": Box(
                     # high is 99*n_machines due to lower bound method of calculation
                     low=0,
@@ -33,7 +35,6 @@ class Env(gym.Env):
                     shape=(2, MAX_N_EDGES),
                     dtype=np.int64,
                 ),
-                "n_nodes": Discrete(MAX_N_NODES),
                 "mask": Box(low=0, high=1, shape=(MAX_N_EDGES,)),
             }
         )
@@ -59,12 +60,18 @@ class Env(gym.Env):
         self.reset()
 
     def step(self, action):
-        obs = Observation.from_torch_geometric(
-            self.transition_model.get_graph(), self.transition_model.get_mask()
+        obs = EnvObservation.from_torch_geometric(
+            self.n_jobs,
+            self.n_machines,
+            self.transition_model.get_graph(),
+            self.transition_model.get_mask(),
         )
-        self.transition_model.run(action)
-        next_obs = Observation.from_torch_geometric(
-            self.transition_model.get_graph(), self.transition_model.get_mask()
+        self.transition_model.run(self._convert_action_to_node_ids(action))
+        next_obs = EnvObservation.from_torch_geometric(
+            self.n_jobs,
+            self.n_machines,
+            self.transition_model.get_graph(),
+            self.transition_model.get_mask(),
         )
         reward = self.reward_model.evaluate(obs, action, next_obs)
         done = self.transition_model.done()
@@ -73,14 +80,22 @@ class Env(gym.Env):
 
         return gym_observation, reward, done, {}
 
+    def _convert_action_to_node_ids(self, action):
+        first_node_id = action // MAX_N_NODES
+        second_node_id = action % MAX_N_NODES
+        return first_node_id, second_node_id
+
     def reset(self):
         if self.generate_random_problems:
             self.affectations, self.durations = generate_problem(
                 self.n_jobs, self.n_machines, self.max_duration
             )
         self._create_transition_and_reward_model()
-        observation = Observation.from_torch_geometric(
-            self.transition_model.get_graph(), self.transition_model.get_mask()
+        observation = EnvObservation.from_torch_geometric(
+            self.n_jobs,
+            self.n_machines,
+            self.transition_model.get_graph(),
+            self.transition_model.get_mask(),
         )
         return observation.to_gym_observation()
 

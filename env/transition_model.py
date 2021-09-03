@@ -16,7 +16,7 @@ class TransitionModel(ABC):
         self.state = State(self.affectations, self.durations)
 
     @abstractmethod
-    def run(self, action):
+    def run(self, first_node_id, second_node_id):
         pass
 
     @abstractmethod

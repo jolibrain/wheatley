@@ -25,8 +25,8 @@ class State:
         self.graph = nx.DiGraph(
             [
                 (
-                    job_index * self.n_machines + i,
-                    job_index * self.n_machines + i + 1,
+                    job_index * MAX_N_MACHINES + i,
+                    job_index * MAX_N_MACHINES + i + 1,
                 )
                 for i in range(self.n_machines - 1)
                 for job_index in range(self.n_jobs)
@@ -57,10 +57,13 @@ class State:
 
     def _get_machine_node_ids(self, machine_id):
         node_ids = []
-        for node_id in range(self.n_jobs * self.n_machines):
-            job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
-            if self.affectations[job_id, task_id] == machine_id:
-                node_ids.append(node_id)
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                node_id = job_and_task_to_node(
+                    job_id, task_id, self.n_machines
+                )
+                if self.affectations[job_id, task_id] == machine_id:
+                    node_ids.append(node_id)
         return node_ids
 
     def to_torch_geometric(self, node_encoding="L2D"):
@@ -70,16 +73,26 @@ class State:
         parameter of the Data object) that should be added to the graph.
         """
         if node_encoding == "L2D":
-            for node_id in range(self.n_machines * self.n_jobs):
-                job_id, task_id = node_to_job_and_task(
-                    node_id, self.n_machines
-                )
-                self.graph.nodes[node_id]["x"] = [
-                    node_id,
-                    self.is_affected[job_id, task_id],
-                    self.task_completion_times[job_id, task_id],
-                ]
-            return torch_geometric.utils.from_networkx(self.graph)
+            for job_id in range(self.n_jobs):
+                for task_id in range(self.n_machines):
+                    node_id = job_and_task_to_node(
+                        job_id, task_id, self.n_machines
+                    )
+                    self.graph.nodes[node_id]["x"] = [
+                        node_id,
+                        self.is_affected[job_id, task_id],
+                        self.task_completion_times[job_id, task_id],
+                    ]
+            graph = torch_geometric.utils.from_networkx(self.graph)
+
+            # We have to reorder features, since the networx -> torch_geometric
+            # shuffles the nodes
+            node_ids = graph.x[:, 0]
+            features = torch.zeros((n_nodes, graph.x[:, 1:].shape[1]))
+            features[node_ids] = graph.x[:, 1:]
+            edge_index = node_ids[graph.edge_index]
+
+            return torch_geometric.data.Data(x=features, edge_index=edge_index)
 
         else:
             raise Exception("Encoding not recognized")

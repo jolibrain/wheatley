@@ -1,7 +1,8 @@
 import numpy as np
-import torch
 
 from env.env import Env
+
+from config import MAX_N_NODES
 
 
 class RandomAgent:
@@ -15,13 +16,15 @@ class RandomAgent:
         while not done:
             action = self.select_action(observation)
             observation, _, done, _ = env.step(action)
+            print(env.transition_model.state.is_affected)
         solution = env.get_solution()
         return solution
 
     def select_action(self, observation):
-        possible_actions = (
-            torch.nonzero(observation["mask"], as_tuple=True)[0]
-            .detach()
-            .numpy()
-        )
-        return np.random.choice(possible_actions)
+        real_mask = np.zeros((MAX_N_NODES, MAX_N_NODES))
+        n_nodes = observation["n_nodes"]
+        lil_mask = observation["mask"].reshape(n_nodes, n_nodes)
+        real_mask[0:n_nodes, 0:n_nodes] = lil_mask
+        possible_actions = np.nonzero(real_mask)[0]
+        action = np.random.choice(possible_actions)
+        return action

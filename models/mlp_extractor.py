@@ -48,22 +48,11 @@ class MLPExtractor(nn.Module):
         FeatureExtractor
         """
         # First decompose the features into mask, graph_embedding and nodes_embedding
-        graph_and_nodes_embedding, extended_mask = torch.split(
-            embedded_features,
-            [
-                HIDDEN_DIM_FEATURES_EXTRACTOR,
-                embedded_features.shape[2] - HIDDEN_DIM_FEATURES_EXTRACTOR,
-            ],
-            dim=2,
+        graph_embedding, nodes_embedding, mask = self._decompose_features(
+            embedded_features
         )
-        graph_embedding, nodes_embedding = torch.split(
-            graph_and_nodes_embedding,
-            [1, graph_and_nodes_embedding.shape[1] - 1],
-            dim=1,
-        )
-        batch_size = graph_embedding.shape[0]
         n_nodes = nodes_embedding.shape[1]
-        mask = extended_mask[:, 1:, :].reshape(batch_size, -1)
+        batch_size = graph_embedding.shape[0]
 
         # Then compute actor and critic
         value = self.critic(graph_embedding)
@@ -107,3 +96,21 @@ class MLPExtractor(nn.Module):
 
         s_a_pairs = torch.cat([states, nodes1, nodes2], dim=2)
         return s_a_pairs
+
+    def _decompose_features(self, embedded_features):
+        graph_and_nodes_embedding, extended_mask = torch.split(
+            embedded_features,
+            [
+                HIDDEN_DIM_FEATURES_EXTRACTOR,
+                embedded_features.shape[2] - HIDDEN_DIM_FEATURES_EXTRACTOR,
+            ],
+            dim=2,
+        )
+        graph_embedding, nodes_embedding = torch.split(
+            graph_and_nodes_embedding,
+            [1, graph_and_nodes_embedding.shape[1] - 1],
+            dim=1,
+        )
+        batch_size = graph_embedding.shape[0]
+        mask = extended_mask[:, 1:, :].reshape(batch_size, -1)
+        return graph_embedding, nodes_embedding, mask
