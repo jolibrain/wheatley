@@ -21,10 +21,10 @@ class Env(gym.Env):
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
             {
-                "n_jobs": Discrete(MAX_N_JOBS),
-                "n_machines": Discrete(MAX_N_MACHINES),
-                "n_nodes": Discrete(MAX_N_NODES),
-                "n_edges": Discrete(MAX_N_EDGES),
+                "n_jobs": Discrete(MAX_N_JOBS + 1),
+                "n_machines": Discrete(MAX_N_MACHINES + 1),
+                "n_nodes": Discrete(MAX_N_NODES + 1),
+                "n_edges": Discrete(MAX_N_EDGES + 1),
                 "features": Box(
                     # high is 99*n_machines due to lower bound method of calculation
                     low=0,
