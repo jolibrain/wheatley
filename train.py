@@ -23,9 +23,11 @@ def main():
         f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
         f"Training time : {args.n_timesteps} timesteps"
     )
-
+    affectations, durations = generate_problem(
+        args.n_j, args.n_m, MAX_DURATION
+    )
     problem_description = ProblemDescription(
-        args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
+        args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D", affectations, durations
     )
     training_env = Env(problem_description)
 

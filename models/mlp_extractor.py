@@ -83,6 +83,7 @@ class MLPExtractor(nn.Module):
         )
         filled_pi[:, 0:n_nodes, 0:n_nodes] = shaped_pi
         filled_pi = filled_pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES)
+
         return filled_pi, value
 
     def _compute_possible_s_a_pairs(self, graph_embedding, nodes_embedding):
