@@ -22,7 +22,7 @@ def main():
     random_agent = RandomAgent()
     print(
         "Launching inference.\n"
-        f"Problem size : {args.n_j_testing} jobs, {args.n_m_testing} machines\n"
+        f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
         f"Number of problem tested : {args.n_test_problems}"
     )
 
@@ -34,11 +34,11 @@ def main():
         if (i + 1) % (args.n_test_problems // 10) == 0:
             print(f"{i+1}/{args.n_test_problems}")
         testing_affectations, testing_durations = generate_problem(
-            args.n_j_testing, args.n_m_testing, MAX_DURATION
+            args.n_j, args.n_m, MAX_DURATION
         )
         problem_description = ProblemDescription(
-            args.n_j_testing,
-            args.n_m_testing,
+            args.n_j,
+            args.n_m,
             MAX_DURATION,
             "L2D",
             "L2D",

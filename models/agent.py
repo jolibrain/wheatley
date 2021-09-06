@@ -45,7 +45,7 @@ class Agent:
 
     @classmethod
     def load(cls, path):
-        fake_env = Env(ProblemDescription(3, 3, 99, "L2D", "L2D"))
+        fake_env = Env(ProblemDescription(2, 2, 99, "L2D", "L2D"))
         return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
 
     def train(self, problem_description, total_timesteps):

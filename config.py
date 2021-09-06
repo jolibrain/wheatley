@@ -1,5 +1,7 @@
 import torch
 
+from args import args
+
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -18,6 +20,10 @@ MAX_DURATION = 99
 # Parameters that shouldn't play a role in learning
 MAX_N_JOBS = 8
 MAX_N_MACHINES = 8
+
+if args.fix_problem_size:
+    MAX_N_JOBS = args.n_j
+    MAX_N_MACHINES = args.n_m
 
 MAX_N_NODES = MAX_N_JOBS * MAX_N_MACHINES
 MAX_N_EDGES = MAX_N_NODES ** 2

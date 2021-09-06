@@ -7,12 +7,6 @@ parser = argparse.ArgumentParser(
 # General problem arguments
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
-parser.add_argument(
-    "--n_j_testing", type=int, default=5, help="Number of jobs for test"
-)
-parser.add_argument(
-    "--n_m_testing", type=int, default=5, help="Number of jobs for test"
-)
 
 parser.add_argument(
     "--n_timesteps",
@@ -39,7 +33,10 @@ parser.add_argument(
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 
 parser.add_argument(
-    "--path", type=str, required=True, help="Path to saved model"
+    "--path",
+    type=str,
+    default="saved_networks/default_net",
+    help="Path to saved model",
 )
 
 parser.add_argument(
@@ -48,5 +45,14 @@ parser.add_argument(
     default=100,
     help="Number of problems for testing",
 )
+
+# Debug options
+parser.add_argument(
+    "--fix_problem_size",
+    default=False,
+    action="store_true",
+    help="Wether the size of the problem (n_jobs, n_machines) is fixed for the agent or not",
+)
+
 
 args = parser.parse_args()
