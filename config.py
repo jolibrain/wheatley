@@ -18,8 +18,8 @@ HIDDEN_DIM_CRITIC = 32
 MAX_DURATION = 99
 
 # Parameters that shouldn't play a role in learning
-MAX_N_JOBS = 8
-MAX_N_MACHINES = 8
+MAX_N_JOBS = 10
+MAX_N_MACHINES = 10
 
 if args.fix_problem_size:
     MAX_N_JOBS = args.n_j

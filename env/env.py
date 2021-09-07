@@ -80,7 +80,6 @@ class Env(gym.Env):
         )
         reward = self.reward_model.evaluate(obs, action, next_obs)
         done = self.transition_model.done()
-
         gym_observation = next_obs.to_gym_observation()
 
         return gym_observation, reward, done, {}
