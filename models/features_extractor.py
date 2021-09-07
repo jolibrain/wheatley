@@ -21,8 +21,10 @@ from config import (
 class FeaturesExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space):
         super(FeaturesExtractor, self).__init__(
-            observation_space=observation_space, features_dim=1
-        )  # Only so it's not 0. Cf stable_baselines3 implementation
+            observation_space=observation_space,
+            features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES)
+            * (MAX_N_NODES + 1),
+        )
 
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
@@ -38,6 +40,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                         hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         batch_norm=True,
+                        activation="relu",
                         device=DEVICE,
                     )
                 )

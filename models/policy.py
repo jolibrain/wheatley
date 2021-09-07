@@ -26,7 +26,11 @@ class Policy(ActorCriticPolicy):
         latent_pi, latent_vf, _ = self._get_latent(obs)
         values = latent_vf  # Modification here
         distribution = Categorical(latent_pi)  # And here
-        actions = distribution.sample()
+        actions = (
+            torch.argmax(distribution.probs, dim=1)
+            if deterministic
+            else distribution.sample()
+        )
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob
 

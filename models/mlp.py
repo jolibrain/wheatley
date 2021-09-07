@@ -5,7 +5,14 @@ import torch.nn.functional as F
 
 class MLP(nn.Module):
     def __init__(
-        self, n_layers, input_dim, hidden_dim, output_dim, batch_norm, device
+        self,
+        n_layers,
+        input_dim,
+        hidden_dim,
+        output_dim,
+        batch_norm,
+        activation,
+        device,
     ):
         super(MLP, self).__init__()
         if n_layers < 3:
@@ -29,12 +36,20 @@ class MLP(nn.Module):
                     self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
                 else:
                     self.batch_norms.append(nn.BatchNorm1d(output_dim))
+        if activation == "tanh":
+            self.activation_layer = nn.Tanh()
+        elif activation == "relu":
+            self.activation_layer = nn.ReLU()
+        else:
+            raise Exception("Activation not recognized")
         self.to(device)
 
     def forward(self, x):
-        for layer in range(self.n_layers - 1):
+        for layer in range(self.n_layers - 2):
             if self.batch_norm:
-                x = F.relu(self.batch_norms[layer](self.layers[layer](x)))
+                x = self.activation_layer(
+                    self.batch_norms[layer](self.layers[layer](x))
+                )
             else:
-                x = F.relu(self.layers[layer](x))
-        return x
+                x = self.activation_layer(self.layers[layer](x))
+        return self.layers[self.n_layers - 2](x)

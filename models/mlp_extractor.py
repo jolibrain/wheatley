@@ -31,6 +31,7 @@ class MLPExtractor(nn.Module):
             hidden_dim=HIDDEN_DIM_ACTOR,
             output_dim=1,
             batch_norm=False,
+            activation="tanh",
             device=DEVICE,
         )
         self.critic = MLP(
@@ -39,6 +40,7 @@ class MLPExtractor(nn.Module):
             hidden_dim=HIDDEN_DIM_CRITIC,
             output_dim=1,
             batch_norm=False,
+            activation="tanh",
             device=DEVICE,
         )
 
