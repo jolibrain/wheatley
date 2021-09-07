@@ -40,7 +40,7 @@ def main():
         vf_coef=args.vf_coef,
         lr=args.lr,
     )
-
+    print(agent)
     agent.save(args.path)
 
 

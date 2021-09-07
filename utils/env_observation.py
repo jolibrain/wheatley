@@ -2,6 +2,8 @@ import torch
 
 from config import MAX_N_NODES, MAX_N_EDGES
 
+from args import args
+
 
 class EnvObservation:
     def __init__(
@@ -35,6 +37,9 @@ class EnvObservation:
 
         n_nodes = n_jobs * n_machines
         n_edges = graph.edge_index.shape[1]
+
+        if args.remove_mask:
+            mask = torch.ones_like(mask)
 
         return cls(
             n_jobs,

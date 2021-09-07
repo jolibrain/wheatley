@@ -53,6 +53,11 @@ parser.add_argument(
     action="store_true",
     help="Wether the size of the problem (n_jobs, n_machines) is fixed for the agent or not",
 )
-
+parser.add_argument(
+    "--remove_mask",
+    default=False,
+    action="store_true",
+    help="Removes the mask, to check wheter there is a problem in its implementation",
+)
 
 args = parser.parse_args()

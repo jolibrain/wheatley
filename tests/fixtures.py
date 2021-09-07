@@ -1,3 +1,4 @@
+from gym.spaces import Dict, Box, Discrete
 import numpy as np
 from pytest import fixture
 import torch
@@ -6,6 +7,7 @@ from torch_geometric.data import Data
 from env.env import Env
 from env.l2d_transition_model import L2DTransitionModel
 from env.state import State
+from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
 from utils.env_observation import EnvObservation
 from utils.agent_observation import AgentObservation
@@ -210,3 +212,21 @@ def gym_observation():
 def l2d_transition_model(affectations, durations):
     l2d_transition_model = L2DTransitionModel(affectations, durations)
     return l2d_transition_model
+
+
+@fixture
+def features_extractor():
+    features_extractor = FeaturesExtractor(
+        observation_space=Dict(
+            {
+                "n_jobs": Discrete(3),
+                "n_machines": Discrete(3),
+                "n_nodes": Discrete(9),
+                "n_edges": Discrete(81),
+                "features": Box(0, 1, shape=(9, 2)),
+                "edge_index": Box(0, 9, shape=(2, 81), dtype=np.int64),
+                "mask": Box(0, 1, shape=(81,), dtype=np.int64),
+            }
+        )
+    )
+    return features_extractor

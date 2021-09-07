@@ -35,7 +35,7 @@ class Agent:
                 clip_range=clip_range,
                 ent_coef=ent_coef,
                 vf_coef=vf_coef,
-                verbose=1,
+                verbose=2,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
             )
