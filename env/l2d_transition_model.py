@@ -11,11 +11,13 @@ class L2DTransitionModel(TransitionModel):
         super(L2DTransitionModel, self).__init__(
             affectations, durations, node_encoding="L2D"
         )
+        self.useless_timesteps = 0
 
     def run(self, first_node_id, second_node_id):
         # Since L2D operates on nodes, and not edges, each action must correspond to
         # an edge with the same node on both sides
         if first_node_id != second_node_id:
+            self.useless_timesteps += 1
             return
         node_id = first_node_id
 
@@ -28,9 +30,11 @@ class L2DTransitionModel(TransitionModel):
 
         # If the job_id is bigger that max job_id, we don't operate the action
         if job_id >= self.n_jobs:
+            self.useless_timesteps += 1
             return
         # Finally, if the task doesn't correspond to the available tasks, we also skip
         if task_id != self.state.get_first_unaffected_task(job_id):
+            self.useless_timesteps += 1
             return
 
         machine_id = self.affectations[job_id, task_id]
