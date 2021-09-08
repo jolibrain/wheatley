@@ -3,7 +3,7 @@ import torch
 
 from models.features_extractor import FeaturesExtractor
 
-from config import HIDDEN_DIM_FEATURES_EXTRACTOR
+from config import HIDDEN_DIM_FEATURES_EXTRACTOR, DEVICE
 
 
 def test_features_extractor_learning(features_extractor):
@@ -27,7 +27,8 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                             [0.5, 0.3],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -35,11 +36,12 @@ def test_features_extractor_learning(features_extractor):
                             [0, 2, 3, 4, 6, 7] + [0 for i in range(75)],
                             [1, 1, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).long(),
-                "mask": torch.zeros(1, 81),
+                "mask": torch.zeros((1, 81), device=DEVICE),
             },
-            torch.tensor([0]).float(),
+            torch.tensor([0], device=DEVICE).float(),
         ),
         (
             {
@@ -60,7 +62,8 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                             [0.5, 0.3],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -68,11 +71,12 @@ def test_features_extractor_learning(features_extractor):
                             [0, 1, 3, 4, 6, 7] + [0 for i in range(75)],
                             [2, 2, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).long(),
-                "mask": torch.zeros(1, 81),
+                "mask": torch.zeros((1, 81), device=DEVICE),
             },
-            torch.tensor([1]).float(),
+            torch.tensor([1], device=DEVICE).float(),
         ),
         (
             {
@@ -93,7 +97,8 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                             [0.5, 0.3],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -101,11 +106,12 @@ def test_features_extractor_learning(features_extractor):
                             [0, 1, 3, 4, 6, 7] + [0 for i in range(75)],
                             [1, 2, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).long(),
-                "mask": torch.zeros(1, 81),
+                "mask": torch.zeros((1, 81), device=DEVICE),
             },
-            torch.tensor([0]).float(),
+            torch.tensor([0], device=DEVICE).float(),
         ),
         (
             {
@@ -126,7 +132,8 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                             [0.5, 0.3],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -134,14 +141,16 @@ def test_features_extractor_learning(features_extractor):
                             [0, 1, 3, 4, 6, 7] + [0 for i in range(75)],
                             [1, 2, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
-                    ]
+                    ],
+                    device=DEVICE,
                 ).long(),
-                "mask": torch.zeros(1, 81),
+                "mask": torch.zeros((1, 81), device=DEVICE),
             },
-            torch.tensor([1]).float(),
+            torch.tensor([1], device=DEVICE).float(),
         ),
     ]
     last_layer = torch.nn.Linear(10 * HIDDEN_DIM_FEATURES_EXTRACTOR, 1)
+    last_layer.to(DEVICE)
     optimizer = torch.optim.Adam(features_extractor.parameters())
     criterion = torch.nn.BCELoss()
 
@@ -169,4 +178,10 @@ def test_features_extractor_learning(features_extractor):
                 .squeeze()
             )
         )
-        assert np.round(prediction.detach().numpy()) == y.detach().numpy()
+        if torch.cuda.is_available():
+            prediction = prediction.detach().cpu().numpy()
+            y = y.detach().cpu().numpy()
+        else:
+            prediction = prediction.detach().numpy()
+            y = y.detach().numpy()
+        assert np.round(prediction) == y
