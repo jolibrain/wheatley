@@ -13,11 +13,14 @@ class Agent:
         self,
         env,
         n_epochs=None,
+        n_steps_episode=None,
+        batch_size=None,
         gamma=None,
         clip_range=None,
         ent_coef=None,
         vf_coef=None,
         lr=None,
+        tensorboard_log=None,
         model=None,
     ):
         if model is not None:
@@ -28,8 +31,8 @@ class Agent:
                 Policy,
                 env,
                 n_epochs=n_epochs,
-                n_steps=512,
-                batch_size=256,
+                n_steps=n_steps_episode,
+                batch_size=batch_size,
                 gamma=gamma,
                 learning_rate=lr,
                 clip_range=clip_range,
@@ -38,6 +41,7 @@ class Agent:
                 verbose=2,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
+                tensorboard_log=tensorboard_log,
             )
 
     def save(self, path):

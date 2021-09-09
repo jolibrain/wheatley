@@ -28,6 +28,18 @@ parser.add_argument(
     default=1,
     help="Number of epochs for updating the PPO parameters",
 )
+parser.add_argument(
+    "--n_steps_episode",
+    type=int,
+    default=256,
+    help="Number of steps per episode. This should be bigger than the average number of steps in 1 env run.",
+)
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    default=64,
+    help="Batch size during training of PPO",
+)
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
 parser.add_argument(
     "--clip_range", type=float, default=0.2, help="Clipping parameter"

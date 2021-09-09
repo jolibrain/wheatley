@@ -35,11 +35,14 @@ def main():
     agent = Agent(
         training_env,
         n_epochs=args.n_epochs,
+        n_steps_episode=args.n_steps_episode,
+        batch_size=args.batch_size,
         gamma=args.gamma,
         clip_range=args.clip_range,
         ent_coef=args.ent_coef,
         vf_coef=args.vf_coef,
         lr=args.lr,
+        tensorboard_log="./experiments",
     )
     agent.train(problem_description, total_timesteps=args.n_timesteps)
     agent.save(args.path)
