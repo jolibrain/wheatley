@@ -1,4 +1,5 @@
 import gym
+import numpy as np
 from stable_baselines3 import PPO
 import torch
 
@@ -12,6 +13,9 @@ from args import args
 
 
 def main():
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     if args.n_j > MAX_N_JOBS or args.n_m > MAX_N_MACHINES:
         raise Exception(

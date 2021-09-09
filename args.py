@@ -7,7 +7,15 @@ parser = argparse.ArgumentParser(
 # General problem arguments
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
+parser.add_argument("--seed", type=int, default=42, help="Random seed")
+parser.add_argument(
+    "--path",
+    type=str,
+    default="saved_networks/default_net",
+    help="Path to saved model",
+)
 
+# Training arguments
 parser.add_argument(
     "--n_timesteps",
     type=int,
@@ -32,13 +40,7 @@ parser.add_argument(
 )
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 
-parser.add_argument(
-    "--path",
-    type=str,
-    default="saved_networks/default_net",
-    help="Path to saved model",
-)
-
+# Testing arguments
 parser.add_argument(
     "--n_test_problems",
     type=int,
@@ -60,4 +62,5 @@ parser.add_argument(
     help="Removes the mask, to check wheter there is a problem in its implementation",
 )
 
+# Parsing
 args = parser.parse_args()
