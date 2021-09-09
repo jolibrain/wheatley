@@ -1,3 +1,5 @@
+from functools import partial
+import numpy as np
 from stable_baselines3.common.policies import ActorCriticPolicy
 import torch
 from torch.distributions import Categorical
@@ -12,9 +14,36 @@ class Policy(ActorCriticPolicy):
     def _build_mlp_extractor(self):
         self.mlp_extractor = MLPExtractor()
 
-    # The three following functions should be checked, since they are re written from
+    # The four following functions should be checked, since they are re written from
     # stable_baselines3. We should also check that there are no other functions that
     # are used by PPO, to guarantee that it will work
+
+    def _build(self, lr_schedule):
+        """
+        Create the networks and the optimizer.
+        :param lr_schedule: Learning rate schedule
+            lr_schedule(1) is the initial learning rate
+        """
+        self._build_mlp_extractor()
+
+        # Init weights: use orthogonal initialization
+        # with small initial weight for the output
+        if self.ortho_init:
+            # TODO: check for features_extractor
+            # Values from stable-baselines.
+            # features_extractor/mlp values are
+            # originally from openai/baselines (default gains/init_scales).
+            module_gains = {
+                self.features_extractor: np.sqrt(2),
+                self.mlp_extractor: np.sqrt(2),
+            }
+            for module, gain in module_gains.items():
+                module.apply(partial(self.init_weights, gain=gain))
+
+        # Setup optimizer with initial learning rate
+        self.optimizer = self.optimizer_class(
+            self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs
+        )
 
     def forward(self, obs, deterministic=False):
         """
@@ -42,5 +71,5 @@ class Policy(ActorCriticPolicy):
         latent_pi, latent_vf, _ = self._get_latent(obs)
         distribution = Categorical(latent_pi)
         log_prob = distribution.log_prob(actions)
-        values = self.value_net(latent_vf)
+        values = latent_vf
         return values, log_prob, distribution.entropy()
