@@ -17,10 +17,22 @@ parser.add_argument(
 
 # Training arguments
 parser.add_argument(
-    "--n_timesteps",
+    "--total_timesteps",
     type=int,
     default=int(1e4),
     help="Number of training timesteps (corresponding to env timesteps)",
+)
+parser.add_argument(
+    "--n_test_env",
+    type=int,
+    default=5,
+    help="Number of testing environments during traing",
+)
+parser.add_argument(
+    "--eval_freq",
+    type=int,
+    default=200,
+    help="Evaluation of model is made every eval_freq timesteps",
 )
 parser.add_argument(
     "--n_epochs",

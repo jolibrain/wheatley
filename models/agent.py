@@ -54,10 +54,14 @@ class Agent:
         fake_env = Env(ProblemDescription(2, 2, 99, "L2D", "L2D"))
         return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
 
-    def train(self, problem_description, total_timesteps):
+    def train(
+        self, problem_description, total_timesteps, n_test_env, eval_freq
+    ):
         # First setup callbacks during training
-        test_callback = TestCallback()
-        event_callback = EveryNTimesteps(n_steps=200, callback=test_callback)
+        test_callback = TestCallback(n_test_env=n_test_env)
+        event_callback = EveryNTimesteps(
+            n_steps=eval_freq, callback=test_callback
+        )
 
         # Then launch training
         env = Env(problem_description)

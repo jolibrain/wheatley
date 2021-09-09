@@ -28,7 +28,7 @@ def main():
     print(
         f"Launching training\n"
         f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
-        f"Training time : {args.n_timesteps} timesteps"
+        f"Training time : {args.total_timesteps} timesteps"
     )
     problem_description = ProblemDescription(
         args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
@@ -46,7 +46,12 @@ def main():
         vf_coef=args.vf_coef,
         lr=args.lr,
     )
-    agent.train(problem_description, total_timesteps=args.n_timesteps)
+    agent.train(
+        problem_description,
+        total_timesteps=args.total_timesteps,
+        n_test_env=args.n_test_env,
+        eval_freq=args.eval_freq,
+    )
     agent.save(args.path)
 
 
