@@ -12,11 +12,12 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description):
+    def __init__(self, problem_description, divide_loss=False):
         n_features = 2  # This is fixed by the way we choose the nodes features
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration
+        self.divide_loss = divide_loss
 
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
@@ -78,7 +79,9 @@ class Env(gym.Env):
             self.transition_model.get_graph(),
             self.transition_model.get_mask(),
         )
-        reward = self.reward_model.evaluate(obs, action, next_obs)
+        reward = self.reward_model.evaluate(
+            obs, action, next_obs, np.max(self.durations)
+        )
         done = self.transition_model.done()
         gym_observation = next_obs.to_gym_observation()
 
@@ -116,6 +119,6 @@ class Env(gym.Env):
             raise Exception("Transition model not recognized")
 
         if self.reward_model_config == "L2D":
-            self.reward_model = L2DRewardModel()
+            self.reward_model = L2DRewardModel(self.divide_loss)
         else:
             raise Exception("Reward model not recognized")

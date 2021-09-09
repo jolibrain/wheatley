@@ -2,7 +2,6 @@ import gym
 import numpy as np
 from stable_baselines3 import PPO
 import torch
-import visdom
 
 from env.env import Env
 from models.agent import Agent
@@ -14,8 +13,6 @@ from args import args
 
 
 def main():
-
-    visdom.Visdom()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -33,7 +30,7 @@ def main():
     problem_description = ProblemDescription(
         args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
     )
-    training_env = Env(problem_description)
+    training_env = Env(problem_description, args.divide_loss)
 
     agent = Agent(
         training_env,
@@ -51,6 +48,7 @@ def main():
         total_timesteps=args.total_timesteps,
         n_test_env=args.n_test_env,
         eval_freq=args.eval_freq,
+        divide_loss=args.divide_loss,
     )
     agent.save(args.path)
 

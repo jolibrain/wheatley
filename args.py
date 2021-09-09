@@ -63,6 +63,12 @@ parser.add_argument(
     "--vf_coef", type=float, default=0.5, help="Value function coefficient"
 )
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
+parser.add_argument(
+    "--divide_loss",
+    default=False,
+    action="store_true",
+    help="Normalize loss... It's a hack",
+)
 
 # Testing arguments
 parser.add_argument(

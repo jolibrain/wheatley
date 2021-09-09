@@ -22,7 +22,6 @@ class Agent:
         ent_coef=None,
         vf_coef=None,
         lr=None,
-        tensorboard_log=None,
         model=None,
     ):
         if model is not None:
@@ -43,7 +42,6 @@ class Agent:
                 verbose=2,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
-                tensorboard_log=tensorboard_log,
             )
 
     def save(self, path):
@@ -51,11 +49,16 @@ class Agent:
 
     @classmethod
     def load(cls, path):
-        fake_env = Env(ProblemDescription(2, 2, 99, "L2D", "L2D"))
+        fake_env = Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False)
         return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
 
     def train(
-        self, problem_description, total_timesteps, n_test_env, eval_freq
+        self,
+        problem_description,
+        total_timesteps,
+        n_test_env,
+        eval_freq,
+        divide_loss,
     ):
         # First setup callbacks during training
         test_callback = TestCallback(n_test_env=n_test_env)
@@ -64,7 +67,7 @@ class Agent:
         )
 
         # Then launch training
-        env = Env(problem_description)
+        env = Env(problem_description, divide_loss)
         self.model.set_env(env)
         self.model.learn(total_timesteps, callback=event_callback)
 
