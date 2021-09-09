@@ -9,6 +9,7 @@ from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
 from utils.utils import generate_problem
+from utils.utils_testing import test_agent, get_ortools_makespan
 
 from config import MAX_N_JOBS, MAX_N_MACHINES, MAX_DURATION, DEVICE
 from args import args
@@ -33,26 +34,13 @@ def main():
     for i in range(args.n_test_problems):
         if (i + 1) % (args.n_test_problems // 10) == 0:
             print(f"{i+1}/{args.n_test_problems}")
-        testing_affectations, testing_durations = generate_problem(
+        rl_makespan = test_agent(agent, args.n_j, args.n_m, MAX_DURATION)
+        random_makespan = test_agent(
+            random_agent, args.n_j, args.n_m, MAX_DURATION
+        )
+        or_tools_makespan = get_ortools_makespan(
             args.n_j, args.n_m, MAX_DURATION
         )
-        problem_description = ProblemDescription(
-            args.n_j,
-            args.n_m,
-            MAX_DURATION,
-            "L2D",
-            "L2D",
-            testing_affectations,
-            testing_durations,
-        )
-        rl_solution = agent.predict(problem_description)
-        or_tools_solution = solve_jssp(testing_affectations, testing_durations)
-        random_solution = random_agent.predict(problem_description)
-        rl_makespan = np.max(rl_solution.schedule + testing_durations)
-        or_tools_makespan = np.max(
-            or_tools_solution.schedule + testing_durations
-        )
-        random_makespan = np.max(random_solution.schedule + testing_durations)
         diff_percentage = (
             100 * (rl_makespan - or_tools_makespan) / or_tools_makespan
         )

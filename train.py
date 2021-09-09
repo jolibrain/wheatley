@@ -2,6 +2,7 @@ import gym
 import numpy as np
 from stable_baselines3 import PPO
 import torch
+import visdom
 
 from env.env import Env
 from models.agent import Agent
@@ -13,6 +14,8 @@ from args import args
 
 
 def main():
+
+    visdom.Visdom()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -42,7 +45,6 @@ def main():
         ent_coef=args.ent_coef,
         vf_coef=args.vf_coef,
         lr=args.lr,
-        tensorboard_log="./experiments",
     )
     agent.train(problem_description, total_timesteps=args.n_timesteps)
     agent.save(args.path)

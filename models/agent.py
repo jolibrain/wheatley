@@ -1,9 +1,11 @@
+from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.ppo import PPO
 
 from env.env import Env
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
+from utils.utils_testing import TestCallback
 
 from config import DEVICE
 
@@ -53,9 +55,14 @@ class Agent:
         return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
 
     def train(self, problem_description, total_timesteps):
+        # First setup callbacks during training
+        test_callback = TestCallback()
+        event_callback = EveryNTimesteps(n_steps=200, callback=test_callback)
+
+        # Then launch training
         env = Env(problem_description)
         self.model.set_env(env)
-        self.model.learn(total_timesteps)
+        self.model.learn(total_timesteps, callback=event_callback)
 
     def predict(self, problem_description):
         env = Env(problem_description)
