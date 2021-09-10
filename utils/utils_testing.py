@@ -119,9 +119,15 @@ class TestCallback(BaseCallback):
         self.random_makespans.append(random_mean_makespan)
         self.vis.line(
             Y=np.array(
-                [self.ortools_makespans, self.random_makespans, self.makespans]
+                [self.makespans, self.random_makespans, self.ortools_makespans]
             ).T,
             win="test_makespan",
+            opts={
+                "legend": ["PPO", "Random", "OR-tools"],
+                "linecolor": np.array(
+                    [[31, 119, 180], [255, 127, 14], [44, 160, 44]]
+                ),
+            },
         )
         self.vis.line(
             Y=np.stack(
@@ -133,6 +139,10 @@ class TestCallback(BaseCallback):
                 ]
             ).T,
             win="test_makespan_ratio",
+            opts={
+                "legend": ["PPO / OR-tools", "Random / OR-tools"],
+                "linecolor": np.array([[31, 119, 180], [255, 127, 14]]),
+            },
         )
 
     def _visdom_metrics(self):
