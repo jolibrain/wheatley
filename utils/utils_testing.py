@@ -39,10 +39,10 @@ def get_ortools_makespan(n_j, n_m, max_duration):
 
 
 class TestCallback(BaseCallback):
-    def __init__(self, n_test_env, verbose=2):
+    def __init__(self, n_test_env, display_env, verbose=2):
         super(TestCallback, self).__init__(verbose=verbose)
         self.n_test_env = n_test_env
-        self.vis = visdom.Visdom()
+        self.vis = visdom.Visdom(env=display_env)
 
         self.makespans = []
         self.ortools_makespans = []

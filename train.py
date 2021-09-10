@@ -49,6 +49,7 @@ def main():
         n_test_env=args.n_test_env,
         eval_freq=args.eval_freq,
         divide_loss=args.divide_loss,
+        display_env=f"{args.n_j}j{args.n_m}m{args.total_timesteps}steps{args.seed}seed",
     )
     agent.save(args.path)
 

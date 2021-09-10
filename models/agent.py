@@ -59,9 +59,12 @@ class Agent:
         n_test_env,
         eval_freq,
         divide_loss,
+        display_env,
     ):
         # First setup callbacks during training
-        test_callback = TestCallback(n_test_env=n_test_env)
+        test_callback = TestCallback(
+            n_test_env=n_test_env, display_env=display_env
+        )
         event_callback = EveryNTimesteps(
             n_steps=eval_freq, callback=test_callback
         )
