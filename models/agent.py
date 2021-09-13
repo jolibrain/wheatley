@@ -84,7 +84,7 @@ class Agent:
         observation = env.reset()
         done = False
         while not done:
-            action, _ = self.model.predict(observation, deterministic=False)
+            action, _ = self.model.predict(observation, deterministic=True)
             observation, reward, done, info = env.step(action)
         solution = env.get_solution()
         return solution
