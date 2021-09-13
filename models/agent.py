@@ -22,6 +22,7 @@ class Agent:
         ent_coef=None,
         vf_coef=None,
         lr=None,
+        add_machine_id=False,
         model=None,
     ):
         if model is not None:
@@ -43,13 +44,16 @@ class Agent:
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
             )
+        self.add_machine_id = add_machine_id
 
     def save(self, path):
         self.model.save(path)
 
     @classmethod
     def load(cls, path):
-        fake_env = Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False)
+        fake_env = Env(
+            ProblemDescription(2, 2, 99, "L2D", "L2D"), False, False
+        )
         return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
 
     def train(
@@ -70,12 +74,12 @@ class Agent:
         )
 
         # Then launch training
-        env = Env(problem_description, divide_loss)
+        env = Env(problem_description, divide_loss, self.add_machine_id)
         self.model.set_env(env)
         self.model.learn(total_timesteps, callback=event_callback)
 
     def predict(self, problem_description):
-        env = Env(problem_description)
+        env = Env(problem_description, add_machine_id=self.add_machine_id)
         self.model.set_env(env)
         observation = env.reset()
         done = False

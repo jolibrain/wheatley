@@ -44,7 +44,9 @@ def main():
         problem_description = ProblemDescription(
             args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
         )
-    training_env = Env(problem_description, args.divide_loss)
+    training_env = Env(
+        problem_description, args.divide_loss, args.add_machine_id
+    )
 
     agent = Agent(
         training_env,
@@ -56,6 +58,7 @@ def main():
         ent_coef=args.ent_coef,
         vf_coef=args.vf_coef,
         lr=args.lr,
+        add_machine_id=args.add_machine_id,
     )
     agent.train(
         problem_description,

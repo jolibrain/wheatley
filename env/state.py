@@ -68,7 +68,7 @@ class State:
                     node_ids.append(node_id)
         return node_ids
 
-    def to_torch_geometric(self, node_encoding="L2D"):
+    def to_torch_geometric(self, add_machine_id, node_encoding="L2D"):
         """
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
@@ -80,12 +80,20 @@ class State:
                     node_id = job_and_task_to_node(
                         job_id, task_id, self.n_machines
                     )
-                    self.graph.nodes[node_id]["x"] = [
-                        node_id,
-                        self.is_affected[job_id, task_id],
-                        self.task_completion_times[job_id, task_id],
-                        self.affectations[job_id, task_id],
-                    ]
+                    self.graph.nodes[node_id]["x"] = (
+                        [
+                            node_id,
+                            self.is_affected[job_id, task_id],
+                            self.task_completion_times[job_id, task_id],
+                            self.affectations[job_id, task_id],
+                        ]
+                        if add_machine_id
+                        else [
+                            node_id,
+                            self.is_affected[job_id, task_id],
+                            self.task_completion_times[job_id, task_id],
+                        ]
+                    )
             graph = torch_geometric.utils.from_networkx(self.graph)
 
             # We have to reorder features, since the networx -> torch_geometric

@@ -14,6 +14,12 @@ parser.add_argument(
     default="saved_networks/default_net",
     help="Path to saved model",
 )
+parser.add_argument(
+    "--add_machine_id",
+    default=False,
+    action="store_true",
+    help="Add the machine id in the node embedding",
+)
 
 # Training arguments
 parser.add_argument(

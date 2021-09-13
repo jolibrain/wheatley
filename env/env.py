@@ -12,12 +12,15 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description, divide_loss=False):
-        n_features = 3  # This is fixed by the way we choose the nodes features
+    def __init__(
+        self, problem_description, divide_loss=False, add_machine_id=False
+    ):
+        n_features = 3 if add_machine_id else 2
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration
         self.divide_loss = divide_loss
+        self.add_machine_id = add_machine_id
 
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
@@ -66,7 +69,7 @@ class Env(gym.Env):
         obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(),
+            self.transition_model.get_graph(self.add_machine_id),
             self.transition_model.get_mask(),
         )
         first_node_id, second_node_id = self._convert_action_to_node_ids(
@@ -76,7 +79,7 @@ class Env(gym.Env):
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(),
+            self.transition_model.get_graph(self.add_machine_id),
             self.transition_model.get_mask(),
         )
         reward = self.reward_model.evaluate(
@@ -101,7 +104,7 @@ class Env(gym.Env):
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(),
+            self.transition_model.get_graph(self.add_machine_id),
             self.transition_model.get_mask(),
         )
         return observation.to_gym_observation()
