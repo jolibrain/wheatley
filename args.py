@@ -69,6 +69,12 @@ parser.add_argument(
     action="store_true",
     help="Normalize loss... It's a hack",
 )
+parser.add_argument(
+    "--fixed_problem",
+    default=False,
+    action="store_true",
+    help="Fix affectations and durations",
+)
 
 # Testing arguments
 parser.add_argument(

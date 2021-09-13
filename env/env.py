@@ -13,7 +13,7 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 class Env(gym.Env):
     def __init__(self, problem_description, divide_loss=False):
-        n_features = 2  # This is fixed by the way we choose the nodes features
+        n_features = 3  # This is fixed by the way we choose the nodes features
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration

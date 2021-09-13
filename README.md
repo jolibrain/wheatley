@@ -1,17 +1,17 @@
 # JoliJSS2
 
+This repo intends to replicate L2D, a model proposed in this paper:
+[Learning to Dispatch for Job Shop Scheduling via Deep Reinforcement Learning](https://arxiv.org/pdf/2010.12367)
+
+It should also provide improvements, in order to apply it to real industry problems
+
 TODO:
- - Voir si il faut pas rajouter une feature dans les nodes, qui précise quelle machine
- ils utilisent (!!!!!!!!)
  - Implémenter un GIN Features Extractor
  - Implémenter les tests pour env_observation.py et agent_observation.py
- - Ajouter des unit testing de graph embedding et actor_critic
 
-## Différences avec L2D:
- - Ils normalisent les rewards, pas moi
- - Ils fonctionnent en comptant le nombre d'environnements, je compte le nombre de steps
- (et du coup ils s'entrainent à chaque fin d'environnement, moi à chaque fois que j'ai 
- fait n steps)
- - Ils ne fonctionnent pas par batch, moi si
- - Leur loss est le double de la mienne (parce qu'ils ont un policy loss de 2, et que
- je suis obligé d'avoir 1)
+## Differences with L2D implementation:
+ - Rewards are normalized, I only divide them by a scalar.
+ - They update the PPO model every env run, I do it every n_steps
+ - They don't use batching, I do
+ - Theyr loss is twice mine.
+ - Theyr action space get smaller as tasks are totally completed. Not mine.

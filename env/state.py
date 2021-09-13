@@ -84,6 +84,7 @@ class State:
                         node_id,
                         self.is_affected[job_id, task_id],
                         self.task_completion_times[job_id, task_id],
+                        self.affectations[job_id, task_id],
                     ]
             graph = torch_geometric.utils.from_networkx(self.graph)
 
