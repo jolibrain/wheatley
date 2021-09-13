@@ -158,7 +158,7 @@ class TestCallback(BaseCallback):
             self.model.logger.name_to_value["train/policy_gradient_loss"]
         )
         self.value_losses.append(
-            self.model_vf_coef
+            self.model.vf_coef
             * self.model.logger.name_to_value["train/value_loss"]
         )
         self.losses.append(self.model.logger.name_to_value["train/loss"])
