@@ -68,12 +68,17 @@ class MLPExtractor(nn.Module):
 
         # Compute the probabilities
         probabilities = self.actor(pairs_to_compute)
-        pi = F.softmax(probabilities, dim=1)
 
+        # Remove the probabilities for unallowed actions
+        for i in range(probabilities.shape[0]):
+            probabilities[i][len(indexes[i]) :] = 0
+        pi = F.softmax(probabilities, dim=1)
         # And reshape pi in ordrer to have every value corresponding to its edge index
         shaped_pi = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
         for i in range(batch_size):
-            shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])
+            shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])[
+                0 : len(indexes[i])
+            ]
 
         # The final pi must include all actions (even those that are not applicable
         # because of the size of the graph). So we convert the flattened pi to a square
@@ -126,7 +131,11 @@ class MLPExtractor(nn.Module):
         indexes = []
         masked_tensors = []
 
+        dim = int(torch.max(torch.sum(mask, axis=1)).item())
         for i in range(tensor.shape[0]):
+            # Every mask should be the same size, so if there are multiple sizes, take the largest one
             indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
-            masked_tensors.append(tensor[i][indexes[-1]])
+            masked_tensor = torch.zeros((dim, tensor.shape[2]))
+            masked_tensor[0 : indexes[-1].shape[0], :] = tensor[i][indexes[-1]]
+            masked_tensors.append(masked_tensor)
         return torch.stack(masked_tensors), indexes

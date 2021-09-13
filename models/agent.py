@@ -43,6 +43,7 @@ class Agent:
                 verbose=2,
                 policy_kwargs={"features_extractor_class": FeaturesExtractor},
                 device=DEVICE,
+                gae_lambda=1,  # To use same vanilla advantage function
             )
         self.add_machine_id = add_machine_id
 

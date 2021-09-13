@@ -11,7 +11,7 @@ def generate_problem(n_jobs, n_machines, high):
     """
     durations = np.random.randint(low=1, high=high, size=(n_jobs, n_machines))
     affectations = np.expand_dims(np.arange(0, n_machines), axis=0)
-    affectations = affectations.repeat(repeats=n_machines, axis=0)
+    affectations = affectations.repeat(repeats=n_jobs, axis=0)
     affectations = _permute_rows(affectations)
     return affectations, durations
 

@@ -40,6 +40,8 @@ def main():
             affectations,
             durations,
         )
+        print(affectations)
+        print(durations)
     else:
         problem_description = ProblemDescription(
             args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
