@@ -151,14 +151,14 @@ class TestCallback(BaseCallback):
             return
 
         self.entropy_losses.append(
-            self.model.ent_coeff
+            self.model.ent_coef
             * self.model.logger.name_to_value["train/entropy_loss"]
         )
         self.policy_gradient_losses.append(
             self.model.logger.name_to_value["train/policy_gradient_loss"]
         )
         self.value_losses.append(
-            self.model_vf_coeff
+            self.model_vf_coef
             * self.model.logger.name_to_value["train/value_loss"]
         )
         self.losses.append(self.model.logger.name_to_value["train/loss"])

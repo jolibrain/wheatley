@@ -16,6 +16,10 @@ from args import args
 
 
 def main():
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
     print("Loading agent")
     agent = Agent.load(args.path)
     agent.model.verbose = 0
