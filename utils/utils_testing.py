@@ -27,7 +27,7 @@ def test_agent(agent, n_j, n_m, max_duration):
         durations,
     )
     solution = agent.predict(problem_description)
-    makespan = np.max(solution + durations)
+    makespan = np.max(solution.schedule + durations)
     return makespan
 
 
