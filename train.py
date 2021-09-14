@@ -1,6 +1,5 @@
 import gym
 import numpy as np
-from stable_baselines3 import PPO
 import torch
 
 from env.env import Env
@@ -46,12 +45,8 @@ def main():
         problem_description = ProblemDescription(
             args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
         )
-    training_env = Env(
-        problem_description, args.divide_loss, args.add_machine_id
-    )
 
     agent = Agent(
-        training_env,
         n_epochs=args.n_epochs,
         n_steps_episode=args.n_steps_episode,
         batch_size=args.batch_size,
@@ -67,8 +62,9 @@ def main():
         total_timesteps=args.total_timesteps,
         n_test_env=args.n_test_env,
         eval_freq=args.eval_freq,
-        divide_loss=args.divide_loss,
+        divide_loss=not args.dont_divide_loss,
         display_env=f"{args.n_j}j{args.n_m}m{args.total_timesteps}steps{args.seed}seed",
+        n_workers=args.n_workers,
     )
     agent.save(args.path)
 

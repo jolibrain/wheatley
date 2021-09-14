@@ -63,6 +63,8 @@ class Env(gym.Env):
         self.transition_model = None
         self.reward_model = None
 
+        self.n_steps = 0
+
         self.reset()
 
     def step(self, action):
@@ -83,12 +85,18 @@ class Env(gym.Env):
             self.transition_model.get_mask(),
         )
         reward = self.reward_model.evaluate(
-            obs, action, next_obs, np.max(self.durations)
+            obs,
+            action,
+            next_obs,
+            np.max(np.sum(self.durations, axis=1)) / self.n_machines,
         )
         done = self.transition_model.done()
         gym_observation = next_obs.to_gym_observation()
 
-        return gym_observation, reward, done, {}
+        info = {"episode": {"r": reward, "l": 1 + self.n_steps * 2}}
+        self.n_steps += 1
+
+        return gym_observation, reward, done, info
 
     def _convert_action_to_node_ids(self, action):
         first_node_id = action // MAX_N_NODES
@@ -107,6 +115,9 @@ class Env(gym.Env):
             self.transition_model.get_graph(self.add_machine_id),
             self.transition_model.get_mask(),
         )
+
+        self.n_steps = 0
+
         return observation.to_gym_observation()
 
     def get_solution(self):

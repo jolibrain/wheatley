@@ -1,4 +1,5 @@
 from stable_baselines3.common.callbacks import EveryNTimesteps
+from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.ppo import PPO
 
 from env.env import Env
@@ -13,7 +14,6 @@ from config import DEVICE
 class Agent:
     def __init__(
         self,
-        env,
         n_epochs=None,
         n_steps_episode=None,
         batch_size=None,
@@ -25,13 +25,14 @@ class Agent:
         add_machine_id=False,
         model=None,
     ):
+        fake_env = Agent._create_fake_env()
         if model is not None:
             self.model = model
-            self.model.set_env(env)
+            self.model.set_env(fake_env)
         else:
             self.model = PPO(
                 Policy,
-                env,
+                fake_env,
                 n_epochs=n_epochs,
                 n_steps=n_steps_episode,
                 batch_size=batch_size,
@@ -52,10 +53,7 @@ class Agent:
 
     @classmethod
     def load(cls, path):
-        fake_env = Env(
-            ProblemDescription(2, 2, 99, "L2D", "L2D"), False, False
-        )
-        return cls(fake_env, model=PPO.load(path, fake_env, DEVICE))
+        return cls(model=PPO.load(path, Agent._create_fake_env(), DEVICE))
 
     def train(
         self,
@@ -65,6 +63,7 @@ class Agent:
         eval_freq,
         divide_loss,
         display_env,
+        n_workers,
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
@@ -75,8 +74,12 @@ class Agent:
         )
 
         # Then launch training
-        env = Env(problem_description, divide_loss, self.add_machine_id)
-        self.model.set_env(env)
+        env_fns = [
+            self._get_env_fn(problem_description, divide_loss)
+            for _ in range(n_workers)
+        ]
+        vec_env = DummyVecEnv(env_fns)
+        self.model.set_env(vec_env)
         self.model.learn(total_timesteps, callback=event_callback)
 
     def predict(self, problem_description):
@@ -89,3 +92,13 @@ class Agent:
             observation, reward, done, info = env.step(action)
         solution = env.get_solution()
         return solution
+
+    @staticmethod
+    def _create_fake_env():
+        return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, False)
+
+    def _get_env_fn(self, problem_description, divide_loss):
+        def f():
+            return Env(problem_description, divide_loss, self.add_machine_id)
+
+        return f

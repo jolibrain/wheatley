@@ -70,16 +70,22 @@ parser.add_argument(
 )
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 parser.add_argument(
-    "--divide_loss",
+    "--dont_divide_loss",
     default=False,
     action="store_true",
-    help="Normalize loss... It's a hack",
+    help="Remove the dividing loss hack",
 )
 parser.add_argument(
     "--fixed_problem",
     default=False,
     action="store_true",
     help="Fix affectations and durations",
+)
+parser.add_argument(
+    "--n_workers",
+    type=int,
+    default=1,
+    help="Number of CPU cores for simulating environment",
 )
 
 # Testing arguments
