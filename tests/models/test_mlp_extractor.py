@@ -136,6 +136,6 @@ def test_forward():
     pi[0, 0] = 0
     pi[0, 2 * MAX_N_NODES + 2] = 0
     assert (pi[0] == 0).all()
-    assert pi[1, 4 * MAX_N_NODES + 4] != 0
-    pi[1, 4 * MAX_N_NODES + 4] = 0
+    assert pi[1, 3 * MAX_N_NODES + 3] != 0
+    pi[1, 3 * MAX_N_NODES + 3] = 0
     assert (pi == 0).all()
