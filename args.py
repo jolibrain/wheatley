@@ -87,6 +87,12 @@ parser.add_argument(
     default=1,
     help="Number of CPU cores for simulating environment",
 )
+parser.add_argument(
+    "--multiprocessing",
+    default=False,
+    action="store_true",
+    help="Wether to use multiprocessing or not",
+)
 
 # Testing arguments
 parser.add_argument(

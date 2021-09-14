@@ -1,5 +1,5 @@
 from stable_baselines3.common.callbacks import EveryNTimesteps
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.ppo import PPO
 
 from env.env import Env
@@ -64,10 +64,13 @@ class Agent:
         divide_loss,
         display_env,
         n_workers,
+        multiprocessing,
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
-            n_test_env=n_test_env, display_env=display_env
+            env=Env(problem_description, divide_loss, self.add_machine_id),
+            n_test_env=n_test_env,
+            display_env=display_env,
         )
         event_callback = EveryNTimesteps(
             n_steps=eval_freq, callback=test_callback
@@ -78,7 +81,8 @@ class Agent:
             self._get_env_fn(problem_description, divide_loss)
             for _ in range(n_workers)
         ]
-        vec_env = DummyVecEnv(env_fns)
+        vec_env_class = SubprocVecEnv if multiprocessing else DummyVecEnv
+        vec_env = vec_env_class(env_fns)
         self.model.set_env(vec_env)
         self.model.learn(total_timesteps, callback=event_callback)
 
