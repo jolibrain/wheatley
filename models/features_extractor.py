@@ -29,7 +29,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
 
-        for layer in range(self.n_layers_features_extractor - 1):
+        for layer in range(self.n_layers_features_extractor):
             self.features_extractors.append(
                 GINConv(
                     MLP(
@@ -62,7 +62,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         features, edge_index = graph_state.x, graph_state.edge_index
 
         # Compute graph embeddings
-        for layer in range(self.n_layers_features_extractor - 1):
+        for layer in range(self.n_layers_features_extractor):
             features = self.features_extractors[layer](features, edge_index)
         features = features.reshape(batch_size, n_nodes, -1)
 

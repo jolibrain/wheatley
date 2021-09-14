@@ -6,14 +6,13 @@ This repo intends to replicate L2D, a model proposed in this paper:
 It should also provide improvements, in order to apply it to real industry problems
 
 TODO:
- - Finir d'implémenter l'impossibilité d'utiliser des actions inutiles (corriger les tests)
  - Implémenter les tests pour env_observation.py et agent_observation.py
+ - Corriger la seed pour qu'elle fonctionne aussi sous cuda
 
 ## Differences with L2D implementation:
  - Rewards are normalized, I only divide them by a scalar.
  - They update the PPO model every n env run, I do it every n_steps
  - They don't use batching, I do
  - Theyr loss is twice mine.
- - I add the machine_id in the features
  - The input for actor is [node_embedding, node_embedding, graph_embedding]. For them, 
    it's [node_embedding, graph_embedding]
