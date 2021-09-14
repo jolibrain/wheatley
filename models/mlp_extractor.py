@@ -135,7 +135,7 @@ class MLPExtractor(nn.Module):
         for i in range(tensor.shape[0]):
             # Every mask should be the same size, so if there are multiple sizes, take the largest one
             indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
-            masked_tensor = torch.zeros((dim, tensor.shape[2]))
+            masked_tensor = torch.zeros((dim, tensor.shape[2]), device=DEVICE)
             masked_tensor[0 : indexes[-1].shape[0], :] = tensor[i][indexes[-1]]
             masked_tensors.append(masked_tensor)
         return torch.stack(masked_tensors), indexes

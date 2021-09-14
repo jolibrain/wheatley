@@ -52,7 +52,10 @@ def test_apply_mask():
     assert (
         masked_tensor[2]
         == torch.cat(
-            [tensor[2][[7]], torch.zeros((2, HIDDEN_DIM_FEATURES_EXTRACTOR))],
+            [
+                tensor[2][[7]],
+                torch.zeros((2, HIDDEN_DIM_FEATURES_EXTRACTOR), device=DEVICE),
+            ],
             dim=0,
         )
     ).all()
@@ -61,7 +64,7 @@ def test_apply_mask():
         == torch.cat(
             [
                 tensor[3][[6, 7]],
-                torch.zeros((1, HIDDEN_DIM_FEATURES_EXTRACTOR)),
+                torch.zeros((1, HIDDEN_DIM_FEATURES_EXTRACTOR), device=DEVICE),
             ],
             dim=0,
         )
@@ -86,7 +89,8 @@ def test_forward():
                         [0, 0, 1, 0],
                         [0, 0, 0, 0],
                     ]
-                ]
+                ],
+                device=DEVICE,
             ),
         ],
         axis=2,
