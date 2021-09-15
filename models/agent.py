@@ -65,12 +65,14 @@ class Agent:
         display_env,
         n_workers,
         multiprocessing,
+        path,
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
             env=Env(problem_description, divide_loss, self.add_machine_id),
             n_test_env=n_test_env,
             display_env=display_env,
+            path=path,
         )
         event_callback = EveryNTimesteps(
             n_steps=eval_freq, callback=test_callback

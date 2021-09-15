@@ -39,11 +39,12 @@ def get_ortools_makespan(n_j, n_m, max_duration):
 
 
 class TestCallback(BaseCallback):
-    def __init__(self, env, n_test_env, display_env, verbose=2):
+    def __init__(self, env, n_test_env, display_env, path, verbose=2):
         super(TestCallback, self).__init__(verbose=verbose)
         self.testing_env = env
         self.n_test_env = n_test_env
         self.vis = visdom.Visdom(env=display_env)
+        self.path = path
 
         self.makespans = []
         self.ortools_makespans = []
@@ -65,8 +66,16 @@ class TestCallback(BaseCallback):
 
     def _on_step(self):
         self._evaluate_agent()
+        self._save_if_best_model()
         self._visdom_metrics()
         return True
+
+    def _save_if_best_model(self):
+        min_ratio = np.min(
+            np.array(self.makespans) / np.array(self.ortools_makespans)
+        )
+        if self.makespans[-1] / self.ortools_makespans[-1] == min_ratio:
+            self.model.save(self.path)
 
     def _evaluate_agent(self):
         random_agent = RandomAgent()

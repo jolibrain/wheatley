@@ -66,8 +66,8 @@ def main():
         display_env=f"{args.n_j}j{args.n_m}m{args.total_timesteps}steps{args.seed}seed",
         n_workers=args.n_workers,
         multiprocessing=args.multiprocessing,
+        path=args.path,
     )
-    agent.save(args.path)
 
 
 if __name__ == "__main__":
