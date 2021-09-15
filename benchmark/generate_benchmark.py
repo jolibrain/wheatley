@@ -1,12 +1,12 @@
 import sys
 
-import numpy as np
-
-from utils.utils import generate_data
-
-from config import MAX_DURATION
-
 sys.path.append("..")
+
+import numpy as np  # noqa: E402
+
+from utils.utils import generate_data  # noqa: E402
+
+from config import MAX_DURATION  # noqa: E402
 
 
 def main():
