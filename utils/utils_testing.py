@@ -77,7 +77,7 @@ class TestCallback(BaseCallback):
             obs = self.testing_env.reset()
             done = False
             while not done:
-                action, _ = self.model.predict(obs, deterministic=True)
+                action, _ = self.model.predict(obs, deterministic=False)
                 obs, reward, done, info = self.testing_env.step(action)
             schedule = self.testing_env.get_solution().schedule
             durations = self.testing_env.durations
