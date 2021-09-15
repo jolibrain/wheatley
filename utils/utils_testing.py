@@ -1,4 +1,5 @@
 from copy import deepcopy
+from os import path
 import time
 
 import matplotlib.pyplot as plt
@@ -7,16 +8,20 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import safe_mean
 import visdom
 
+from env.env import Env
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
-from utils.utils import generate_problem
+from utils.utils import generate_problem, generate_data
 
 from config import MAX_DURATION
 
 
-def test_agent(agent, n_j, n_m, max_duration):
-    affectations, durations = generate_problem(n_j, n_m, max_duration)
+def test_agent(
+    agent, n_j, n_m, max_duration, affectations=None, durations=None
+):
+    if affectations is None and durations is None:
+        affectations, durations = generate_problem(n_j, n_m, max_duration)
     problem_description = ProblemDescription(
         n_j,
         n_m,
@@ -31,20 +36,36 @@ def test_agent(agent, n_j, n_m, max_duration):
     return makespan
 
 
-def get_ortools_makespan(n_j, n_m, max_duration):
-    affectations, durations = generate_problem(n_j, n_m, max_duration)
+def get_ortools_makespan(
+    n_j, n_m, max_duration, affectations=None, durations=None
+):
+    if affectations is None and durations is None:
+        affectations, durations = generate_problem(n_j, n_m, max_duration)
     solution = solve_jssp(affectations, durations)
     makespan = np.max(solution.schedule + durations)
     return makespan
 
 
 class TestCallback(BaseCallback):
-    def __init__(self, env, n_test_env, display_env, path, verbose=2):
+    def __init__(
+        self, env, n_test_env, display_env, path, fixed_benchmark, verbose=2
+    ):
         super(TestCallback, self).__init__(verbose=verbose)
         self.testing_env = env
         self.n_test_env = n_test_env
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
+        self.fixed_benchmark = fixed_benchmark
+
+        if self.fixed_benchmark:
+            self._init_testing_envs()
+            self.n_test_env = 100
+            self.testing_env = None
+        else:
+            self.testing_envs = [
+                deepcopy(self.testing_env) for _ in range(self.n_test_env)
+            ]
+            self.testing_env = None
 
         self.makespans = []
         self.ortools_makespans = []
@@ -64,6 +85,34 @@ class TestCallback(BaseCallback):
         self.first_callback = True
         self.figure = None
 
+    def _init_testing_envs(self):
+        n_jobs = self.testing_env.n_jobs
+        n_machines = self.testing_env.n_machines
+        if not path.exists(
+            f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"
+        ):
+            data = generate_data(n_jobs, n_machines, MAX_DURATION)
+        else:
+            data = np.load(
+                f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"
+            )
+        self.testing_envs = [
+            Env(
+                ProblemDescription(
+                    n_jobs,
+                    n_machines,
+                    MAX_DURATION,
+                    "L2D",
+                    "L2D",
+                    data[i][0],
+                    data[i][1],
+                ),
+                divide_loss=self.testing_env.divide_loss,
+                add_machine_id=self.testing_env.add_machine_id,
+            )
+            for i in range(data.shape[0])
+        ]
+
     def _on_step(self):
         self._evaluate_agent()
         self._save_if_best_model()
@@ -82,23 +131,23 @@ class TestCallback(BaseCallback):
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
-        for _ in range(self.n_test_env):
-            obs = self.testing_env.reset()
+        for i in range(self.n_test_env):
+            obs = self.testing_envs[i].reset()
             done = False
             while not done:
-                action, _ = self.model.predict(obs, deterministic=False)
-                obs, reward, done, info = self.testing_env.step(action)
-            schedule = self.testing_env.get_solution().schedule
-            durations = self.testing_env.durations
+                action, _ = self.model.predict(obs, deterministic=True)
+                obs, reward, done, info = self.testing_envs[i].step(action)
+            schedule = self.testing_envs[i].get_solution().schedule
+            durations = self.testing_envs[i].durations
             mean_makespan += np.max(schedule + durations) / self.n_test_env
 
             ortools_mean_makespan += (
                 np.max(
                     solve_jssp(
-                        self.testing_env.affectations,
-                        self.testing_env.durations,
+                        self.testing_envs[i].affectations,
+                        self.testing_envs[i].durations,
                     ).schedule
-                    + self.testing_env.durations
+                    + self.testing_envs[i].durations
                 )
                 / self.n_test_env
             )
@@ -107,16 +156,16 @@ class TestCallback(BaseCallback):
                 np.max(
                     random_agent.predict(
                         ProblemDescription(
-                            self.testing_env.n_jobs,
-                            self.testing_env.n_machines,
+                            self.testing_envs[i].n_jobs,
+                            self.testing_envs[i].n_machines,
                             MAX_DURATION,
                             "L2D",
                             "L2D",
-                            self.testing_env.affectations,
-                            self.testing_env.durations,
+                            self.testing_envs[i].affectations,
+                            self.testing_envs[i].durations,
                         )
                     ).schedule
-                    + self.testing_env.durations
+                    + self.testing_envs[i].durations
                 )
                 / self.n_test_env
             )
@@ -124,6 +173,8 @@ class TestCallback(BaseCallback):
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
+
+    def _visdom_metrics(self):
         self.vis.line(
             Y=np.array(
                 [self.makespans, self.random_makespans, self.ortools_makespans]
@@ -152,7 +203,6 @@ class TestCallback(BaseCallback):
             },
         )
 
-    def _visdom_metrics(self):
         if self.first_callback:
             self.first_callback = False
             return

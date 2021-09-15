@@ -25,6 +25,14 @@ def _permute_rows(x):
     return x[ix_i, ix_j]
 
 
+def generate_data(n_j, n_m, max_duration, seed=200, n_problems=100):
+    np.random.seed(seed)
+    data = np.array(
+        [generate_problem(n_j, n_m, max_duration) for _ in range(n_problems)]
+    )
+    return data
+
+
 def node_to_job_and_task(node_id, n_machines):
     return node_id // n_machines, node_id % n_machines
 

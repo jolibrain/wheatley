@@ -21,6 +21,14 @@ parser.add_argument(
     help="Add the machine id in the node embedding",
 )
 
+# Training and testing argument
+parser.add_argument(
+    "--fixed_benchmark",
+    default=False,
+    action="store_true",
+    help="Wether to test model on fixed or random becnhmark",
+)
+
 # Training arguments
 parser.add_argument(
     "--total_timesteps",

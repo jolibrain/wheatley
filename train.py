@@ -67,6 +67,7 @@ def main():
         n_workers=args.n_workers,
         multiprocessing=args.multiprocessing,
         path=args.path,
+        fixed_benchmark=args.fixed_benchmark,
     )
 
 

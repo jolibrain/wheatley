@@ -66,6 +66,7 @@ class Agent:
         n_workers,
         multiprocessing,
         path,
+        fixed_benchmark,
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
@@ -73,6 +74,7 @@ class Agent:
             n_test_env=n_test_env,
             display_env=display_env,
             path=path,
+            fixed_benchmark=fixed_benchmark,
         )
         event_callback = EveryNTimesteps(
             n_steps=eval_freq, callback=test_callback
