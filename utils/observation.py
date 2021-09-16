@@ -38,13 +38,9 @@ class Observation:
         else:
             n_dims = len(list(gym_observation["n_nodes"].shape))
             if n_dims == 3:
-                n_nodes = (gym_observation["n_nodes"][0][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
+                n_nodes = (gym_observation["n_nodes"][0][0] == 1).nonzero(as_tuple=True)[0]
             else:
-                n_nodes = (gym_observation["n_nodes"][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
+                n_nodes = (gym_observation["n_nodes"][0] == 1).nonzero(as_tuple=True)[0]
             n_nodes = n_nodes.item()
 
         features = gym_observation["features"]
@@ -96,10 +92,7 @@ class Observation:
                 raise Exception("Please use this only on cuda observation")
 
         loader = DataLoader(
-            [
-                Data(self.features[i], self.edge_index[i])
-                for i in range(self.get_batch_size())
-            ],
+            [Data(self.features[i], self.edge_index[i]) for i in range(self.get_batch_size())],
             batch_size=self.get_batch_size(),
         )
         graph = next(iter(loader))

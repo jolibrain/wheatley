@@ -12,9 +12,7 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
-    def __init__(
-        self, problem_description, divide_loss=False, add_machine_id=False
-    ):
+    def __init__(self, problem_description, divide_loss=False, add_machine_id=False):
         n_features = 3 if add_machine_id else 2
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
@@ -48,16 +46,11 @@ class Env(gym.Env):
 
         self.affectations = problem_description.affectations
         self.durations = problem_description.durations
-        self.transition_model_config = (
-            problem_description.transition_model_config
-        )
+        self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
         self.generate_random_problems = False
-        if (
-            problem_description.affectations is None
-            and problem_description.durations is None
-        ):
+        if problem_description.affectations is None and problem_description.durations is None:
             self.generate_random_problems = True
 
         self.transition_model = None
@@ -74,9 +67,7 @@ class Env(gym.Env):
             self.transition_model.get_graph(self.add_machine_id),
             self.transition_model.get_mask(),
         )
-        first_node_id, second_node_id = self._convert_action_to_node_ids(
-            action
-        )
+        first_node_id, second_node_id = self._convert_action_to_node_ids(action)
         self.transition_model.run(first_node_id, second_node_id)
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
@@ -105,9 +96,7 @@ class Env(gym.Env):
 
     def reset(self):
         if self.generate_random_problems:
-            self.affectations, self.durations = generate_problem(
-                self.n_jobs, self.n_machines, self.max_duration
-            )
+            self.affectations, self.durations = generate_problem(self.n_jobs, self.n_machines, self.max_duration)
         self._create_transition_and_reward_model()
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
@@ -126,9 +115,7 @@ class Env(gym.Env):
     def _create_transition_and_reward_model(self):
 
         if self.transition_model_config == "L2D":
-            self.transition_model = L2DTransitionModel(
-                self.affectations, self.durations
-            )
+            self.transition_model = L2DTransitionModel(self.affectations, self.durations)
         else:
             raise Exception("Transition model not recognized")
 

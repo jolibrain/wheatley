@@ -6,9 +6,7 @@ from args import args
 
 
 class EnvObservation:
-    def __init__(
-        self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask
-    ):
+    def __init__(self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask):
         self.n_jobs = n_jobs
         self.n_machines = n_machines
         self.n_nodes = n_nodes

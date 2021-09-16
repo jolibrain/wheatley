@@ -22,8 +22,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space):
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
-            features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES)
-            * (MAX_N_NODES + 1),
+            features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES) * (MAX_N_NODES + 1),
         )
 
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
@@ -34,9 +33,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 GINConv(
                     MLP(
                         n_layers=N_MLP_LAYERS_FEATURES_EXTRACTOR,
-                        input_dim=INPUT_DIM_FEATURES_EXTRACTOR
-                        if layer == 0
-                        else HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        input_dim=INPUT_DIM_FEATURES_EXTRACTOR if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
                         hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         batch_norm=True,
@@ -69,16 +66,10 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         # Create graph embedding and concatenate
         graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes
         graph_embedding = torch.matmul(graph_pooling, features)
-        graph_and_nodes_embedding = torch.cat(
-            (graph_embedding.reshape(batch_size, 1, -1), features), dim=1
-        )
+        graph_and_nodes_embedding = torch.cat((graph_embedding.reshape(batch_size, 1, -1), features), dim=1)
 
         mask = mask.reshape(batch_size, n_nodes, n_nodes)
-        extended_mask = torch.cat(
-            (torch.zeros((batch_size, 1, n_nodes), device=DEVICE), mask), dim=1
-        )
-        embedded_features = torch.cat(
-            (graph_and_nodes_embedding, extended_mask), dim=2
-        )
+        extended_mask = torch.cat((torch.zeros((batch_size, 1, n_nodes), device=DEVICE), mask), dim=1)
+        embedded_features = torch.cat((graph_and_nodes_embedding, extended_mask), dim=2)
 
         return embedded_features

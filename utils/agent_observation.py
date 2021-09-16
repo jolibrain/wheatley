@@ -3,9 +3,7 @@ from torch_geometric.data import Data, DataLoader
 
 
 class AgentObservation:
-    def __init__(
-        self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask
-    ):
+    def __init__(self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask):
         self.n_jobs = n_jobs
         self.n_machines = n_machines
         self.n_nodes = n_nodes
@@ -45,31 +43,15 @@ class AgentObservation:
         else:
             n_dims = len(list(gym_observation["n_jobs"].shape))
             if n_dims == 3:
-                n_jobs = (gym_observation["n_jobs"][0][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
-                n_machines = (
-                    gym_observation["n_machines"][0][0] == 1
-                ).nonzero(as_tuple=True)[0]
-                n_nodes = (gym_observation["n_nodes"][0][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
-                n_edges = (gym_observation["n_edges"][0][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
+                n_jobs = (gym_observation["n_jobs"][0][0] == 1).nonzero(as_tuple=True)[0]
+                n_machines = (gym_observation["n_machines"][0][0] == 1).nonzero(as_tuple=True)[0]
+                n_nodes = (gym_observation["n_nodes"][0][0] == 1).nonzero(as_tuple=True)[0]
+                n_edges = (gym_observation["n_edges"][0][0] == 1).nonzero(as_tuple=True)[0]
             else:
-                n_jobs = (gym_observation["n_jobs"][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
-                n_machines = (gym_observation["n_machines"][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
-                n_nodes = (gym_observation["n_nodes"][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
-                n_edges = (gym_observation["n_edges"][0] == 1).nonzero(
-                    as_tuple=True
-                )[0]
+                n_jobs = (gym_observation["n_jobs"][0] == 1).nonzero(as_tuple=True)[0]
+                n_machines = (gym_observation["n_machines"][0] == 1).nonzero(as_tuple=True)[0]
+                n_nodes = (gym_observation["n_nodes"][0] == 1).nonzero(as_tuple=True)[0]
+                n_edges = (gym_observation["n_edges"][0] == 1).nonzero(as_tuple=True)[0]
 
             n_jobs = n_jobs.item()
             n_machines = n_machines.item()
@@ -79,9 +61,7 @@ class AgentObservation:
         features = gym_observation["features"][:, 0:n_nodes, :]
         edge_index = gym_observation["edge_index"][:, :, 0:n_edges].long()
         mask = gym_observation["mask"][:, 0 : n_nodes ** 2]
-        return cls(
-            n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask
-        )
+        return cls(n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask)
 
     def to_torch_geometric(self):
         """
@@ -94,10 +74,7 @@ class AgentObservation:
                 raise Exception("Please use this only on cuda observation")
 
         loader = DataLoader(
-            [
-                Data(self.features[i], self.edge_index[i])
-                for i in range(self.get_batch_size())
-            ],
+            [Data(self.features[i], self.edge_index[i]) for i in range(self.get_batch_size())],
             batch_size=self.get_batch_size(),
         )
         graph = next(iter(loader))

@@ -17,9 +17,7 @@ def main():
     np.random.seed(args.seed)
 
     if args.n_j > MAX_N_JOBS or args.n_m > MAX_N_MACHINES:
-        raise Exception(
-            "MAX_N_JOBS or MAX_N_MACHINES are too low for this setup"
-        )
+        raise Exception("MAX_N_JOBS or MAX_N_MACHINES are too low for this setup")
 
     print(
         f"Launching training\n"
@@ -27,9 +25,7 @@ def main():
         f"Training time : {args.total_timesteps} timesteps"
     )
     if args.fixed_problem:
-        affectations, durations = generate_problem(
-            args.n_j, args.n_m, MAX_DURATION
-        )
+        affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
         problem_description = ProblemDescription(
             args.n_j,
             args.n_m,
@@ -42,9 +38,7 @@ def main():
         print(affectations)
         print(durations)
     else:
-        problem_description = ProblemDescription(
-            args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D"
-        )
+        problem_description = ProblemDescription(args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D")
 
     agent = Agent(
         n_epochs=args.n_epochs,

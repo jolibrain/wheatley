@@ -47,13 +47,8 @@ class State:
         contains exactly n-1 edges where n is the number of jobs
         """
         for machine_id in range(self.n_machines):
-            machine_sub_graph = self.graph.subgraph(
-                self._get_machine_node_ids(machine_id)
-            )
-            if (
-                nx.algorithms.dag.dag_longest_path_length(machine_sub_graph)
-                != self.n_jobs - 1
-            ):
+            machine_sub_graph = self.graph.subgraph(self._get_machine_node_ids(machine_id))
+            if nx.algorithms.dag.dag_longest_path_length(machine_sub_graph) != self.n_jobs - 1:
                 return False
         return True
 
@@ -61,9 +56,7 @@ class State:
         node_ids = []
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
-                node_id = job_and_task_to_node(
-                    job_id, task_id, self.n_machines
-                )
+                node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                 if self.affectations[job_id, task_id] == machine_id:
                     node_ids.append(node_id)
         return node_ids
@@ -77,9 +70,7 @@ class State:
         if node_encoding == "L2D":
             for job_id in range(self.n_jobs):
                 for task_id in range(self.n_machines):
-                    node_id = job_and_task_to_node(
-                        job_id, task_id, self.n_machines
-                    )
+                    node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                     self.graph.nodes[node_id]["x"] = (
                         [
                             node_id,
@@ -121,28 +112,16 @@ class State:
             (distance, cur_node_id) = priority_queue.get()
             predecessors = list(self.graph.predecessors(cur_node_id))
             max_completion_time_predecessors = (
-                max(
-                    [
-                        self.task_completion_times[
-                            node_to_job_and_task(p, self.n_machines)
-                        ]
-                        for p in predecessors
-                    ]
-                )
+                max([self.task_completion_times[node_to_job_and_task(p, self.n_machines)] for p in predecessors])
                 if len(predecessors) != 0
                 else 0
             )
 
             new_completion_time = (
-                max_completion_time_predecessors
-                + self.durations[
-                    node_to_job_and_task(cur_node_id, self.n_machines)
-                ]
+                max_completion_time_predecessors + self.durations[node_to_job_and_task(cur_node_id, self.n_machines)]
             )
 
-            self.task_completion_times[
-                node_to_job_and_task(cur_node_id, self.n_machines)
-            ] = new_completion_time
+            self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)] = new_completion_time
 
             for successor in self.graph.successors(cur_node_id):
                 priority_queue.put((distance + 1, successor))
@@ -153,9 +132,7 @@ class State:
         and updates all other attributes of the State related to the graph.
         """
         # First check that second_node is not scheduled before first node
-        nodes_after_second_node = nx.algorithms.descendants(
-            self.graph, second_node_id
-        )
+        nodes_after_second_node = nx.algorithms.descendants(self.graph, second_node_id)
         if first_node_id in nodes_after_second_node:
             return False
         # Also check that first and second node ids are not the same

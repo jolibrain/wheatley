@@ -24,9 +24,7 @@ class TransitionModel(ABC):
         pass
 
     def get_graph(self, add_machine_id):
-        return self.state.to_torch_geometric(
-            add_machine_id, self.node_encoding
-        )
+        return self.state.to_torch_geometric(add_machine_id, self.node_encoding)
 
     def done(self):
         return self.state.done()

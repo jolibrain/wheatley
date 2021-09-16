@@ -1,4 +1,4 @@
-pre-commit
+pre - commit
 pytest
 torch
 numpy

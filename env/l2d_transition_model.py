@@ -8,9 +8,7 @@ from config import MAX_N_EDGES, MAX_N_NODES
 
 class L2DTransitionModel(TransitionModel):
     def __init__(self, affectations, durations):
-        super(L2DTransitionModel, self).__init__(
-            affectations, durations, node_encoding="L2D"
-        )
+        super(L2DTransitionModel, self).__init__(affectations, durations, node_encoding="L2D")
         self.useless_timesteps = 0
 
     def run(self, first_node_id, second_node_id):
@@ -39,9 +37,7 @@ class L2DTransitionModel(TransitionModel):
 
         machine_id = self.affectations[job_id, task_id]
         machine_occupancy = self.state.get_machine_occupancy(machine_id)
-        job_availability_time = self.state.get_job_availability(
-            job_id, task_id
-        )
+        job_availability_time = self.state.get_job_availability(job_id, task_id)
 
         # If no task is affected on machine, just affect it wherever possible and returns
         if not machine_occupancy:
@@ -60,10 +56,7 @@ class L2DTransitionModel(TransitionModel):
                 start_time, duration, _ = machine_occupancy[i]
                 next_start_time, next_duration, _ = machine_occupancy[i + 1]
                 if start_time + duration < next_start_time:
-                    if (
-                        start_time + duration <= job_availability_time
-                        and job_availability_time < next_start_time
-                    ):
+                    if start_time + duration <= job_availability_time and job_availability_time < next_start_time:
                         index = i
             if index == -1:
                 # The job can be inserted nowhere, so we add it at the end
@@ -71,9 +64,7 @@ class L2DTransitionModel(TransitionModel):
             else:
                 # The job is inserted between task_index and task_index+1
                 self.state.set_precedency(machine_occupancy[index][2], node_id)
-                self.state.set_precedency(
-                    node_id, machine_occupancy[index + 1][2]
-                )
+                self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
         self.state.affect_node(node_id)
 
     def get_mask(self):
@@ -81,9 +72,7 @@ class L2DTransitionModel(TransitionModel):
         for job_id in range(self.n_jobs):
             task_id = self.state.get_first_unaffected_task(job_id)
             if task_id != -1:
-                available_node_ids.append(
-                    job_and_task_to_node(job_id, task_id, self.n_machines)
-                )
+                available_node_ids.append(job_and_task_to_node(job_id, task_id, self.n_machines))
         mask = torch.zeros(self.n_nodes ** 2)
         for node_id in available_node_ids:
             mask[node_id + self.n_nodes * node_id] = 1

@@ -40,19 +40,13 @@ def test_run(l2d_transition_model):
     assert l2d_tm.state.is_affected[1, 1] == 1
     assert l2d_tm.state.is_affected[0, 0] == 1
     assert nx.is_isomorphic(l2d_tm.state.graph, l2d_tm_cp.state.graph)
-    assert (
-        l2d_tm.state.task_completion_times
-        == l2d_tm_cp.state.task_completion_times
-    ).all()
+    assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph and affectations (and btw, insertion before)
     l2d_tm.run(15, 15)
     assert l2d_tm.state.is_affected[3, 0] == 1
     assert l2d_tm.state.graph.has_edge(15, 6)
-    assert (
-        l2d_tm.state.task_completion_times
-        == l2d_tm_cp.state.task_completion_times
-    ).all()
+    assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph, affectations and task_completion_times
     l2d_tm.run(20, 20)
@@ -117,9 +111,7 @@ def test_run(l2d_transition_model):
 def eq(state1, state2):
     if (
         nx.is_isomorphic(state1.graph, state2.graph)
-        and (
-            state1.task_completion_times == state2.task_completion_times
-        ).all()
+        and (state1.task_completion_times == state2.task_completion_times).all()
         and (state1.is_affected == state2.is_affected).all()
     ):
         return True

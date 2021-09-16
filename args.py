@@ -67,15 +67,9 @@ parser.add_argument(
     help="Batch size during training of PPO",
 )
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
-parser.add_argument(
-    "--clip_range", type=float, default=0.2, help="Clipping parameter"
-)
-parser.add_argument(
-    "--ent_coef", type=float, default=0.005, help="Entropy coefficient"
-)
-parser.add_argument(
-    "--vf_coef", type=float, default=0.5, help="Value function coefficient"
-)
+parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping parameter")
+parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
+parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 parser.add_argument(
     "--dont_divide_loss",

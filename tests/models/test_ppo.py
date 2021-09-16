@@ -49,10 +49,7 @@ def test_ppo_static_env():
     )
     assert ppo.predict(env.get_observation(), deterministic=True)[0] == 0
     switched_observation = env.get_observation()[[0, 2, 1, 3, 4]]
-    assert (
-        ppo.predict(switched_observation, deterministic=True)[0]
-        == 1 * MAX_N_NODES + 1
-    )
+    assert ppo.predict(switched_observation, deterministic=True)[0] == 1 * MAX_N_NODES + 1
 
 
 def test_ppo_dynamic_env():
@@ -171,10 +168,7 @@ def test_ppo_dynamic_env():
         )[1]
     )
     env.reset()
-    assert (
-        ppo.predict(env.get_observation(), deterministic=True)[0]
-        == 2 * MAX_N_NODES + 2
-    )
+    assert ppo.predict(env.get_observation(), deterministic=True)[0] == 2 * MAX_N_NODES + 2
     env.step(0)
     assert ppo.predict(env.get_observation(), deterministic=True)[0] == 0
 
@@ -182,9 +176,7 @@ def test_ppo_dynamic_env():
 class StaticEnv(gym.Env):
     def __init__(self):
         self.action_space = Discrete(MAX_N_EDGES + 1)
-        self.observation_space = Box(
-            0, 6, (5, HIDDEN_DIM_FEATURES_EXTRACTOR + 4)
-        )
+        self.observation_space = Box(0, 6, (5, HIDDEN_DIM_FEATURES_EXTRACTOR + 4))
         self.counter = 0
 
     def step(self, action):
@@ -206,16 +198,11 @@ class StaticEnv(gym.Env):
     def get_observation(self):
         return np.array(
             [
-                [1 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0 for i in range(4)],
-                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1 for i in range(4)],
-                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1 for i in range(4)],
-                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1 for i in range(4)],
-                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1 for i in range(4)],
+                [1 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0 for i in range(4)],
+                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1 for i in range(4)],
+                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1 for i in range(4)],
+                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1 for i in range(4)],
+                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1 for i in range(4)],
             ]
         )
 
@@ -226,9 +213,7 @@ class StaticEnv(gym.Env):
 class DynamicEnv(gym.Env):
     def __init__(self):
         self.action_space = Discrete(MAX_N_EDGES + 1)
-        self.observation_space = Box(
-            0, 6, (5, HIDDEN_DIM_FEATURES_EXTRACTOR + 4)
-        )
+        self.observation_space = Box(0, 6, (5, HIDDEN_DIM_FEATURES_EXTRACTOR + 4))
         self.counter = 0
         self.state = 1
 
@@ -264,16 +249,11 @@ class DynamicEnv(gym.Env):
     def get_observation(self):
         return np.array(
             [
-                [self.state for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0 for i in range(4)],
-                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1, 1, 1, 1],
-                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1, 1, 1, 1],
-                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1, 1, 1, 1],
-                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1, 1, 1, 0],
+                [self.state for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0 for i in range(4)],
+                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1, 1, 1, 1],
+                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1, 1, 1, 1],
+                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1, 1, 1, 1],
+                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1, 1, 1, 0],
             ]
         )
 

@@ -17,9 +17,7 @@ from utils.utils import generate_problem, generate_data
 from config import MAX_DURATION
 
 
-def test_agent(
-    agent, n_j, n_m, max_duration, affectations=None, durations=None
-):
+def test_agent(agent, n_j, n_m, max_duration, affectations=None, durations=None):
     if affectations is None and durations is None:
         affectations, durations = generate_problem(n_j, n_m, max_duration)
     problem_description = ProblemDescription(
@@ -36,9 +34,7 @@ def test_agent(
     return makespan
 
 
-def get_ortools_makespan(
-    n_j, n_m, max_duration, affectations=None, durations=None
-):
+def get_ortools_makespan(n_j, n_m, max_duration, affectations=None, durations=None):
     if affectations is None and durations is None:
         affectations, durations = generate_problem(n_j, n_m, max_duration)
     solution = solve_jssp(affectations, durations)
@@ -47,9 +43,7 @@ def get_ortools_makespan(
 
 
 class TestCallback(BaseCallback):
-    def __init__(
-        self, env, n_test_env, display_env, path, fixed_benchmark, verbose=2
-    ):
+    def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, verbose=2):
         super(TestCallback, self).__init__(verbose=verbose)
         self.testing_env = env
         self.n_test_env = n_test_env
@@ -62,9 +56,7 @@ class TestCallback(BaseCallback):
             self.n_test_env = 100
             self.testing_env = None
         else:
-            self.testing_envs = [
-                deepcopy(self.testing_env) for _ in range(self.n_test_env)
-            ]
+            self.testing_envs = [deepcopy(self.testing_env) for _ in range(self.n_test_env)]
             self.testing_env = None
 
         self.makespans = []
@@ -88,14 +80,10 @@ class TestCallback(BaseCallback):
     def _init_testing_envs(self):
         n_jobs = self.testing_env.n_jobs
         n_machines = self.testing_env.n_machines
-        if not path.exists(
-            f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"
-        ):
+        if not path.exists(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"):
             data = generate_data(n_jobs, n_machines, MAX_DURATION)
         else:
-            data = np.load(
-                f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"
-            )
+            data = np.load(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy")
         self.testing_envs = [
             Env(
                 ProblemDescription(
@@ -120,9 +108,7 @@ class TestCallback(BaseCallback):
         return True
 
     def _save_if_best_model(self):
-        min_ratio = np.min(
-            np.array(self.makespans) / np.array(self.ortools_makespans)
-        )
+        min_ratio = np.min(np.array(self.makespans) / np.array(self.ortools_makespans))
         if self.makespans[-1] / self.ortools_makespans[-1] == min_ratio:
             self.model.save(self.path)
 
@@ -176,24 +162,18 @@ class TestCallback(BaseCallback):
 
     def _visdom_metrics(self):
         self.vis.line(
-            Y=np.array(
-                [self.makespans, self.random_makespans, self.ortools_makespans]
-            ).T,
+            Y=np.array([self.makespans, self.random_makespans, self.ortools_makespans]).T,
             win="test_makespan",
             opts={
                 "legend": ["PPO", "Random", "OR-tools"],
-                "linecolor": np.array(
-                    [[31, 119, 180], [255, 127, 14], [44, 160, 44]]
-                ),
+                "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
             },
         )
         self.vis.line(
             Y=np.stack(
                 [
-                    np.array(self.makespans)
-                    / np.array(self.ortools_makespans),
-                    np.array(self.random_makespans)
-                    / np.array(self.ortools_makespans),
+                    np.array(self.makespans) / np.array(self.ortools_makespans),
+                    np.array(self.random_makespans) / np.array(self.ortools_makespans),
                 ]
             ).T,
             win="test_makespan_ratio",
@@ -207,43 +187,18 @@ class TestCallback(BaseCallback):
             self.first_callback = False
             return
 
-        self.entropy_losses.append(
-            self.model.ent_coef
-            * self.model.logger.name_to_value["train/entropy_loss"]
-        )
-        self.policy_gradient_losses.append(
-            self.model.logger.name_to_value["train/policy_gradient_loss"]
-        )
-        self.value_losses.append(
-            self.model.vf_coef
-            * self.model.logger.name_to_value["train/value_loss"]
-        )
+        self.entropy_losses.append(self.model.ent_coef * self.model.logger.name_to_value["train/entropy_loss"])
+        self.policy_gradient_losses.append(self.model.logger.name_to_value["train/policy_gradient_loss"])
+        self.value_losses.append(self.model.vf_coef * self.model.logger.name_to_value["train/value_loss"])
         self.losses.append(self.model.logger.name_to_value["train/loss"])
-        self.approx_kls.append(
-            self.model.logger.name_to_value["train/approx_kl"]
-        )
-        self.clip_fractions.append(
-            self.model.logger.name_to_value["train/clip_fraction"]
-        )
-        self.explained_variances.append(
-            self.model.logger.name_to_value["train/explained_variance"]
-        )
-        self.clip_ranges.append(
-            self.model.logger.name_to_value["train/clip_range"]
-        )
+        self.approx_kls.append(self.model.logger.name_to_value["train/approx_kl"])
+        self.clip_fractions.append(self.model.logger.name_to_value["train/clip_fraction"])
+        self.explained_variances.append(self.model.logger.name_to_value["train/explained_variance"])
+        self.clip_ranges.append(self.model.logger.name_to_value["train/clip_range"])
         # Recreate last features by hand, since they are erased
-        self.ep_rew_means.append(
-            safe_mean([ep_info["r"] for ep_info in self.model.ep_info_buffer])
-        )
-        self.ep_len_means.append(
-            safe_mean([ep_info["l"] for ep_info in self.model.ep_info_buffer])
-        )
-        self.fpss.append(
-            int(
-                self.model.num_timesteps
-                / (time.time() - self.model.start_time)
-            )
-        )
+        self.ep_rew_means.append(safe_mean([ep_info["r"] for ep_info in self.model.ep_info_buffer]))
+        self.ep_len_means.append(safe_mean([ep_info["l"] for ep_info in self.model.ep_info_buffer]))
+        self.fpss.append(int(self.model.num_timesteps / (time.time() - self.model.start_time)))
         self.total_timestepss.append(self.model.num_timesteps)
 
         figure, ax = plt.subplots(3, 4, figsize=(16, 12))

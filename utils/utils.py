@@ -27,9 +27,7 @@ def _permute_rows(x):
 
 def generate_data(n_j, n_m, max_duration, seed=200, n_problems=100):
     np.random.seed(seed)
-    data = np.array(
-        [generate_problem(n_j, n_m, max_duration) for _ in range(n_problems)]
-    )
+    data = np.array([generate_problem(n_j, n_m, max_duration) for _ in range(n_problems)])
     return data
 
 

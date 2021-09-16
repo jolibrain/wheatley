@@ -157,13 +157,7 @@ def test_features_extractor_learning(features_extractor):
     for epoch in range(100):
         for x, y in dataset:
             embedded_features = features_extractor(x).squeeze()
-            prediction = torch.sigmoid(
-                last_layer(
-                    embedded_features[:, 0:HIDDEN_DIM_FEATURES_EXTRACTOR]
-                    .flatten()
-                    .squeeze()
-                )
-            )
+            prediction = torch.sigmoid(last_layer(embedded_features[:, 0:HIDDEN_DIM_FEATURES_EXTRACTOR].flatten().squeeze()))
             criterion.zero_grad()
             loss = criterion(prediction, y)
             loss.backward()
@@ -171,13 +165,7 @@ def test_features_extractor_learning(features_extractor):
 
     for x, y in dataset:
         embedded_features = features_extractor(x).squeeze()
-        prediction = torch.sigmoid(
-            last_layer(
-                embedded_features[:, 0:HIDDEN_DIM_FEATURES_EXTRACTOR]
-                .flatten()
-                .squeeze()
-            )
-        )
+        prediction = torch.sigmoid(last_layer(embedded_features[:, 0:HIDDEN_DIM_FEATURES_EXTRACTOR].flatten().squeeze()))
         if torch.cuda.is_available():
             prediction = prediction.detach().cpu().numpy()
             y = y.detach().cpu().numpy()

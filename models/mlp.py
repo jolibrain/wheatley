@@ -47,9 +47,7 @@ class MLP(nn.Module):
     def forward(self, x):
         for layer in range(self.n_layers - 2):
             if self.batch_norm:
-                x = self.activation_layer(
-                    self.batch_norms[layer](self.layers[layer](x))
-                )
+                x = self.activation_layer(self.batch_norms[layer](self.layers[layer](x)))
             else:
                 x = self.activation_layer(self.layers[layer](x))
         return self.layers[self.n_layers - 2](x)

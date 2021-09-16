@@ -50,18 +50,14 @@ class MLPExtractor(nn.Module):
         FeatureExtractor
         """
         # First decompose the features into mask, graph_embedding and nodes_embedding
-        graph_embedding, nodes_embedding, mask = self._decompose_features(
-            embedded_features
-        )
+        graph_embedding, nodes_embedding, mask = self._decompose_features(embedded_features)
         n_nodes = nodes_embedding.shape[1]
         batch_size = graph_embedding.shape[0]
 
         # Then compute actor and critic
         value = self.critic(graph_embedding)
 
-        possible_s_a_pairs = self._compute_possible_s_a_pairs(
-            graph_embedding, nodes_embedding
-        )
+        possible_s_a_pairs = self._compute_possible_s_a_pairs(graph_embedding, nodes_embedding)
 
         # Apply a mask
         pairs_to_compute, indexes = self._apply_mask(possible_s_a_pairs, mask)
@@ -76,18 +72,14 @@ class MLPExtractor(nn.Module):
         # And reshape pi in ordrer to have every value corresponding to its edge index
         shaped_pi = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
         for i in range(batch_size):
-            shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])[
-                0 : len(indexes[i])
-            ]
+            shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])[0 : len(indexes[i])]
 
         # The final pi must include all actions (even those that are not applicable
         # because of the size of the graph). So we convert the flattened pi to a square
         # matrix of size (n_nodes, n_nodes). We then complete the matrix to get a square
         # matrix of size (MAX_N_NODES, MAX_N_NODES) with 0, and we reflatten it.
         shaped_pi = shaped_pi.reshape(batch_size, n_nodes, n_nodes)
-        filled_pi = torch.zeros(
-            (batch_size, MAX_N_NODES, MAX_N_NODES), device=DEVICE
-        )
+        filled_pi = torch.zeros((batch_size, MAX_N_NODES, MAX_N_NODES), device=DEVICE)
         filled_pi[:, 0:n_nodes, 0:n_nodes] = shaped_pi
         filled_pi = filled_pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES)
 

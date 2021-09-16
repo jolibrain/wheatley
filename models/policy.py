@@ -41,9 +41,7 @@ class Policy(ActorCriticPolicy):
                 module.apply(partial(self.init_weights, gain=gain))
 
         # Setup optimizer with initial learning rate
-        self.optimizer = self.optimizer_class(
-            self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs
-        )
+        self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
     def forward(self, obs, deterministic=False):
         """
@@ -55,11 +53,7 @@ class Policy(ActorCriticPolicy):
         latent_pi, latent_vf, _ = self._get_latent(obs)
         values = latent_vf  # Modification here
         distribution = Categorical(latent_pi)  # And here
-        actions = (
-            torch.argmax(distribution.probs, dim=1)
-            if deterministic
-            else distribution.sample()
-        )
+        actions = torch.argmax(distribution.probs, dim=1) if deterministic else distribution.sample()
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob
 

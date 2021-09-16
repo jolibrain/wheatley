@@ -107,28 +107,18 @@ def test_forward():
     features = torch.tensor(
         [
             [
-                [1 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
-                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [1, 0, 0, 0],
-                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
-                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 1, 0],
-                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
+                [1 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
+                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [1, 0, 0, 0],
+                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
+                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 1, 0],
+                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
             ],
             [
-                [1 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
-                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
-                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
-                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 0],
-                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)]
-                + [0, 0, 0, 1],
+                [1 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
+                [2 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
+                [3 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
+                [4 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 0],
+                [5 for i in range(HIDDEN_DIM_FEATURES_EXTRACTOR)] + [0, 0, 0, 1],
             ],
         ],
         dtype=torch.float,

@@ -76,15 +76,10 @@ class Agent:
             path=path,
             fixed_benchmark=fixed_benchmark,
         )
-        event_callback = EveryNTimesteps(
-            n_steps=eval_freq, callback=test_callback
-        )
+        event_callback = EveryNTimesteps(n_steps=eval_freq, callback=test_callback)
 
         # Then launch training
-        env_fns = [
-            self._get_env_fn(problem_description, divide_loss)
-            for _ in range(n_workers)
-        ]
+        env_fns = [self._get_env_fn(problem_description, divide_loss) for _ in range(n_workers)]
         vec_env_class = SubprocVecEnv if multiprocessing else DummyVecEnv
         vec_env = vec_env_class(env_fns)
         self.model.set_env(vec_env)
