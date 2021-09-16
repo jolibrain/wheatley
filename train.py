@@ -24,21 +24,22 @@ def main():
         f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
         f"Training time : {args.total_timesteps} timesteps"
     )
+
     if args.fixed_problem:
         affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
-        problem_description = ProblemDescription(
-            args.n_j,
-            args.n_m,
-            MAX_DURATION,
-            "L2D",
-            "L2D",
-            affectations,
-            durations,
-        )
         print(affectations)
         print(durations)
     else:
-        problem_description = ProblemDescription(args.n_j, args.n_m, MAX_DURATION, "L2D", "L2D")
+        affectations, durations = None, None
+    problem_description = ProblemDescription(
+        args.n_j,
+        args.n_m,
+        MAX_DURATION,
+        args.transition_model_config,
+        args.reward_model_config,
+        affectations,
+        durations,
+    )
 
     agent = Agent(
         n_epochs=args.n_epochs,

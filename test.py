@@ -23,7 +23,7 @@ def main():
 
     print("Loading agent")
     agent = Agent.load(args.path)
-    agent.model.verbose = 0
+    random_agent = RandomAgent()
 
     if args.fixed_benchmark:
         args.n_test_problems = 100
@@ -32,7 +32,6 @@ def main():
         else:
             problem_data = np.load(f"benchmark/generated_data{args.n_j}_{args.n_m}_seed200.npy")
 
-    random_agent = RandomAgent()
     print(
         "Launching inference.\n"
         f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
@@ -46,20 +45,20 @@ def main():
     for i in range(args.n_test_problems):
         if (i + 1) % (args.n_test_problems // 10) == 0:
             print(f"{i+1}/{args.n_test_problems}")
-        if args.fixed_benchmark:
-            affectations, durations = problem_data[i][0], problem_data[i][1]
-        else:
-            affectations, durations = None, None
-        rl_makespan = test_agent(agent, args.n_j, args.n_m, MAX_DURATION, affectations, durations)
-        random_makespan = test_agent(
-            random_agent,
-            args.n_j,
-            args.n_m,
-            MAX_DURATION,
-            affectations,
-            durations,
+
+        affectations, durations = (
+            (problem_data[i][0], problem_data[i][1])
+            if args.fixed_benchmark
+            else generate_problem(args.n_j, args.n_m, MAX_DURATION)
         )
+        problem_description = ProblemDescription(
+            args.n_j, args.n_m, MAX_DURATION, args.transition_model_config, args.reward_model_config, affectations, durations
+        )
+
+        rl_makespan = test_agent(agent, problem_description)
+        random_makespan = test_agent(random_agent, problem_description)
         or_tools_makespan = get_ortools_makespan(args.n_j, args.n_m, MAX_DURATION, affectations, durations)
+
         diff_percentage = 100 * (rl_makespan - or_tools_makespan) / or_tools_makespan
         rl_makespans.append(rl_makespan)
         or_tools_makespans.append(or_tools_makespan)
@@ -70,7 +69,8 @@ def main():
     print(f"Makespan for OR-tools solution : {np.mean(or_tools_makespans):.0f}±{np.std(or_tools_makespans):.0f}")
     print(f"Makespan for random solution : {np.mean(random_makespans):.0f}±{np.std(random_makespans):.0f}")
     print(
-        f"Difference in percentage between OR-tools and RL : {np.mean(diff_percentages):.1f}±{np.std(diff_percentages):.1f}%"
+        "Difference in percentage between OR-tools and RL : "
+        f"{np.mean(diff_percentages):.1f}±{np.std(diff_percentages):.1f}%"
     )
 
 

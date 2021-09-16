@@ -17,20 +17,9 @@ from utils.utils import generate_problem, generate_data
 from config import MAX_DURATION
 
 
-def test_agent(agent, n_j, n_m, max_duration, affectations=None, durations=None):
-    if affectations is None and durations is None:
-        affectations, durations = generate_problem(n_j, n_m, max_duration)
-    problem_description = ProblemDescription(
-        n_j,
-        n_m,
-        max_duration,
-        "L2D",
-        "L2D",
-        affectations,
-        durations,
-    )
+def test_agent(agent, problem_description):
     solution = agent.predict(problem_description)
-    makespan = np.max(solution.schedule + durations)
+    makespan = np.max(solution.schedule + problem_description.durations)
     return makespan
 
 
