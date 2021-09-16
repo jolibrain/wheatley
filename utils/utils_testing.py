@@ -1,5 +1,4 @@
 from copy import deepcopy
-from os import path
 import time
 
 import matplotlib.pyplot as plt
@@ -12,7 +11,7 @@ from env.env import Env
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
-from utils.utils import generate_problem, generate_data
+from utils.utils import generate_problem, generate_data, load_benchmark
 
 from config import MAX_DURATION
 
@@ -39,6 +38,14 @@ class TestCallback(BaseCallback):
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
         self.fixed_benchmark = fixed_benchmark
+
+        self.n_jobs = self.testing_env.n_jobs
+        self.n_machines = self.testing_env.n_machines
+        self.max_duration = self.testing_env.max_duration
+        self.transition_model_config = self.testing_env.transition_model_config
+        self.reward_model_config = self.testing_env.reward_model_config
+
+        self.random_agent = RandomAgent()
 
         if self.fixed_benchmark:
             self._init_testing_envs()
@@ -67,20 +74,15 @@ class TestCallback(BaseCallback):
         self.figure = None
 
     def _init_testing_envs(self):
-        n_jobs = self.testing_env.n_jobs
-        n_machines = self.testing_env.n_machines
-        if not path.exists(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"):
-            data = generate_data(n_jobs, n_machines, MAX_DURATION)
-        else:
-            data = np.load(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy")
+        data = load_benchmark(self.n_jobs, self.n_machines)
         self.testing_envs = [
             Env(
                 ProblemDescription(
-                    n_jobs,
-                    n_machines,
-                    MAX_DURATION,
-                    "L2D",
-                    "L2D",
+                    self.n_jobs,
+                    self.n_machines,
+                    self.max_duration,
+                    self.transition_model_config,
+                    self.reward_model_config,
                     data[i][0],
                     data[i][1],
                 ),
@@ -102,7 +104,6 @@ class TestCallback(BaseCallback):
             self.model.save(self.path)
 
     def _evaluate_agent(self):
-        random_agent = RandomAgent()
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
@@ -117,25 +118,25 @@ class TestCallback(BaseCallback):
             mean_makespan += np.max(schedule + durations) / self.n_test_env
 
             ortools_mean_makespan += (
-                np.max(
-                    solve_jssp(
-                        self.testing_envs[i].affectations,
-                        self.testing_envs[i].durations,
-                    ).schedule
-                    + self.testing_envs[i].durations
+                get_ortools_makespan(
+                    self.n_jobs,
+                    self.n_machines,
+                    self.max_duration,
+                    self.testing_envs[i].affectations,
+                    self.testing_envs[i].durations,
                 )
                 / self.n_test_env
             )
 
             random_mean_makespan += (
                 np.max(
-                    random_agent.predict(
+                    self.random_agent.predict(
                         ProblemDescription(
                             self.testing_envs[i].n_jobs,
                             self.testing_envs[i].n_machines,
-                            MAX_DURATION,
-                            "L2D",
-                            "L2D",
+                            self.testing_envs[i].max_duration,
+                            self.testing_envs[i].transition_model_config,
+                            self.testing_envs[i].reward_model_config,
                             self.testing_envs[i].affectations,
                             self.testing_envs[i].durations,
                         )

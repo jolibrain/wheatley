@@ -1,7 +1,9 @@
+from os import path
+
 import numpy as np
 import torch
 
-from config import MAX_N_MACHINES
+from config import MAX_N_MACHINES, MAX_DURATION
 
 
 def generate_problem(n_jobs, n_machines, high):
@@ -51,3 +53,12 @@ def apply_mask(tensor, mask):
         indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
         masked_tensors.append(tensor[i][indexes[-1]])
     return torch.stack(masked_tensors), indexes
+
+
+def load_benchmark(n_jobs, n_machines):
+    if not path.exists(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"):
+        data = generate_data(n_jobs, n_machines, MAX_DURATION)
+    else:
+        data = np.load(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy")
+    np.save(f"generated_data{n_jobs}_{n_machines}_seed200.npy", data)
+    return data

@@ -87,7 +87,6 @@ class Agent:
 
     def predict(self, problem_description):
         env = Env(problem_description, add_machine_id=self.add_machine_id)
-        self.model.set_env(env)
         observation = env.reset()
         done = False
         while not done:

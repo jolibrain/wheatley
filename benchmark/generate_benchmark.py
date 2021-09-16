@@ -13,7 +13,7 @@ def main():
     seed = 200
     for n_j, n_m in [(6, 6), (10, 10), (15, 15), (20, 20), (30, 20)]:
         data = generate_data(n_j, n_m, MAX_DURATION, seed, 100)
-        np.save("generated_data{}_{}_seed{}.npy".format(n_j, n_m, seed), data)
+        np.save(f"generated_data{n_j}_{n_m}_seed{seed}.npy", data)
 
 
 if __name__ == "__main__":
