@@ -3,10 +3,10 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.ppo import PPO
 
 from env.env import Env
+from models.agent_callback import TestCallback
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
-from utils.utils_testing import TestCallback
 
 from config import DEVICE
 
