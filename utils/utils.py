@@ -46,5 +46,5 @@ def load_benchmark(n_jobs, n_machines):
         data = generate_data(n_jobs, n_machines, MAX_DURATION)
     else:
         data = np.load(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy")
-    np.save(f"generated_data{n_jobs}_{n_machines}_seed200.npy", data)
+    np.save(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy", data)
     return data

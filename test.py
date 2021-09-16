@@ -9,7 +9,7 @@ from models.agent import Agent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
-from utils.utils import generate_problem, generate_data
+from utils.utils import generate_problem, generate_data, load_benchmark
 from utils.utils_testing import test_agent, get_ortools_makespan
 
 from config import MAX_N_JOBS, MAX_N_MACHINES, MAX_DURATION, DEVICE
@@ -27,10 +27,7 @@ def main():
 
     if args.fixed_benchmark:
         args.n_test_problems = 100
-        if not path.exists(f"benchmark/generated_data{args.n_j}_{args.n_m}_seed200.npy"):
-            problem_data = generate_data(args.n_j, args.n_m, MAX_DURATION)
-        else:
-            problem_data = np.load(f"benchmark/generated_data{args.n_j}_{args.n_m}_seed200.npy")
+        problem_data = load_benchmark(args.n_j, args.n_m)
 
     print(
         "Launching inference.\n"
@@ -43,6 +40,7 @@ def main():
     or_tools_makespans = []
     random_makespans = []
     for i in range(args.n_test_problems):
+        # Prints
         if (i + 1) % (args.n_test_problems // 50) == 0:
             print(f"{i+1}/{args.n_test_problems}")
 
