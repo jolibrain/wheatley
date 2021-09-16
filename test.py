@@ -43,7 +43,7 @@ def main():
     or_tools_makespans = []
     random_makespans = []
     for i in range(args.n_test_problems):
-        if (i + 1) % (args.n_test_problems // 10) == 0:
+        if (i + 1) % (args.n_test_problems // 50) == 0:
             print(f"{i+1}/{args.n_test_problems}")
 
         affectations, durations = (
