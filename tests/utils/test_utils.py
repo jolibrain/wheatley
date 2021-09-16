@@ -5,7 +5,6 @@ from utils.utils import (
     generate_problem,
     node_to_job_and_task,
     job_and_task_to_node,
-    apply_mask,
 )
 
 
@@ -24,29 +23,3 @@ def test_job_and_task_to_node():
     assert job_and_task_to_node(0, 4, 5) == 4
     assert job_and_task_to_node(5, 5, 6) == 35
     assert job_and_task_to_node(3, 2, 4) == 14
-
-
-def test_apply_mask():
-    tensor = torch.tensor(
-        [
-            [
-                [1, 2, 3],
-                [4, 5, 6],
-                [7, 8, 9],
-            ],
-            [
-                [11, 12, 13],
-                [14, 15, 16],
-                [17, 18, 19],
-            ],
-        ]
-    )
-    mask = torch.tensor(
-        [
-            [0, 1, 0],
-            [1, 0, 0],
-        ]
-    )
-    masked_tensor, indexes = apply_mask(tensor, mask)
-    assert (masked_tensor == torch.tensor([[[4, 5, 6]], [[11, 12, 13]]])).all()
-    assert indexes == [torch.tensor([1]), torch.tensor([0])]

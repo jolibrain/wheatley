@@ -41,20 +41,6 @@ def job_and_task_to_node(job_id, task_id, n_machines):
     return job_id * n_machines + task_id
 
 
-def apply_mask(tensor, mask):
-    """
-    Returns the tensor corresponding to 1 values in the mask, and the corresponding
-    indexes. Tensor should be (A, B, C) shaped and mask (A, B) shaped
-    """
-    indexes = []
-    masked_tensors = []
-
-    for i in range(tensor.shape[0]):
-        indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
-        masked_tensors.append(tensor[i][indexes[-1]])
-    return torch.stack(masked_tensors), indexes
-
-
 def load_benchmark(n_jobs, n_machines):
     if not path.exists(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy"):
         data = generate_data(n_jobs, n_machines, MAX_DURATION)

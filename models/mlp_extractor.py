@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from torch_geometric.nn.conv import GINConv
 
 from models.mlp import MLP
-from utils.utils import apply_mask
 
 from config import (
     HIDDEN_DIM_FEATURES_EXTRACTOR,
