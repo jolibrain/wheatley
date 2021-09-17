@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 
 from utils.utils import (
     generate_problem,

@@ -10,11 +10,8 @@ import visdom
 from env.env import Env
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
-from utils.ortools_solver import solve_jssp
 from utils.utils_testing import get_ortools_makespan
-from utils.utils import generate_problem, generate_data, load_benchmark
-
-from config import MAX_DURATION
+from utils.utils import load_benchmark
 
 
 class TestCallback(BaseCallback):

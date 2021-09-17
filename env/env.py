@@ -1,7 +1,6 @@
 import gym
 from gym.spaces import Discrete, Dict, Box
 import numpy as np
-import torch
 
 from env.l2d_transition_model import L2DTransitionModel
 from env.l2d_reward_model import L2DRewardModel

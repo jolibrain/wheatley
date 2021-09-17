@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 
-from models.features_extractor import FeaturesExtractor
 
 from config import HIDDEN_DIM_FEATURES_EXTRACTOR, DEVICE
 

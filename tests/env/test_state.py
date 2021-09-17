@@ -2,8 +2,6 @@ from copy import deepcopy
 import numpy as np
 import torch
 
-from env.state import State
-
 
 def test_init_and_reset(state):
     assert (state.is_affected == 0).all()

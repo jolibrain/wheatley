@@ -1,18 +1,13 @@
-import gym
 import numpy as np
-from os import path
-from stable_baselines3 import PPO
 import torch
 
-from env.env import Env
 from models.agent import Agent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
-from utils.ortools_solver import solve_jssp
-from utils.utils import generate_problem, generate_data, load_benchmark
+from utils.utils import generate_problem, load_benchmark
 from utils.utils_testing import test_agent, get_ortools_makespan
 
-from config import MAX_N_JOBS, MAX_N_MACHINES, MAX_DURATION, DEVICE
+from config import MAX_DURATION
 from args import args
 
 

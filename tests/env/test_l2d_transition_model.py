@@ -2,7 +2,6 @@ from copy import deepcopy
 
 import networkx as nx
 import numpy as np
-import torch
 
 
 def test_get_mask(l2d_transition_model):

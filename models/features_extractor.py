@@ -1,8 +1,6 @@
-import numpy as np
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch
 import torch.nn as nn
-from torch_geometric.data import Data
 from torch_geometric.nn.conv import GINConv
 
 from models.mlp import MLP

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn.conv import GINConv
 
 from models.mlp import MLP
 

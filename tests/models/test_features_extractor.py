@@ -1,8 +1,3 @@
-import numpy as np
-import torch
-
-from models.features_extractor import FeaturesExtractor
-
 from config import DEVICE
 
 

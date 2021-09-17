@@ -1,6 +1,3 @@
-from utils.utils import generate_problem
-
-
 class ProblemDescription:
     def __init__(
         self,

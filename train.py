@@ -1,13 +1,11 @@
-import gym
 import numpy as np
 import torch
 
-from env.env import Env
 from models.agent import Agent
 from problem.problem_description import ProblemDescription
 from utils.utils import generate_problem
 
-from config import MAX_N_JOBS, MAX_N_MACHINES, MAX_DURATION, DEVICE
+from config import MAX_DURATION, MAX_N_JOBS, MAX_N_MACHINES
 from args import args
 
 

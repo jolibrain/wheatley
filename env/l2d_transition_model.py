@@ -3,8 +3,6 @@ import torch
 from env.transition_model import TransitionModel
 from utils.utils import job_and_task_to_node, node_to_job_and_task
 
-from config import MAX_N_EDGES, MAX_N_NODES
-
 
 class L2DTransitionModel(TransitionModel):
     def __init__(self, affectations, durations):

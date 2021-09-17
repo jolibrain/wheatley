@@ -3,8 +3,6 @@ import pytest
 import numpy as np
 from stable_baselines3.common.env_checker import check_env
 
-from env.env import Env
-from problem.problem_description import ProblemDescription
 
 from config import MAX_N_NODES, MAX_N_EDGES, INPUT_DIM_FEATURES_EXTRACTOR
 

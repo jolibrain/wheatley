@@ -1,6 +1,5 @@
 from copy import deepcopy
 
-import torch
 
 from env.l2d_reward_model import L2DRewardModel
 
