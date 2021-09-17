@@ -1,13 +1,17 @@
 repos:
+-   repo: https://gitlab.com/pycqa/flake8
+    rev: 3.9.2
+    hooks:
+    - id: flake8
+-   repo: https://github.com/myint/autoflake
+    rev: v1.4
+    hooks:
+    - id: autoflake
 -   repo: https://github.com/ambv/black
     rev: 21.7b0
     hooks:
     - id: black
       language_version: python3
--   repo: https://gitlab.com/pycqa/flake8
-    rev: 3.9.2
-    hooks:
-    - id: flake8
 -   repo: local 
     hooks:
     - id: pytest
