@@ -13,3 +13,12 @@ It should also provide improvements, in order to apply it to real industry probl
  - They don't use batching, I do
  - The input for actor is [node_embedding, node_embedding, graph_embedding]. For them, 
    it's [node_embedding, graph_embedding]
+
+## Questions:
+ - L2D doesn't pass the machine id information in the node. So the problem is lacking 
+ information during training and inference... Isn't it problematic?
+ - Due to the graph embedding process, first nodes don't have access to the
+ information contained in the later nodes... It means the model can't make a decision
+ based on the whole information at the beginning. The only way to access this 
+ information is through the graph embedding, which is diffuse... I think that the
+ model could perform better with more information.
