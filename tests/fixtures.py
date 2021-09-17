@@ -225,6 +225,7 @@ def features_extractor():
                 "edge_index": Box(0, 9, shape=(2, 81), dtype=np.int64),
                 "mask": Box(0, 1, shape=(81,), dtype=np.int64),
             }
-        )
+        ),
+        input_dim_features_extractor=2,
     )
     return features_extractor

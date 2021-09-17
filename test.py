@@ -17,7 +17,7 @@ def main():
     np.random.seed(args.seed)
 
     print("Loading agent")
-    agent = Agent.load(args.path)
+    agent = Agent.load(args.path, args.add_machine_id)
     random_agent = RandomAgent()
 
     if args.fixed_benchmark:

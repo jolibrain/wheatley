@@ -23,9 +23,10 @@ class Agent:
         vf_coef=None,
         lr=None,
         add_machine_id=False,
+        input_dim_features_extractor=None,
         model=None,
     ):
-        fake_env = Agent._create_fake_env()
+        fake_env = Agent._create_fake_env(add_machine_id)
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -42,7 +43,10 @@ class Agent:
                 ent_coef=ent_coef,
                 vf_coef=vf_coef,
                 verbose=2,
-                policy_kwargs={"features_extractor_class": FeaturesExtractor},
+                policy_kwargs={
+                    "features_extractor_class": FeaturesExtractor,
+                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor},
+                },
                 device=DEVICE,
                 gae_lambda=1,  # To use same vanilla advantage function
             )
@@ -52,8 +56,8 @@ class Agent:
         self.model.save(path)
 
     @classmethod
-    def load(cls, path):
-        return cls(model=PPO.load(path, Agent._create_fake_env(), DEVICE))
+    def load(cls, path, add_machine_id):
+        return cls(model=PPO.load(path, Agent._create_fake_env(add_machine_id), DEVICE), add_machine_id=add_machine_id)
 
     def train(
         self,
@@ -96,8 +100,8 @@ class Agent:
         return solution
 
     @staticmethod
-    def _create_fake_env():
-        return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, False)
+    def _create_fake_env(add_machine_id):
+        return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, add_machine_id)
 
     def _get_env_fn(self, problem_description, divide_loss):
         def f():

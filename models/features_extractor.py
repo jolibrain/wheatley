@@ -11,13 +11,12 @@ from config import (
     HIDDEN_DIM_FEATURES_EXTRACTOR,
     N_LAYERS_FEATURES_EXTRACTOR,
     N_MLP_LAYERS_FEATURES_EXTRACTOR,
-    INPUT_DIM_FEATURES_EXTRACTOR,
     DEVICE,
 )
 
 
 class FeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space):
+    def __init__(self, observation_space, input_dim_features_extractor):
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
             features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES) * (MAX_N_NODES + 1),
@@ -31,7 +30,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 GINConv(
                     MLP(
                         n_layers=N_MLP_LAYERS_FEATURES_EXTRACTOR,
-                        input_dim=INPUT_DIM_FEATURES_EXTRACTOR if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        input_dim=input_dim_features_extractor if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
                         hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                         batch_norm=True,

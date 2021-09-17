@@ -49,6 +49,7 @@ def main():
         vf_coef=args.vf_coef,
         lr=args.lr,
         add_machine_id=args.add_machine_id,
+        input_dim_features_extractor=3 if args.add_machine_id else 2,
     )
     agent.train(
         problem_description,

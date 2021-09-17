@@ -4,7 +4,7 @@ import numpy as np
 from stable_baselines3.common.env_checker import check_env
 
 
-from config import MAX_N_NODES, MAX_N_EDGES, INPUT_DIM_FEATURES_EXTRACTOR
+from config import MAX_N_NODES, MAX_N_EDGES
 
 
 def test_observation_shape_and_validity(env):
@@ -12,7 +12,7 @@ def test_observation_shape_and_validity(env):
     assert obs["n_nodes"] == 25
     assert list(obs["features"].shape) == [
         MAX_N_NODES,
-        INPUT_DIM_FEATURES_EXTRACTOR,
+        2,
     ]
     assert list(obs["edge_index"].shape) == [2, MAX_N_EDGES]
     assert not np.isnan(obs["features"]).any()
