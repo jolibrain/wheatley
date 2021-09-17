@@ -7,7 +7,6 @@ import argparse  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-
 from models.agent import Agent  # noqa: E402
 from problem.problem_description import ProblemDescription  # noqa: E402
 from utils.ortools_solver import solve_jssp  # noqa: E402
@@ -16,16 +15,25 @@ from utils.utils import generate_problem  # noqa: E402
 from config import MAX_DURATION  # noqa: E402
 
 
-def main(args):
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
+def main(cur_args):
+    torch.manual_seed(cur_args.seed)
+    np.random.seed(cur_args.seed)
 
-    affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
-    agent = Agent.load("../" + args.path)
+    if cur_args.affectations and cur_args.durations:
+        affectations, durations = cur_args.affectations, cur_args.durations
+
+    affectations, durations = generate_problem(cur_args.n_j, cur_args.n_m, MAX_DURATION)
+    agent = Agent.load("../" + cur_args.path, cur_args.add_machine_id)
     or_tools_schedule = solve_jssp(affectations, durations).schedule
     rl_schedule = agent.predict(
         ProblemDescription(
-            args.n_j, args.n_m, MAX_DURATION, args.transition_model_config, args.reward_model_config, affectations, durations
+            cur_args.n_j,
+            cur_args.n_m,
+            MAX_DURATION,
+            cur_args.transition_model_config,
+            cur_args.reward_model_config,
+            affectations,
+            durations,
         )
     ).schedule
 
@@ -46,5 +54,10 @@ if __name__ == "__main__":
     parser.add_argument("--reward_model_config", type=str, default="L2D", help="Which reward model to use")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved model")
+    parser.add_argument("--affectations", nargs="+", default=[], help="Problem affectations")
+    parser.add_argument("--durations", nargs="+", default=[], help="Problem durations")
+    parser.add_argument(
+        "--add_machine_id", default=False, action="store_true", help="Add the machine id in the node embedding"
+    )
 
     main(parser.parse_args())
