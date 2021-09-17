@@ -1,5 +1,5 @@
 import torch
-from torch_geometric.data import Data, DataLoader
+from torch_geometric.data import Data
 
 from models.mlp_extractor import MLPExtractor
 
