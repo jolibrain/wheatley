@@ -144,6 +144,10 @@ class State:
         self._update_completion_times(second_node_id)
         return True
 
+    def remove_precedency(self, first_node_id, second_node_id):
+        self.graph.remove_edge(first_node_id, second_node_id)
+        return True
+
     def affect_node(self, node_id):
         """
         Sets the self.is_affected to 1 for the current node_id.

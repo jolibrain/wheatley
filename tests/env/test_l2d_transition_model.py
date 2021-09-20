@@ -92,7 +92,7 @@ def test_run(l2d_transition_model):
     assert l2d_tm.state.is_affected[4, 1] == 1
     assert l2d_tm.state.graph.has_edge(7, 21)
     assert l2d_tm.state.graph.has_edge(21, 2)
-    assert l2d_tm.state.graph.has_edge(7, 2)
+    assert not l2d_tm.state.graph.has_edge(7, 2)
     assert (
         l2d_tm.state.task_completion_times
         == np.array(

@@ -61,8 +61,10 @@ class L2DTransitionModel(TransitionModel):
                 self.state.set_precedency(machine_occupancy[-1][2], node_id)
             else:
                 # The job is inserted between task_index and task_index+1
+                self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
                 self.state.set_precedency(machine_occupancy[index][2], node_id)
                 self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
+
         self.state.affect_node(node_id)
 
     def get_mask(self):
