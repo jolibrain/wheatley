@@ -114,7 +114,9 @@ class Env(gym.Env):
     def _create_transition_and_reward_model(self):
 
         if self.transition_model_config == "L2D":
-            self.transition_model = L2DTransitionModel(self.affectations, self.durations)
+            self.transition_model = L2DTransitionModel(self.affectations, self.durations, node_encoding="L2D")
+        elif self.transition_model_config == "DenseL2D":
+            self.transition_model = L2DTransitionModel(self.affectations, self.durations, node_encoding="DenseL2D")
         else:
             raise Exception("Transition model not recognized")
 

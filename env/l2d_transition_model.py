@@ -5,8 +5,8 @@ from utils.utils import job_and_task_to_node, node_to_job_and_task
 
 
 class L2DTransitionModel(TransitionModel):
-    def __init__(self, affectations, durations):
-        super(L2DTransitionModel, self).__init__(affectations, durations, node_encoding="L2D")
+    def __init__(self, affectations, durations, node_encoding="L2D"):
+        super(L2DTransitionModel, self).__init__(affectations, durations, node_encoding)
         self.useless_timesteps = 0
 
     def run(self, first_node_id, second_node_id):

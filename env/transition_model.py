@@ -13,7 +13,7 @@ class TransitionModel(ABC):
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines
 
-        self.state = State(self.affectations, self.durations)
+        self.state = State(self.affectations, self.durations, node_encoding)
 
     @abstractmethod
     def run(self, first_node_id, second_node_id):
@@ -24,7 +24,7 @@ class TransitionModel(ABC):
         pass
 
     def get_graph(self, add_machine_id):
-        return self.state.to_torch_geometric(add_machine_id, self.node_encoding)
+        return self.state.to_torch_geometric(add_machine_id)
 
     def done(self):
         return self.state.done()

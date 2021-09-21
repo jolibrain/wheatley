@@ -1,3 +1,4 @@
+from copy import deepcopy
 from queue import PriorityQueue
 
 import networkx as nx
@@ -10,12 +11,16 @@ from utils.utils import node_to_job_and_task, job_and_task_to_node
 
 
 class State:
-    def __init__(self, affectations, durations):
+    def __init__(self, affectations, durations, node_encoding="L2D"):
         self.affectations = affectations
         self.durations = durations
         self.n_jobs = self.affectations.shape[0]
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines
+
+        self.node_encoding = node_encoding
+        if self.node_encoding == "DenseL2D":
+            self.return_graph = None
 
         self.graph = None
         self.task_completion_times = None
@@ -34,6 +39,15 @@ class State:
                 for job_index in range(self.n_jobs)
             ]
         )
+
+        if self.node_encoding == "DenseL2D":
+            self.return_graph = deepcopy(self.graph)
+            for machine_id in range(self.n_machines):
+                node_ids = self._get_machine_node_ids(machine_id)
+                for first_node_id in node_ids:
+                    for second_node_id in node_ids:
+                        if second_node_id != first_node_id:
+                            self.return_graph.add_edge(first_node_id, second_node_id)
 
         self.task_completion_times = np.cumsum(self.durations, axis=1)
 
@@ -61,31 +75,48 @@ class State:
                     node_ids.append(node_id)
         return node_ids
 
-    def to_torch_geometric(self, add_machine_id, node_encoding="L2D"):
+    def to_torch_geometric(self, add_machine_id):
         """
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
         parameter of the Data object) that should be added to the graph.
         """
-        if node_encoding == "L2D":
+        if self.node_encoding in ["L2D", "DenseL2D"]:
             for job_id in range(self.n_jobs):
                 for task_id in range(self.n_machines):
                     node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
-                    self.graph.nodes[node_id]["x"] = (
-                        [
-                            node_id,
-                            self.is_affected[job_id, task_id],
-                            self.task_completion_times[job_id, task_id],
-                            self.affectations[job_id, task_id],
-                        ]
-                        if add_machine_id
-                        else [
-                            node_id,
-                            self.is_affected[job_id, task_id],
-                            self.task_completion_times[job_id, task_id],
-                        ]
-                    )
-            graph = torch_geometric.utils.from_networkx(self.graph)
+                    if self.node_encoding == "L2D":
+                        self.graph.nodes[node_id]["x"] = (
+                            [
+                                node_id,
+                                self.is_affected[job_id, task_id],
+                                self.task_completion_times[job_id, task_id],
+                                self.affectations[job_id, task_id],
+                            ]
+                            if add_machine_id
+                            else [
+                                node_id,
+                                self.is_affected[job_id, task_id],
+                                self.task_completion_times[job_id, task_id],
+                            ]
+                        )
+                    elif self.node_encoding == "DenseL2D":
+                        self.return_graph.nodes[node_id]["x"] = (
+                            [
+                                node_id,
+                                self.is_affected[job_id, task_id],
+                                self.task_completion_times[job_id, task_id],
+                                self.affectations[job_id, task_id],
+                            ]
+                            if add_machine_id
+                            else [
+                                node_id,
+                                self.is_affected[job_id, task_id],
+                                self.task_completion_times[job_id, task_id],
+                            ]
+                        )
+            nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
+            graph = torch_geometric.utils.from_networkx(nx_graph)
 
             # We have to reorder features, since the networx -> torch_geometric
             # shuffles the nodes
@@ -140,13 +171,39 @@ class State:
             return False
         # Then add the node into the graph
         self.graph.add_edge(first_node_id, second_node_id)
+        if self.node_encoding == "DenseL2D":
+            self.update_return_graph("add_precedency", first_node_id, second_node_id)
+
         # Finally update the task starting times
         self._update_completion_times(second_node_id)
         return True
 
     def remove_precedency(self, first_node_id, second_node_id):
         self.graph.remove_edge(first_node_id, second_node_id)
+        if self.node_encoding == "DenseL2D":
+            self.update_return_graph("remove_precedency", first_node_id, second_node_id)
         return True
+
+    def update_return_graph(self, operation, first_node_id, second_node_id):
+        """
+        The return graph is updated when the graph is. We update for adding edges, but removing edges do nothing to the
+        return graph.
+        """
+        if self.node_encoding != "DenseL2D":
+            return
+        if operation == "add_precedency":
+            for p in self.graph.predecessors(first_node_id):
+                if self.return_graph.has_edge(second_node_id, p):
+                    self.return_graph.remove_edge(second_node_id, p)
+            for s in self.graph.successors(second_node_id):
+                if self.return_graph.has_edge(s, first_node_id):
+                    self.return_graph.remove_edge(s, first_node_id)
+            if self.return_graph.has_edge(second_node_id, first_node_id):
+                self.return_graph.remove_edge(second_node_id, first_node_id)
+        elif operation == "remove_precedency":
+            pass
+        else:
+            raise Exception("Operation not recognized")
 
     def affect_node(self, node_id):
         """
