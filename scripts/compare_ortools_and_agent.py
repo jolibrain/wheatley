@@ -24,7 +24,7 @@ def main(cur_args):
         durations = np.array(cur_args.durations).reshape(cur_args.n_j, cur_args.n_m)
     else:
         affectations, durations = generate_problem(cur_args.n_j, cur_args.n_m, MAX_DURATION)
-    agent = Agent.load("../" + cur_args.path, cur_args.add_machine_id)
+    agent = Agent.load("../" + cur_args.path, not cur_args.remove_machine_id)
     or_tools_schedule = solve_jssp(affectations, durations).schedule
     rl_schedule = agent.predict(
         ProblemDescription(
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--affectations", type=int, nargs="+", default=[], help="Problem affectations")
     parser.add_argument("--durations", type=int, nargs="+", default=[], help="Problem durations")
     parser.add_argument(
-        "--add_machine_id", default=False, action="store_true", help="Add the machine id in the node embedding"
+        "--remove_machine_id", default=False, action="store_true", help="Add the machine id in the node embedding"
     )
 
     main(parser.parse_args())

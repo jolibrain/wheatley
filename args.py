@@ -12,7 +12,9 @@ parser.add_argument("--reward_model_config", type=str, default="L2D", help="Whic
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
 parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved model")
 
-parser.add_argument("--add_machine_id", default=True, action="store_true", help="Add the machine id in the node embedding")
+parser.add_argument(
+    "--remove_machine_id", default=False, action="store_true", help="Add the machine id in the node embedding"
+)
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
 
 # Training arguments
