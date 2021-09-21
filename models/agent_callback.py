@@ -80,6 +80,7 @@ class TestCallback(BaseCallback):
         self._evaluate_agent()
         self._save_if_best_model()
         self._visdom_metrics()
+        print(self.path)
         return True
 
     def _save_if_best_model(self):
