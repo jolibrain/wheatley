@@ -6,7 +6,7 @@ from problem.problem_description import ProblemDescription
 from utils.utils import generate_problem
 
 from config import MAX_DURATION, MAX_N_JOBS, MAX_N_MACHINES
-from args import args
+from args import args, exp_name
 
 
 def main():
@@ -51,16 +51,17 @@ def main():
         add_machine_id=not args.remove_machine_id,
         input_dim_features_extractor=2 if args.remove_machine_id else 3,
     )
+
     agent.train(
         problem_description,
         total_timesteps=args.total_timesteps,
         n_test_env=args.n_test_env,
         eval_freq=args.eval_freq,
         divide_loss=not args.dont_divide_loss,
-        display_env=f"{args.n_j}j{args.n_m}m{args.total_timesteps}steps{args.seed}seed",
+        display_env=exp_name,
         n_workers=args.n_workers,
         multiprocessing=args.multiprocessing,
-        path=args.path,
+        path="saved_networks/" + exp_name,
         fixed_benchmark=args.fixed_benchmark,
     )
 

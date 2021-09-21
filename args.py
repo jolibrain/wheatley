@@ -10,10 +10,9 @@ parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument("--transition_model_config", type=str, default="L2D", help="Which transition model to use")
 parser.add_argument("--reward_model_config", type=str, default="L2D", help="Which reward model to use")
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
-parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved model")
 
 parser.add_argument(
-    "--remove_machine_id", default=False, action="store_true", help="Add the machine id in the node embedding"
+    "--remove_machine_id", default=False, action="store_true", help="Remove the machine id from the node embedding"
 )
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
 
@@ -28,8 +27,8 @@ parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coeff
 parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 
-parser.add_argument("--n_test_env", type=int, default=5, help="Number of testing environments during traing")
-parser.add_argument("--eval_freq", type=int, default=200, help="Number of steps between each evaluation during training")
+parser.add_argument("--n_test_env", type=int, default=50, help="Number of testing environments during traing")
+parser.add_argument("--eval_freq", type=int, default=1000, help="Number of steps between each evaluation during training")
 
 parser.add_argument("--dont_divide_loss", default=False, action="store_true", help="Don't divide loss by a constant")
 parser.add_argument("--fixed_problem", default=False, action="store_true", help="Fix affectations and durations for train")
@@ -40,13 +39,21 @@ parser.add_argument("--multiprocessing", default=False, action="store_true", hel
 # Testing arguments
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
 
-# Debug options
-parser.add_argument(
-    "--fix_problem_size",
-    default=False,
-    action="store_true",
-    help="Wether the size of the problem (n_jobs, n_machines) is fixed for the agent or not",
-)
+# Other
+parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
+
 
 # Parsing
 args = parser.parse_args()
+
+exp_name = f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}"
+if args.remove_machine_id:
+    exp_name += "_RMI"
+if args.fixed_benchmark:
+    exp_name += "_FB"
+if args.dont_divide_loss:
+    exp_name += "_DDL"
+if args.fixed_problem:
+    exp_name += "_FP"
+if args.exp_name_appendix is not None:
+    exp_name += "_" + args.exp_name_appendix

@@ -8,7 +8,7 @@ from utils.utils import generate_problem, load_benchmark
 from utils.utils_testing import test_agent, get_ortools_makespan
 
 from config import MAX_DURATION
-from args import args
+from args import args, exp_name
 
 
 def main():
@@ -17,7 +17,8 @@ def main():
     np.random.seed(args.seed)
 
     print("Loading agent")
-    agent = Agent.load(args.path, not args.remove_machine_id)
+    path = "saved_networks/" + exp_name
+    agent = Agent.load(path, not args.remove_machine_id)
     random_agent = RandomAgent()
 
     if args.fixed_benchmark:
