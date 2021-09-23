@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 
@@ -39,18 +41,22 @@ def main():
         durations,
     )
 
-    agent = Agent(
-        n_epochs=args.n_epochs,
-        n_steps_episode=args.n_steps_episode,
-        batch_size=args.batch_size,
-        gamma=args.gamma,
-        clip_range=args.clip_range,
-        ent_coef=args.ent_coef,
-        vf_coef=args.vf_coef,
-        lr=args.lr,
-        add_machine_id=not args.remove_machine_id,
-        input_dim_features_extractor=2 if args.remove_machine_id else 3,
-    )
+    path = "saved_networks/" + exp_name + ".zip"
+    if args.retrain and os.path.exists(path):
+        agent = Agent.load(path, not args.remove_machine_id)
+    else:
+        agent = Agent(
+            n_epochs=args.n_epochs,
+            n_steps_episode=args.n_steps_episode,
+            batch_size=args.batch_size,
+            gamma=args.gamma,
+            clip_range=args.clip_range,
+            ent_coef=args.ent_coef,
+            vf_coef=args.vf_coef,
+            lr=args.lr,
+            add_machine_id=not args.remove_machine_id,
+            input_dim_features_extractor=2 if args.remove_machine_id else 3,
+        )
 
     agent.train(
         problem_description,
@@ -61,7 +67,7 @@ def main():
         display_env=exp_name,
         n_workers=args.n_workers,
         multiprocessing=args.multiprocessing,
-        path="saved_networks/" + exp_name,
+        path=path,
         fixed_benchmark=args.fixed_benchmark,
     )
 

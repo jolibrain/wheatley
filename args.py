@@ -36,6 +36,13 @@ parser.add_argument("--fixed_problem", default=False, action="store_true", help=
 parser.add_argument("--n_workers", type=int, default=1, help="Number of CPU cores for simulating environment")
 parser.add_argument("--multiprocessing", default=False, action="store_true", help="Wether to use multiprocessing or not")
 
+parser.add_argument(
+    "--retrain",
+    default=False,
+    action="store_true",
+    help="If true, the script checks for already existing model and use it as a basis for training",
+)
+
 # Testing arguments
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
 
