@@ -54,6 +54,7 @@ def main():
             ent_coef=args.ent_coef,
             vf_coef=args.vf_coef,
             lr=args.lr,
+            optimizer=args.optimizer,
             add_machine_id=not args.remove_machine_id,
             input_dim_features_extractor=2 if args.remove_machine_id else 3,
         )

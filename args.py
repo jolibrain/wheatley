@@ -26,6 +26,7 @@ parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping para
 parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
 parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
+parser.add_argument("--optimizer", type=str, default="adam", help="Which optimizer to use")
 
 parser.add_argument("--n_test_env", type=int, default=50, help="Number of testing environments during traing")
 parser.add_argument("--eval_freq", type=int, default=1000, help="Number of steps between each evaluation during training")

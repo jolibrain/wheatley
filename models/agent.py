@@ -1,6 +1,7 @@
 from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.ppo import PPO
+import torch
 
 from env.env import Env
 from models.agent_callback import TestCallback
@@ -22,6 +23,7 @@ class Agent:
         ent_coef=None,
         vf_coef=None,
         lr=None,
+        optimizer=None,
         add_machine_id=False,
         input_dim_features_extractor=None,
         model=None,
@@ -31,6 +33,13 @@ class Agent:
             self.model = model
             self.model.set_env(fake_env)
         else:
+            if optimizer.lower() == "adam":
+                optimizer_class = torch.optim.Adam
+            elif optimizer.lower() == "sgd":
+                optimizer_class = torch.optim.SGD
+            else:
+                raise Exception("Optimizer not recognized")
+
             self.model = PPO(
                 Policy,
                 fake_env,
@@ -46,6 +55,7 @@ class Agent:
                 policy_kwargs={
                     "features_extractor_class": FeaturesExtractor,
                     "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor},
+                    "optimizer_class": optimizer_class,
                 },
                 device=DEVICE,
                 gae_lambda=1,  # To use same vanilla advantage function
