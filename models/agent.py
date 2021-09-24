@@ -75,7 +75,7 @@ class Agent:
         total_timesteps,
         n_test_env,
         eval_freq,
-        divide_loss,
+        normalize_input,
         display_env,
         n_workers,
         multiprocessing,
@@ -84,7 +84,7 @@ class Agent:
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
-            env=Env(problem_description, divide_loss, self.add_machine_id),
+            env=Env(problem_description, normalize_input, self.add_machine_id),
             n_test_env=n_test_env,
             display_env=display_env,
             path=path,
@@ -93,7 +93,7 @@ class Agent:
         event_callback = EveryNTimesteps(n_steps=eval_freq, callback=test_callback)
 
         # Then launch training
-        env_fns = [self._get_env_fn(problem_description, divide_loss) for _ in range(n_workers)]
+        env_fns = [self._get_env_fn(problem_description, normalize_input) for _ in range(n_workers)]
         vec_env_class = SubprocVecEnv if multiprocessing else DummyVecEnv
         vec_env = vec_env_class(env_fns)
         self.model.set_env(vec_env)
@@ -113,8 +113,8 @@ class Agent:
     def _create_fake_env(add_machine_id):
         return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, add_machine_id)
 
-    def _get_env_fn(self, problem_description, divide_loss):
+    def _get_env_fn(self, problem_description, normalize_input):
         def f():
-            return Env(problem_description, divide_loss, self.add_machine_id)
+            return Env(problem_description, normalize_input, self.add_machine_id)
 
         return f

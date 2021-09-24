@@ -11,12 +11,12 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description, divide_loss=False, add_machine_id=False):
+    def __init__(self, problem_description, normalize_input=False, add_machine_id=False):
         n_features = 3 if add_machine_id else 2
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration
-        self.divide_loss = divide_loss
+        self.normalize_input = normalize_input
         self.add_machine_id = add_machine_id
 
         self.action_space = Discrete(MAX_N_EDGES)
@@ -63,7 +63,7 @@ class Env(gym.Env):
         obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id),
+            self.transition_model.get_graph(self.add_machine_id, self.normalize_input),
             self.transition_model.get_mask(),
         )
         first_node_id, second_node_id = self._convert_action_to_node_ids(action)
@@ -71,14 +71,13 @@ class Env(gym.Env):
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id),
+            self.transition_model.get_graph(self.add_machine_id, self.normalize_input),
             self.transition_model.get_mask(),
         )
         reward = self.reward_model.evaluate(
             obs,
             action,
             next_obs,
-            np.max(np.sum(self.durations, axis=1)) / self.n_machines,
         )
         done = self.transition_model.done()
         gym_observation = next_obs.to_gym_observation()
@@ -100,7 +99,7 @@ class Env(gym.Env):
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id),
+            self.transition_model.get_graph(self.add_machine_id, self.normalize_input),
             self.transition_model.get_mask(),
         )
 
@@ -121,6 +120,6 @@ class Env(gym.Env):
             raise Exception("Transition model not recognized")
 
         if self.reward_model_config == "L2D":
-            self.reward_model = L2DRewardModel(self.divide_loss)
+            self.reward_model = L2DRewardModel()
         else:
             raise Exception("Reward model not recognized")

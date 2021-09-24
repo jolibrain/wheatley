@@ -31,7 +31,9 @@ parser.add_argument("--optimizer", type=str, default="adam", help="Which optimiz
 parser.add_argument("--n_test_env", type=int, default=50, help="Number of testing environments during traing")
 parser.add_argument("--eval_freq", type=int, default=1000, help="Number of steps between each evaluation during training")
 
-parser.add_argument("--dont_divide_loss", default=False, action="store_true", help="Don't divide loss by a constant")
+parser.add_argument(
+    "--dont_normalize_input", default=False, action="store_true", help="Default is dividing input by constant"
+)
 parser.add_argument("--fixed_problem", default=False, action="store_true", help="Fix affectations and durations for train")
 
 parser.add_argument("--n_workers", type=int, default=1, help="Number of CPU cores for simulating environment")
@@ -59,8 +61,8 @@ if args.remove_machine_id:
     exp_name += "_RMI"
 if args.fixed_benchmark:
     exp_name += "_FB"
-if args.dont_divide_loss:
-    exp_name += "_DDL"
+if args.dont_normalize_input:
+    exp_name += "_DNI"
 if args.fixed_problem:
     exp_name += "_FP"
 if args.exp_name_appendix is not None:

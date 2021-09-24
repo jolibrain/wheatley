@@ -64,7 +64,7 @@ def main():
         total_timesteps=args.total_timesteps,
         n_test_env=args.n_test_env,
         eval_freq=args.eval_freq,
-        divide_loss=not args.dont_divide_loss,
+        normalize_input=not args.dont_normalize_input,
         display_env=exp_name,
         n_workers=args.n_workers,
         multiprocessing=args.multiprocessing,
