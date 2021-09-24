@@ -16,6 +16,9 @@ parser.add_argument(
 )
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
 
+# Agent arguments
+parser.add_argument("--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2")
+
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
 parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs for updating the PPO parameters")
@@ -54,7 +57,7 @@ parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name
 # Parsing
 args = parser.parse_args()
 
-exp_name = f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}"
+exp_name = f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
 if args.remove_machine_id:
     exp_name += "_RMI"
 if args.fixed_benchmark:
