@@ -22,6 +22,7 @@ def main():
     print(
         f"Launching training\n"
         f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
+        f"Agent graph : {args.gconv_type}\n"
         f"Training time : {args.total_timesteps} timesteps"
     )
 
@@ -54,6 +55,7 @@ def main():
             ent_coef=args.ent_coef,
             vf_coef=args.vf_coef,
             lr=args.lr,
+            gconv_type=args.gconv_type,
             optimizer=args.optimizer,
             add_machine_id=not args.remove_machine_id,
             input_dim_features_extractor=2 if args.remove_machine_id else 3,
