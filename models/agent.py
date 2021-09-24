@@ -1,6 +1,7 @@
 from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.ppo import PPO
+from stable_baselines3.a2c import A2C
 import torch
 
 from env.env import Env
@@ -26,6 +27,7 @@ class Agent:
         optimizer=None,
         add_machine_id=False,
         input_dim_features_extractor=None,
+        gconv_type='gin',
         model=None,
     ):
         fake_env = Agent._create_fake_env(add_machine_id)
@@ -54,7 +56,8 @@ class Agent:
                 verbose=2,
                 policy_kwargs={
                     "features_extractor_class": FeaturesExtractor,
-                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor},
+                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor,
+                                                  "gconv_type": gconv_type},
                     "optimizer_class": optimizer_class,
                 },
                 device=DEVICE,
