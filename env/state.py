@@ -26,6 +26,8 @@ class State:
         self.task_completion_times = None
         self.is_affected = None
 
+        self.max_completion_time = np.max(np.sum(self.durations, axis=1))
+
         self.reset()
 
     def reset(self):
@@ -75,7 +77,7 @@ class State:
                     node_ids.append(node_id)
         return node_ids
 
-    def to_torch_geometric(self, add_machine_id):
+    def to_torch_geometric(self, add_machine_id, normalize_input):
         """
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
@@ -85,19 +87,22 @@ class State:
             for job_id in range(self.n_jobs):
                 for task_id in range(self.n_machines):
                     node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
+                    completion_time = self.task_completion_times[job_id, task_id] / (
+                        self.max_completion_time if normalize_input else 1
+                    )
                     if self.node_encoding == "L2D":
                         self.graph.nodes[node_id]["x"] = (
                             [
                                 node_id,
                                 self.is_affected[job_id, task_id],
-                                self.task_completion_times[job_id, task_id],
+                                completion_time,
                                 self.affectations[job_id, task_id],
                             ]
                             if add_machine_id
                             else [
                                 node_id,
                                 self.is_affected[job_id, task_id],
-                                self.task_completion_times[job_id, task_id],
+                                completion_time,
                             ]
                         )
                     elif self.node_encoding == "DenseL2D":
@@ -105,14 +110,14 @@ class State:
                             [
                                 node_id,
                                 self.is_affected[job_id, task_id],
-                                self.task_completion_times[job_id, task_id],
+                                completion_time,
                                 self.affectations[job_id, task_id],
                             ]
                             if add_machine_id
                             else [
                                 node_id,
                                 self.is_affected[job_id, task_id],
-                                self.task_completion_times[job_id, task_id],
+                                completion_time,
                             ]
                         )
             nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
@@ -120,7 +125,7 @@ class State:
 
             # We have to reorder features, since the networx -> torch_geometric
             # shuffles the nodes
-            node_ids = graph.x[:, 0]
+            node_ids = graph.x[:, 0].long()
             features = torch.zeros((self.n_nodes, graph.x[:, 1:].shape[1]))
             features[node_ids] = graph.x[:, 1:].float()
             edge_index = node_ids[graph.edge_index]

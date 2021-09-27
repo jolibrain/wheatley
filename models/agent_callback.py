@@ -70,7 +70,7 @@ class TestCallback(BaseCallback):
                     data[i][0],
                     data[i][1],
                 ),
-                divide_loss=self.testing_env.divide_loss,
+                normalize_input=self.testing_env.normalize_input,
                 add_machine_id=self.testing_env.add_machine_id,
             )
             for i in range(data.shape[0])

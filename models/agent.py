@@ -1,6 +1,7 @@
 from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.ppo import PPO
+from stable_baselines3.a2c import A2C
 import torch
 
 from env.env import Env
@@ -26,6 +27,7 @@ class Agent:
         optimizer=None,
         add_machine_id=False,
         input_dim_features_extractor=None,
+        gconv_type='gin',
         model=None,
     ):
         fake_env = Agent._create_fake_env(add_machine_id)
@@ -54,7 +56,8 @@ class Agent:
                 verbose=2,
                 policy_kwargs={
                     "features_extractor_class": FeaturesExtractor,
-                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor},
+                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor,
+                                                  "gconv_type": gconv_type},
                     "optimizer_class": optimizer_class,
                 },
                 device=DEVICE,
@@ -75,7 +78,7 @@ class Agent:
         total_timesteps,
         n_test_env,
         eval_freq,
-        divide_loss,
+        normalize_input,
         display_env,
         n_workers,
         multiprocessing,
@@ -84,7 +87,7 @@ class Agent:
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
-            env=Env(problem_description, divide_loss, self.add_machine_id),
+            env=Env(problem_description, normalize_input, self.add_machine_id),
             n_test_env=n_test_env,
             display_env=display_env,
             path=path,
@@ -93,7 +96,7 @@ class Agent:
         event_callback = EveryNTimesteps(n_steps=eval_freq, callback=test_callback)
 
         # Then launch training
-        env_fns = [self._get_env_fn(problem_description, divide_loss) for _ in range(n_workers)]
+        env_fns = [self._get_env_fn(problem_description, normalize_input) for _ in range(n_workers)]
         vec_env_class = SubprocVecEnv if multiprocessing else DummyVecEnv
         vec_env = vec_env_class(env_fns)
         self.model.set_env(vec_env)
@@ -113,8 +116,8 @@ class Agent:
     def _create_fake_env(add_machine_id):
         return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, add_machine_id)
 
-    def _get_env_fn(self, problem_description, divide_loss):
+    def _get_env_fn(self, problem_description, normalize_input):
         def f():
-            return Env(problem_description, divide_loss, self.add_machine_id)
+            return Env(problem_description, normalize_input, self.add_machine_id)
 
         return f
