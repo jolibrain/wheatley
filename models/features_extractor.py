@@ -18,7 +18,7 @@ import sys
 
 
 class FeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, input_dim_features_extractor, gconv_type, freeze_graph):
+    def __init__(self, observation_space, input_dim_features_extractor, gconv_type, max_pool, freeze_graph):
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
             features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES) * (MAX_N_NODES + 1),
@@ -26,6 +26,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         self.freeze_graph = freeze_graph
 
         self.gconv_type = gconv_type
+        self.max_pool = max_pool
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
 
@@ -83,8 +84,12 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate
-        graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes
-        graph_embedding = torch.matmul(graph_pooling, features)
+        if self.max_pool:
+            max_elts, max_ind = torch.max(features,dim=1)
+            graph_embedding = max_elts
+        else: # avg
+            graph_pooling = torch.ones(n_nodes, device=DEVICE) / n_nodes
+            graph_embedding = torch.matmul(graph_pooling, features)
         graph_and_nodes_embedding = torch.cat((graph_embedding.reshape(batch_size, 1, -1), features), dim=1)
 
         mask = mask.reshape(batch_size, n_nodes, n_nodes)
