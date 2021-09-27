@@ -54,12 +54,13 @@ parser.add_argument("--n_test_problems", type=int, default=100, help="Number of 
 
 # Other
 parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
-
+parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
 
 # Parsing
 args = parser.parse_args()
 
 exp_name = f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
+
 if args.remove_machine_id:
     exp_name += "_RMI"
 if args.fixed_benchmark:
@@ -70,3 +71,14 @@ if args.fixed_problem:
     exp_name += "_FP"
 if args.exp_name_appendix is not None:
     exp_name += "_" + args.exp_name_appendix
+
+# Modify path if there is a custom SB3 library path specified
+if args.stable_baselines3_localisation is not None:
+    import sys
+
+    sys.path.insert(0, args.stable_baselines3_localisation + "/stable-baselines3/")
+    sys.path.insert(0, args.stable_baselines3_localisation + "stable-baselines3/")
+    sys.path.insert(0, args.stable_baselines3_localisation)
+    import stable_baselines3
+
+    print(f"Stable Baselines 3 imported from : {stable_baselines3.__file__}")
