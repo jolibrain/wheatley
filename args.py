@@ -21,6 +21,7 @@ parser.add_argument("--fixed_benchmark", default=False, action="store_true", hel
 parser.add_argument(
     "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
 )
+parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
 
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
@@ -81,6 +82,8 @@ if args.one_hot_machine_id:
     exp_name += "_OHMI"
 if args.exp_name_appendix is not None:
     exp_name += "_" + args.exp_name_appendix
+if args.max_pool:
+    exp_name += "_max"
 
 # Modify path if there is a custom SB3 library path specified
 if args.stable_baselines3_localisation is not None:
