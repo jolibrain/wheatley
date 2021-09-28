@@ -14,6 +14,7 @@ parser.add_argument("--seed", type=int, default=42, help="Random seed")
 parser.add_argument(
     "--remove_machine_id", default=False, action="store_true", help="Remove the machine id from the node embedding"
 )
+parser.add_argument("--one_hot_machine_id", default=False, action="store_true", help="Add machine id as one hot encoding")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
 
 # Agent arguments
@@ -73,6 +74,8 @@ if args.fixed_problem:
     exp_name += "_FP"
 if args.freeze_graph:
     exp_name += "_FG"
+if args.one_hot_machine_id:
+    exp_name += "_OHMI"
 if args.exp_name_appendix is not None:
     exp_name += "_" + args.exp_name_appendix
 

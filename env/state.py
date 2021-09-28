@@ -9,6 +9,8 @@ import torch_geometric
 from problem.solution import Solution
 from utils.utils import node_to_job_and_task, job_and_task_to_node
 
+from config import MAX_N_MACHINES
+
 
 class State:
     def __init__(self, affectations, durations, node_encoding="L2D"):
@@ -77,7 +79,7 @@ class State:
                     node_ids.append(node_id)
         return node_ids
 
-    def to_torch_geometric(self, add_machine_id, normalize_input):
+    def to_torch_geometric(self, add_machine_id, normalize_input, one_hot_machine_id):
         """
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
@@ -96,8 +98,12 @@ class State:
                                 node_id,
                                 self.is_affected[job_id, task_id],
                                 completion_time,
-                                self.affectations[job_id, task_id],
                             ]
+                            + (
+                                self.to_one_hot(self.affectations[job_id, task_id])
+                                if one_hot_machine_id
+                                else [self.affectations[job_id, task_id]]
+                            )
                             if add_machine_id
                             else [
                                 node_id,
@@ -134,6 +140,11 @@ class State:
 
         else:
             raise Exception("Encoding not recognized")
+
+    def to_one_hot(self, machine_id):
+        rep = [0 for i in range(MAX_N_MACHINES)]
+        rep[machine_id] = 1
+        return rep
 
     def _update_completion_times(self, node_id):
         """

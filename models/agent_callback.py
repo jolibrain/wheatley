@@ -72,6 +72,7 @@ class TestCallback(BaseCallback):
                 ),
                 normalize_input=self.testing_env.normalize_input,
                 add_machine_id=self.testing_env.add_machine_id,
+                one_hot_machine_id=self.testing_env.one_hot_machine_id,
             )
             for i in range(data.shape[0])
         ]

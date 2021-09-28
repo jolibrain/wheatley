@@ -44,8 +44,15 @@ def main():
 
     path = "saved_networks/" + exp_name + ".zip"
     if args.retrain and os.path.exists(path):
-        agent = Agent.load(path, not args.remove_machine_id)
+        agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id)
     else:
+        if args.remove_machine_id:
+            input_dim_features_extractor = 2
+        else:
+            if args.one_hot_machine_id:
+                input_dim_features_extractor = 2 + MAX_N_MACHINES
+            else:
+                input_dim_features_extractor = 3
         agent = Agent(
             n_epochs=args.n_epochs,
             n_steps_episode=args.n_steps_episode,
@@ -58,8 +65,9 @@ def main():
             gconv_type=args.gconv_type,
             optimizer=args.optimizer,
             add_machine_id=not args.remove_machine_id,
-            input_dim_features_extractor=2 if args.remove_machine_id else 3,
             freeze_graph=args.freeze_graph,
+            input_dim_features_extractor=input_dim_features_extractor,
+            one_hot_machine_id=args.one_hot_machine_id,
         )
 
     agent.train(

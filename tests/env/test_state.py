@@ -75,7 +75,7 @@ def test_get_machine_node_ids(state):
 
 
 def test_to_torch_geometric(state):
-    graph = state.to_torch_geometric(True, False)
+    graph = state.to_torch_geometric(True, False, False)
     assert torch.eq(
         graph.x,
         torch.tensor(
