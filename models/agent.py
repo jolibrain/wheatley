@@ -29,6 +29,7 @@ class Agent:
         freeze_graph=None,
         input_dim_features_extractor=None,
         gconv_type="gin",
+        max_pool=False,
         one_hot_machine_id=False,
         model=None,
     ):
@@ -61,6 +62,7 @@ class Agent:
                     "features_extractor_kwargs": {
                         "input_dim_features_extractor": input_dim_features_extractor,
                         "gconv_type": gconv_type,
+                        "max_pool": max_pool,
                         "freeze_graph": freeze_graph,
                     },
                     "optimizer_class": optimizer_class,
