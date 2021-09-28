@@ -11,13 +11,21 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description, normalize_input=False, add_machine_id=False):
-        n_features = 3 if add_machine_id else 2
+    def __init__(self, problem_description, normalize_input=False, add_machine_id=False, one_hot_machine_id=False):
+        
+        if not add_machine_id:
+            n_features = 2
+        else:
+            if not one_hot_machine_id:
+                n_features = 3
+            else:
+                n_features = 2 + MAX_N_MACHINES
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration
         self.normalize_input = normalize_input
         self.add_machine_id = add_machine_id
+        self.one_hot_machine_id = one_hot_machine_id
 
         self.action_space = Discrete(MAX_N_EDGES)
         self.observation_space = Dict(
@@ -63,7 +71,7 @@ class Env(gym.Env):
         obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id, self.normalize_input),
+            self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
             self.transition_model.get_mask(),
         )
         first_node_id, second_node_id = self._convert_action_to_node_ids(action)
@@ -71,7 +79,7 @@ class Env(gym.Env):
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id, self.normalize_input),
+            self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
             self.transition_model.get_mask(),
         )
         reward = self.reward_model.evaluate(
@@ -99,7 +107,7 @@ class Env(gym.Env):
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id, self.normalize_input),
+            self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
             self.transition_model.get_mask(),
         )
 

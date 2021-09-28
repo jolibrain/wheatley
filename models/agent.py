@@ -26,11 +26,13 @@ class Agent:
         lr=None,
         optimizer=None,
         add_machine_id=False,
+        freeze_graph=None,
         input_dim_features_extractor=None,
-        gconv_type='gin',
+        gconv_type="gin",
+        one_hot_machine_id=False,
         model=None,
     ):
-        fake_env = Agent._create_fake_env(add_machine_id)
+        fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id)
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -56,21 +58,29 @@ class Agent:
                 verbose=2,
                 policy_kwargs={
                     "features_extractor_class": FeaturesExtractor,
-                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor,
-                                                  "gconv_type": gconv_type},
+                    "features_extractor_kwargs": {
+                        "input_dim_features_extractor": input_dim_features_extractor,
+                        "gconv_type": gconv_type,
+                        "freeze_graph": freeze_graph,
+                    },
                     "optimizer_class": optimizer_class,
                 },
                 device=DEVICE,
                 gae_lambda=1,  # To use same vanilla advantage function
             )
         self.add_machine_id = add_machine_id
+        self.one_hot_machine_id = one_hot_machine_id
 
     def save(self, path):
         self.model.save(path)
 
     @classmethod
-    def load(cls, path, add_machine_id):
-        return cls(model=PPO.load(path, Agent._create_fake_env(add_machine_id), DEVICE), add_machine_id=add_machine_id)
+    def load(cls, path, add_machine_id, one_hot_machine_id):
+        return cls(
+            model=PPO.load(path, Agent._create_fake_env(add_machine_id, one_hot_machine_id), DEVICE),
+            add_machine_id=add_machine_id,
+            one_hot_machine_id=one_hot_machine_id,
+        )
 
     def train(
         self,
@@ -87,7 +97,7 @@ class Agent:
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
-            env=Env(problem_description, normalize_input, self.add_machine_id),
+            env=Env(problem_description, normalize_input, self.add_machine_id, self.one_hot_machine_id),
             n_test_env=n_test_env,
             display_env=display_env,
             path=path,
@@ -103,7 +113,7 @@ class Agent:
         self.model.learn(total_timesteps, callback=event_callback)
 
     def predict(self, problem_description):
-        env = Env(problem_description, add_machine_id=self.add_machine_id)
+        env = Env(problem_description, add_machine_id=self.add_machine_id, one_hot_machine_id=self.one_hot_machine_id)
         observation = env.reset()
         done = False
         while not done:
@@ -113,11 +123,11 @@ class Agent:
         return solution
 
     @staticmethod
-    def _create_fake_env(add_machine_id):
-        return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, add_machine_id)
+    def _create_fake_env(add_machine_id, one_hot_machine_id):
+        return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, add_machine_id, one_hot_machine_id)
 
     def _get_env_fn(self, problem_description, normalize_input):
         def f():
-            return Env(problem_description, normalize_input, self.add_machine_id)
+            return Env(problem_description, normalize_input, self.add_machine_id, self.one_hot_machine_id)
 
         return f

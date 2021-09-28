@@ -1,7 +1,6 @@
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch
 import torch.nn as nn
-from torch_geometric.nn.conv import GINConv
 from torch_geometric.nn.conv import GINConv, GATv2Conv
 
 from models.mlp import MLP
@@ -17,19 +16,21 @@ from config import (
 
 import sys
 
+
 class FeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, input_dim_features_extractor, gconv_type):
+    def __init__(self, observation_space, input_dim_features_extractor, gconv_type, freeze_graph):
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
             features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES) * (MAX_N_NODES + 1),
         )
+        self.freeze_graph = freeze_graph
 
         self.gconv_type = gconv_type
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
-            if self.gconv_type == 'gin':
+            if self.gconv_type == "gin":
                 self.features_extractors.append(
                     GINConv(
                         MLP(
@@ -37,23 +38,30 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                             input_dim=input_dim_features_extractor if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
                             hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
                             output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
-                            batch_norm=True,
+                            batch_norm=False if self.freeze_graph else True,
                             activation="relu",
                             device=DEVICE,
                         )
                     )
                 )
-            elif self.gconv_type == 'gatv2':
-                    self.features_extractors.append(
+
+            elif self.gconv_type == "gatv2":
+                self.features_extractors.append(
                     GATv2Conv(
                         in_channels=input_dim_features_extractor if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
-                        out_channels=HIDDEN_DIM_FEATURES_EXTRACTOR
+                        out_channels=HIDDEN_DIM_FEATURES_EXTRACTOR,
                     )
                 )
+
             else:
-                print('Unknown gconv type ', self.gconv_type)
+                print("Unknown gconv type ", self.gconv_type)
                 sys.exit()
+
             self.features_extractors[-1].to(DEVICE)
+
+        if self.freeze_graph:
+            for param in self.parameters():
+                param.requires_grad = False
 
     def forward(self, obs):
         """
