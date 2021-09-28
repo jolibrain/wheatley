@@ -49,6 +49,8 @@ parser.add_argument(
     help="If true, the script checks for already existing model and use it as a basis for training",
 )
 
+parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
+
 # Testing arguments
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
 
@@ -69,6 +71,8 @@ if args.dont_normalize_input:
     exp_name += "_DNI"
 if args.fixed_problem:
     exp_name += "_FP"
+if args.freeze_graph:
+    exp_name += "_FG"
 if args.exp_name_appendix is not None:
     exp_name += "_" + args.exp_name_appendix
 

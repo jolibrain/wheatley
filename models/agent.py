@@ -26,6 +26,7 @@ class Agent:
         lr=None,
         optimizer=None,
         add_machine_id=False,
+        freeze_graph=None,
         input_dim_features_extractor=None,
         gconv_type='gin',
         model=None,
@@ -56,8 +57,11 @@ class Agent:
                 verbose=2,
                 policy_kwargs={
                     "features_extractor_class": FeaturesExtractor,
-                    "features_extractor_kwargs": {"input_dim_features_extractor": input_dim_features_extractor,
-                                                  "gconv_type": gconv_type},
+                    "features_extractor_kwargs": {
+                        "input_dim_features_extractor": input_dim_features_extractor,
+                        "gconv_type": gconv_type,
+                        "freeze_graph": freeze_graph,
+                    },
                     "optimizer_class": optimizer_class,
                 },
                 device=DEVICE,

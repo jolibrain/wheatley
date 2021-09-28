@@ -59,6 +59,7 @@ def main():
             optimizer=args.optimizer,
             add_machine_id=not args.remove_machine_id,
             input_dim_features_extractor=2 if args.remove_machine_id else 3,
+            freeze_graph=args.freeze_graph,
         )
 
     agent.train(
