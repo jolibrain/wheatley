@@ -1,4 +1,4 @@
-# JoliJSS2
+# Wheatley 
 
 This repo intends to replicate L2D, a model proposed in this paper:
 [Learning to Dispatch for Job Shop Scheduling via Deep Reinforcement Learning](https://arxiv.org/pdf/2010.12367)
