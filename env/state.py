@@ -168,10 +168,13 @@ class State:
                 max_completion_time_predecessors + self.durations[node_to_job_and_task(cur_node_id, self.n_machines)]
             )
 
+            old_completion_time = self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)]
             self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)] = new_completion_time
 
-            for successor in self.graph.successors(cur_node_id):
-                priority_queue.put((distance + 1, successor))
+            # Only add the nodes in the queue if update is necessary
+            if old_completion_time != new_completion_time:
+                for successor in self.graph.successors(cur_node_id):
+                    priority_queue.put((distance + 1, successor))
 
     def set_precedency(self, first_node_id, second_node_id):
         """

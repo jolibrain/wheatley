@@ -9,10 +9,12 @@ from models.mlp_extractor import MLPExtractor
 
 class Policy(ActorCriticPolicy):
     def __init__(self, *args, **kwargs):
+        add_pdr_boolean = kwargs.pop("add_pdr_boolean")
+        self.add_pdr_boolean = add_pdr_boolean
         super(Policy, self).__init__(*args, **kwargs)
 
     def _build_mlp_extractor(self):
-        self.mlp_extractor = MLPExtractor()
+        self.mlp_extractor = MLPExtractor(self.add_pdr_boolean)
 
     # The four following functions should be checked, since they are re written from
     # stable_baselines3. We should also check that there are no other functions that

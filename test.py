@@ -17,8 +17,8 @@ def main():
     np.random.seed(args.seed)
 
     print("Loading agent")
-    path = "saved_networks/" + exp_name
-    agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id)
+    path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
+    agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pdr_boolean)
     random_agent = RandomAgent()
 
     if args.fixed_benchmark:

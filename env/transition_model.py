@@ -13,7 +13,7 @@ class TransitionModel(ABC):
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines
 
-        self.state = State(self.affectations, self.durations, node_encoding)
+        self.state = State(self.affectations, self.durations, self.node_encoding)
 
     @abstractmethod
     def run(self, first_node_id, second_node_id):

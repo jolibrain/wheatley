@@ -7,6 +7,8 @@ from ortools.sat.python import cp_model
 
 from problem.solution import Solution
 
+from config import MAX_TIME_ORTOOLS
+
 
 def solve_jssp(affectations, durations):
     """Minimal jobshop problem."""
@@ -62,20 +64,21 @@ def solve_jssp(affectations, durations):
 
     # Solve model.
     solver = cp_model.CpSolver()
-    status = solver.Solve(model)
+    solver.parameters.max_time_in_seconds = MAX_TIME_ORTOOLS
+    solver.Solve(model)
 
     schedule = np.zeros_like(affectations)
-    if status == cp_model.OPTIMAL:
-        # Create one list of assigned tasks per machine.
-        for job_id, job in enumerate(jobs_data):
-            for task_id, task in enumerate(job):
-                machine = task[0]
-                schedule[job_id, task_id] = solver.Value(all_tasks[job_id, task_id].start)
-        return Solution(schedule)
+    # if status == cp_model.OPTIMAL:
+    # Create one list of assigned tasks per machine.
+    for job_id, job in enumerate(jobs_data):
+        for task_id, task in enumerate(job):
+            machine = task[0]
+            schedule[job_id, task_id] = solver.Value(all_tasks[job_id, task_id].start)
+    return Solution(schedule)
 
-    else:
-        print("No Optimal solution found")
-        return
+    # else:
+    #     print("No Optimal solution found")
+    #     return
 
 
 if __name__ == "__main__":

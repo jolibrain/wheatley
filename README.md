@@ -1,4 +1,4 @@
-# JoliJSS2
+# Wheatley 
 
 This repo intends to replicate L2D, a model proposed in this paper:
 [Learning to Dispatch for Job Shop Scheduling via Deep Reinforcement Learning](https://arxiv.org/pdf/2010.12367)
@@ -15,8 +15,6 @@ It should also provide improvements, in order to apply it to real industry probl
    it's [node_embedding, graph_embedding]
 
 ## Questions:
- - L2D doesn't pass the machine id information in the node. So the problem is lacking 
- information during training and inference... Isn't it problematic?
  - Due to the graph embedding process, first nodes don't have access to the
  information contained in the later nodes... It means the model can't make a decision
  based on the whole information at the beginning. The only way to access this 

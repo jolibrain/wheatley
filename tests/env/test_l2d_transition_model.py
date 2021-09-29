@@ -20,21 +20,25 @@ def test_get_mask(l2d_transition_model):
 
 
 def test_run(l2d_transition_model):
+
+    l2d_tm_no_pdr = deepcopy(l2d_transition_model)
+
+    # With PDR
     l2d_tm = l2d_transition_model
     l2d_tm_cp = deepcopy(l2d_tm)
 
     # Check if unallowed actions have no effects, as they should
-    l2d_tm_cp.run(0, 1)
+    l2d_tm_cp.run(0, 1, True)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(50, 50)
+    l2d_tm_cp.run(50, 50, True)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(1, 1)
+    l2d_tm_cp.run(1, 1, True)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
 
     # Check actions that change only affectations
-    l2d_tm.run(5, 5)
-    l2d_tm.run(6, 6)
-    l2d_tm.run(0, 0)
+    l2d_tm.run(5, 5, True)
+    l2d_tm.run(6, 6, True)
+    l2d_tm.run(0, 0, True)
     assert l2d_tm.state.is_affected[1, 0] == 1
     assert l2d_tm.state.is_affected[1, 1] == 1
     assert l2d_tm.state.is_affected[0, 0] == 1
@@ -42,15 +46,15 @@ def test_run(l2d_transition_model):
     assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph and affectations (and btw, insertion before)
-    l2d_tm.run(15, 15)
+    l2d_tm.run(15, 15, True)
     assert l2d_tm.state.is_affected[3, 0] == 1
     assert l2d_tm.state.graph.has_edge(15, 6)
     assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph, affectations and task_completion_times
-    l2d_tm.run(20, 20)
-    l2d_tm.run(10, 10)
-    l2d_tm.run(1, 1)
+    l2d_tm.run(20, 20, True)
+    l2d_tm.run(10, 10, True)
+    l2d_tm.run(1, 1, True)
     assert l2d_tm.state.is_affected[4, 0] == 1
     assert l2d_tm.state.is_affected[2, 0] == 1
     assert l2d_tm.state.is_affected[0, 1] == 1
@@ -71,8 +75,8 @@ def test_run(l2d_transition_model):
     ).all()
 
     # Check insertion between 2 nodes
-    l2d_tm.run(7, 7)
-    l2d_tm.run(2, 2)
+    l2d_tm.run(7, 7, True)
+    l2d_tm.run(2, 2, True)
     assert l2d_tm.state.is_affected[1, 2] == 1
     assert l2d_tm.state.is_affected[0, 2] == 1
     assert l2d_tm.state.graph.has_edge(7, 2)
@@ -88,7 +92,7 @@ def test_run(l2d_transition_model):
             ]
         )
     ).all()
-    l2d_tm.run(21, 21)
+    l2d_tm.run(21, 21, True)
     assert l2d_tm.state.is_affected[4, 1] == 1
     assert l2d_tm.state.graph.has_edge(7, 21)
     assert l2d_tm.state.graph.has_edge(21, 2)
@@ -102,6 +106,86 @@ def test_run(l2d_transition_model):
                 [5, 9, 13, 17, 21],
                 [5, 11, 18, 26, 35],
                 [14, 22, 29, 35, 40],
+            ]
+        )
+    ).all()
+
+    # Without PDR
+    l2d_tm = l2d_tm_no_pdr
+    l2d_tm_cp = deepcopy(l2d_tm)
+
+    # Check actions that change only affectations
+    l2d_tm.run(5, 5, False)
+    l2d_tm.run(6, 6, False)
+    l2d_tm.run(0, 0, False)
+    assert l2d_tm.state.is_affected[1, 0] == 1
+    assert l2d_tm.state.is_affected[1, 1] == 1
+    assert l2d_tm.state.is_affected[0, 0] == 1
+    assert nx.is_isomorphic(l2d_tm.state.graph, l2d_tm_cp.state.graph)
+    assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
+
+    # Check actions that change graph and affectations (and btw, insertion before)
+    l2d_tm.run(15, 15, False)
+    assert l2d_tm.state.is_affected[3, 0] == 1
+    assert l2d_tm.state.graph.has_edge(15, 6)
+    assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
+
+    # Check actions that change graph, affectations and task_completion_times
+    l2d_tm.run(20, 20, False)
+    l2d_tm.run(10, 10, False)
+    l2d_tm.run(1, 1, False)
+    assert l2d_tm.state.is_affected[4, 0] == 1
+    assert l2d_tm.state.is_affected[2, 0] == 1
+    assert l2d_tm.state.is_affected[0, 1] == 1
+    assert l2d_tm.state.graph.has_edge(5, 20)
+    assert l2d_tm.state.graph.has_edge(0, 10)
+    assert l2d_tm.state.graph.has_edge(20, 1)
+    assert (
+        l2d_tm.state.task_completion_times
+        == np.array(
+            [
+                [1, 19, 29, 36, 44],
+                [5, 11, 14, 17, 21],
+                [5, 9, 13, 17, 21],
+                [5, 11, 18, 26, 35],
+                [14, 22, 29, 35, 40],
+            ]
+        )
+    ).all()
+
+    # Check insertion between 2 nodes
+    l2d_tm.run(7, 7, False)
+    l2d_tm.run(2, 2, False)
+    assert l2d_tm.state.is_affected[1, 2] == 1
+    assert l2d_tm.state.is_affected[0, 2] == 1
+    assert l2d_tm.state.graph.has_edge(7, 2)
+    assert (
+        l2d_tm.state.task_completion_times
+        == np.array(
+            [
+                [1, 19, 29, 36, 44],
+                [5, 11, 14, 17, 21],
+                [5, 9, 13, 17, 21],
+                [5, 11, 18, 26, 35],
+                [14, 22, 29, 35, 40],
+            ]
+        )
+    ).all()
+    l2d_tm.run(21, 21, False)
+    assert l2d_tm.state.is_affected[4, 1] == 1
+    assert l2d_tm.state.graph.has_edge(7, 2)
+    assert l2d_tm.state.graph.has_edge(2, 21)
+    assert not l2d_tm.state.graph.has_edge(7, 21)
+    assert not l2d_tm.state.graph.has_edge(21, 2)
+    assert (
+        l2d_tm.state.task_completion_times
+        == np.array(
+            [
+                [1, 19, 29, 36, 44],
+                [5, 11, 14, 17, 21],
+                [5, 9, 13, 17, 21],
+                [5, 11, 18, 26, 35],
+                [14, 37, 44, 50, 55],
             ]
         )
     ).all()

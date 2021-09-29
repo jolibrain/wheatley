@@ -10,12 +10,16 @@ parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument("--transition_model_config", type=str, default="L2D", help="Which transition model to use")
 parser.add_argument("--reward_model_config", type=str, default="L2D", help="Which reward model to use")
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
+parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved network")
 
 parser.add_argument(
     "--remove_machine_id", default=False, action="store_true", help="Remove the machine id from the node embedding"
 )
 parser.add_argument("--one_hot_machine_id", default=False, action="store_true", help="Add machine id as one hot encoding")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
+parser.add_argument(
+    "--add_pdr_boolean", default=False, action="store_true", help="Add a boolean in action space for PDR use"
+)
 
 # Agent arguments
 parser.add_argument(
@@ -68,6 +72,7 @@ args = parser.parse_args()
 exp_name = (
     f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
 )
+
 if args.remove_machine_id:
     exp_name += "_RMI"
 if args.fixed_benchmark:
@@ -80,6 +85,8 @@ if args.freeze_graph:
     exp_name += "_FG"
 if args.one_hot_machine_id:
     exp_name += "_OHMI"
+if args.add_pdr_boolean:
+    exp_name += "_PDR"
 if args.exp_name_appendix is not None:
     exp_name += "_" + args.exp_name_appendix
 if args.max_pool:
