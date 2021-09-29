@@ -229,5 +229,6 @@ def features_extractor():
         input_dim_features_extractor=2,
         gconv_type="gin",
         freeze_graph=False,
+        max_pool=False,
     )
     return features_extractor
