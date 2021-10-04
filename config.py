@@ -15,8 +15,8 @@ HIDDEN_DIM_CRITIC = 32
 MAX_DURATION = 99  # Handle this with care, linked to a lot of other things
 
 # Parameters that shouldn't play a role in learning
-MAX_N_JOBS = 20
-MAX_N_MACHINES = 20
+MAX_N_JOBS = 30
+MAX_N_MACHINES = 30
 
 MAX_N_NODES = MAX_N_JOBS * MAX_N_MACHINES
 MAX_N_EDGES = MAX_N_NODES ** 2

@@ -16,9 +16,14 @@ parser.add_argument(
 )
 parser.add_argument("--one_hot_machine_id", default=False, action="store_true", help="Add machine id as one hot encoding")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
+parser.add_argument(
+    "--add_pdr_boolean", default=False, action="store_true", help="Add a boolean in action space for PDR use"
+)
 
 # Agent arguments
-parser.add_argument("--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2")
+parser.add_argument(
+    "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
+)
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
 
 # Training arguments
@@ -63,7 +68,9 @@ parser.add_argument("--stable_baselines3_localisation", type=str, help="If using
 # Parsing
 args = parser.parse_args()
 
-exp_name = f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
+exp_name = (
+    f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
+)
 
 if args.remove_machine_id:
     exp_name += "_RMI"
@@ -77,11 +84,13 @@ if args.freeze_graph:
     exp_name += "_FG"
 if args.one_hot_machine_id:
     exp_name += "_OHMI"
+if args.add_pdr_boolean:
+    exp_name += "_PDR"
 if args.exp_name_appendix is not None:
     exp_name += "_" + args.exp_name_appendix
 if args.max_pool:
     exp_name += "_max"
-    
+
 # Modify path if there is a custom SB3 library path specified
 if args.stable_baselines3_localisation is not None:
     import sys
