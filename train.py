@@ -44,7 +44,7 @@ def main():
 
     path = "saved_networks/" + exp_name + ".zip"
     if args.retrain and os.path.exists(path):
-        agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id)
+        agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pr_boolean)
     else:
         if args.remove_machine_id:
             input_dim_features_extractor = 2
@@ -69,6 +69,7 @@ def main():
             freeze_graph=args.freeze_graph,
             input_dim_features_extractor=input_dim_features_extractor,
             one_hot_machine_id=args.one_hot_machine_id,
+            add_pdr_boolean=args.add_pdr_boolean,
         )
 
     agent.train(

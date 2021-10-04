@@ -65,7 +65,7 @@ def solve_jssp(affectations, durations):
     # Solve model.
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = MAX_TIME_ORTOOLS
-    # status = solver.Solve(model)
+    solver.Solve(model)
 
     schedule = np.zeros_like(affectations)
     # if status == cp_model.OPTIMAL:

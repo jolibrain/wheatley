@@ -11,8 +11,15 @@ from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description, normalize_input=False, add_machine_id=False, one_hot_machine_id=False):
-        
+    def __init__(
+        self,
+        problem_description,
+        normalize_input=False,
+        add_machine_id=False,
+        one_hot_machine_id=False,
+        add_pdr_boolean=False,
+    ):
+
         if not add_machine_id:
             n_features = 2
         else:
@@ -26,8 +33,9 @@ class Env(gym.Env):
         self.normalize_input = normalize_input
         self.add_machine_id = add_machine_id
         self.one_hot_machine_id = one_hot_machine_id
+        self.add_pdr_boolean = add_pdr_boolean
 
-        self.action_space = Discrete(MAX_N_EDGES)
+        self.action_space = Discrete(2 * MAX_N_EDGES if self.add_pdr_boolean else MAX_N_EDGES)
         self.observation_space = Dict(
             {
                 "n_jobs": Discrete(MAX_N_JOBS + 1),
@@ -74,8 +82,8 @@ class Env(gym.Env):
             self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
             self.transition_model.get_mask(),
         )
-        first_node_id, second_node_id = self._convert_action_to_node_ids(action)
-        self.transition_model.run(first_node_id, second_node_id)
+        first_node_id, second_node_id, pdr_boolean = self._convert_action_to_node_ids(action)
+        self.transition_model.run(first_node_id, second_node_id, pdr_boolean)
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
@@ -96,9 +104,13 @@ class Env(gym.Env):
         return gym_observation, reward, done, info
 
     def _convert_action_to_node_ids(self, action):
+        pdr_boolean = True
+        if self.add_pdr_boolean:
+            pdr_boolean = True if action >= MAX_N_EDGES else False
+            action = action % MAX_N_EDGES
         first_node_id = action // MAX_N_NODES
         second_node_id = action % MAX_N_NODES
-        return first_node_id, second_node_id
+        return first_node_id, second_node_id, pdr_boolean
 
     def reset(self):
         if self.generate_random_problems:
