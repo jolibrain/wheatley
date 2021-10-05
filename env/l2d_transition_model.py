@@ -57,11 +57,11 @@ class L2DTransitionModel(TransitionModel):
                     start_time, duration, _ = machine_occupancy[i]
                     next_start_time, next_duration, _ = machine_occupancy[i + 1]
                     if start_time + duration < next_start_time:
-                        if (
-                            start_time + duration <= job_availability_time
-                            and job_availability_time + job_duration < next_start_time
+                        if start_time + duration <= job_availability_time and job_duration <= next_start_time - (
+                            start_time + duration
                         ):
                             index = i
+                            break
                 if index == -1:
                     # The job can be inserted nowhere, so we add it at the end
                     self.state.set_precedency(machine_occupancy[-1][2], node_id)
@@ -86,8 +86,9 @@ class L2DTransitionModel(TransitionModel):
                     start_time, duration, _ = machine_occupancy[i]
                     next_start_time, next_duration, _ = machine_occupancy[i + 1]
                     if start_time + duration < next_start_time:
-                        if start_time + duration <= job_availability_time and job_availability_time < next_start_time:
+                        if job_availability_time < next_start_time:
                             index = i
+                            break
                 if index == -1:
                     # The job can be inserted nowhere, so we add it at the end
                     self.state.set_precedency(machine_occupancy[-1][2], node_id)
