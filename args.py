@@ -10,6 +10,7 @@ parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument("--transition_model_config", type=str, default="L2D", help="Which transition model to use")
 parser.add_argument("--reward_model_config", type=str, default="L2D", help="Which reward model to use")
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
+parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved network")
 
 parser.add_argument(
     "--remove_machine_id", default=False, action="store_true", help="Remove the machine id from the node embedding"
