@@ -110,7 +110,7 @@ class MLPExtractor(nn.Module):
 
             counter = 0
             for index in indexes[-1]:
-                index1 = index // n_nodes
+                index1 = torch.div(index, n_nodes, rounding_mode="floor")
                 index2 = index % n_nodes
                 node1 = n_embeddings[i][index1]
                 node2 = n_embeddings[i][index2]
