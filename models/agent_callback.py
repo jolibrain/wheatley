@@ -132,6 +132,7 @@ class TestCallback(BaseCallback):
                 / self.n_test_env
             )
 
+        print('--- mean_makespan=',mean_makespan, ' ---')
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
