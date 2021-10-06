@@ -67,33 +67,37 @@ parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name
 parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
 
 # Parsing
-args = parser.parse_args()
+args = parser.parse_known_args()
 
-exp_name = (
-    f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
-)
+if hasattr(args,'n_j') and hasattr(args,'n_m'):
+    exp_name = (
+        f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
+    )
 
-if args.remove_machine_id:
-    exp_name += "_RMI"
-if args.fixed_benchmark:
-    exp_name += "_FB"
-if args.dont_normalize_input:
-    exp_name += "_DNI"
-if args.fixed_problem:
-    exp_name += "_FP"
-if args.freeze_graph:
-    exp_name += "_FG"
-if args.one_hot_machine_id:
-    exp_name += "_OHMI"
-if args.add_pdr_boolean:
-    exp_name += "_PDR"
-if args.exp_name_appendix is not None:
-    exp_name += "_" + args.exp_name_appendix
-if args.max_pool:
-    exp_name += "_max"
+    if args.remove_machine_id:
+        exp_name += "_RMI"
+    if args.fixed_benchmark:
+        exp_name += "_FB"
+    if args.dont_normalize_input:
+        exp_name += "_DNI"
+    if args.fixed_problem:
+        exp_name += "_FP"
+    if args.freeze_graph:
+        exp_name += "_FG"
+    if args.one_hot_machine_id:
+        exp_name += "_OHMI"
+    if args.add_pdr_boolean:
+        exp_name += "_PDR"
+    if args.exp_name_appendix is not None:
+        exp_name += "_" + args.exp_name_appendix
+    if args.max_pool:
+        exp_name += "_max"
 
+else:
+    exp_name = ''
+    
 # Modify path if there is a custom SB3 library path specified
-if args.stable_baselines3_localisation is not None:
+if hasattr(args,'stable_baselines3_localisation') and args.stable_baselines3_localisation is not None:
     import sys
 
     sys.path.insert(0, args.stable_baselines3_localisation + "/stable-baselines3/")
