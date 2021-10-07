@@ -17,9 +17,8 @@ parser.add_argument(
 )
 parser.add_argument("--one_hot_machine_id", default=False, action="store_true", help="Add machine id as one hot encoding")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
-parser.add_argument(
-    "--add_pdr_boolean", default=False, action="store_true", help="Add a boolean in action space for PDR use"
-)
+parser.add_argument("--add_pdr_boolean", default=False, action="store_true", help="Add a bool in action space for PDR use")
+parser.add_argument("--slot_locking", default=False, action="store_true", help="Add a bool in act. space for slot locking")
 
 # Agent arguments
 parser.add_argument(

@@ -16,19 +16,19 @@ from config import (
 
 
 class MLPExtractor(nn.Module):
-    def __init__(self, add_pdr_boolean):
+    def __init__(self, add_boolean):
         super(MLPExtractor, self).__init__()
 
         # This is necessary because of stable_baselines3 API
-        self.latent_dim_pi = (MAX_N_NODES ** 2) * (2 if add_pdr_boolean else 1)
+        self.latent_dim_pi = (MAX_N_NODES ** 2) * (2 if add_boolean else 1)
         self.latent_dim_vf = 1
-        self.add_pdr_boolean = add_pdr_boolean
+        self.add_boolean = add_boolean
 
         self.actor = MLP(
             n_layers=N_MLP_LAYERS_ACTOR,
             input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * 3,
             hidden_dim=HIDDEN_DIM_ACTOR,
-            output_dim=2 if self.add_pdr_boolean else 1,
+            output_dim=2 if self.add_boolean else 1,
             batch_norm=False,
             activation="tanh",
             device=DEVICE,
@@ -62,22 +62,22 @@ class MLPExtractor(nn.Module):
 
         # Compute the probabilities
         probabilities = self.actor(pairs_to_compute)
-        if self.add_pdr_boolean:
-            probabilities, pdr_boolean = torch.split(probabilities, [1, 1], dim=2)
-            pdr_boolean = torch.sigmoid(pdr_boolean)
+        if self.add_boolean:
+            probabilities, boolean = torch.split(probabilities, [1, 1], dim=2)
+            boolean = torch.sigmoid(boolean)
         pi = F.softmax(probabilities, dim=1)
-        if self.add_pdr_boolean:
-            pi_without_pdr = pi * (1 - pdr_boolean)
-            pi = pi * pdr_boolean
+        if self.add_boolean:
+            pi_without_boolean = pi * (1 - boolean)
+            pi = pi * boolean
 
         # And reshape pi in ordrer to have every value corresponding to its edge index
         shaped_pi = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
-        if self.add_pdr_boolean:
-            shaped_pi_without_pdr = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
+        if self.add_boolean:
+            shaped_pi_without_boolean = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
         for i in range(batch_size):
             shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])[0 : len(indexes[i])]
-            if self.add_pdr_boolean:
-                shaped_pi_without_pdr[i][indexes[i]] = pi_without_pdr[i].reshape(pi_without_pdr.shape[1])[
+            if self.add_boolean:
+                shaped_pi_without_boolean[i][indexes[i]] = pi_without_boolean[i].reshape(pi_without_boolean.shape[1])[
                     0 : len(indexes[i])
                 ]
 
@@ -86,13 +86,13 @@ class MLPExtractor(nn.Module):
         # matrix of size (n_nodes, n_nodes). We then complete the matrix to get a square
         # matrix of size (MAX_N_NODES, MAX_N_NODES) with 0, and we reflatten it.
         shaped_pi = shaped_pi.reshape(batch_size, n_nodes, n_nodes)
-        if self.add_pdr_boolean:
-            shaped_pi_without_pdr = shaped_pi_without_pdr.reshape(batch_size, n_nodes, n_nodes)
-        filled_pi = torch.zeros((batch_size, MAX_N_NODES * (2 if self.add_pdr_boolean else 1), MAX_N_NODES), device=DEVICE)
+        if self.add_boolean:
+            shaped_pi_without_boolean = shaped_pi_without_boolean.reshape(batch_size, n_nodes, n_nodes)
+        filled_pi = torch.zeros((batch_size, MAX_N_NODES * (2 if self.add_boolean else 1), MAX_N_NODES), device=DEVICE)
         filled_pi[:, 0:n_nodes, 0:n_nodes] = shaped_pi
-        if self.add_pdr_boolean:
-            filled_pi[:, MAX_N_NODES : MAX_N_NODES + n_nodes, 0:n_nodes] = shaped_pi_without_pdr
-        filled_pi = filled_pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES * (2 if self.add_pdr_boolean else 1))
+        if self.add_boolean:
+            filled_pi[:, MAX_N_NODES : MAX_N_NODES + n_nodes, 0:n_nodes] = shaped_pi_without_boolean
+        filled_pi = filled_pi.reshape(batch_size, MAX_N_NODES * MAX_N_NODES * (2 if self.add_boolean else 1))
 
         return filled_pi, value
 

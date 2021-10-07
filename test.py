@@ -18,7 +18,7 @@ def main():
 
     print("Loading agent")
     path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
-    agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pdr_boolean)
+    agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pdr_boolean, args.slot_locking)
     random_agent = RandomAgent()
 
     if args.fixed_benchmark:

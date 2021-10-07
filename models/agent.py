@@ -32,9 +32,10 @@ class Agent:
         max_pool=False,
         one_hot_machine_id=False,
         add_pdr_boolean=False,
+        slot_locking=False,
         model=None,
     ):
-        fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean)
+        fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking)
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -67,7 +68,7 @@ class Agent:
                         "freeze_graph": freeze_graph,
                     },
                     "optimizer_class": optimizer_class,
-                    "add_pdr_boolean": add_pdr_boolean,
+                    "add_boolean": add_pdr_boolean or slot_locking,
                 },
                 device=DEVICE,
                 gae_lambda=1,  # To use same vanilla advantage function
@@ -75,17 +76,21 @@ class Agent:
         self.add_machine_id = add_machine_id
         self.one_hot_machine_id = one_hot_machine_id
         self.add_pdr_boolean = add_pdr_boolean
+        self.slot_locking = slot_locking
 
     def save(self, path):
         self.model.save(path)
 
     @classmethod
-    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean):
+    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking):
         return cls(
-            model=PPO.load(path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean), DEVICE),
+            model=PPO.load(
+                path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking), DEVICE
+            ),
             add_machine_id=add_machine_id,
             one_hot_machine_id=one_hot_machine_id,
             add_pdr_boolean=add_pdr_boolean,
+            slot_locking=slot_locking,
         )
 
     def train(
@@ -104,7 +109,12 @@ class Agent:
         # First setup callbacks during training
         test_callback = TestCallback(
             env=Env(
-                problem_description, normalize_input, self.add_machine_id, self.one_hot_machine_id, self.add_pdr_boolean
+                problem_description,
+                normalize_input,
+                self.add_machine_id,
+                self.one_hot_machine_id,
+                self.add_pdr_boolean,
+                self.slot_locking,
             ),
             n_test_env=n_test_env,
             display_env=display_env,
@@ -126,6 +136,7 @@ class Agent:
             add_machine_id=self.add_machine_id,
             one_hot_machine_id=self.one_hot_machine_id,
             add_pdr_boolean=self.add_pdr_boolean,
+            slot_locking=self.slot_locking,
         )
         observation = env.reset()
         done = False
@@ -136,13 +147,25 @@ class Agent:
         return solution
 
     @staticmethod
-    def _create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean):
-        return Env(ProblemDescription(2, 2, 99, "L2D", "L2D"), False, add_machine_id, one_hot_machine_id, add_pdr_boolean)
+    def _create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking):
+        return Env(
+            ProblemDescription(2, 2, 99, "L2D", "L2D"),
+            False,
+            add_machine_id,
+            one_hot_machine_id,
+            add_pdr_boolean,
+            slot_locking,
+        )
 
     def _get_env_fn(self, problem_description, normalize_input):
         def f():
             return Env(
-                problem_description, normalize_input, self.add_machine_id, self.one_hot_machine_id, self.add_pdr_boolean
+                problem_description,
+                normalize_input,
+                self.add_machine_id,
+                self.one_hot_machine_id,
+                self.add_pdr_boolean,
+                self.slot_locking,
             )
 
         return f
