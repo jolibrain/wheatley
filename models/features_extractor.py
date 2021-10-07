@@ -18,7 +18,7 @@ import sys
 
 
 class FeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, input_dim_features_extractor, gconv_type, max_pool, freeze_graph):
+    def __init__(self, observation_space, input_dim_features_extractor, gconv_type, max_pool, freeze_graph, graph_has_relu):
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
             features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES) * (MAX_N_NODES + 1),
@@ -26,6 +26,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         self.freeze_graph = freeze_graph
 
         self.gconv_type = gconv_type
+        self.graph_has_relu = graph_has_relu
         self.max_pool = max_pool
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
@@ -81,6 +82,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         # Compute graph embeddings
         for layer in range(self.n_layers_features_extractor):
             features = self.features_extractors[layer](features, edge_index)
+            if self.graph_has_relu:
+                features = torch.nn.functional.elu(features)
         features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate

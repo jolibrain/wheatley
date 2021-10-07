@@ -65,6 +65,7 @@ def main():
             vf_coef=args.vf_coef,
             lr=args.lr,
             gconv_type=args.gconv_type,
+            graph_has_relu=args.graph_has_relu,
             max_pool=args.max_pool,
             optimizer=args.optimizer,
             add_machine_id=not args.remove_machine_id,
