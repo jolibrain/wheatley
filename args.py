@@ -66,9 +66,9 @@ parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name
 parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
 
 # Parsing
-args = parser.parse_known_args()
+args, _ = parser.parse_known_args()
 
-if hasattr(args,'n_j') and hasattr(args,'n_m'):
+if hasattr(args, "n_j") and hasattr(args, "n_m"):
     exp_name = (
         f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
     )
@@ -93,10 +93,10 @@ if hasattr(args,'n_j') and hasattr(args,'n_m'):
         exp_name += "_max"
 
 else:
-    exp_name = ''
-    
+    exp_name = ""
+
 # Modify path if there is a custom SB3 library path specified
-if hasattr(args,'stable_baselines3_localisation') and args.stable_baselines3_localisation is not None:
+if hasattr(args, "stable_baselines3_localisation") and args.stable_baselines3_localisation is not None:
     import sys
 
     sys.path.insert(0, args.stable_baselines3_localisation + "/stable-baselines3/")
