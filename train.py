@@ -45,7 +45,7 @@ def main():
     path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
     if args.retrain and os.path.exists(path):
         agent = Agent.load(
-            path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pdr_boolean, args.slot_locking
+            path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pdr_boolean, args.slot_locking, args.mlp_act
         )
     else:
         if args.remove_machine_id:
@@ -73,6 +73,7 @@ def main():
             one_hot_machine_id=args.one_hot_machine_id,
             add_pdr_boolean=args.add_pdr_boolean,
             slot_locking=args.slot_locking,
+            mlp_act=args.mlp_act
         )
 
     agent.train(

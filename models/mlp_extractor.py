@@ -16,7 +16,7 @@ from config import (
 
 
 class MLPExtractor(nn.Module):
-    def __init__(self, add_boolean):
+    def __init__(self, add_boolean, mlp_act):
         super(MLPExtractor, self).__init__()
 
         # This is necessary because of stable_baselines3 API
@@ -30,7 +30,7 @@ class MLPExtractor(nn.Module):
             hidden_dim=HIDDEN_DIM_ACTOR,
             output_dim=2 if self.add_boolean else 1,
             batch_norm=False,
-            activation="tanh",
+            activation=mlp_act,
             device=DEVICE,
         )
         self.critic = MLP(
@@ -39,7 +39,7 @@ class MLPExtractor(nn.Module):
             hidden_dim=HIDDEN_DIM_CRITIC,
             output_dim=1,
             batch_norm=False,
-            activation="tanh",
+            activation=mlp_act,
             device=DEVICE,
         )
 
