@@ -208,7 +208,7 @@ def gym_observation():
 
 @fixture
 def l2d_transition_model(affectations, durations):
-    l2d_transition_model = L2DTransitionModel(affectations, durations)
+    l2d_transition_model = L2DTransitionModel(affectations, durations, "L2D", False)
     return l2d_transition_model
 
 

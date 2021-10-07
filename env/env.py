@@ -19,6 +19,7 @@ class Env(gym.Env):
         add_machine_id=False,
         one_hot_machine_id=False,
         add_pdr_boolean=False,
+        slot_locking=False,
     ):
 
         if not add_machine_id:
@@ -35,6 +36,7 @@ class Env(gym.Env):
         self.add_machine_id = add_machine_id
         self.one_hot_machine_id = one_hot_machine_id
         self.add_pdr_boolean = add_pdr_boolean
+        self.slot_locking = slot_locking
 
         self.action_space = Discrete(2 * MAX_N_EDGES if self.add_pdr_boolean else MAX_N_EDGES)
         self.observation_space = Dict(
@@ -83,8 +85,17 @@ class Env(gym.Env):
             self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
             self.transition_model.get_mask(),
         )
-        first_node_id, second_node_id, pdr_boolean = self._convert_action_to_node_ids(action)
-        self.transition_model.run(first_node_id, second_node_id, pdr_boolean)
+        first_node_id, second_node_id, boolean = self._convert_action_to_node_ids(action)
+        if self.add_pdr_boolean:
+            pdr_boolean = boolean
+            slot_lock = False
+        elif self.slot_locking:
+            pdr_boolean = True
+            slot_lock = boolean
+        else:
+            pdr_boolean = True
+            slot_lock = False
+        self.transition_model.run(first_node_id, second_node_id, pdr_boolean, slot_lock)
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
@@ -106,7 +117,7 @@ class Env(gym.Env):
 
     def _convert_action_to_node_ids(self, action):
         pdr_boolean = True
-        if self.add_pdr_boolean:
+        if self.add_pdr_boolean or self.slot_locking:
             pdr_boolean = True if action >= MAX_N_EDGES else False
             action = action % MAX_N_EDGES
         first_node_id = action // MAX_N_NODES
@@ -134,9 +145,13 @@ class Env(gym.Env):
     def _create_transition_and_reward_model(self):
 
         if self.transition_model_config == "L2D":
-            self.transition_model = L2DTransitionModel(self.affectations, self.durations, node_encoding="L2D")
+            self.transition_model = L2DTransitionModel(
+                self.affectations, self.durations, node_encoding="L2D", slot_locking=self.slot_locking
+            )
         elif self.transition_model_config == "DenseL2D":
-            self.transition_model = L2DTransitionModel(self.affectations, self.durations, node_encoding="DenseL2D")
+            self.transition_model = L2DTransitionModel(
+                self.affectations, self.durations, node_encoding="DenseL2D", slot_locking=self.slot_locking
+            )
         else:
             raise Exception("Transition model not recognized")
 

@@ -17,15 +17,15 @@ parser.add_argument(
 )
 parser.add_argument("--one_hot_machine_id", default=False, action="store_true", help="Add machine id as one hot encoding")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
-parser.add_argument(
-    "--add_pdr_boolean", default=False, action="store_true", help="Add a boolean in action space for PDR use"
-)
+parser.add_argument("--add_pdr_boolean", default=False, action="store_true", help="Add a bool in action space for PDR use")
+parser.add_argument("--slot_locking", default=False, action="store_true", help="Add a bool in act. space for slot locking")
 
 # Agent arguments
 parser.add_argument(
     "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
 )
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
+parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
 
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
@@ -67,9 +67,9 @@ parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name
 parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
 
 # Parsing
-args = parser.parse_known_args()
+args, _ = parser.parse_known_args()
 
-if hasattr(args,'n_j') and hasattr(args,'n_m'):
+if hasattr(args, "n_j") and hasattr(args, "n_m"):
     exp_name = (
         f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
     )
@@ -88,16 +88,18 @@ if hasattr(args,'n_j') and hasattr(args,'n_m'):
         exp_name += "_OHMI"
     if args.add_pdr_boolean:
         exp_name += "_PDR"
+    if args.slot_locking:
+        exp_name += "_SL"
     if args.exp_name_appendix is not None:
         exp_name += "_" + args.exp_name_appendix
     if args.max_pool:
         exp_name += "_max"
 
 else:
-    exp_name = ''
-    
+    exp_name = ""
+
 # Modify path if there is a custom SB3 library path specified
-if hasattr(args,'stable_baselines3_localisation') and args.stable_baselines3_localisation is not None:
+if hasattr(args, "stable_baselines3_localisation") and args.stable_baselines3_localisation is not None:
     import sys
 
     sys.path.insert(0, args.stable_baselines3_localisation + "/stable-baselines3/")
@@ -106,3 +108,7 @@ if hasattr(args,'stable_baselines3_localisation') and args.stable_baselines3_loc
     import stable_baselines3
 
     print(f"Stable Baselines 3 imported from : {stable_baselines3.__file__}")
+
+# checking incompatibility
+if args.add_pdr_boolean and args.slot_locking:
+    raise Exception("You can't use PDR boolean and slot locking in the same script")
