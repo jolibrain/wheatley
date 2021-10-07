@@ -25,7 +25,9 @@ parser.add_argument(
     "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
 )
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
-parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
+parser.add_argument(
+    "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
+)
 
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
@@ -34,6 +36,7 @@ parser.add_argument("--n_steps_episode", type=int, default=256, help="Number of 
 parser.add_argument("--batch_size", type=int, default=64, help="Batch size during training of PPO")
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
 parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping parameter")
+parser.add_argument("--target_kl", type=float, default=0.2, help="Limit the KL divergence between updates")
 parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
 parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")

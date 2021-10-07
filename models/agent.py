@@ -21,6 +21,7 @@ class Agent:
         batch_size=None,
         gamma=None,
         clip_range=None,
+        target_kl=None,
         ent_coef=None,
         vf_coef=None,
         lr=None,
@@ -29,6 +30,7 @@ class Agent:
         freeze_graph=None,
         input_dim_features_extractor=None,
         gconv_type="gin",
+        graph_has_relu=False,
         max_pool=False,
         one_hot_machine_id=False,
         add_pdr_boolean=False,
@@ -57,6 +59,7 @@ class Agent:
                 gamma=gamma,
                 learning_rate=lr,
                 clip_range=clip_range,
+                target_kl=target_kl,
                 ent_coef=ent_coef,
                 vf_coef=vf_coef,
                 verbose=2,
@@ -67,6 +70,7 @@ class Agent:
                         "gconv_type": gconv_type,
                         "max_pool": max_pool,
                         "freeze_graph": freeze_graph,
+                        "graph_has_relu": graph_has_relu,
                     },
                     "optimizer_class": optimizer_class,
                     "add_boolean": add_pdr_boolean or slot_locking,
@@ -87,7 +91,7 @@ class Agent:
     def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act):
         return cls(
             model=PPO.load(
-                path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act), DEVICE
+                path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking), DEVICE
             ),
             add_machine_id=add_machine_id,
             one_hot_machine_id=one_hot_machine_id,
