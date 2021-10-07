@@ -28,17 +28,17 @@ def test_run(l2d_transition_model):
     l2d_tm_cp = deepcopy(l2d_tm)
 
     # Check if unallowed actions have no effects, as they should
-    l2d_tm_cp.run(0, 1, True)
+    l2d_tm_cp.run(0, 1, True, False)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(50, 50, True)
+    l2d_tm_cp.run(50, 50, True, False)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
-    l2d_tm_cp.run(1, 1, True)
+    l2d_tm_cp.run(1, 1, True, False)
     assert eq(l2d_tm.state, l2d_tm_cp.state)
 
     # Check actions that change only affectations
-    l2d_tm.run(5, 5, True)
-    l2d_tm.run(6, 6, True)
-    l2d_tm.run(0, 0, True)
+    l2d_tm.run(5, 5, True, False)
+    l2d_tm.run(6, 6, True, False)
+    l2d_tm.run(0, 0, True, False)
     assert l2d_tm.state.is_affected[1, 0] == 1
     assert l2d_tm.state.is_affected[1, 1] == 1
     assert l2d_tm.state.is_affected[0, 0] == 1
@@ -46,15 +46,15 @@ def test_run(l2d_transition_model):
     assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph and affectations (and btw, insertion before)
-    l2d_tm.run(15, 15, True)
+    l2d_tm.run(15, 15, True, False)
     assert l2d_tm.state.is_affected[3, 0] == 1
     assert l2d_tm.state.graph.has_edge(15, 6)
     assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph, affectations and task_completion_times
-    l2d_tm.run(20, 20, True)
-    l2d_tm.run(10, 10, True)
-    l2d_tm.run(1, 1, True)
+    l2d_tm.run(20, 20, True, False)
+    l2d_tm.run(10, 10, True, False)
+    l2d_tm.run(1, 1, True, False)
     assert l2d_tm.state.is_affected[4, 0] == 1
     assert l2d_tm.state.is_affected[2, 0] == 1
     assert l2d_tm.state.is_affected[0, 1] == 1
@@ -75,8 +75,8 @@ def test_run(l2d_transition_model):
     ).all()
 
     # Check insertion between 2 nodes
-    l2d_tm.run(7, 7, True)
-    l2d_tm.run(2, 2, True)
+    l2d_tm.run(7, 7, True, False)
+    l2d_tm.run(2, 2, True, False)
     assert l2d_tm.state.is_affected[1, 2] == 1
     assert l2d_tm.state.is_affected[0, 2] == 1
     assert l2d_tm.state.graph.has_edge(7, 2)
@@ -92,7 +92,7 @@ def test_run(l2d_transition_model):
             ]
         )
     ).all()
-    l2d_tm.run(21, 21, True)
+    l2d_tm.run(21, 21, True, False)
     assert l2d_tm.state.is_affected[4, 1] == 1
     assert l2d_tm.state.graph.has_edge(7, 21)
     assert l2d_tm.state.graph.has_edge(21, 2)
@@ -115,9 +115,9 @@ def test_run(l2d_transition_model):
     l2d_tm_cp = deepcopy(l2d_tm)
 
     # Check actions that change only affectations
-    l2d_tm.run(5, 5, False)
-    l2d_tm.run(6, 6, False)
-    l2d_tm.run(0, 0, False)
+    l2d_tm.run(5, 5, False, False)
+    l2d_tm.run(6, 6, False, False)
+    l2d_tm.run(0, 0, False, False)
     assert l2d_tm.state.is_affected[1, 0] == 1
     assert l2d_tm.state.is_affected[1, 1] == 1
     assert l2d_tm.state.is_affected[0, 0] == 1
@@ -125,15 +125,15 @@ def test_run(l2d_transition_model):
     assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph and affectations (and btw, insertion before)
-    l2d_tm.run(15, 15, False)
+    l2d_tm.run(15, 15, False, False)
     assert l2d_tm.state.is_affected[3, 0] == 1
     assert l2d_tm.state.graph.has_edge(15, 6)
     assert (l2d_tm.state.task_completion_times == l2d_tm_cp.state.task_completion_times).all()
 
     # Check actions that change graph, affectations and task_completion_times
-    l2d_tm.run(20, 20, False)
-    l2d_tm.run(10, 10, False)
-    l2d_tm.run(1, 1, False)
+    l2d_tm.run(20, 20, False, False)
+    l2d_tm.run(10, 10, False, False)
+    l2d_tm.run(1, 1, False, False)
     assert l2d_tm.state.is_affected[4, 0] == 1
     assert l2d_tm.state.is_affected[2, 0] == 1
     assert l2d_tm.state.is_affected[0, 1] == 1
@@ -154,8 +154,8 @@ def test_run(l2d_transition_model):
     ).all()
 
     # Check insertion between 2 nodes
-    l2d_tm.run(7, 7, False)
-    l2d_tm.run(2, 2, False)
+    l2d_tm.run(7, 7, False, False)
+    l2d_tm.run(2, 2, False, False)
     assert l2d_tm.state.is_affected[1, 2] == 1
     assert l2d_tm.state.is_affected[0, 2] == 1
     assert l2d_tm.state.graph.has_edge(7, 2)
@@ -171,7 +171,7 @@ def test_run(l2d_transition_model):
             ]
         )
     ).all()
-    l2d_tm.run(21, 21, False)
+    l2d_tm.run(21, 21, False, False)
     assert l2d_tm.state.is_affected[4, 1] == 1
     assert l2d_tm.state.graph.has_edge(7, 2)
     assert l2d_tm.state.graph.has_edge(2, 21)
