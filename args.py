@@ -87,6 +87,8 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
         exp_name += "_OHMI"
     if args.add_pdr_boolean:
         exp_name += "_PDR"
+    if args.slot_locking:
+        exp_name += "_SL"
     if args.exp_name_appendix is not None:
         exp_name += "_" + args.exp_name_appendix
     if args.max_pool:
@@ -105,3 +107,7 @@ if hasattr(args, "stable_baselines3_localisation") and args.stable_baselines3_lo
     import stable_baselines3
 
     print(f"Stable Baselines 3 imported from : {stable_baselines3.__file__}")
+
+# checking incompatibility
+if args.add_pdr_boolean and args.slot_locking:
+    raise Exception("You can't use PDR boolean and slot locking in the same script")
