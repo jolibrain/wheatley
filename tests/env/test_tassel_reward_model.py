@@ -6,7 +6,7 @@ from utils.env_observation import EnvObservation
 
 
 def test_evaluate():
-    rm = TasselRewardModel(np.array([[0, 1, 2], [0, 1, 2], [0, 1, 2]]), np.array([[5, 5, 5], [6, 6, 6], [7, 7, 7]]))
+    rm = TasselRewardModel(np.array([[0, 1, 2], [0, 1, 2], [0, 1, 2]]), np.array([[5, 5, 5], [6, 6, 6], [7, 7, 7]]), False)
     obs = EnvObservation(
         3,
         3,

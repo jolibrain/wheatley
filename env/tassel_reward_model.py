@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from env.reward_model import RewardModel
@@ -5,9 +6,10 @@ from utils.utils import node_to_job_and_task
 
 
 class TasselRewardModel(RewardModel):
-    def __init__(self, affectations, durations):
+    def __init__(self, affectations, durations, normalize_input):
         self.affectations = affectations
         self.durations = durations
+        self.dividing_factor = np.max(self.durations.flatten()) if normalize_input else 1
 
     def evaluate(self, obs, action, next_obs):
         """
@@ -20,9 +22,6 @@ class TasselRewardModel(RewardModel):
         cur_duration = self.durations[job_id, task_id]
 
         ancient_idle_time = torch.sum(torch.max(features_t[:, 1].reshape(self.affectations.shape), axis=1).values)
-        print(ancient_idle_time)
         new_idle_time = torch.sum(torch.max(features_tp[:, 1].reshape(self.affectations.shape), axis=1).values)
-        print(new_idle_time)
-        print(cur_duration)
-        reward = cur_duration - (new_idle_time - ancient_idle_time)
+        reward = (cur_duration / self.dividing_factor) - (new_idle_time - ancient_idle_time)
         return reward.item()
