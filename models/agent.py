@@ -35,6 +35,7 @@ class Agent:
         add_pdr_boolean=False,
         slot_locking=False,
         model=None,
+        mlp_act="tanh"
     ):
         fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking)
         if model is not None:
@@ -71,6 +72,7 @@ class Agent:
                     },
                     "optimizer_class": optimizer_class,
                     "add_boolean": add_pdr_boolean or slot_locking,
+                    "mlp_act": mlp_act,
                 },
                 device=DEVICE,
                 gae_lambda=1,  # To use same vanilla advantage function
@@ -84,15 +86,16 @@ class Agent:
         self.model.save(path)
 
     @classmethod
-    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking):
+    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act):
         return cls(
             model=PPO.load(
-                path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking), DEVICE
+                path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act), DEVICE
             ),
             add_machine_id=add_machine_id,
             one_hot_machine_id=one_hot_machine_id,
             add_pdr_boolean=add_pdr_boolean,
             slot_locking=slot_locking,
+            mlp_act=mlp_act
         )
 
     def train(

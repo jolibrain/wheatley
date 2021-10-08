@@ -25,6 +25,7 @@ parser.add_argument(
     "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
 )
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
+parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
 parser.add_argument("--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers")
 
 # Training arguments

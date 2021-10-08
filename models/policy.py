@@ -11,10 +11,12 @@ class Policy(ActorCriticPolicy):
     def __init__(self, *args, **kwargs):
         add_boolean = kwargs.pop("add_boolean")
         self.add_boolean = add_boolean
+        mlp_act = kwargs.pop("mlp_act")
+        self.mlp_act = mlp_act
         super(Policy, self).__init__(*args, **kwargs)
 
     def _build_mlp_extractor(self):
-        self.mlp_extractor = MLPExtractor(self.add_boolean)
+        self.mlp_extractor = MLPExtractor(self.add_boolean, self.mlp_act)
 
     # The four following functions should be checked, since they are re written from
     # stable_baselines3. We should also check that there are no other functions that

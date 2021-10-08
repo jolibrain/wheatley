@@ -38,7 +38,7 @@ class MLP(nn.Module):
         if activation == "tanh":
             self.activation_layer = nn.Tanh()
         elif activation == "relu":
-            self.activation_layer = nn.ReLU()
+            self.activation_layer = nn.LeakyReLU()
         else:
             raise Exception("Activation not recognized")
         self.to(device)
