@@ -26,6 +26,7 @@ parser.add_argument(
 )
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
 parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
+parser.add_argument("--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers")
 
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
@@ -88,6 +89,8 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
         exp_name += "_OHMI"
     if args.add_pdr_boolean:
         exp_name += "_PDR"
+    if args.slot_locking:
+        exp_name += "_SL"
     if args.exp_name_appendix is not None:
         exp_name += "_" + args.exp_name_appendix
     if args.max_pool:
@@ -106,3 +109,7 @@ if hasattr(args, "stable_baselines3_localisation") and args.stable_baselines3_lo
     import stable_baselines3
 
     print(f"Stable Baselines 3 imported from : {stable_baselines3.__file__}")
+
+# checking incompatibility
+if args.add_pdr_boolean and args.slot_locking:
+    raise Exception("You can't use PDR boolean and slot locking in the same script")
