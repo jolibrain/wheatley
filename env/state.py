@@ -42,7 +42,7 @@ class State:
         self.task_completion_times = None
         self.is_affected = None
 
-        self.max_completion_time = np.max(np.sum(self.durations, axis=1))
+        self.max_completion_time = np.max(self.durations.flatten())
 
         self.reset()
 
