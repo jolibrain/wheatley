@@ -142,6 +142,9 @@ class Env(gym.Env):
     def get_solution(self):
         return self.transition_model.state.get_solution()
 
+    def render_solution(self, schedule):
+        return self.transition_model.state.render_solution(schedule)
+    
     def _create_transition_and_reward_model(self):
 
         if self.transition_model_config == "L2D":

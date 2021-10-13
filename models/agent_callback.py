@@ -56,6 +56,8 @@ class TestCallback(BaseCallback):
         self.total_timestepss = []
         self.first_callback = True
         self.figure = None
+        self.gantt_rl_img = None
+        self.gantt_or_img = None
 
     def _init_testing_envs(self):
         data = load_benchmark(self.n_jobs, self.n_machines)
@@ -100,17 +102,24 @@ class TestCallback(BaseCallback):
                 action, _ = self.model.predict(obs, deterministic=True)
                 obs, reward, done, info = self.testing_envs[i].step(action)
             schedule = self.testing_envs[i].get_solution().schedule
+
+            if i == 0:
+                self.gantt_rl_img = self.testing_envs[i].render_solution(schedule)
+            
             durations = self.testing_envs[i].durations
             mean_makespan += np.max(schedule + durations) / self.n_test_env
 
-            ortools_mean_makespan += (
-                get_ortools_makespan(
+            or_tools_makespan, or_tools_schedule = get_ortools_makespan(
                     self.n_jobs,
                     self.n_machines,
                     self.max_duration,
                     self.testing_envs[i].affectations,
                     self.testing_envs[i].durations,
                 )
+            if i == 0:
+                self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule)
+            ortools_mean_makespan += (
+                or_tools_makespan
                 / self.n_test_env
             )
 
@@ -206,6 +215,10 @@ class TestCallback(BaseCallback):
         ax[2, 3].set_title("total_timesteps")
 
         self.vis.matplot(figure, win="training")
-
         plt.close(self.figure)
         self.figure = figure
+
+        if not self.gantt_rl_img is None:
+            self.vis.image(self.gantt_rl_img, opts={'caption':'Gantt RL schedule'}, win='rl_schedule')
+        if not self.gantt_or_img is None:
+            self.vis.image(self.gantt_or_img, opts={'caption':'Gantt OR-Tools schedule'}, win='or_schedule')
