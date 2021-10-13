@@ -27,4 +27,4 @@ def get_ortools_makespan(n_j, n_m, max_duration, affectations=None, durations=No
         affectations, durations = generate_problem(n_j, n_m, max_duration)
     solution = solve_jssp(affectations, durations)
     makespan = np.max(solution.schedule + durations)
-    return makespan
+    return makespan, solution.schedule
