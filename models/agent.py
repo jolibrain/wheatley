@@ -38,8 +38,11 @@ class Agent:
         mlp_act="tanh",
         n_workers=1,
         device=None,
+        graph_resoning = 'graph'
     ):
         fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers)
+        self.graph_reasoning = graph_reasoning
+
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -51,6 +54,7 @@ class Agent:
             else:
                 raise Exception("Optimizer not recognized")
 
+
             self.model = PPO(
                 Policy,
                 fake_env,
@@ -60,7 +64,6 @@ class Agent:
                 gamma=gamma,
                 learning_rate=lr,
                 clip_range=clip_range,
-                target_kl=target_kl,
                 ent_coef=ent_coef,
                 vf_coef=vf_coef,
                 verbose=2,
@@ -73,6 +76,7 @@ class Agent:
                         "freeze_graph": freeze_graph,
                         "graph_has_relu": graph_has_relu,
                         "device": device,
+                        "graph_reasoning": self.graph_reasoning,
                     },
                     "optimizer_class": optimizer_class,
                     "add_boolean": add_pdr_boolean or slot_locking,
@@ -80,8 +84,9 @@ class Agent:
                     "device": device,
                 },
                 device=device,
-                gae_lambda=1,  # To use same vanilla advantage function
+                gae_lambda=1.0,  # To use same vanilla advantage function
             )
+
         self.add_machine_id = add_machine_id
         self.one_hot_machine_id = one_hot_machine_id
         self.add_pdr_boolean = add_pdr_boolean

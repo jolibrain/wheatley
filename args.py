@@ -66,6 +66,7 @@ parser.add_argument("--freeze_graph", default=False, action="store_true", help="
 
 # Testing arguments
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
+parser.add_argument("--graph_reasoning", type=str, default = "graph", help="type of graph reasoning : graph|mlp|nolearn")
 
 # Other
 parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
@@ -99,6 +100,12 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
         exp_name += "_" + args.exp_name_appendix
     if args.max_pool:
         exp_name += "_max"
+    if args.graph_reasoning == "nolearn":
+        exp_name += "_NOLEARN_STATE_REP"
+    if args.graph_reasoning == "mlp":
+        exp_name += "_MLPLEARN_STATE_REP"
+    if args.graph_reasoning == "graph":
+        exp_name += "_GRAPHLEARN_STATE_REP"
 
 else:
     exp_name = ""

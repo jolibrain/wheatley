@@ -78,6 +78,7 @@ def main():
             mlp_act=args.mlp_act,
             n_workers=args.n_workers,
             device=torch.device("cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"),
+            graph_reasoning = args.graph_reasoning,
         )
 
     agent.train(
