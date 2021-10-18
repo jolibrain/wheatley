@@ -61,6 +61,7 @@ def main():
             batch_size=args.batch_size,
             gamma=args.gamma,
             clip_range=args.clip_range,
+            target_kl=args.target_kl,
             ent_coef=args.ent_coef,
             vf_coef=args.vf_coef,
             lr=args.lr,
