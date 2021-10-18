@@ -6,11 +6,20 @@ import numpy as np
 import torch
 import torch_geometric
 
+import datetime
+import random
+import pandas as pd
+import plotly.figure_factory as ff
+import cv2
+
 from problem.solution import Solution
 from utils.utils import node_to_job_and_task, job_and_task_to_node
 
 from config import MAX_N_MACHINES
 
+COLORS = [
+    tuple([random.random() for _ in range(3)]) for _ in range(MAX_N_MACHINES)
+]
 
 class State:
     def __init__(self, affectations, durations, node_encoding="L2D"):
@@ -20,6 +29,11 @@ class State:
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines
 
+        if len(COLORS) > self.n_machines:
+            self.colors = COLORS[:self.n_machines]
+        else:
+            self.colors = COLORS
+            
         self.node_encoding = node_encoding
         if self.node_encoding == "DenseL2D":
             self.return_graph = None
@@ -28,7 +42,7 @@ class State:
         self.task_completion_times = None
         self.is_affected = None
 
-        self.max_completion_time = np.max(np.sum(self.durations, axis=1))
+        self.max_completion_time = np.max(self.durations.flatten())
 
         self.reset()
 
@@ -257,6 +271,38 @@ class State:
         schedule = self.task_completion_times - self.durations
         return Solution(schedule=schedule)
 
+    def render_solution(self, schedule):
+        df = []
+        all_finish = schedule + self.durations
+        for job in range(self.n_jobs):
+            i = 0
+            while i < self.n_machines:
+                dict_op = dict()
+                dict_op['Task'] = 'Job {}'.format(job)
+                start_sec = schedule[job][i]
+                finish_sec = all_finish[job][i]
+                dict_op['Start'] = datetime.datetime.fromtimestamp(start_sec)
+                dict_op['Finish'] = datetime.datetime.fromtimestamp(finish_sec)
+                dict_op['Resource'] = 'Machine {}'.format(self.affectations[job][i])
+                df.append(dict_op)
+                i += 1
+        fig = None
+        if len(df) > 0:
+            df = pd.DataFrame(df)
+            fig = ff.create_gantt(df, index_col='Resource', colors=self.colors, show_colorbar=True, group_tasks=True)
+            if not fig is None:
+                fig.update_yaxes(autorange="reversed")  # otherwise tasks are listed from the bottom
+                figimg = fig.to_image(format="png")
+                npimg = np.fromstring(figimg, dtype='uint8')
+                cvimg = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
+                npimg = np.transpose(cvimg, (2, 0, 1))
+                torchimg = torch.from_numpy(npimg)
+                return torchimg
+            else:
+                return None
+        else:
+            return None
+            
     def get_first_unaffected_task(self, job_id):
         """
         Returns the id of the first task that wasn't affected. If all tasks are

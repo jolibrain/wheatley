@@ -5,6 +5,7 @@ import numpy as np
 from env.l2d_transition_model import L2DTransitionModel
 from env.l2d_reward_model import L2DRewardModel
 from env.sparse_reward_model import SparseRewardModel
+from env.tassel_reward_model import TasselRewardModel
 from utils.env_observation import EnvObservation
 from utils.utils import generate_problem
 
@@ -142,6 +143,9 @@ class Env(gym.Env):
     def get_solution(self):
         return self.transition_model.state.get_solution()
 
+    def render_solution(self, schedule):
+        return self.transition_model.state.render_solution(schedule)
+    
     def _create_transition_and_reward_model(self):
 
         if self.transition_model_config == "L2D":
@@ -159,5 +163,7 @@ class Env(gym.Env):
             self.reward_model = L2DRewardModel()
         elif self.reward_model_config == "Sparse":
             self.reward_model = SparseRewardModel()
+        elif self.reward_model_config == "Tassel":
+            self.reward_model = TasselRewardModel(self.affectations, self.durations, self.normalize_input)
         else:
             raise Exception("Reward model not recognized")
