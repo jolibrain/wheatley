@@ -75,7 +75,9 @@ def main():
             one_hot_machine_id=args.one_hot_machine_id,
             add_pdr_boolean=args.add_pdr_boolean,
             slot_locking=args.slot_locking,
-            mlp_act=args.mlp_act
+            mlp_act=args.mlp_act,
+            n_workers=args.n_workers,
+            device=torch.device("cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"),
         )
 
     agent.train(
@@ -85,7 +87,6 @@ def main():
         eval_freq=args.eval_freq,
         normalize_input=not args.dont_normalize_input,
         display_env=exp_name,
-        n_workers=args.n_workers,
         multiprocessing=args.multiprocessing,
         path=path,
         fixed_benchmark=args.fixed_benchmark,

@@ -1,5 +1,6 @@
 from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.ppo import PPO
 from stable_baselines3.a2c import A2C
 import torch
@@ -9,8 +10,6 @@ from models.agent_callback import TestCallback
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
-
-from config import DEVICE
 
 
 class Agent:
@@ -36,9 +35,11 @@ class Agent:
         add_pdr_boolean=False,
         slot_locking=False,
         model=None,
-        mlp_act="tanh"
+        mlp_act="tanh",
+        n_workers=1,
+        device=None,
     ):
-        fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking)
+        fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers)
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -71,33 +72,39 @@ class Agent:
                         "max_pool": max_pool,
                         "freeze_graph": freeze_graph,
                         "graph_has_relu": graph_has_relu,
+                        "device": device,
                     },
                     "optimizer_class": optimizer_class,
                     "add_boolean": add_pdr_boolean or slot_locking,
                     "mlp_act": mlp_act,
+                    "device": device,
                 },
-                device=DEVICE,
+                device=device,
                 gae_lambda=1,  # To use same vanilla advantage function
             )
         self.add_machine_id = add_machine_id
         self.one_hot_machine_id = one_hot_machine_id
         self.add_pdr_boolean = add_pdr_boolean
         self.slot_locking = slot_locking
+        self.n_workers = n_workers
+        self.device = device
 
     def save(self, path):
         self.model.save(path)
 
     @classmethod
-    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act):
+    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act, n_workers, device):
         return cls(
             model=PPO.load(
-                path, Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking), DEVICE
+                path,
+                Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers),
+                device,
             ),
             add_machine_id=add_machine_id,
             one_hot_machine_id=one_hot_machine_id,
             add_pdr_boolean=add_pdr_boolean,
             slot_locking=slot_locking,
-            mlp_act=mlp_act
+            mlp_act=mlp_act,
         )
 
     def train(
@@ -108,7 +115,6 @@ class Agent:
         eval_freq,
         normalize_input,
         display_env,
-        n_workers,
         multiprocessing,
         path,
         fixed_benchmark,
@@ -131,9 +137,12 @@ class Agent:
         event_callback = EveryNTimesteps(n_steps=eval_freq, callback=test_callback)
 
         # Then launch training
-        env_fns = [self._get_env_fn(problem_description, normalize_input) for _ in range(n_workers)]
-        vec_env_class = SubprocVecEnv if multiprocessing else DummyVecEnv
-        vec_env = vec_env_class(env_fns)
+        vec_env = make_vec_env(
+            self._get_env_fn(problem_description, normalize_input),
+            n_envs=self.n_workers,
+            vec_env_cls=SubprocVecEnv,
+            vec_env_kwargs={"start_method": "spawn"},
+        )
         self.model.set_env(vec_env)
         self.model.learn(total_timesteps, callback=event_callback)
 
@@ -154,15 +163,18 @@ class Agent:
         return solution
 
     @staticmethod
-    def _create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking):
-        return Env(
-            ProblemDescription(2, 2, 99, "L2D", "L2D"),
-            False,
-            add_machine_id,
-            one_hot_machine_id,
-            add_pdr_boolean,
-            slot_locking,
-        )
+    def _create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers):
+        def f():
+            return Env(
+                ProblemDescription(2, 2, 99, "L2D", "L2D"),
+                False,
+                add_machine_id,
+                one_hot_machine_id,
+                add_pdr_boolean,
+                slot_locking,
+            )
+
+        return make_vec_env(f, n_workers)
 
     def _get_env_fn(self, problem_description, normalize_input):
         def f():

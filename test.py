@@ -18,7 +18,15 @@ def main():
 
     print("Loading agent")
     path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
-    agent = Agent.load(path, not args.remove_machine_id, args.one_hot_machine_id, args.add_pdr_boolean, args.slot_locking)
+    agent = Agent.load(
+        path,
+        not args.remove_machine_id,
+        args.one_hot_machine_id,
+        args.add_pdr_boolean,
+        args.slot_locking,
+        args.mlp_act,
+        args.n_workers,
+    )
     random_agent = RandomAgent()
 
     if args.fixed_benchmark:
@@ -51,7 +59,7 @@ def main():
 
         rl_makespan = test_agent(agent, problem_description)
         random_makespan = test_agent(random_agent, problem_description)
-        or_tools_makespan = get_ortools_makespan(args.n_j, args.n_m, MAX_DURATION, affectations, durations)
+        or_tools_makespan = get_ortools_makespan(args.n_j, args.n_m, MAX_DURATION, affectations, durations)[0]
 
         diff_percentage = 100 * (rl_makespan - or_tools_makespan) / or_tools_makespan
         rl_makespans.append(rl_makespan)

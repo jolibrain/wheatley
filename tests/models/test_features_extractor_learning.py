@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 
-from config import HIDDEN_DIM_FEATURES_EXTRACTOR, DEVICE
+from config import HIDDEN_DIM_FEATURES_EXTRACTOR
 
 
 def test_features_extractor_learning(features_extractor):
@@ -27,7 +27,7 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -36,11 +36,11 @@ def test_features_extractor_learning(features_extractor):
                             [1, 1, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=DEVICE),
+                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
             },
-            torch.tensor([0], device=DEVICE).float(),
+            torch.tensor([0], device=torch.device("cpu")).float(),
         ),
         (
             {
@@ -62,7 +62,7 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -71,11 +71,11 @@ def test_features_extractor_learning(features_extractor):
                             [2, 2, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=DEVICE),
+                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
             },
-            torch.tensor([1], device=DEVICE).float(),
+            torch.tensor([1], device=torch.device("cpu")).float(),
         ),
         (
             {
@@ -97,7 +97,7 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -106,11 +106,11 @@ def test_features_extractor_learning(features_extractor):
                             [1, 2, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=DEVICE),
+                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
             },
-            torch.tensor([0], device=DEVICE).float(),
+            torch.tensor([0], device=torch.device("cpu")).float(),
         ),
         (
             {
@@ -132,7 +132,7 @@ def test_features_extractor_learning(features_extractor):
                             [0.5, 0.3],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).float(),
                 "edge_index": torch.tensor(
                     [
@@ -141,15 +141,15 @@ def test_features_extractor_learning(features_extractor):
                             [1, 2, 4, 5, 7, 8] + [0 for i in range(75)],
                         ]
                     ],
-                    device=DEVICE,
+                    device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=DEVICE),
+                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
             },
-            torch.tensor([1], device=DEVICE).float(),
+            torch.tensor([1], device=torch.device("cpu")).float(),
         ),
     ]
     last_layer = torch.nn.Linear(10 * HIDDEN_DIM_FEATURES_EXTRACTOR, 1)
-    last_layer.to(DEVICE)
+    last_layer.to(torch.device("cpu"))
     optimizer = torch.optim.Adam(features_extractor.parameters())
     criterion = torch.nn.BCELoss()
 
