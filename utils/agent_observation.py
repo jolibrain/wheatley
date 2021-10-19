@@ -32,9 +32,9 @@ class AgentObservation:
         This should only hanlde cuda tensors, since it is used on the agent side
         (if and only if cuda is available on the machine).
         """
-        if torch.cuda.is_available():
-            if not gym_observation["features"].is_cuda:
-                raise Exception("Please provide a cuda observation")
+        # if torch.cuda.is_available():
+        #     if not gym_observation["features"].is_cuda:
+        #         raise Exception("Please provide a cuda observation")
 
         if isinstance(gym_observation["n_jobs"], int):
             n_jobs = gym_observation["n_jobs"]
@@ -70,9 +70,9 @@ class AgentObservation:
         This should only hanlde cuda tensors, since it is used on the agent side
         (if and only if cuda is available on the machine).
         """
-        if torch.cuda.is_available():
-            if not self.features.is_cuda:
-                raise Exception("Please use this only on cuda observation")
+        # if torch.cuda.is_available():
+        #     if not self.features.is_cuda:
+        #         raise Exception("Please use this only on cuda observation")
 
         loader = DataLoader(
             [Data(self.features[i], self.edge_index[i]) for i in range(self.get_batch_size())],

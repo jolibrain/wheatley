@@ -47,8 +47,8 @@ class L2DTransitionModel(TransitionModel):
                 self.slot_availability[machine_id].append(0 if slot_lock else 1)
             return
 
-        # If priority dispatch rule is False
-        if not pdr_boolean:
+        # If priority dispatch rule is True (which is default)
+        if pdr_boolean:
             job_duration = self.durations[job_id, task_id]
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time + job_duration <= machine_occupancy[0][0]:
@@ -74,9 +74,8 @@ class L2DTransitionModel(TransitionModel):
                     self.state.set_precedency(machine_occupancy[index][2], node_id)
                     self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
 
-        # If priority dispatch rule is True (which is default)
+        # If priority dispatch rule is False
         elif not self.slot_locking:
-
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time < machine_occupancy[0][0]:
                 # Insert task before all other tasks
@@ -127,7 +126,6 @@ class L2DTransitionModel(TransitionModel):
                     self.state.set_precedency(machine_occupancy[-1][2], node_id)
                     self.slot_availability[machine_id].append(0 if slot_lock else 1)
                 else:
-                    print("wow!")
                     # The job is inserted between task_index and task_index+1
                     self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
                     self.state.set_precedency(machine_occupancy[index][2], node_id)

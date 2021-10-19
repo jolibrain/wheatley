@@ -47,7 +47,7 @@ class Env(gym.Env):
                 "n_nodes": Discrete(MAX_N_NODES + 1),
                 "n_edges": Discrete(MAX_N_EDGES + 1),
                 "features": Box(
-                    # high is 99*n_machines due to lower bound method of calculation
+                    # high is max_duration*n_machines due to lower bound method of calculation
                     low=0,
                     high=self.max_duration * MAX_N_MACHINES,
                     shape=(MAX_N_NODES, n_features),

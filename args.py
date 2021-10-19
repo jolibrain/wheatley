@@ -8,7 +8,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument("--transition_model_config", type=str, default="L2D", help="Which transition model to use")
-parser.add_argument("--reward_model_config", type=str, default="L2D", help="Which reward model to use")
+parser.add_argument(
+    "--reward_model_config", type=str, default="L2D", help="Which reward model to use, from L2D, Sparse, Tassel"
+)
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
 parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved network")
 
@@ -25,6 +27,7 @@ parser.add_argument(
     "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
 )
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
+parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
@@ -52,6 +55,7 @@ parser.add_argument("--fixed_problem", default=False, action="store_true", help=
 
 parser.add_argument("--n_workers", type=int, default=1, help="Number of CPU cores for simulating environment")
 parser.add_argument("--multiprocessing", default=False, action="store_true", help="Wether to use multiprocessing or not")
+parser.add_argument("--cpu", default=False, action="store_true", help="Wether to use CPU or not")
 
 parser.add_argument(
     "--retrain",

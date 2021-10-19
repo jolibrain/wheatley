@@ -2,11 +2,11 @@ import torch
 
 from models.mlp_extractor import MLPExtractor
 
-from config import DEVICE, HIDDEN_DIM_FEATURES_EXTRACTOR, MAX_N_NODES
+from config import HIDDEN_DIM_FEATURES_EXTRACTOR, MAX_N_NODES
 
 
 def test_get_pairs_to_compute():
-    me = MLPExtractor(False)
+    me = MLPExtractor(False, "tanh", torch.device("cpu"))
     graph_embedding = torch.tensor([[[0, 1]], [[2, 3]], [[4, 5]], [[6, 7]]])
     nodes_embedding = torch.tensor([[[10, 11], [12, 13]], [[14, 15], [16, 17]], [[18, 19], [20, 21]], [[22, 23], [24, 25]]])
     mask = torch.tensor(
@@ -34,13 +34,13 @@ def test_get_pairs_to_compute():
 
 def test_forward():
     # Without PDR Boolean
-    me = MLPExtractor(False)
+    me = MLPExtractor(False, "tanh", torch.device("cpu"))
     features1 = torch.cat(
         [
             torch.rand(
                 (1, 5, HIDDEN_DIM_FEATURES_EXTRACTOR),
                 dtype=torch.float32,
-                device=DEVICE,
+                device=torch.device("cpu"),
             ),
             torch.tensor(
                 [
@@ -52,7 +52,7 @@ def test_forward():
                         [0, 0, 0, 0],
                     ]
                 ],
-                device=DEVICE,
+                device=torch.device("cpu"),
             ),
         ],
         axis=2,
@@ -84,7 +84,7 @@ def test_forward():
             ],
         ],
         dtype=torch.float,
-        device=DEVICE,
+        device=torch.device("cpu"),
     )
     pi, value = me(features2)
     assert pi[0, 0] != 0
@@ -97,7 +97,7 @@ def test_forward():
     assert (pi == 0).all()
 
     # Without PDR Boolean
-    me = MLPExtractor(True)
+    me = MLPExtractor(True, "tanh", torch.device("cpu"))
     pi, value = me(features1)
     assert list(pi.shape) == [1, 2 * MAX_N_NODES ** 2]
     # Check that the 0 corresponding to null nodes are in the right positions

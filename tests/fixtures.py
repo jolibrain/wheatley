@@ -12,8 +12,7 @@ from problem.problem_description import ProblemDescription
 from utils.env_observation import EnvObservation
 from utils.agent_observation import AgentObservation
 
-from config import DEVICE
-
+from config import MAX_DURATION
 
 @fixture
 def graph():
@@ -32,7 +31,7 @@ def mask():
 
 @fixture
 def problem_description():
-    problem_description = ProblemDescription(5, 5, 99, "L2D", "L2D")
+    problem_description = ProblemDescription(5, 5, MAX_DURATION, "L2D", "L2D")
     return problem_description
 
 
@@ -158,7 +157,7 @@ def agent_observation():
 
 @fixture
 def gym_observation():
-    mask = torch.zeros((2, 81), device=DEVICE)
+    mask = torch.zeros((2, 81), device=torch.device("cpu"))
     mask[:, 0] = 1
     mask[:, 30] = 1
     mask[:, 60] = 1
@@ -192,7 +191,7 @@ def gym_observation():
                     [1, 5],
                 ],
             ],
-            device=DEVICE,
+            device=torch.device("cpu"),
         ),
         "edge_index": torch.tensor(
             [
@@ -200,7 +199,7 @@ def gym_observation():
                 [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
             ],
             dtype=torch.int64,
-            device=DEVICE,
+            device=torch.device("cpu"),
         ),
         "mask": mask,
     }
@@ -230,5 +229,7 @@ def features_extractor():
         gconv_type="gin",
         freeze_graph=False,
         max_pool=False,
+        graph_has_relu=False,
+        device=torch.device("cpu"),
     )
     return features_extractor
