@@ -11,18 +11,18 @@ from config import (
     N_MLP_LAYERS_CRITIC,
     HIDDEN_DIM_CRITIC,
     MAX_N_NODES,
-    DEVICE,
 )
 
 
 class MLPExtractor(nn.Module):
-    def __init__(self, add_boolean, mlp_act):
+    def __init__(self, add_boolean, mlp_act, device):
         super(MLPExtractor, self).__init__()
 
         # This is necessary because of stable_baselines3 API
         self.latent_dim_pi = (MAX_N_NODES ** 2) * (2 if add_boolean else 1)
         self.latent_dim_vf = 1
         self.add_boolean = add_boolean
+        self.device = device
 
         self.actor = MLP(
             n_layers=N_MLP_LAYERS_ACTOR,
@@ -31,7 +31,7 @@ class MLPExtractor(nn.Module):
             output_dim=2 if self.add_boolean else 1,
             batch_norm=False,
             activation=mlp_act,
-            device=DEVICE,
+            device=device,
         )
         self.critic = MLP(
             n_layers=N_MLP_LAYERS_CRITIC,
@@ -40,7 +40,7 @@ class MLPExtractor(nn.Module):
             output_dim=1,
             batch_norm=False,
             activation=mlp_act,
-            device=DEVICE,
+            device=device,
         )
 
     def forward(self, embedded_features):
@@ -71,9 +71,9 @@ class MLPExtractor(nn.Module):
             pi = pi * boolean
 
         # And reshape pi in ordrer to have every value corresponding to its edge index
-        shaped_pi = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
+        shaped_pi = torch.zeros((batch_size, n_nodes * n_nodes), device=self.device)
         if self.add_boolean:
-            shaped_pi_without_boolean = torch.zeros((batch_size, n_nodes * n_nodes), device=DEVICE)
+            shaped_pi_without_boolean = torch.zeros((batch_size, n_nodes * n_nodes), device=self.device)
         for i in range(batch_size):
             shaped_pi[i][indexes[i]] = pi[i].reshape(pi.shape[1])[0 : len(indexes[i])]
             if self.add_boolean:
@@ -88,7 +88,7 @@ class MLPExtractor(nn.Module):
         shaped_pi = shaped_pi.reshape(batch_size, n_nodes, n_nodes)
         if self.add_boolean:
             shaped_pi_without_boolean = shaped_pi_without_boolean.reshape(batch_size, n_nodes, n_nodes)
-        filled_pi = torch.zeros((batch_size, MAX_N_NODES * (2 if self.add_boolean else 1), MAX_N_NODES), device=DEVICE)
+        filled_pi = torch.zeros((batch_size, MAX_N_NODES * (2 if self.add_boolean else 1), MAX_N_NODES), device=self.device)
         filled_pi[:, 0:n_nodes, 0:n_nodes] = shaped_pi
         if self.add_boolean:
             filled_pi[:, MAX_N_NODES : MAX_N_NODES + n_nodes, 0:n_nodes] = shaped_pi_without_boolean
@@ -106,7 +106,7 @@ class MLPExtractor(nn.Module):
         for i in range(mask.shape[0]):
             # Every mask should be the same size, so if there are multiple sizes, take the largest one
             indexes.append((mask[i] == 1).nonzero(as_tuple=True)[0])
-            masked_tensor = torch.zeros((dim, g_embedding.shape[2] + 2 * n_embeddings.shape[2]), device=DEVICE)
+            masked_tensor = torch.zeros((dim, g_embedding.shape[2] + 2 * n_embeddings.shape[2]), device=self.device)
 
             counter = 0
             for index in indexes[-1]:

@@ -6,17 +6,20 @@ from torch.distributions import Categorical
 
 from models.mlp_extractor import MLPExtractor
 
+
 class Policy(ActorCriticPolicy):
     def __init__(self, *args, **kwargs):
         add_boolean = kwargs.pop("add_boolean")
         self.add_boolean = add_boolean
         mlp_act = kwargs.pop("mlp_act")
         self.mlp_act = mlp_act
+        device = kwargs.pop("device")
+        self.cur_device = device
         self.ortho_init = True
         super(Policy, self).__init__(*args, **kwargs)
 
     def _build_mlp_extractor(self):
-        self.mlp_extractor = MLPExtractor(self.add_boolean, self.mlp_act)
+        self.mlp_extractor = MLPExtractor(self.add_boolean, self.mlp_act, self.cur_device)
 
     # The four following functions should be checked, since they are re written from
     # stable_baselines3. We should also check that there are no other functions that

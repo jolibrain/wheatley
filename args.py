@@ -26,7 +26,9 @@ parser.add_argument(
 )
 parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
 parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
-parser.add_argument("--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers")
+parser.add_argument(
+    "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
+)
 
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
@@ -51,6 +53,7 @@ parser.add_argument("--fixed_problem", default=False, action="store_true", help=
 
 parser.add_argument("--n_workers", type=int, default=1, help="Number of CPU cores for simulating environment")
 parser.add_argument("--multiprocessing", default=False, action="store_true", help="Wether to use multiprocessing or not")
+parser.add_argument("--cpu", default=False, action="store_true", help="Wether to use CPU or not")
 
 parser.add_argument(
     "--retrain",
