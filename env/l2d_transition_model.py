@@ -12,7 +12,7 @@ class L2DTransitionModel(TransitionModel):
         if self.slot_locking:
             self.slot_availability = [[] for _ in range(affectations.shape[1])]
 
-    def run(self, first_node_id, second_node_id, pdr_boolean, slot_lock):  # noqa
+    def run(self, first_node_id, second_node_id, force_insert, slot_lock):  # noqa
         # Since L2D operates on nodes, and not edges, each action must correspond to
         # an edge with the same node on both sides
         if first_node_id != second_node_id:
@@ -47,61 +47,8 @@ class L2DTransitionModel(TransitionModel):
                 self.slot_availability[machine_id].append(0 if slot_lock else 1)
             return
 
-        # If priority dispatch rule is True (which is default)
-        if pdr_boolean:
-            job_duration = self.durations[job_id, task_id]
-            # Checks wheter task is inserted at the begining, in between or at the end
-            if job_availability_time + job_duration <= machine_occupancy[0][0]:
-                # Insert task before all other tasks
-                self.state.set_precedency(node_id, machine_occupancy[0][2])
-
-            else:
-                # Find where there are free times, and check if we can insert task
-                index = -1
-                for i in range(len(machine_occupancy) - 1):
-                    start_time, duration, _ = machine_occupancy[i]
-                    next_start_time, next_duration, _ = machine_occupancy[i + 1]
-                    if start_time + duration < next_start_time:
-                        if job_duration <= next_start_time - max(start_time + duration, job_availability_time):
-                            index = i
-                            break
-                if index == -1:
-                    # The job can be inserted nowhere, so we add it at the end
-                    self.state.set_precedency(machine_occupancy[-1][2], node_id)
-                else:
-                    # The job is inserted between task_index and task_index+1
-                    self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
-                    self.state.set_precedency(machine_occupancy[index][2], node_id)
-                    self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
-
-        # If priority dispatch rule is False
-        elif not self.slot_locking:
-            # Checks wheter task is inserted at the begining, in between or at the end
-            if job_availability_time < machine_occupancy[0][0]:
-                # Insert task before all other tasks
-                self.state.set_precedency(node_id, machine_occupancy[0][2])
-
-            else:
-                # Find where there are free times, and check if we can insert task
-                index = -1
-                for i in range(len(machine_occupancy) - 1):
-                    start_time, duration, _ = machine_occupancy[i]
-                    next_start_time, next_duration, _ = machine_occupancy[i + 1]
-                    if start_time + duration < next_start_time:
-                        if job_availability_time < next_start_time:
-                            index = i
-                            break
-                if index == -1:
-                    # The job can be inserted nowhere, so we add it at the end
-                    self.state.set_precedency(machine_occupancy[-1][2], node_id)
-                else:
-                    # The job is inserted between task_index and task_index+1
-                    self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
-                    self.state.set_precedency(machine_occupancy[index][2], node_id)
-                    self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
-
-        # Use slot locking (neither PDR nor no PDR, but something in between)
-        else:
+        # Use slot locking (forced insertions are sometimes available)
+        if self.slot_locking:
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time < machine_occupancy[0][0] and (
                 not self.slot_availability[machine_id] or (self.slot_availability[machine_id][0] == 1)
@@ -131,6 +78,59 @@ class L2DTransitionModel(TransitionModel):
                     self.state.set_precedency(machine_occupancy[index][2], node_id)
                     self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
                     self.slot_availability[machine_id].insert(index + 1, 0 if slot_lock else 1)
+
+        # If forced insertion are not allowed at all
+        elif not force_insert:
+            job_duration = self.durations[job_id, task_id]
+            # Checks wheter task is inserted at the begining, in between or at the end
+            if job_availability_time + job_duration <= machine_occupancy[0][0]:
+                # Insert task before all other tasks
+                self.state.set_precedency(node_id, machine_occupancy[0][2])
+
+            else:
+                # Find where there are free times, and check if we can insert task
+                index = -1
+                for i in range(len(machine_occupancy) - 1):
+                    start_time, duration, _ = machine_occupancy[i]
+                    next_start_time, next_duration, _ = machine_occupancy[i + 1]
+                    if start_time + duration < next_start_time:
+                        if job_duration <= next_start_time - max(start_time + duration, job_availability_time):
+                            index = i
+                            break
+                if index == -1:
+                    # The job can be inserted nowhere, so we add it at the end
+                    self.state.set_precedency(machine_occupancy[-1][2], node_id)
+                else:
+                    # The job is inserted between task_index and task_index+1
+                    self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
+                    self.state.set_precedency(machine_occupancy[index][2], node_id)
+                    self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
+
+        # If forced insertion is allowed and performed
+        else:
+            # Checks wheter task is inserted at the begining, in between or at the end
+            if job_availability_time < machine_occupancy[0][0]:
+                # Insert task before all other tasks
+                self.state.set_precedency(node_id, machine_occupancy[0][2])
+
+            else:
+                # Find where there are free times, and check if we can insert task
+                index = -1
+                for i in range(len(machine_occupancy) - 1):
+                    start_time, duration, _ = machine_occupancy[i]
+                    next_start_time, next_duration, _ = machine_occupancy[i + 1]
+                    if start_time + duration < next_start_time:
+                        if job_availability_time < next_start_time:
+                            index = i
+                            break
+                if index == -1:
+                    # The job can be inserted nowhere, so we add it at the end
+                    self.state.set_precedency(machine_occupancy[-1][2], node_id)
+                else:
+                    # The job is inserted between task_index and task_index+1
+                    self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
+                    self.state.set_precedency(machine_occupancy[index][2], node_id)
+                    self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
 
         self.state.affect_node(node_id)
 

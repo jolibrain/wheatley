@@ -13,13 +13,15 @@ class Policy(ActorCriticPolicy):
         self.add_boolean = add_boolean
         mlp_act = kwargs.pop("mlp_act")
         self.mlp_act = mlp_act
-        device = kwargs.pop("device")
-        self.cur_device = device
+        _device = kwargs.pop("_device")  # We can't use device since it's already used. So we use _device
+        self._device = _device
+        input_dim_features_extractor = kwargs.pop("input_dim_features_extractor")
+        self.input_dim_features_extractor = input_dim_features_extractor
         self.ortho_init = True
         super(Policy, self).__init__(*args, **kwargs)
 
     def _build_mlp_extractor(self):
-        self.mlp_extractor = MLPExtractor(self.add_boolean, self.mlp_act, self.cur_device)
+        self.mlp_extractor = MLPExtractor(self.add_boolean, self.mlp_act, self._device, self.input_dim_features_extractor)
 
     # The four following functions should be checked, since they are re written from
     # stable_baselines3. We should also check that there are no other functions that

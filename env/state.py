@@ -15,11 +15,10 @@ import cv2
 from problem.solution import Solution
 from utils.utils import node_to_job_and_task, job_and_task_to_node
 
-from config import MAX_N_MACHINES
+from config import MAX_N_MACHINES, MAX_N_JOBS
 
-COLORS = [
-    tuple([random.random() for _ in range(3)]) for _ in range(MAX_N_MACHINES)
-]
+COLORS = [tuple([random.random() for _ in range(3)]) for _ in range(MAX_N_MACHINES)]
+
 
 class State:
     def __init__(self, affectations, durations, node_encoding="L2D"):
@@ -30,19 +29,27 @@ class State:
         self.n_nodes = self.n_jobs * self.n_machines
 
         if len(COLORS) > self.n_machines:
-            self.colors = COLORS[:self.n_machines]
+            self.colors = COLORS[: self.n_machines]
         else:
             self.colors = COLORS
-            
+
         self.node_encoding = node_encoding
         if self.node_encoding == "DenseL2D":
             self.return_graph = None
 
         self.graph = None
+
         self.task_completion_times = None
         self.is_affected = None
 
-        self.max_completion_time = np.max(self.durations.flatten())
+        # Used to compute the features
+        self.max_duration = None
+        self.max_completion_time = None
+        self.total_job_time = None
+        self.total_machine_time = None
+        self.job_completion_time = None
+        self.machine_completion_time = None
+        self.number_operations_scheduled = None
 
         self.reset()
 
@@ -68,8 +75,19 @@ class State:
                             self.return_graph.add_edge(first_node_id, second_node_id)
 
         self.task_completion_times = np.cumsum(self.durations, axis=1)
-
         self.is_affected = np.zeros_like(self.affectations)
+
+        # Used to compute the features
+        self.max_duration = np.max(self.durations.flatten())
+        self.max_completion_time = np.max(self.task_completion_times.flatten())
+        self.total_job_time = np.sum(self.durations, axis=1)
+        self.total_machine_time = np.zeros(self.n_machines)
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
+        self.job_completion_time = np.zeros(self.n_jobs)
+        self.machine_completion_time = np.zeros(self.n_machines)
+        self.number_operations_scheduled = np.zeros(self.n_jobs)
 
     def done(self):
         """
@@ -93,53 +111,62 @@ class State:
                     node_ids.append(node_id)
         return node_ids
 
-    def to_torch_geometric(self, add_machine_id, normalize_input, one_hot_machine_id):
+    def to_torch_geometric(self, normalize_input, input_list):
         """
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
         parameter of the Data object) that should be added to the graph.
+        Note, input_set can contains the following str: 'is_affected', 'completion_time', 'one_hot_machine_id',
+        'one_hot_job_id', 'duration', 'total_job_time', 'total_machine_time', 'job_completion_percentage',
+        'machine_completion_percentage', 'mopnr', 'mwkr', 'cr'
         """
         if self.node_encoding in ["L2D", "DenseL2D"]:
             for job_id in range(self.n_jobs):
                 for task_id in range(self.n_machines):
+                    machine_id = self.affectations[job_id, task_id]
+
                     node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
+
+                    # Mandatory eatures
+                    is_affected = self.is_affected[job_id, task_id]
                     completion_time = self.task_completion_times[job_id, task_id] / (
                         self.max_completion_time if normalize_input else 1
                     )
+
+                    # Other features
+                    one_hot_machine_id = self.to_one_hot(machine_id, MAX_N_MACHINES)
+                    one_hot_job_id = self.to_one_hot(job_id, MAX_N_JOBS)
+                    duration = self.durations[job_id, task_id] 
+                    total_job_time = self.total_job_time[job_id] 
+                    total_machine_time = self.total_machine_time[machine_id]
+                    job_completion_percentage = self.job_completion_time[job_id] / total_job_time
+                    machine_completion_percentage = self.machine_completion_time[machine_id] / total_machine_time
+
+                    # See https://hal.archives-ouvertes.fr/hal-00728900/document for the definition of these metrics
+                    mopnr = (self.n_machines - self.number_operations_scheduled[job_id])
+                    mwkr = (total_job_time - self.job_completion_time[job_id])
+                    cr = duration / (total_job_time - self.job_completion_time[job_id] + 1e-7)
+                    
+                    if normalize_input:
+                        duration = duration / self.max_duration
+                        total_job_time = total_job_time / self.max_completion_time
+                        total_machine_time = total_machine_time / self.max_completion_time
+                        mopnr = mopnr / self.n_machines
+                        mwkr = mwkr / self.max_completion_time
+                    
+                    node_vector = [node_id, is_affected, completion_time]
+
+                    for input_name in input_list:
+                        if input_name[0:7] == "one_hot":
+                            node_vector = node_vector + locals()[input_name]
+                        else:
+                            node_vector.append(locals()[input_name])
+
                     if self.node_encoding == "L2D":
-                        self.graph.nodes[node_id]["x"] = (
-                            [
-                                node_id,
-                                self.is_affected[job_id, task_id],
-                                completion_time,
-                            ]
-                            + (
-                                self.to_one_hot(self.affectations[job_id, task_id])
-                                if one_hot_machine_id
-                                else [self.affectations[job_id, task_id]]
-                            )
-                            if add_machine_id
-                            else [
-                                node_id,
-                                self.is_affected[job_id, task_id],
-                                completion_time,
-                            ]
-                        )
+                        self.graph.nodes[node_id]["x"] = node_vector
                     elif self.node_encoding == "DenseL2D":
-                        self.return_graph.nodes[node_id]["x"] = (
-                            [
-                                node_id,
-                                self.is_affected[job_id, task_id],
-                                completion_time,
-                                self.affectations[job_id, task_id],
-                            ]
-                            if add_machine_id
-                            else [
-                                node_id,
-                                self.is_affected[job_id, task_id],
-                                completion_time,
-                            ]
-                        )
+                        self.return_graph.nodes[node_id]["x"] = node_vector
+
             nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
             graph = torch_geometric.utils.from_networkx(nx_graph)
 
@@ -155,9 +182,9 @@ class State:
         else:
             raise Exception("Encoding not recognized")
 
-    def to_one_hot(self, machine_id):
-        rep = [0 for i in range(MAX_N_MACHINES)]
-        rep[machine_id] = 1
+    def to_one_hot(self, index, max_index):
+        rep = [0 for i in range(max_index)]
+        rep[index] = 1
         return rep
 
     def _update_completion_times(self, node_id):
@@ -246,7 +273,12 @@ class State:
         for the moment. Later on, it is important to check this consistency in the
         affect_node function
         """
-        self.is_affected[node_to_job_and_task(node_id, self.n_machines)] = 1
+        job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
+        machine_id = self.affectations[job_id, task_id]
+        self.is_affected[job_id, task_id] = 1
+        self.job_completion_time[job_id] += self.durations[job_id, task_id]
+        self.machine_completion_time[machine_id] += self.durations[job_id, task_id]
+        self.number_operations_scheduled[job_id] += 1
 
     def get_machine_occupancy(self, machine_id):
         """
@@ -278,22 +310,22 @@ class State:
             i = 0
             while i < self.n_machines:
                 dict_op = dict()
-                dict_op['Task'] = 'Job {}'.format(job)
+                dict_op["Task"] = "Job {}".format(job)
                 start_sec = schedule[job][i]
                 finish_sec = all_finish[job][i]
-                dict_op['Start'] = datetime.datetime.fromtimestamp(start_sec)
-                dict_op['Finish'] = datetime.datetime.fromtimestamp(finish_sec)
-                dict_op['Resource'] = 'Machine {}'.format(self.affectations[job][i])
+                dict_op["Start"] = datetime.datetime.fromtimestamp(start_sec)
+                dict_op["Finish"] = datetime.datetime.fromtimestamp(finish_sec)
+                dict_op["Resource"] = "Machine {}".format(self.affectations[job][i])
                 df.append(dict_op)
                 i += 1
         fig = None
         if len(df) > 0:
             df = pd.DataFrame(df)
-            fig = ff.create_gantt(df, index_col='Resource', colors=self.colors, show_colorbar=True, group_tasks=True)
-            if not fig is None:
+            fig = ff.create_gantt(df, index_col="Resource", colors=self.colors, show_colorbar=True, group_tasks=True)
+            if fig is not None:
                 fig.update_yaxes(autorange="reversed")  # otherwise tasks are listed from the bottom
                 figimg = fig.to_image(format="png")
-                npimg = np.fromstring(figimg, dtype='uint8')
+                npimg = np.fromstring(figimg, dtype="uint8")
                 cvimg = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
                 npimg = np.transpose(cvimg, (2, 0, 1))
                 torchimg = torch.from_numpy(npimg)
@@ -302,7 +334,7 @@ class State:
                 return None
         else:
             return None
-            
+
     def get_first_unaffected_task(self, job_id):
         """
         Returns the id of the first task that wasn't affected. If all tasks are

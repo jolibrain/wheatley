@@ -13,20 +13,41 @@ parser.add_argument(
 )
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
 parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved network")
-
-parser.add_argument(
-    "--remove_machine_id", default=False, action="store_true", help="Remove the machine id from the node embedding"
-)
-parser.add_argument("--one_hot_machine_id", default=False, action="store_true", help="Add machine id as one hot encoding")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
-parser.add_argument("--add_pdr_boolean", default=False, action="store_true", help="Add a bool in action space for PDR use")
+parser.add_argument(
+    "--add_force_insert_boolean",
+    default=False,
+    action="store_true",
+    help="Add a bool in action space for forced insertion use",
+)
+parser.add_argument(
+    "--full_force_insert",
+    default=False,
+    action="store_true",
+    help="Action are forced to be inserted",
+)
 parser.add_argument("--slot_locking", default=False, action="store_true", help="Add a bool in act. space for slot locking")
+parser.add_argument(
+    "--features",
+    type=str,
+    nargs="+",
+    default=[
+        "duration",
+        "total_job_time",
+        "total_machine_time",
+        "job_completion_percentage",
+        "machine_completion_percentage",
+        "mopnr",
+        "mwkr",
+    ],
+    help="The features we want to have as input of features_extractor",
+)
 
 # Agent arguments
 parser.add_argument(
-    "--gconv_type", type=str, default="gin", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
+    "--gconv_type", type=str, default="gatv2", help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2"
 )
-parser.add_argument("--max_pool", action="store_true", help="whether to use max instead of avg graph embedding to RL")
+parser.add_argument("--graph_pooling", type=str, default="max", help="which pooling to use (avg or max)")
 parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
@@ -35,8 +56,8 @@ parser.add_argument(
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
 parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs for updating the PPO parameters")
-parser.add_argument("--n_steps_episode", type=int, default=256, help="Number of steps per episode.")
-parser.add_argument("--batch_size", type=int, default=64, help="Batch size during training of PPO")
+parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
+parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of PPO")
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
 parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping parameter")
 parser.add_argument("--target_kl", type=float, default=0.2, help="Limit the KL divergence between updates")
@@ -45,7 +66,7 @@ parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function c
 parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
 parser.add_argument("--optimizer", type=str, default="adam", help="Which optimizer to use")
 
-parser.add_argument("--n_test_env", type=int, default=50, help="Number of testing environments during traing")
+parser.add_argument("--n_test_env", type=int, default=20, help="Number of testing environments during traing")
 parser.add_argument("--eval_freq", type=int, default=1000, help="Number of steps between each evaluation during training")
 
 parser.add_argument(
@@ -66,6 +87,8 @@ parser.add_argument(
 
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 
+parser.add_argument("--custom_heuristic_name", default="None", help="Which custom heuristic to run")
+
 # Testing arguments
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
 
@@ -77,12 +100,8 @@ parser.add_argument("--stable_baselines3_localisation", type=str, help="If using
 args, _ = parser.parse_known_args()
 
 if hasattr(args, "n_j") and hasattr(args, "n_m"):
-    exp_name = (
-        f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}"
-    )
+    exp_name = f"{args.n_j}j{args.n_m}m_{args.seed}seed_{args.transition_model_config}_{args.reward_model_config}_{args.gconv_type}_{args.graph_pooling}"
 
-    if args.remove_machine_id:
-        exp_name += "_RMI"
     if args.fixed_benchmark:
         exp_name += "_FB"
     if args.dont_normalize_input:
@@ -91,16 +110,12 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
         exp_name += "_FP"
     if args.freeze_graph:
         exp_name += "_FG"
-    if args.one_hot_machine_id:
-        exp_name += "_OHMI"
-    if args.add_pdr_boolean:
-        exp_name += "_PDR"
+    if args.add_force_insert_boolean:
+        exp_name += "_FI"
     if args.slot_locking:
         exp_name += "_SL"
     if args.exp_name_appendix is not None:
         exp_name += "_" + args.exp_name_appendix
-    if args.max_pool:
-        exp_name += "_max"
 
 else:
     exp_name = ""
@@ -117,5 +132,11 @@ if hasattr(args, "stable_baselines3_localisation") and args.stable_baselines3_lo
     print(f"Stable Baselines 3 imported from : {stable_baselines3.__file__}")
 
 # checking incompatibility
-if args.add_pdr_boolean and args.slot_locking:
-    raise Exception("You can't use PDR boolean and slot locking in the same script")
+if args.add_force_insert_boolean and args.slot_locking:
+    raise Exception("You can't use force insert boolean and slot locking in the same script")
+if args.full_force_insert and args.add_force_insert_boolean:
+    raise Exception("You can't use force insert boolean and full force insert in the same script")
+if args.full_force_insert and args.slot_locking:
+    raise Exception("You can't use full force insert and slot locking in the same script")
+
+args.input_list = args.features

@@ -17,29 +17,27 @@ class Env(gym.Env):
         self,
         problem_description,
         normalize_input=False,
-        add_machine_id=False,
-        one_hot_machine_id=False,
-        add_pdr_boolean=False,
+        input_list=[],
+        add_force_insert_boolean=False,
         slot_locking=False,
+        full_force_insert=False,
     ):
+        n_features = 2 + len(input_list)
+        if "one_hot_job_id" in input_list:
+            n_features += MAX_N_JOBS - 1
+        if "one_hot_machine_id" in input_list:
+            n_features += MAX_N_MACHINES - 1
 
-        if not add_machine_id:
-            n_features = 2
-        else:
-            if not one_hot_machine_id:
-                n_features = 3
-            else:
-                n_features = 2 + MAX_N_MACHINES
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.max_duration = problem_description.max_duration
         self.normalize_input = normalize_input
-        self.add_machine_id = add_machine_id
-        self.one_hot_machine_id = one_hot_machine_id
-        self.add_pdr_boolean = add_pdr_boolean
+        self.input_list = input_list
+        self.add_force_insert_boolean = add_force_insert_boolean
         self.slot_locking = slot_locking
+        self.full_force_insert = full_force_insert
 
-        self.action_space = Discrete(2 * MAX_N_EDGES if self.add_pdr_boolean else MAX_N_EDGES)
+        self.action_space = Discrete(2 * MAX_N_EDGES if self.add_force_insert_boolean else MAX_N_EDGES)
         self.observation_space = Dict(
             {
                 "n_jobs": Discrete(MAX_N_JOBS + 1),
@@ -83,24 +81,27 @@ class Env(gym.Env):
         obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
+            self.transition_model.get_graph(self.normalize_input, self.input_list),
             self.transition_model.get_mask(),
         )
         first_node_id, second_node_id, boolean = self._convert_action_to_node_ids(action)
-        if self.add_pdr_boolean:
-            pdr_boolean = boolean
+        if self.full_force_insert:
+            force_insert = True
+            slot_lock = False
+        elif self.add_force_insert_boolean:
+            force_insert = boolean
             slot_lock = False
         elif self.slot_locking:
-            pdr_boolean = True
+            force_insert = False
             slot_lock = boolean
         else:
-            pdr_boolean = True
+            force_insert = False
             slot_lock = False
-        self.transition_model.run(first_node_id, second_node_id, pdr_boolean, slot_lock)
+        self.transition_model.run(first_node_id, second_node_id, force_insert, slot_lock)
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
+            self.transition_model.get_graph(self.normalize_input, self.input_list),
             self.transition_model.get_mask(),
         )
         reward = self.reward_model.evaluate(
@@ -117,13 +118,13 @@ class Env(gym.Env):
         return gym_observation, reward, done, info
 
     def _convert_action_to_node_ids(self, action):
-        pdr_boolean = True
-        if self.add_pdr_boolean or self.slot_locking:
-            pdr_boolean = True if action >= MAX_N_EDGES else False
+        boolean = True
+        if self.add_force_insert_boolean or self.slot_locking:
+            boolean = True if action >= MAX_N_EDGES else False
             action = action % MAX_N_EDGES
         first_node_id = action // MAX_N_NODES
         second_node_id = action % MAX_N_NODES
-        return first_node_id, second_node_id, pdr_boolean
+        return first_node_id, second_node_id, boolean
 
     def reset(self):
         if self.generate_random_problems:
@@ -132,7 +133,7 @@ class Env(gym.Env):
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.add_machine_id, self.normalize_input, self.one_hot_machine_id),
+            self.transition_model.get_graph(self.normalize_input, self.input_list),
             self.transition_model.get_mask(),
         )
 
@@ -145,7 +146,7 @@ class Env(gym.Env):
 
     def render_solution(self, schedule):
         return self.transition_model.state.render_solution(schedule)
-    
+
     def _create_transition_and_reward_model(self):
 
         if self.transition_model_config == "L2D":

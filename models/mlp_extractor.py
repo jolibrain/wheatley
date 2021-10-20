@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from models.mlp import MLP
 
 from config import (
+    N_LAYERS_FEATURES_EXTRACTOR,
     HIDDEN_DIM_FEATURES_EXTRACTOR,
     N_MLP_LAYERS_ACTOR,
     HIDDEN_DIM_ACTOR,
@@ -15,7 +16,7 @@ from config import (
 
 
 class MLPExtractor(nn.Module):
-    def __init__(self, add_boolean, mlp_act, device):
+    def __init__(self, add_boolean, mlp_act, device, input_dim_features_extractor):
         super(MLPExtractor, self).__init__()
 
         # This is necessary because of stable_baselines3 API
@@ -23,10 +24,11 @@ class MLPExtractor(nn.Module):
         self.latent_dim_vf = 1
         self.add_boolean = add_boolean
         self.device = device
+        self.input_dim_features_extractor = input_dim_features_extractor
 
         self.actor = MLP(
             n_layers=N_MLP_LAYERS_ACTOR,
-            input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * 3,
+            input_dim=(self.input_dim_features_extractor + HIDDEN_DIM_FEATURES_EXTRACTOR * N_LAYERS_FEATURES_EXTRACTOR) * 3,
             hidden_dim=HIDDEN_DIM_ACTOR,
             output_dim=2 if self.add_boolean else 1,
             batch_norm=False,
@@ -35,7 +37,7 @@ class MLPExtractor(nn.Module):
         )
         self.critic = MLP(
             n_layers=N_MLP_LAYERS_CRITIC,
-            input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
+            input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * N_LAYERS_FEATURES_EXTRACTOR + self.input_dim_features_extractor,
             hidden_dim=HIDDEN_DIM_CRITIC,
             output_dim=1,
             batch_norm=False,
@@ -123,8 +125,10 @@ class MLPExtractor(nn.Module):
         graph_and_nodes_embedding, extended_mask = torch.split(
             embedded_features,
             [
-                HIDDEN_DIM_FEATURES_EXTRACTOR,
-                embedded_features.shape[2] - HIDDEN_DIM_FEATURES_EXTRACTOR,
+                HIDDEN_DIM_FEATURES_EXTRACTOR * N_LAYERS_FEATURES_EXTRACTOR + self.input_dim_features_extractor,
+                embedded_features.shape[2]
+                - HIDDEN_DIM_FEATURES_EXTRACTOR * N_LAYERS_FEATURES_EXTRACTOR
+                - self.input_dim_features_extractor,
             ],
             dim=2,
         )

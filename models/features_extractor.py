@@ -18,18 +18,28 @@ import sys
 
 class FeaturesExtractor(BaseFeaturesExtractor):
     def __init__(
-        self, observation_space, input_dim_features_extractor, gconv_type, max_pool, freeze_graph, graph_has_relu, device
+        self,
+        observation_space,
+        input_dim_features_extractor,
+        gconv_type,
+        graph_pooling,
+        freeze_graph,
+        graph_has_relu,
+        device,
     ):
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
-            features_dim=(HIDDEN_DIM_FEATURES_EXTRACTOR + MAX_N_NODES) * (MAX_N_NODES + 1),
+            features_dim=(
+                (HIDDEN_DIM_FEATURES_EXTRACTOR * N_LAYERS_FEATURES_EXTRACTOR + input_dim_features_extractor) + MAX_N_NODES
+            )
+            * (MAX_N_NODES + 1),
         )
         self.freeze_graph = freeze_graph
         self.device = device
 
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
-        self.max_pool = max_pool
+        self.graph_pooling = graph_pooling
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
 
@@ -82,19 +92,24 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         features, edge_index = graph_state.x, graph_state.edge_index
 
         # Compute graph embeddings
+        features_list = [features]
         for layer in range(self.n_layers_features_extractor):
             features = self.features_extractors[layer](features, edge_index)
             if self.graph_has_relu:
                 features = torch.nn.functional.elu(features)
+            features_list.append(features)
+        features = torch.cat(features_list, axis=1)  # The final embedding is concatenation of all layers embeddings
         features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate
-        if self.max_pool:
+        if self.graph_pooling == "max":
             max_elts, max_ind = torch.max(features, dim=1)
             graph_embedding = max_elts
-        else:  # avg
+        elif self.graph_pooling == "avg":
             graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
             graph_embedding = torch.matmul(graph_pooling, features)
+        else:
+            raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
         graph_and_nodes_embedding = torch.cat((graph_embedding.reshape(batch_size, 1, -1), features), dim=1)
 
         mask = mask.reshape(batch_size, n_nodes, n_nodes)

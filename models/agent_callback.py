@@ -8,6 +8,7 @@ from stable_baselines3.common.utils import safe_mean
 import visdom
 
 from env.env import Env
+from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
@@ -15,7 +16,7 @@ from utils.utils import load_benchmark
 
 
 class TestCallback(BaseCallback):
-    def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, verbose=2):
+    def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, custom_name, verbose=2):
         super(TestCallback, self).__init__(verbose=verbose)
         self.testing_env = env
         self.n_test_env = n_test_env
@@ -30,6 +31,9 @@ class TestCallback(BaseCallback):
         self.reward_model_config = self.testing_env.reward_model_config
 
         self.random_agent = RandomAgent()
+        if custom_name != "None":
+            self.custom_agent = CustomAgent(custom_name.lower())
+        self.custom_name = custom_name
 
         if self.fixed_benchmark:
             self._init_testing_envs()
@@ -42,6 +46,7 @@ class TestCallback(BaseCallback):
         self.makespans = []
         self.ortools_makespans = []
         self.random_makespans = []
+        self.custom_makespans = []
         self.entropy_losses = []
         self.policy_gradient_losses = []
         self.value_losses = []
@@ -73,8 +78,7 @@ class TestCallback(BaseCallback):
                     data[i][1],
                 ),
                 normalize_input=self.testing_env.normalize_input,
-                add_machine_id=self.testing_env.add_machine_id,
-                one_hot_machine_id=self.testing_env.one_hot_machine_id,
+                input_set=self.testing_env.input_set,
             )
             for i in range(data.shape[0])
         ]
@@ -95,6 +99,7 @@ class TestCallback(BaseCallback):
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
+        custom_mean_makespan = 0
         for i in range(self.n_test_env):
             obs = self.testing_envs[i].reset()
             done = False
@@ -105,23 +110,20 @@ class TestCallback(BaseCallback):
 
             if i == 0:
                 self.gantt_rl_img = self.testing_envs[i].render_solution(schedule)
-            
+
             durations = self.testing_envs[i].durations
             mean_makespan += np.max(schedule + durations) / self.n_test_env
 
             or_tools_makespan, or_tools_schedule = get_ortools_makespan(
-                    self.n_jobs,
-                    self.n_machines,
-                    self.max_duration,
-                    self.testing_envs[i].affectations,
-                    self.testing_envs[i].durations,
-                )
+                self.n_jobs,
+                self.n_machines,
+                self.max_duration,
+                self.testing_envs[i].affectations,
+                self.testing_envs[i].durations,
+            )
             if i == 0:
                 self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule)
-            ortools_mean_makespan += (
-                or_tools_makespan
-                / self.n_test_env
-            )
+            ortools_mean_makespan += or_tools_makespan / self.n_test_env
 
             random_mean_makespan += (
                 np.max(
@@ -134,40 +136,63 @@ class TestCallback(BaseCallback):
                             self.testing_envs[i].reward_model_config,
                             self.testing_envs[i].affectations,
                             self.testing_envs[i].durations,
-                        )
+                        ),
+                        True,
+                        None,
                     ).schedule
                     + self.testing_envs[i].durations
                 )
                 / self.n_test_env
             )
-
-        print('--- mean_makespan=',mean_makespan, ' ---')
+            if self.custom_name != "None":
+                custom_mean_makespan += (
+                    np.max(
+                        self.custom_agent.predict(
+                            ProblemDescription(
+                                self.testing_envs[i].n_jobs,
+                                self.testing_envs[i].n_machines,
+                                self.testing_envs[i].max_duration,
+                                self.testing_envs[i].transition_model_config,
+                                self.testing_envs[i].reward_model_config,
+                                self.testing_envs[i].affectations,
+                                self.testing_envs[i].durations,
+                            ),
+                            True,
+                            None,
+                        ).schedule
+                        + self.testing_envs[i].durations
+                    )
+                    / self.n_test_env
+                )
+        print("--- mean_makespan=", mean_makespan, " ---")
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
+        self.custom_makespans.append(custom_mean_makespan)
 
     def _visdom_metrics(self):
-        self.vis.line(
-            Y=np.array([self.makespans, self.random_makespans, self.ortools_makespans]).T,
-            win="test_makespan",
-            opts={
-                "legend": ["PPO", "Random", "OR-tools"],
-                "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
-            },
-        )
-        self.vis.line(
-            Y=np.stack(
-                [
-                    np.array(self.makespans) / np.array(self.ortools_makespans),
-                    np.array(self.random_makespans) / np.array(self.ortools_makespans),
-                ]
-            ).T,
-            win="test_makespan_ratio",
-            opts={
-                "legend": ["PPO / OR-tools", "Random / OR-tools"],
-                "linecolor": np.array([[31, 119, 180], [255, 127, 14]]),
-            },
-        )
+        Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]
+        opts = {
+            "legend": ["PPO", "Random", "OR-tools"],
+            "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
+        }
+        Y2_list = [
+            np.array(self.makespans) / np.array(self.ortools_makespans),
+            np.array(self.random_makespans) / np.array(self.ortools_makespans),
+        ]
+        opts2 = {
+            "legend": ["PPO / OR-tools", "Random / OR-tools"],
+            "linecolor": np.array([[31, 119, 180], [255, 127, 14]]),
+        }
+        if self.custom_name != "None":
+            Y_list.append(self.custom_makespans)
+            Y2_list.append(self.custom_makespans / np.array(self.ortools_makespans))
+            opts["legend"].append(self.custom_name)
+            opts["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]])
+            opts2["legend"].append(self.custom_name + " / OR-tools")
+            opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
+        self.vis.line(Y=np.array(Y_list).T, win="test_makespan", opts=opts)
+        self.vis.line(Y=np.stack(Y2_list).T, win="test_makespan_ratio", opts=opts2)
 
         if self.first_callback:
             self.first_callback = False
@@ -218,7 +243,7 @@ class TestCallback(BaseCallback):
         plt.close(self.figure)
         self.figure = figure
 
-        if not self.gantt_rl_img is None:
-            self.vis.image(self.gantt_rl_img, opts={'caption':'Gantt RL schedule'}, win='rl_schedule')
-        if not self.gantt_or_img is None:
-            self.vis.image(self.gantt_or_img, opts={'caption':'Gantt OR-Tools schedule'}, win='or_schedule')
+        if self.gantt_rl_img is not None:
+            self.vis.image(self.gantt_rl_img, opts={"caption": "Gantt RL schedule"}, win="rl_schedule")
+        if self.gantt_or_img is not None:
+            self.vis.image(self.gantt_or_img, opts={"caption": "Gantt OR-Tools schedule"}, win="or_schedule")

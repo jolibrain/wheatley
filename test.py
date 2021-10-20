@@ -20,12 +20,12 @@ def main():
     path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
     agent = Agent.load(
         path,
-        not args.remove_machine_id,
-        args.one_hot_machine_id,
-        args.add_pdr_boolean,
+        args.input_list,
+        args.add_force_insert_boolean,
         args.slot_locking,
         args.mlp_act,
         args.n_workers,
+        torch.device("cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"),
     )
     random_agent = RandomAgent()
 
@@ -57,8 +57,8 @@ def main():
             args.n_j, args.n_m, MAX_DURATION, args.transition_model_config, args.reward_model_config, affectations, durations
         )
 
-        rl_makespan = test_agent(agent, problem_description)
-        random_makespan = test_agent(random_agent, problem_description)
+        rl_makespan = test_agent(agent, problem_description, not args.dont_normalize_input, args.full_force_insert)
+        random_makespan = test_agent(random_agent, problem_description, None, None)
         or_tools_makespan = get_ortools_makespan(args.n_j, args.n_m, MAX_DURATION, affectations, durations)[0]
 
         diff_percentage = 100 * (rl_makespan - or_tools_makespan) / or_tools_makespan

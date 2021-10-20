@@ -13,6 +13,7 @@ from problem.problem_description import ProblemDescription
 
 from config import MAX_DURATION
 
+
 class Agent:
     def __init__(
         self,
@@ -26,21 +27,20 @@ class Agent:
         vf_coef=None,
         lr=None,
         optimizer=None,
-        add_machine_id=False,
         freeze_graph=None,
         input_dim_features_extractor=None,
         gconv_type="gin",
         graph_has_relu=False,
-        max_pool=False,
-        one_hot_machine_id=False,
-        add_pdr_boolean=False,
+        graph_pooling=None,
+        add_force_insert_boolean=False,
         slot_locking=False,
         model=None,
         mlp_act="tanh",
         n_workers=1,
         device=None,
+        input_list=None,
     ):
-        fake_env = Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers)
+        fake_env = Agent._create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers)
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -70,22 +70,22 @@ class Agent:
                     "features_extractor_kwargs": {
                         "input_dim_features_extractor": input_dim_features_extractor,
                         "gconv_type": gconv_type,
-                        "max_pool": max_pool,
+                        "graph_pooling": graph_pooling,
                         "freeze_graph": freeze_graph,
                         "graph_has_relu": graph_has_relu,
                         "device": device,
                     },
                     "optimizer_class": optimizer_class,
-                    "add_boolean": add_pdr_boolean or slot_locking,
+                    "add_boolean": add_force_insert_boolean or slot_locking,
                     "mlp_act": mlp_act,
-                    "device": device,
+                    "_device": device,
+                    "input_dim_features_extractor": input_dim_features_extractor,
                 },
                 device=device,
                 gae_lambda=1,  # To use same vanilla advantage function
             )
-        self.add_machine_id = add_machine_id
-        self.one_hot_machine_id = one_hot_machine_id
-        self.add_pdr_boolean = add_pdr_boolean
+        self.input_list = input_list
+        self.add_force_insert_boolean = add_force_insert_boolean
         self.slot_locking = slot_locking
         self.n_workers = n_workers
         self.device = device
@@ -94,16 +94,20 @@ class Agent:
         self.model.save(path)
 
     @classmethod
-    def load(cls, path, add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, mlp_act, n_workers, device):
+    def load(cls, path, input_list, add_force_insert_boolean, slot_locking, mlp_act, n_workers, device):
         return cls(
             model=PPO.load(
                 path,
-                Agent._create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers),
-                device,
+                Agent._create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers),
+                # policy_kwargs={
+                #     "add_boolean": add_force_insert_boolean or slot_locking,
+                #     "mlp_act": mlp_act,
+                #     "device": device,
+                # },
+                device=device,
             ),
-            add_machine_id=add_machine_id,
-            one_hot_machine_id=one_hot_machine_id,
-            add_pdr_boolean=add_pdr_boolean,
+            input_list=input_list,
+            add_force_insert_boolean=add_force_insert_boolean,
             slot_locking=slot_locking,
             mlp_act=mlp_act,
         )
@@ -118,41 +122,45 @@ class Agent:
         display_env,
         path,
         fixed_benchmark,
+        full_force_insert,
+        custom_heuristic_name,
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
             env=Env(
                 problem_description,
                 normalize_input,
-                self.add_machine_id,
-                self.one_hot_machine_id,
-                self.add_pdr_boolean,
+                self.input_list,
+                self.add_force_insert_boolean,
                 self.slot_locking,
+                full_force_insert,
             ),
             n_test_env=n_test_env,
             display_env=display_env,
             path=path,
             fixed_benchmark=fixed_benchmark,
+            custom_name=custom_heuristic_name,
         )
         event_callback = EveryNTimesteps(n_steps=eval_freq, callback=test_callback)
 
         # Then launch training
         vec_env = make_vec_env(
-            self._get_env_fn(problem_description, normalize_input),
+            self._get_env_fn(problem_description, normalize_input, full_force_insert),
             n_envs=self.n_workers,
-            vec_env_cls=SubprocVecEnv,
-            vec_env_kwargs={"start_method": "spawn"},
+            vec_env_cls=DummyVecEnv,
+            #            vec_env_kwargs={"start_method": "spawn"},
         )
         self.model.set_env(vec_env)
         self.model.learn(total_timesteps, callback=event_callback)
 
-    def predict(self, problem_description):
+    def predict(self, problem_description, normalize_input, full_force_insert):
         env = Env(
             problem_description,
-            add_machine_id=self.add_machine_id,
-            one_hot_machine_id=self.one_hot_machine_id,
-            add_pdr_boolean=self.add_pdr_boolean,
+            normalize_input=normalize_input,
+            input_list=self.input_list,
+            add_force_insert_boolean=self.add_force_insert_boolean,
             slot_locking=self.slot_locking,
+            full_force_insert=full_force_insert,
         )
         observation = env.reset()
         done = False
@@ -163,28 +171,27 @@ class Agent:
         return solution
 
     @staticmethod
-    def _create_fake_env(add_machine_id, one_hot_machine_id, add_pdr_boolean, slot_locking, n_workers):
+    def _create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers):
         def f():
             return Env(
                 ProblemDescription(2, 2, MAX_DURATION, "L2D", "L2D"),
-                False,
-                add_machine_id,
-                one_hot_machine_id,
-                add_pdr_boolean,
+                True,
+                input_list,
+                add_force_insert_boolean,
                 slot_locking,
             )
 
         return make_vec_env(f, n_workers)
 
-    def _get_env_fn(self, problem_description, normalize_input):
+    def _get_env_fn(self, problem_description, normalize_input, full_force_insert):
         def f():
             return Env(
                 problem_description,
                 normalize_input,
-                self.add_machine_id,
-                self.one_hot_machine_id,
-                self.add_pdr_boolean,
+                self.input_list,
+                self.add_force_insert_boolean,
                 self.slot_locking,
+                full_force_insert,
             )
 
         return f

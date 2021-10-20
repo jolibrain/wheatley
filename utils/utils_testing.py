@@ -16,8 +16,8 @@ from utils.utils import generate_problem, generate_data, load_benchmark
 from config import MAX_DURATION
 
 
-def test_agent(agent, problem_description):
-    solution = agent.predict(problem_description)
+def test_agent(agent, problem_description, normalize_input, full_force_insert):
+    solution = agent.predict(problem_description, normalize_input, full_force_insert)
     makespan = np.max(solution.schedule + problem_description.durations)
     return makespan
 

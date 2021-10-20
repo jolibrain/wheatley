@@ -14,6 +14,7 @@ from utils.agent_observation import AgentObservation
 
 from config import MAX_DURATION
 
+
 @fixture
 def graph():
     graph = Data(
@@ -228,7 +229,7 @@ def features_extractor():
         input_dim_features_extractor=2,
         gconv_type="gin",
         freeze_graph=False,
-        max_pool=False,
+        graph_pooling="max",
         graph_has_relu=False,
         device=torch.device("cpu"),
     )

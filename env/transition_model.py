@@ -23,8 +23,8 @@ class TransitionModel(ABC):
     def get_mask(self):
         pass
 
-    def get_graph(self, add_machine_id, normalize_input, one_hot_machine_id):
-        return self.state.to_torch_geometric(add_machine_id, normalize_input, one_hot_machine_id)
+    def get_graph(self, normalize_input, input_list):
+        return self.state.to_torch_geometric(normalize_input, input_list)
 
     def done(self):
         return self.state.done()
