@@ -75,7 +75,7 @@ def solve_jssp(affectations, durations):
         for task_id, task in enumerate(job):
             machine = task[0]
             schedule[job_id, task_id] = solver.Value(all_tasks[job_id, task_id].start)
-    return Solution(schedule)
+    return Solution(schedule/SCALING_CONSTANT_ORTOOLS)
 
     # else:
     #     print("No Optimal solution found")

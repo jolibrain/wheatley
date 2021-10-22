@@ -11,6 +11,7 @@ from config import (
     HIDDEN_DIM_FEATURES_EXTRACTOR,
     N_LAYERS_FEATURES_EXTRACTOR,
     N_MLP_LAYERS_FEATURES_EXTRACTOR,
+    N_ATTENTION_HEADS,
 )
 
 import sys
@@ -43,6 +44,9 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
         self.features_extractors = nn.ModuleList()
 
+        if self.gconv_type == "gatv2":
+            self.mlps = nn.ModuleList()
+
         for layer in range(self.n_layers_features_extractor):
             if self.gconv_type == "gin":
                 self.features_extractors.append(
@@ -63,9 +67,21 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 self.features_extractors.append(
                     GATv2Conv(
                         in_channels=input_dim_features_extractor if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
-                        out_channels=HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        out_channels=HIDDEN_DIM_FEATURES_EXTRACTOR, heads = N_ATTENTION_HEADS
                     )
                 )
+                self.mlps.append(
+                    MLP(
+                        n_layers=N_MLP_LAYERS_FEATURES_EXTRACTOR,
+                        input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * N_ATTENTION_HEADS,
+                        hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * N_ATTENTION_HEADS,
+                        output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        batch_norm=False,
+                        activation="elu",
+                        device=self.device,
+                    )
+                )
+
 
             else:
                 print("Unknown gconv type ", self.gconv_type)
@@ -95,6 +111,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         features_list = [features]
         for layer in range(self.n_layers_features_extractor):
             features = self.features_extractors[layer](features, edge_index)
+            if self.gconv_type == "gatv2":
+                features =self.mlps[layer](features)
             if self.graph_has_relu:
                 features = torch.nn.functional.elu(features)
             features_list.append(features)

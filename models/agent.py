@@ -39,8 +39,10 @@ class Agent:
         n_workers=1,
         device=None,
         input_list=None,
+        fixed_distrib = False
     ):
-        fake_env = Agent._create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers)
+        fake_env = Agent._create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers,fixed_distrib)
+        self.fixed_distrib = fixed_distrib
         if model is not None:
             self.model = model
             self.model.set_env(fake_env)
@@ -124,6 +126,8 @@ class Agent:
         fixed_benchmark,
         full_force_insert,
         custom_heuristic_name,
+        ortools_strategy,
+        keep_same_testing_envs
     ):
         # First setup callbacks during training
         test_callback = TestCallback(
@@ -134,12 +138,15 @@ class Agent:
                 self.add_force_insert_boolean,
                 self.slot_locking,
                 full_force_insert,
+                self.fixed_distrib
             ),
             n_test_env=n_test_env,
             display_env=display_env,
             path=path,
             fixed_benchmark=fixed_benchmark,
             custom_name=custom_heuristic_name,
+            ortools_strategy=ortools_strategy,
+            keep_same_testing_envs = keep_same_testing_envs
         )
         event_callback = EveryNTimesteps(n_steps=eval_freq, callback=test_callback)
 
@@ -171,14 +178,16 @@ class Agent:
         return solution
 
     @staticmethod
-    def _create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers):
+    def _create_fake_env(input_list, add_force_insert_boolean, slot_locking, n_workers,fixed_distrib):
         def f():
             return Env(
-                ProblemDescription(2, 2, MAX_DURATION, "L2D", "L2D"),
-                True,
-                input_list,
-                add_force_insert_boolean,
-                slot_locking,
+                ProblemDescription(2, 2, MAX_DURATION, "L2D", "Sparse"),
+                # Sparse is the only type that can be used in both determinisitic and uncertain case
+                normalize_input = True,
+                input_list = input_list,
+                add_force_insert_boolean = add_force_insert_boolean,
+                slot_locking = slot_locking,
+                fixed_distrib = fixed_distrib
             )
 
         return make_vec_env(f, n_workers)
@@ -192,6 +201,7 @@ class Agent:
                 self.add_force_insert_boolean,
                 self.slot_locking,
                 full_force_insert,
+                self.fixed_distrib
             )
 
         return f

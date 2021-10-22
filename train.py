@@ -6,9 +6,9 @@ import torch
 from models.agent import Agent
 from utils.utils import load_taillard_problem  # noqa E402
 from problem.problem_description import ProblemDescription
-from utils.utils import generate_problem
+from utils.utils import generate_problem,generate_problem_distrib
 
-from config import MAX_DURATION, MAX_N_JOBS, MAX_N_MACHINES
+from config import MAX_DURATION, MAX_N_JOBS, MAX_N_MACHINES, DURATION_MODE_BOUNDS, DURATION_DELTA
 from args import args, exp_name
 
 
@@ -30,16 +30,28 @@ def main():
         f"Graph pooling : {args.graph_pooling}\n"
         f"Training time : {args.total_timesteps} timesteps"
     )
+
     if args.load_problem is not None:
-        args.n_j, args.n_m, affectations, durations = load_taillard_problem(args.load_problem, taillard_offset=False)
+        args.n_j, args.n_m, affectations, durations = load_taillard_problem(args.load_problem, taillard_offset=False, fixed_distrib = args.fixed_distrib)
         print(affectations)
         print(durations)
+
+    elif args.fixed_distrib:
+        affectations, durations = generate_problem_distrib(args.n_j, args.n_m, DURATION_MODE_BOUNDS, DURATION_DELTA)
+        print(affectations)
+        print("min")
+        print(durations[:,:,1])
+        print("max")
+        print(durations[:,:,2])
+        print("mode")
+        print(durations[:,:,3])
     elif args.fixed_problem:
         affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
         print(affectations)
         print(durations)
     else:
         affectations, durations = None, None
+
     problem_description = ProblemDescription(
         args.n_j,
         args.n_m,
@@ -62,10 +74,25 @@ def main():
         )
     else:
         n_features = 2 + len(args.input_list)
+        if "duration" in args.input_list and args.fixed_distrib:
+            n_features += 3
         if "one_hot_job_id" in args.input_list:
             n_features += MAX_N_JOBS - 1
         if "one_hot_machine_id" in args.input_list:
             n_features += MAX_N_MACHINES - 1
+        if "total_job_time" in args.input_list and args.fixed_distrib:
+            n_features += 3
+        if "total_machine_time" in args.input_list and args.fixed_distrib:
+            n_features += 3
+        if "job_completion_percentage" in args.input_list and args.fixed_distrib:
+            n_features += 3
+        if "machine_completion_percentage" in args.input_list and args.fixed_distrib:
+            n_features += 3
+        if "mwkr" in args.input_list and args.fixed_distrib:
+            n_features += 3
+
+        if args.fixed_distrib:
+            n_features += 3
 
         agent = Agent(
             n_epochs=args.n_epochs,
@@ -89,6 +116,7 @@ def main():
             n_workers=args.n_workers,
             device=torch.device("cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"),
             input_list=args.input_list,
+            fixed_distrib = args.fixed_distrib
         )
 
     agent.train(
@@ -102,6 +130,8 @@ def main():
         fixed_benchmark=args.fixed_benchmark,
         full_force_insert=args.full_force_insert,
         custom_heuristic_name=args.custom_heuristic_name,
+        ortools_strategy = args.ortools_strategy,
+        keep_same_testing_envs = not args.change_testing_envs
     )
 
 

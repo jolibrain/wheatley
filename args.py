@@ -8,9 +8,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument("--transition_model_config", type=str, default="L2D", help="Which transition model to use")
-parser.add_argument(
-    "--reward_model_config", type=str, default="L2D", help="Which reward model to use, from L2D, Sparse, Tassel"
-)
+parser.add_argument("--reward_model_config", type=str, default="L2D", help="Which reward model to use , from L2D, Sparse, Tassel (deterministic case; for uncertainty (fixed_distrib) you can use pessimistic|optimistic|realistic|averagistic|Sparse")
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
 parser.add_argument("--path", type=str, default="saved_networks/default_net", help="Path to saved network")
 parser.add_argument("--fixed_benchmark", default=False, action="store_true", help="Test model on fixed or random benchmark")
@@ -49,9 +47,8 @@ parser.add_argument(
 )
 parser.add_argument("--graph_pooling", type=str, default="max", help="which pooling to use (avg or max)")
 parser.add_argument("--mlp_act", type=str, default="tanh", help="agent mlp extractor activation type, relu or tanh")
-parser.add_argument(
-    "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
-)
+parser.add_argument("--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers")
+parser.add_argument("--ortools_strategy", type=str, default='pessimistic', help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic  realistic means omiscient, ie sees the future")
 
 # Training arguments
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
@@ -89,9 +86,13 @@ parser.add_argument(
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 
 parser.add_argument("--custom_heuristic_name", default="None", help="Which custom heuristic to run")
+# uncertainty
+parser.add_argument(
+    "--fixed_distrib", action='store_true', help="generate many problem from same distribution data (given in config.py)")
 
 # Testing arguments
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
+parser.add_argument("--change_testing_envs", default = False, action = "store_true", help="change testing environments (ie regenerate real duration at every test) for uncertainty case")
 
 # Other
 parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
@@ -117,6 +118,8 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
         exp_name += "_FI"
     if args.slot_locking:
         exp_name += "_SL"
+    if args.fixed_distrib:
+        exp_name += "_UNCERTAINTY"
     if args.exp_name_appendix is not None:
         exp_name += "_" + args.exp_name_appendix
 

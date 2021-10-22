@@ -31,3 +31,6 @@ class TransitionModel(ABC):
 
     def reset(self):
         self.state.reset()
+
+    def is_uncertain(self):
+        return self.state.durations.shape[2] > 1

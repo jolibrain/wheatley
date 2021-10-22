@@ -12,18 +12,18 @@ from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
-from utils.utils import load_benchmark
-
-from config import SCALING_CONSTANT_ORTOOLS
+from utils.utils import load_benchmark, generate_problem_durations
 
 class TestCallback(BaseCallback):
-    def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, custom_name, verbose=2):
+    def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, custom_name, ortools_strategy = "pessimistic", keep_same_testing_envs = True, verbose=2):
         super(TestCallback, self).__init__(verbose=verbose)
         self.testing_env = env
         self.n_test_env = n_test_env
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
         self.fixed_benchmark = fixed_benchmark
+        self.ortools_strategy = ortools_strategy
+        self.keep_same_testing_envs = keep_same_testing_envs
 
         self.n_jobs = self.testing_env.n_jobs
         self.n_machines = self.testing_env.n_machines
@@ -41,7 +41,10 @@ class TestCallback(BaseCallback):
             self.n_test_env = 100
             self.testing_env = None
         else:
+            if self.testing_env.durations.shape[2] > 1:
+                self.testing_env.durations[:,:,0] = -1
             self.testing_envs = [deepcopy(self.testing_env) for _ in range(self.n_test_env)]
+
             self.testing_env = None
 
         self.makespan_ratio = 1000
@@ -66,6 +69,10 @@ class TestCallback(BaseCallback):
         self.figure = None
         self.gantt_rl_img = None
         self.gantt_or_img = None
+
+        self.all_or_tools_makespan = []
+        self.all_or_tools_schedule = []
+
 
     def _init_testing_envs(self):
         data = load_benchmark(self.n_jobs, self.n_machines)
@@ -110,7 +117,8 @@ class TestCallback(BaseCallback):
         random_mean_makespan = 0
         custom_mean_makespan = 0
         for i in range(self.n_test_env):
-            obs = self.testing_envs[i].reset()
+            obs = self.testing_envs[i].reset(force_regenerate_real_durations= \
+                                             not self.keep_same_testing_envs)
             done = False
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
@@ -120,36 +128,35 @@ class TestCallback(BaseCallback):
             if i == 0:
                 self.gantt_rl_img = self.testing_envs[i].render_solution(schedule)
 
-            durations = self.testing_envs[i].durations
+            durations = self.testing_envs[i].durations[:,:,0]
             mean_makespan += np.max(schedule + durations) / self.n_test_env
 
-            or_tools_makespan, or_tools_schedule = get_ortools_makespan(
-                self.n_jobs,
-                self.n_machines,
-                self.max_duration,
-                self.testing_envs[i].affectations,
-                self.testing_envs[i].durations,
-            )
+            if self.keep_same_testing_envs and len(self.all_or_tools_makespan) == self.n_test_env:
+                or_tools_makespan = self.all_or_tools_makespan[i]
+                or_tools_schedule = self.all_or_tools_schedule[i]
+            else:
+                or_tools_makespan, or_tools_schedule = get_ortools_makespan(
+                    self.n_jobs,
+                    self.n_machines,
+                    self.max_duration,
+                    self.testing_envs[i].affectations,
+                    self.testing_envs[i].durations,
+                    self.ortools_strategy
+                )
+                if self.keep_same_testing_envs:
+                    self.all_or_tools_makespan.append(or_tools_makespan)
+                    self.all_or_tools_schedule.append(or_tools_schedule)
+
             if i == 0:
-                self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule, scaling=1.0/SCALING_CONSTANT_ORTOOLS)
+                self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule, scaling=1.0)
             ortools_mean_makespan += or_tools_makespan / self.n_test_env
 
             random_mean_makespan += (
                 np.max(
                     self.random_agent.predict(
-                        ProblemDescription(
-                            self.testing_envs[i].n_jobs,
-                            self.testing_envs[i].n_machines,
-                            self.testing_envs[i].max_duration,
-                            self.testing_envs[i].transition_model_config,
-                            self.testing_envs[i].reward_model_config,
-                            self.testing_envs[i].affectations,
-                            self.testing_envs[i].durations,
-                        ),
-                        True,
-                        None,
+                        self.testing_envs[i]
                     ).schedule
-                    + self.testing_envs[i].durations
+                    + self.testing_envs[i].durations[:,:,0]
                 )
                 / self.n_test_env
             )
