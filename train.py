@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from models.agent import Agent
+from utils.utils import load_taillard_problem  # noqa E402
 from problem.problem_description import ProblemDescription
 from utils.utils import generate_problem
 
@@ -30,7 +31,11 @@ def main():
         f"Training time : {args.total_timesteps} timesteps"
     )
 
-    if args.fixed_problem:
+    if not args.load_problem is "":
+        args.n_j, args.n_m, affectations, durations = load_taillard_problem(args.load_problem, taillard_offset=False)
+        print(affectations)
+        print(durations)
+    elif args.fixed_problem:
         affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
         print(affectations)
         print(durations)

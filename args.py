@@ -73,6 +73,7 @@ parser.add_argument(
     "--dont_normalize_input", default=False, action="store_true", help="Default is dividing input by constant"
 )
 parser.add_argument("--fixed_problem", default=False, action="store_true", help="Fix affectations and durations for train")
+parser.add_argument("--load_problem", help="Load problem in Taillard format (machine numbering starts at 0)")
 
 parser.add_argument("--n_workers", type=int, default=1, help="Number of CPU cores for simulating environment")
 parser.add_argument("--multiprocessing", default=False, action="store_true", help="Wether to use multiprocessing or not")
@@ -108,6 +109,8 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
         exp_name += "_DNI"
     if args.fixed_problem:
         exp_name += "_FP"
+    if args.load_problem:
+        exp_name += "_" + args.load_problem.replace('.txt','')
     if args.freeze_graph:
         exp_name += "_FG"
     if args.add_force_insert_boolean:

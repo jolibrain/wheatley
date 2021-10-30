@@ -49,7 +49,7 @@ def load_benchmark(n_jobs, n_machines):
     np.save(f"benchmark/generated_data{n_jobs}_{n_machines}_seed200.npy", data)
     return data
 
-def load_taillard_problem(problem_file):
+def load_taillard_problem(problem_file, taillard_offset=True):
     # http://jobshop.jjvh.nl/explanation.php#taillard_def
     with open(problem_file, 'r') as f:
         
@@ -69,10 +69,14 @@ def load_taillard_problem(problem_file):
         durations = np.stack(np_lines)
                 
         # matrix of affectations
+        if taillard_offset:
+            toffset = 1
+        else:
+            toffset = 0
         np_lines = []
         for j in range(n_j):
             line = next(f)
-            aff_list = [int(i)-1 for i in line.split()]  # Taillard spec has machines id start at 1
+            aff_list = [int(i)-toffset for i in line.split()]  # Taillard spec has machines id start at 1
             np_lines.append(np.array(aff_list))
         affectations = np.stack(np_lines)
 
