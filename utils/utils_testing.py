@@ -13,7 +13,7 @@ from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
 from utils.utils import generate_problem, generate_data, load_benchmark
 
-from config import MAX_DURATION
+from config import MAX_DURATION, SCALING_CONSTANT_ORTOOLS
 
 
 def test_agent(agent, problem_description, normalize_input, full_force_insert):
@@ -26,5 +26,5 @@ def get_ortools_makespan(n_j, n_m, max_duration, affectations=None, durations=No
     if affectations is None and durations is None:
         affectations, durations = generate_problem(n_j, n_m, max_duration)
     solution = solve_jssp(affectations, durations)
-    makespan = np.max(solution.schedule + durations)
+    makespan = np.max(solution.schedule + durations)/SCALING_CONSTANT_ORTOOLS
     return makespan, solution.schedule

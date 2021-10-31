@@ -3,7 +3,6 @@ import torch
 from env.transition_model import TransitionModel
 from utils.utils import job_and_task_to_node, node_to_job_and_task
 
-
 class L2DTransitionModel(TransitionModel):
     def __init__(self, affectations, durations, node_encoding, slot_locking):
         super(L2DTransitionModel, self).__init__(affectations, durations, node_encoding)
@@ -37,6 +36,10 @@ class L2DTransitionModel(TransitionModel):
             return
 
         machine_id = self.affectations[job_id, task_id]
+        if machine_id == -1:
+            self.useless_timesteps += 1
+            return
+        
         machine_occupancy = self.state.get_machine_occupancy(machine_id)
         job_availability_time = self.state.get_job_availability(job_id, task_id)
 
@@ -138,7 +141,7 @@ class L2DTransitionModel(TransitionModel):
         available_node_ids = []
         for job_id in range(self.n_jobs):
             task_id = self.state.get_first_unaffected_task(job_id)
-            if task_id != -1:
+            if task_id != -1 and self.affectations[job_id, task_id] != -1:
                 available_node_ids.append(job_and_task_to_node(job_id, task_id, self.n_machines))
         mask = torch.zeros(self.n_nodes ** 2)
         for node_id in available_node_ids:

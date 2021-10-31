@@ -14,6 +14,7 @@ from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
 from utils.utils import load_benchmark
 
+from config import SCALING_CONSTANT_ORTOOLS
 
 class TestCallback(BaseCallback):
     def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, custom_name, verbose=2):
@@ -130,7 +131,7 @@ class TestCallback(BaseCallback):
                 self.testing_envs[i].durations,
             )
             if i == 0:
-                self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule)
+                self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule, scaling=1.0/SCALING_CONSTANT_ORTOOLS)
             ortools_mean_makespan += or_tools_makespan / self.n_test_env
 
             random_mean_makespan += (

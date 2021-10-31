@@ -110,7 +110,7 @@ if hasattr(args, "n_j") and hasattr(args, "n_m"):
     if args.fixed_problem:
         exp_name += "_FP"
     if args.load_problem:
-        exp_name += "_" + args.load_problem.replace('.txt','')
+        exp_name += "_" + args.load_problem.replace('.txt','').replace('/','_')
     if args.freeze_graph:
         exp_name += "_FG"
     if args.add_force_insert_boolean:

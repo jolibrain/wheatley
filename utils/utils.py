@@ -52,22 +52,33 @@ def load_benchmark(n_jobs, n_machines):
 def load_taillard_problem(problem_file, taillard_offset=True):
     # http://jobshop.jjvh.nl/explanation.php#taillard_def
     with open(problem_file, 'r') as f:
+
+        line = next(f)
+        while line[0] == '#':
+            line = next(f)
         
         # header
-        header = next(f)
+        header = line
         head_list = [int(i) for i in header.split()]
         assert(len(head_list) == 2)
         n_j = head_list[0]
         n_m = head_list[1]
 
+        line = next(f)
+        while line[0] == '#':
+            line = next(f)
+        
         # matrix of durations
         np_lines = []
         for j in range(n_j):
-            line = next(f)
-            dur_list = [int(i) for i in line.split()]
+            dur_list = [float(i) for i in line.split()]
             np_lines.append(np.array(dur_list))
+            line = next(f)
         durations = np.stack(np_lines)
-                
+
+        while line[0] == '#':
+            line = next(f)
+        
         # matrix of affectations
         if taillard_offset:
             toffset = 1
@@ -75,9 +86,11 @@ def load_taillard_problem(problem_file, taillard_offset=True):
             toffset = 0
         np_lines = []
         for j in range(n_j):
-            line = next(f)
             aff_list = [int(i)-toffset for i in line.split()]  # Taillard spec has machines id start at 1
             np_lines.append(np.array(aff_list))
+            line = next(f,'')
+            if line == '':
+                break
         affectations = np.stack(np_lines)
 
         return n_j, n_m, affectations, durations

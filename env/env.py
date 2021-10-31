@@ -149,8 +149,8 @@ class Env(gym.Env):
     def get_solution(self):
         return self.transition_model.state.get_solution()
 
-    def render_solution(self, schedule):
-        return self.transition_model.state.render_solution(schedule)
+    def render_solution(self, schedule, scaling=1.0):
+        return self.transition_model.state.render_solution(schedule, scaling)
 
     def _create_transition_model(self):
 

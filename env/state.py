@@ -51,6 +51,15 @@ class State:
         self.machine_completion_time = None
         self.number_operations_scheduled = None
 
+        self.n_jobs_per_machine = np.zeros(self.n_machines)
+        for m in range(0, self.n_machines):
+            self.n_jobs_per_machine[m] = (self.affectations == m).sum()
+        #print('n_jobs_per_machine=',self.n_jobs_per_machine)
+        self.n_machines_per_job = np.zeros(self.n_jobs)
+        for j in range(0, self.n_jobs):
+            self.n_machines_per_job[j] = self.n_machines - (self.affectations[j] == -1).sum()
+        #print('n_machines_per_job=',self.n_machines_per_job)
+        
         self.reset()
 
     def reset(self):
@@ -84,7 +93,8 @@ class State:
         self.total_machine_time = np.zeros(self.n_machines)
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
-                self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
+                if self.affectations[job_id, task_id] != -1:
+                    self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
         self.job_completion_time = np.zeros(self.n_jobs)
         self.machine_completion_time = np.zeros(self.n_machines)
         self.number_operations_scheduled = np.zeros(self.n_jobs)
@@ -98,12 +108,14 @@ class State:
         """
         for machine_id in range(self.n_machines):
             machine_sub_graph = self.graph.subgraph(self._get_machine_node_ids(machine_id))
-            if nx.algorithms.dag.dag_longest_path_length(machine_sub_graph) != self.n_jobs - 1:
+            if nx.algorithms.dag.dag_longest_path_length(machine_sub_graph) != self.n_jobs_per_machine[machine_id] - 1:
                 return False
         return True
 
     def _get_machine_node_ids(self, machine_id):
         node_ids = []
+        if machine_id == -1:
+            return node_ids
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
@@ -275,10 +287,14 @@ class State:
         """
         job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
         machine_id = self.affectations[job_id, task_id]
-        self.is_affected[job_id, task_id] = 1
-        self.job_completion_time[job_id] += self.durations[job_id, task_id]
-        self.machine_completion_time[machine_id] += self.durations[job_id, task_id]
-        self.number_operations_scheduled[job_id] += 1
+        if machine_id == -1:
+            #self.is_affected[job_id, task_id] = 1
+            return 
+        else:
+            self.is_affected[job_id, task_id] = 1
+            self.job_completion_time[job_id] += self.durations[job_id, task_id]
+            self.machine_completion_time[machine_id] += self.durations[job_id, task_id]
+            self.number_operations_scheduled[job_id] += 1
 
     def get_machine_occupancy(self, machine_id):
         """
@@ -303,15 +319,18 @@ class State:
         schedule = self.task_completion_times - self.durations
         return Solution(schedule=schedule)
 
-    def render_solution(self, schedule):
+    def render_solution(self, schedule, scaling=1.0):
         df = []
-        all_finish = schedule + self.durations
+        all_finish = schedule*scaling + self.durations
         for job in range(self.n_jobs):
             i = 0
             while i < self.n_machines:
+                if self.affectations[job][i] == -1:
+                    i += 1
+                    continue
                 dict_op = dict()
                 dict_op["Task"] = "Job {}".format(job)
-                start_sec = schedule[job][i]
+                start_sec = schedule[job][i]*scaling
                 finish_sec = all_finish[job][i]
                 dict_op["Start"] = datetime.datetime.fromtimestamp(start_sec)
                 dict_op["Finish"] = datetime.datetime.fromtimestamp(finish_sec)
@@ -340,7 +359,7 @@ class State:
         Returns the id of the first task that wasn't affected. If all tasks are
         affected, returns -1
         """
-        if np.sum(self.is_affected[job_id]) == self.n_machines:
+        if np.sum(self.is_affected[job_id]) == self.n_machines_per_job[job_id]:
             return -1
         return list(self.is_affected[job_id]).index(0)
 

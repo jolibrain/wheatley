@@ -7,7 +7,7 @@ from ortools.sat.python import cp_model
 
 from problem.solution import Solution
 
-from config import MAX_TIME_ORTOOLS
+from config import MAX_TIME_ORTOOLS, SCALING_CONSTANT_ORTOOLS
 
 
 def solve_jssp(affectations, durations):
@@ -19,7 +19,8 @@ def solve_jssp(affectations, durations):
     for i in range(affectations.shape[0]):
         jobs_data.append([])
         for j in range(affectations.shape[1]):
-            jobs_data[-1].append((int(affectations[i, j]), int(durations[i, j])))
+            if affectations[i,j] != -1:
+                jobs_data[-1].append((int(affectations[i, j]), int(float(durations[i, j])*SCALING_CONSTANT_ORTOOLS)))
 
     machines_count = 1 + max(task[0] for job in jobs_data for task in job)
     all_machines = range(machines_count)
