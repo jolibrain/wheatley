@@ -30,8 +30,7 @@ def main():
         f"Graph pooling : {args.graph_pooling}\n"
         f"Training time : {args.total_timesteps} timesteps"
     )
-
-    if not args.load_problem is "":
+    if args.load_problem is not None:
         args.n_j, args.n_m, affectations, durations = load_taillard_problem(args.load_problem, taillard_offset=False)
         print(affectations)
         print(durations)

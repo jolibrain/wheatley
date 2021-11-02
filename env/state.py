@@ -136,24 +136,24 @@ class State:
                     # Other features
                     one_hot_machine_id = self.to_one_hot(machine_id, MAX_N_MACHINES)
                     one_hot_job_id = self.to_one_hot(job_id, MAX_N_JOBS)
-                    duration = self.durations[job_id, task_id] 
-                    total_job_time = self.total_job_time[job_id] 
+                    duration = self.durations[job_id, task_id]
+                    total_job_time = self.total_job_time[job_id]
                     total_machine_time = self.total_machine_time[machine_id]
                     job_completion_percentage = self.job_completion_time[job_id] / total_job_time
                     machine_completion_percentage = self.machine_completion_time[machine_id] / total_machine_time
 
                     # See https://hal.archives-ouvertes.fr/hal-00728900/document for the definition of these metrics
-                    mopnr = (self.n_machines - self.number_operations_scheduled[job_id])
-                    mwkr = (total_job_time - self.job_completion_time[job_id])
-                    cr = duration / (total_job_time - self.job_completion_time[job_id] + 1e-7)
-                    
+                    mopnr = self.n_machines - self.number_operations_scheduled[job_id]
+                    mwkr = total_job_time - self.job_completion_time[job_id]
+                    cr = duration / (total_job_time - self.job_completion_time[job_id] + self.max_duration)
+
                     if normalize_input:
                         duration = duration / self.max_duration
                         total_job_time = total_job_time / self.max_completion_time
                         total_machine_time = total_machine_time / self.max_completion_time
                         mopnr = mopnr / self.n_machines
                         mwkr = mwkr / self.max_completion_time
-                    
+
                     node_vector = [node_id, is_affected, completion_time]
 
                     for input_name in input_list:

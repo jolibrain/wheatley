@@ -3,7 +3,9 @@ from gym.spaces import Discrete, Dict, Box
 import numpy as np
 
 from env.l2d_transition_model import L2DTransitionModel
+from env.intrisic_reward_model import IntrisicRewardModel
 from env.l2d_reward_model import L2DRewardModel
+from env.meta_reward_model import MetaRewardModel
 from env.sparse_reward_model import SparseRewardModel
 from env.tassel_reward_model import TasselRewardModel
 from utils.env_observation import EnvObservation
@@ -27,6 +29,8 @@ class Env(gym.Env):
             n_features += MAX_N_JOBS - 1
         if "one_hot_machine_id" in input_list:
             n_features += MAX_N_MACHINES - 1
+
+        self.n_features = n_features
 
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
@@ -75,6 +79,8 @@ class Env(gym.Env):
 
         self.n_steps = 0
 
+        self._create_reward_model()
+
         self.reset()
 
     def step(self, action):
@@ -114,7 +120,6 @@ class Env(gym.Env):
 
         info = {"episode": {"r": reward, "l": 1 + self.n_steps * 2}}
         self.n_steps += 1
-
         return gym_observation, reward, done, info
 
     def _convert_action_to_node_ids(self, action):
@@ -129,7 +134,7 @@ class Env(gym.Env):
     def reset(self):
         if self.generate_random_problems:
             self.affectations, self.durations = generate_problem(self.n_jobs, self.n_machines, self.max_duration)
-        self._create_transition_and_reward_model()
+        self._create_transition_model()
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
@@ -147,7 +152,7 @@ class Env(gym.Env):
     def render_solution(self, schedule):
         return self.transition_model.state.render_solution(schedule)
 
-    def _create_transition_and_reward_model(self):
+    def _create_transition_model(self):
 
         if self.transition_model_config == "L2D":
             self.transition_model = L2DTransitionModel(
@@ -160,11 +165,20 @@ class Env(gym.Env):
         else:
             raise Exception("Transition model not recognized")
 
+    def _create_reward_model(self):
         if self.reward_model_config == "L2D":
             self.reward_model = L2DRewardModel()
         elif self.reward_model_config == "Sparse":
             self.reward_model = SparseRewardModel()
         elif self.reward_model_config == "Tassel":
             self.reward_model = TasselRewardModel(self.affectations, self.durations, self.normalize_input)
+        elif self.reward_model_config == "Intrinsic":
+            self.reward_model = IntrisicRewardModel(self.n_features * self.n_nodes)
+        elif self.reward_model_config == "Intrinsic_and_L2D":
+            self.reward_model = MetaRewardModel(
+                [L2DRewardModel, IntrisicRewardModel],
+                [{}, {"observation_input_size": self.n_features * self.n_nodes}],
+                [1, 5],
+            )
         else:
             raise Exception("Reward model not recognized")

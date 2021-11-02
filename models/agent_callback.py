@@ -43,6 +43,8 @@ class TestCallback(BaseCallback):
             self.testing_envs = [deepcopy(self.testing_env) for _ in range(self.n_test_env)]
             self.testing_env = None
 
+        self.makespan_ratio = 1000
+
         self.makespans = []
         self.ortools_makespans = []
         self.random_makespans = []
@@ -91,9 +93,15 @@ class TestCallback(BaseCallback):
         return True
 
     def _save_if_best_model(self):
-        min_ratio = np.min(np.array(self.makespans) / np.array(self.ortools_makespans))
-        if self.makespans[-1] / self.ortools_makespans[-1] == min_ratio:
+        cur_ratio = np.mean(
+            np.array(self.makespans[-4 : len(self.makespans)])
+            / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
+        )
+        if cur_ratio <= self.makespan_ratio:
             self.model.save(self.path)
+            self.makespan_ratio = cur_ratio
+            print("Saving model")
+            print(f"Current ratio : {cur_ratio:.3f}")
 
     def _evaluate_agent(self):
         mean_makespan = 0

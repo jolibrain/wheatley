@@ -10,7 +10,7 @@ class RandomAgent:
         pass
 
     def predict(self, problem_description, normalize_input, full_force_insert):
-        env = Env(problem_description, False, {"is_affected", "completion_time"})
+        env = Env(problem_description, True, {"is_affected", "completion_time"})
         observation = env.reset()
         done = False
         while not done:
