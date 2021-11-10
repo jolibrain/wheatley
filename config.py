@@ -20,8 +20,8 @@ DURATION_DELTA = (2,50) # (v1, v2) a random value within [0,v1] is removed from 
 # v2 = 0 means values are considered as max
 
 # Parameters that shouldn't play a role in learning
-MAX_N_JOBS = 20
-MAX_N_MACHINES = 20
+MAX_N_JOBS = 10
+MAX_N_MACHINES = 10
 
 MAX_N_NODES = MAX_N_JOBS * MAX_N_MACHINES
 MAX_N_EDGES = MAX_N_NODES ** 2

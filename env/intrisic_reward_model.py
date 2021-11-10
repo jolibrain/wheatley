@@ -5,7 +5,7 @@ from env.reward_model import RewardModel
 
 
 class IntrisicRewardModel(RewardModel):
-    def __init__(self, observation_input_size):
+    def __init__(self, observation_input_size, n_nodes):
         self.random_network = nn.Sequential(
             nn.Linear(observation_input_size, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, 16), nn.Sigmoid()
         )
@@ -13,7 +13,8 @@ class IntrisicRewardModel(RewardModel):
             nn.Linear(observation_input_size, 16), nn.ReLU(), nn.Linear(16, 16), nn.ReLU(), nn.Linear(16, 16), nn.Sigmoid()
         )
         self.criterion = nn.L1Loss()
-        self.optimizer = torch.optim.Adam(self.predictor_network.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.predictor_network.parameters(), lr=0.01)
+        self.n_nodes = n_nodes
 
     def evaluate(self, obs, action, next_obs):
         inp = obs.features.flatten()
@@ -25,4 +26,5 @@ class IntrisicRewardModel(RewardModel):
         reward = loss.item()
         loss.backward()
         self.optimizer.step()
+        reward = reward / self.n_nodes  # We divide by the number of nodes to have a return which is between -1 and 1
         return reward

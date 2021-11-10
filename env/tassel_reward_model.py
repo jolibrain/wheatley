@@ -9,7 +9,7 @@ class TasselRewardModel(RewardModel):
     def __init__(self, affectations, durations, normalize_input):
         self.affectations = affectations
         self.durations = durations
-        self.dividing_factor = np.max(self.durations.flatten()) if normalize_input else 1
+        self.dividing_factor = np.sum(self.durations.flatten()) if normalize_input else 1
 
     def evaluate(self, obs, action, next_obs):
         """

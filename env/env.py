@@ -12,7 +12,7 @@ from env.sparse_reward_model import SparseRewardModel
 from env.tassel_reward_model import TasselRewardModel
 from env.uncertain_reward_model import UncertainRewardModel
 from utils.env_observation import EnvObservation
-from utils.utils import generate_problem,generate_problem_durations
+from utils.utils import generate_problem, generate_problem_durations
 
 from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
 
@@ -26,13 +26,12 @@ class Env(gym.Env):
         add_force_insert_boolean=False,
         slot_locking=False,
         full_force_insert=False,
-        fixed_distrib = False
-
+        fixed_distrib=False,
     ):
         # both cases are possible (one for fake env, the other is nominal case)
         self.fixed_distrib = fixed_distrib or (problem_description.durations.shape[2] > 1)
         n_features = 2 + len(input_list)
-        if 'duration' in input_list and self.fixed_distrib:
+        if "duration" in input_list and self.fixed_distrib:
             n_features += 3
         if "one_hot_job_id" in input_list:
             n_features += MAX_N_JOBS - 1
@@ -49,9 +48,8 @@ class Env(gym.Env):
         if "mwkr" in input_list and fixed_distrib:
             n_features += 3
 
-
-        if self.fixed_distrib :
-            n_features += 3 #completion times is of dim 4 instead of  1
+        if self.fixed_distrib:
+            n_features += 3  # completion times is of dim 4 instead of  1
 
         self.n_features = n_features
         self.n_jobs = problem_description.n_jobs
@@ -153,11 +151,11 @@ class Env(gym.Env):
         second_node_id = action % MAX_N_NODES
         return first_node_id, second_node_id, boolean
 
-    def reset(self,force_regenerate_real_durations = True):
+    def reset(self, force_regenerate_real_durations=True):
         if self.generate_random_problems:
             self.affectations, self.durations = generate_problem(self.n_jobs, self.n_machines, self.max_duration)
-        if self.durations.shape[2] > 1 :
-            if force_regenerate_real_durations or self.durations[0,0,0] == -1:
+        if self.durations.shape[2] > 1:
+            if force_regenerate_real_durations or self.durations[0, 0, 0] == -1:
                 self.durations = generate_problem_durations(self.durations)
 
         self._create_transition_model()
@@ -192,26 +190,21 @@ class Env(gym.Env):
         else:
             raise Exception("Transition model not recognized")
 
-
-    def _create_reward_model(self, fixed_distrib):
-
-        if self.reward_model_config == "Sparse":
-            self.reward_model= SparseRewardModel()
-
-        elif not fixed_distrib:
-            if self.reward_model_config == "L2D":
-                self.reward_model = L2DRewardModel()
-            elif self.reward_model_config == "Tassel":
-                self.reward_model = TasselRewardModel(self.affectations, self.durations, self.normalize_input)
-            elif self.reward_model_config == "Intrinsic":
-                self.reward_model = IntrisicRewardModel(self.n_features * self.n_nodes)
-            elif self.reward_model_config == "Intrinsic_and_L2D":
-                self.reward_model = MetaRewardModel(
-                    [L2DRewardModel, IntrisicRewardModel],
-                    [{}, {"observation_input_size": self.n_features * self.n_nodes}],
-                    [1, 5],
-                )
-            else:
-                raise Exception("Reward model not recognized")
+    def _create_reward_model(self):
+        if self.reward_model_config == "L2D":
+            self.reward_model = L2DRewardModel()
+        elif self.reward_model_config == "Sparse":
+            self.reward_model = SparseRewardModel()
+        elif self.reward_model_config == "Tassel":
+            self.reward_model = TasselRewardModel(self.affectations, self.durations, self.normalize_input)
+        elif self.reward_model_config == "Intrinsic":
+            self.reward_model = IntrisicRewardModel(self.n_features * self.n_nodes)
+        elif self.reward_model_config == "Intrinsic_and_L2D":
+            self.reward_model = MetaRewardModel(
+                [L2DRewardModel, IntrisicRewardModel],
+                [{}, {"observation_input_size": self.n_features * self.n_nodes, "n_nodes": self.n_nodes}],
+                [0, 1],
+                n_timesteps=1500000,
+            )
         else:
             self.reward_model = UncertainRewardModel(self.reward_model_config)
