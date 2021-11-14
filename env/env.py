@@ -29,7 +29,7 @@ class Env(gym.Env):
         fixed_distrib=False,
     ):
         # both cases are possible (one for fake env, the other is nominal case)
-        self.fixed_distrib = fixed_distrib or (problem_description.durations.shape[2] > 1)
+        self.fixed_distrib = fixed_distrib or (problem_description.durations is not None and problem_description.durations.shape[2] > 1)
         n_features = 2 + len(input_list)
         if "duration" in input_list and self.fixed_distrib:
             n_features += 3

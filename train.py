@@ -48,7 +48,7 @@ def main():
     elif args.fixed_problem:
         affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
         print(affectations)
-        print(durations)
+        print(durations[:,:,0])
     else:
         affectations, durations = None, None
 

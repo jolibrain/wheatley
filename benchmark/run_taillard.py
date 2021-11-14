@@ -110,6 +110,8 @@ def main():
             fixed_benchmark=args.fixed_benchmark,
             full_force_insert=args.full_force_insert,
             custom_heuristic_name=args.custom_heuristic_name,
+            ortools_strategy = args.ortools_strategy,
+            keep_same_testing_envs = not args.change_testing_envs
         )
 
         # test agent

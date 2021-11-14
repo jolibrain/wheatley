@@ -1,22 +1,43 @@
 # Wheatley 
 
-This repo intends to replicate L2D, a model proposed in this paper:
+A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems.
+
+## Features
+- Trains a scheduler for fixed or problems with uncertainty
+- Support for training over random problems and generalize
+- Support for training over problems with bounded but uncertain durations
+- Reads JSSP in Taillard format, extended for uncertain durations
+- Web live training metrics reported with [Visdom]()
+- Includes schedule visualization as Gantt charts
+- Compares to OR-Tools
+- Relies on state-of-the art Deep Learning libraries: written with [Pytorch](), uses [stables-baselines3]() for RL, and [pytorch-geometric]() for graph neural networks
+
+## Installation
+
+```
+pip install -r requirements.txt
+```
+
+## Technical details
+- Wheatley learns how to schedule well and generalize over problems and/or uncertainty. It works from a representation of the schedule state-space directly, as opposed to the state-space of jobs and machines.
+- Uses PPO as the main RL algorithm
+- Captures schedules in the form of graphs and trains with an underlying Graph Neural Network
+- Large number of hyper-parameters, default values are set to the best currently known values
+- A small choice of different rewards is implemented.
+
+## References
+- Wheatley first intended to replicate L2D, a model proposed in this paper:
 [Learning to Dispatch for Job Shop Scheduling via Deep Reinforcement Learning](https://arxiv.org/pdf/2010.12367)
+- Uses some intuitions and ideas from [A Reinforcement Learning Environment For Job-Shop Scheduling](https://arxiv.org/abs/2104.03760)
 
-It should also provide improvements, in order to apply it to real industry problems
-
-## Differences with L2D implementation:
- - Rewards are normalized, I only divide them by a scalar. This also means that the 
- value they use for value loss is not the same as mine.
- - Theyr loss is twice mine (at least for ent_coef and pg_coef).
- - They update the PPO model every n env run, I do it every n_steps
- - They don't use batching, I do
- - The input for actor is [node_embedding, node_embedding, graph_embedding]. For them, 
+## Differences with L2D and other JSSP-RL implementations:
+ - Rewards are normalized, simply divided by a scalar. This also means that the 
+ original implementeation value loss is different than ours
+ - L2D updates the PPO model every n environment runs, Wheatley does every n steps, which is more practical
+ - Wheatley uses batching
+ - Wheatley input for actor is [node_embedding, node_embedding, graph_embedding]. For them, 
    it's [node_embedding, graph_embedding]
+ - Wheatley uses advanced GNN, such as gatv2 thanks to pytorch-geometric
+ - Wheatley embeds more information into every node of the schedule graph, yielding more informed policies
+ - Wheatley has support for bounded uncertain durations, including at node and reward levels.
 
-## Questions:
- - Due to the graph embedding process, first nodes don't have access to the
- information contained in the later nodes... It means the model can't make a decision
- based on the whole information at the beginning. The only way to access this 
- information is through the graph embedding, which is diffuse... I think that the
- model could perform better with more information.
