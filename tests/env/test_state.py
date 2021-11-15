@@ -6,7 +6,7 @@ import torch
 def test_init_and_reset(state):
     assert (state.is_affected == 0).all()
     assert (
-        state.task_completion_times
+        state.task_completion_times[:, :, 3]
         == np.array(
             [
                 [1, 6, 16, 23, 31],
@@ -80,31 +80,31 @@ def test_to_torch_geometric(state):
         graph.x,
         torch.tensor(
             [
-                [0, 1],
-                [0, 6],
-                [0, 16],
-                [0, 23],
-                [0, 31],
-                [0, 5],
-                [0, 11],
-                [0, 14],
-                [0, 17],
-                [0, 21],
-                [0, 4],
-                [0, 8],
-                [0, 12],
-                [0, 16],
-                [0, 20],
-                [0, 5],
-                [0, 11],
-                [0, 18],
-                [0, 26],
-                [0, 35],
-                [0, 9],
-                [0, 17],
-                [0, 24],
-                [0, 30],
-                [0, 35],
+                [0, 0, 0, 0, 1, 1, 1, 1],
+                [0, 0, 0, 0, 6, 6, 6, 6],
+                [0, 0, 0, 0, 16, 16, 16, 16],
+                [0, 0, 0, 0, 23, 23, 23, 23],
+                [0, 0, 0, 0, 31, 31, 31, 31],
+                [0, 0, 0, 0, 5, 5, 5, 5],
+                [0, 0, 0, 0, 11, 11, 11, 11],
+                [0, 0, 0, 0, 14, 14, 14, 14],
+                [0, 0, 0, 0, 17, 17, 17, 17],
+                [0, 0, 0, 0, 21, 21, 21, 21],
+                [0, 0, 0, 0, 4, 4, 4, 4],
+                [0, 0, 0, 0, 8, 8, 8, 8],
+                [0, 0, 0, 0, 12, 12, 12, 12],
+                [0, 0, 0, 0, 16, 16, 16, 16],
+                [0, 0, 0, 0, 20, 20, 20, 20],
+                [0, 0, 0, 0, 5, 5, 5, 5],
+                [0, 0, 0, 0, 11, 11, 11, 11],
+                [0, 0, 0, 0, 18, 18, 18, 18],
+                [0, 0, 0, 0, 26, 26, 26, 26],
+                [0, 0, 0, 0, 35, 35, 35, 35],
+                [0, 0, 0, 0, 9, 9, 9, 9],
+                [0, 0, 0, 0, 17, 17, 17, 17],
+                [0, 0, 0, 0, 24, 24, 24, 24],
+                [0, 0, 0, 0, 30, 30, 30, 30],
+                [0, 0, 0, 0, 35, 35, 35, 35],
             ]
         ),
     ).all()
@@ -137,10 +137,10 @@ def test_to_torch_geometric(state):
 
 
 def test_update_completion_times(state):
-    state.task_completion_times[0, 0] = 2
+    state.task_completion_times[:, :, 3][0, 0] = 2
     state._update_completion_times(1)
     assert (
-        state.task_completion_times
+        state.task_completion_times[:, :, 3]
         == np.array(
             [
                 [2, 7, 17, 24, 32],
@@ -154,36 +154,36 @@ def test_update_completion_times(state):
 
 
 def test_set_precedency(state):
-    first_cum_sum = deepcopy(state.task_completion_times)
+    first_cum_sum = deepcopy(state.task_completion_times[:, :, 3])
     assert state.set_precedency(4, 0) is False
     assert state.set_precedency(0, 4)
     assert state.set_precedency(0, 0) is False
-    assert (first_cum_sum == state.task_completion_times).all()
+    assert (first_cum_sum == state.task_completion_times[:, :, 3]).all()
     assert state.set_precedency(5, 1)
-    assert list(state.task_completion_times[0]) == [1, 10, 20, 27, 35]
+    assert list(state.task_completion_times[:, :, 3][0]) == [1, 10, 20, 27, 35]
     assert state.set_precedency(5, 20)
-    assert list(state.task_completion_times[4]) == [14, 22, 29, 35, 40]
+    assert list(state.task_completion_times[:, :, 3][4]) == [14, 22, 29, 35, 40]
     assert state.set_precedency(1, 20)
-    assert list(state.task_completion_times[4]) == [19, 27, 34, 40, 45]
+    assert list(state.task_completion_times[:, :, 3][4]) == [19, 27, 34, 40, 45]
 
 
 def test_get_machine_occupancy(state):
     for i in range(5):
-        assert state.get_machine_occupancy(i) == []
+        assert state.get_machine_occupancy(i, "averagistic") == []
     state.affect_node(0)
     state.set_precedency(0, 10)
     state.affect_node(10)
-    assert state.get_machine_occupancy(0) == [(0, 1, 0), (1, 4, 10)]
+    assert state.get_machine_occupancy(0, "averagistic") == [(0, 1, 0), (1, 4, 10)]
     state.set_precedency(10, 9)
     state.affect_node(9)
-    assert state.get_machine_occupancy(0) == [
+    assert state.get_machine_occupancy(0, "averagistic") == [
         (0, 1, 0),
         (1, 4, 10),
         (17, 4, 9),
     ]
     state.set_precedency(24, 9)
     state.affect_node(24)
-    assert state.get_machine_occupancy(0) == [
+    assert state.get_machine_occupancy(0, "averagistic") == [
         (0, 1, 0),
         (1, 4, 10),
         (30, 5, 24),
@@ -264,5 +264,5 @@ def test_get_first_unaffected_task(state):
 
 
 def test_get_job_availability(state):
-    assert state.get_job_availability(2, 0) == 0
-    assert state.get_job_availability(2, 2) == 8
+    assert state.get_job_availability(2, 0, "averagsitic") == 0
+    assert state.get_job_availability(2, 2, "averagistic") == 8

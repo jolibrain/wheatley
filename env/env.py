@@ -4,167 +4,134 @@ import numpy as np
 import sys
 import traceback
 
-from env.l2d_transition_model import L2DTransitionModel
-from env.intrisic_reward_model import IntrisicRewardModel
-from env.l2d_reward_model import L2DRewardModel
-from env.meta_reward_model import MetaRewardModel
-from env.sparse_reward_model import SparseRewardModel
-from env.tassel_reward_model import TasselRewardModel
-from env.uncertain_reward_model import UncertainRewardModel
+from env.transition_models.l2d_transition_model import L2DTransitionModel
+from env.transition_models.slot_locking_transition_model import SlotLockingTransitionModel
+from env.reward_models.intrisic_reward_model import IntrisicRewardModel
+from env.reward_models.l2d_reward_model import L2DRewardModel
+from env.reward_models.meta_reward_model import MetaRewardModel
+from env.reward_models.sparse_reward_model import SparseRewardModel
+from env.reward_models.tassel_reward_model import TasselRewardModel
+from env.reward_models.uncertain_reward_model import UncertainRewardModel
 from utils.env_observation import EnvObservation
-from utils.utils import generate_problem, generate_problem_durations
-
-from config import MAX_N_NODES, MAX_N_EDGES, MAX_N_MACHINES, MAX_N_JOBS
+from utils.utils import get_n_features
 
 
 class Env(gym.Env):
     def __init__(
         self,
         problem_description,
-        normalize_input=False,
-        input_list=[],
-        add_force_insert_boolean=False,
-        slot_locking=False,
-        full_force_insert=False,
-        fixed_distrib=False,
+        env_specification,
     ):
-        # both cases are possible (one for fake env, the other is nominal case)
-        self.fixed_distrib = fixed_distrib or (problem_description.durations is not None and problem_description.durations.shape[2] > 1)
-        n_features = 2 + len(input_list)
-        if "duration" in input_list and self.fixed_distrib:
-            n_features += 3
-        if "one_hot_job_id" in input_list:
-            n_features += MAX_N_JOBS - 1
-        if "one_hot_machine_id" in input_list:
-            n_features += MAX_N_MACHINES - 1
-        if "total_job_time" in input_list and fixed_distrib:
-            n_features += 3
-        if "total_machine_time" in input_list and fixed_distrib:
-            n_features += 3
-        if "job_completion_percentage" in input_list and fixed_distrib:
-            n_features += 3
-        if "machine_completion_percentage" in input_list and fixed_distrib:
-            n_features += 3
-        if "mwkr" in input_list and fixed_distrib:
-            n_features += 3
+        self.problem_description = problem_description
+        self.env_specification = env_specification
 
-        if self.fixed_distrib:
-            n_features += 3  # completion times is of dim 4 instead of  1
-
-        self.n_features = n_features
+        self.transition_model_config = problem_description.transition_model_config
+        self.reward_model_config = problem_description.reward_model_config
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
-        self.max_duration = problem_description.max_duration
-        self.normalize_input = normalize_input
-        self.input_list = input_list
-        self.add_force_insert_boolean = add_force_insert_boolean
-        self.slot_locking = slot_locking
-        self.full_force_insert = full_force_insert
+        self.n_nodes = self.n_machines * self.n_jobs
+        self.deterministic = problem_description.deterministic
 
-        self.action_space = Discrete(2 * MAX_N_EDGES if self.add_force_insert_boolean else MAX_N_EDGES)
+        self.n_features = get_n_features(
+            self.env_specification.input_list, self.env_specification.max_n_jobs, self.env_specification.max_n_machines
+        )
+        self.action_space = Discrete(self.env_specification.max_n_nodes * (2 if self.env_specification.add_boolean else 1))
         self.observation_space = Dict(
             {
-                "n_jobs": Discrete(MAX_N_JOBS + 1),
-                "n_machines": Discrete(MAX_N_MACHINES + 1),
-                "n_nodes": Discrete(MAX_N_NODES + 1),
-                "n_edges": Discrete(MAX_N_EDGES + 1),
+                "n_jobs": Discrete(self.env_specification.max_n_jobs + 1),
+                "n_machines": Discrete(self.env_specification.max_n_machines + 1),
+                "n_nodes": Discrete(self.env_specification.max_n_nodes + 1),
+                "n_edges": Discrete(self.env_specification.max_n_edges + 1),
                 "features": Box(
-                    # high is max_duration*n_machines due to lower bound method of calculation
                     low=0,
-                    high=self.max_duration * MAX_N_MACHINES,
-                    shape=(MAX_N_NODES, n_features),
+                    high=1000 * self.env_specification.max_n_machines,
+                    shape=(self.env_specification.max_n_nodes, self.n_features),
                 ),
                 "edge_index": Box(
                     low=0,
-                    high=MAX_N_NODES,
-                    shape=(2, MAX_N_EDGES),
+                    high=self.env_specification.max_n_nodes,
+                    shape=(2, self.env_specification.max_n_edges),
                     dtype=np.int64,
                 ),
-                "mask": Box(low=0, high=1, shape=(MAX_N_EDGES,)),
+                "mask": Box(low=0, high=1, shape=(self.env_specification.max_n_nodes,)),
             }
         )
-        self.n_nodes = self.n_machines * self.n_jobs
-
-        self.affectations = problem_description.affectations
-        self.durations = problem_description.durations
-        self.transition_model_config = problem_description.transition_model_config
-        self.reward_model_config = problem_description.reward_model_config
-
-        self.generate_random_problems = False
-        if problem_description.affectations is None and problem_description.durations is None:
-            self.generate_random_problems = True
 
         self.transition_model = None
         self.reward_model = None
 
         self.n_steps = 0
 
-        self._create_reward_model(self.fixed_distrib)
+        self._create_reward_model()
 
         self.reset()
 
     def step(self, action):
+        # Getting current observation
         obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.normalize_input, self.input_list),
+            self.transition_model.get_graph(self.env_specification.normalize_input, self.env_specification.input_list),
             self.transition_model.get_mask(),
+            self.env_specification.max_n_jobs,
+            self.env_specification.max_n_machines,
         )
-        first_node_id, second_node_id, boolean = self._convert_action_to_node_ids(action)
-        if self.full_force_insert:
-            force_insert = True
-            slot_lock = False
-        elif self.add_force_insert_boolean:
-            force_insert = boolean
-            slot_lock = False
-        elif self.slot_locking:
-            force_insert = False
-            slot_lock = boolean
-        else:
-            force_insert = False
-            slot_lock = False
-        self.transition_model.run(first_node_id, second_node_id, force_insert, slot_lock)
+
+        # Running the transition model on the current action
+        node_id, boolean = self._convert_action_to_node_id(action)
+        if self.env_specification.insertion_mode == "no_forced_insertion":
+            self.transition_model.run(node_id, force_insert=False)
+        elif self.env_specification.insertion_mode == "full_forced_insertion":
+            self.transition_model.run(node_id, force_insert=True)
+        elif self.env_specification.insertion_mode == "choose_forced_insertion":
+            self.transition_model.run(node_id, force_insert=boolean)
+        elif self.env_specification.insertion_mode == "slot_locking":
+            self.transition_model.run(node_id, lock_slot=boolean)
+
+        # Getting next observation
         next_obs = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.normalize_input, self.input_list),
+            self.transition_model.get_graph(self.env_specification.normalize_input, self.env_specification.input_list),
             self.transition_model.get_mask(),
+            self.env_specification.max_n_jobs,
+            self.env_specification.max_n_machines,
         )
+
+        # Getting the reward associated with the current action
         reward = self.reward_model.evaluate(
             obs,
             action,
             next_obs,
         )
+
+        # Getting final necessary information
         done = self.transition_model.done()
         gym_observation = next_obs.to_gym_observation()
-
         info = {"episode": {"r": reward, "l": 1 + self.n_steps * 2}}
         self.n_steps += 1
+
         return gym_observation, reward, done, info
 
-    def _convert_action_to_node_ids(self, action):
+    def _convert_action_to_node_id(self, action):
         boolean = True
-        if self.add_force_insert_boolean or self.slot_locking:
-            boolean = True if action >= MAX_N_EDGES else False
-            action = action % MAX_N_EDGES
-        first_node_id = action // MAX_N_NODES
-        second_node_id = action % MAX_N_NODES
-        return first_node_id, second_node_id, boolean
+        if self.env_specification.add_boolean:
+            boolean = True if action >= self.env_specification.max_n_nodes else False
+        node_id = action % self.env_specification.max_n_nodes
+        return node_id, boolean
 
-    def reset(self, force_regenerate_real_durations=True):
-        if self.generate_random_problems:
-            self.affectations, self.durations = generate_problem(self.n_jobs, self.n_machines, self.max_duration)
-        if self.durations.shape[2] > 1:
-            if force_regenerate_real_durations or self.durations[0, 0, 0] == -1:
-                self.durations = generate_problem_durations(self.durations)
-
+    def reset(self):
+        # Reset the transition model by creating a new one
         self._create_transition_model()
 
+        # Get the new observation
         observation = EnvObservation.from_torch_geometric(
             self.n_jobs,
             self.n_machines,
-            self.transition_model.get_graph(self.normalize_input, self.input_list),
+            self.transition_model.get_graph(self.env_specification.normalize_input, self.env_specification.input_list),
             self.transition_model.get_mask(),
+            self.env_specification.max_n_jobs,
+            self.env_specification.max_n_machines,
         )
 
         self.n_steps = 0
@@ -178,33 +145,45 @@ class Env(gym.Env):
         return self.transition_model.state.render_solution(schedule, scaling)
 
     def _create_transition_model(self):
-
-        if self.transition_model_config == "L2D":
+        affectations, durations = self.problem_description.sample_problem()
+        if self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
             self.transition_model = L2DTransitionModel(
-                self.affectations, self.durations, node_encoding="L2D", slot_locking=self.slot_locking
+                affectations,
+                durations,
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
             )
-        elif self.transition_model_config == "DenseL2D":
-            self.transition_model = L2DTransitionModel(
-                self.affectations, self.durations, node_encoding="DenseL2D", slot_locking=self.slot_locking
+        elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode == "slot_locking":
+            self.transition_model = SlotLockingTransitionModel(
+                affectations,
+                durations,
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
             )
         else:
             raise Exception("Transition model not recognized")
 
     def _create_reward_model(self):
-        if self.reward_model_config == "L2D":
-            self.reward_model = L2DRewardModel()
-        elif self.reward_model_config == "Sparse":
-            self.reward_model = SparseRewardModel()
-        elif self.reward_model_config == "Tassel":
-            self.reward_model = TasselRewardModel(self.affectations, self.durations, self.normalize_input)
-        elif self.reward_model_config == "Intrinsic":
-            self.reward_model = IntrisicRewardModel(self.n_features * self.n_nodes)
-        elif self.reward_model_config == "Intrinsic_and_L2D":
-            self.reward_model = MetaRewardModel(
-                [L2DRewardModel, IntrisicRewardModel],
-                [{}, {"observation_input_size": self.n_features * self.n_nodes, "n_nodes": self.n_nodes}],
-                [0, 1],
-                n_timesteps=1500000,
-            )
+        # For deterministic problems, there are a few rewards available
+        if self.deterministic:
+            if self.reward_model_config == "L2D":
+                self.reward_model = L2DRewardModel()
+            elif self.reward_model_config == "Sparse":
+                self.reward_model = SparseRewardModel()
+            elif self.reward_model_config == "Tassel":
+                self.reward_model = TasselRewardModel(
+                    self.affectations, self.durations, self.env_specification.normalize_input
+                )
+            elif self.reward_model_config == "Intrinsic":
+                self.reward_model = IntrisicRewardModel(self.n_features * self.n_nodes)
+            else:
+                raise Exception("Reward model not recognized")
+
+        # If the problem_description is stochastic, only Sparse and Uncertain reward models are accepted
         else:
-            self.reward_model = UncertainRewardModel(self.reward_model_config)
+            if self.reward_model_config in ["realistic", "optimistic", "pessimistic", "averagistic"]:
+                self.reward_model = UncertainRewardModel(self.reward_model_config)
+            elif self.reward_model_config == "Sparse":
+                self.reward_model = SparseRewardModel()
+            else:
+                raise Exception("Reward model not recognized")

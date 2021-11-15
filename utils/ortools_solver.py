@@ -7,10 +7,8 @@ from ortools.sat.python import cp_model
 
 from problem.solution import Solution
 
-from config import MAX_TIME_ORTOOLS, SCALING_CONSTANT_ORTOOLS
 
-
-def solve_jssp(affectations, durations):
+def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortools):
     """Minimal jobshop problem."""
     # Create the model.
     model = cp_model.CpModel()
@@ -19,8 +17,8 @@ def solve_jssp(affectations, durations):
     for i in range(affectations.shape[0]):
         jobs_data.append([])
         for j in range(affectations.shape[1]):
-            if affectations[i,j] != -1:
-                jobs_data[-1].append((int(affectations[i, j]), int(float(durations[i, j])*SCALING_CONSTANT_ORTOOLS)))
+            if affectations[i, j] != -1:
+                jobs_data[-1].append((int(affectations[i, j]), int(float(durations[i, j]) * scaling_constant_ortools)))
 
     machines_count = 1 + max(task[0] for job in jobs_data for task in job)
     all_machines = range(machines_count)
@@ -65,27 +63,14 @@ def solve_jssp(affectations, durations):
 
     # Solve model.
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = MAX_TIME_ORTOOLS
+    solver.parameters.max_time_in_seconds = max_time_ortools
     solver.Solve(model)
 
     schedule = np.zeros_like(affectations)
-    # if status == cp_model.OPTIMAL:
+
     # Create one list of assigned tasks per machine.
     for job_id, job in enumerate(jobs_data):
         for task_id, task in enumerate(job):
             machine = task[0]
             schedule[job_id, task_id] = solver.Value(all_tasks[job_id, task_id].start)
-    return Solution(schedule/SCALING_CONSTANT_ORTOOLS)
-
-    # else:
-    #     print("No Optimal solution found")
-    #     return
-
-
-if __name__ == "__main__":
-    print(
-        solve_jssp(
-            np.array([[0, 1, 2], [2, 0, 1], [1, 0, 2]]),
-            np.array([[2, 2, 4], [2, 4, 5], [2, 2, 6]]),
-        )
-    )
+    return Solution(schedule=schedule / scaling_constant_ortools, real_durations=durations)

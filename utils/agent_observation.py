@@ -15,13 +15,16 @@ class AgentObservation:
         assert self.n_nodes == self.n_jobs * self.n_machines
         assert self.n_nodes == self.features.shape[1]
         assert self.n_edges == self.edge_index.shape[2]
-        assert self.n_nodes ** 2 == self.mask.shape[1]
+        assert self.n_nodes == self.mask.shape[1]
 
     def get_batch_size(self):
         return self.features.shape[0]
 
     def get_n_nodes(self):
         return self.n_nodes
+
+    def get_n_jobs(self):
+        return self.n_jobs
 
     def get_mask(self):
         return self.mask

@@ -2,9 +2,6 @@ import numpy as np
 import torch
 
 
-from config import HIDDEN_DIM_FEATURES_EXTRACTOR
-
-
 def test_features_extractor_learning(features_extractor):
     dataset = [
         (
@@ -16,15 +13,15 @@ def test_features_extractor_learning(features_extractor):
                 "features": torch.tensor(
                     [
                         [
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
                         ]
                     ],
                     device=torch.device("cpu"),
@@ -38,7 +35,7 @@ def test_features_extractor_learning(features_extractor):
                     ],
                     device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
+                "mask": torch.zeros((1, 9), device=torch.device("cpu")),
             },
             torch.tensor([0], device=torch.device("cpu")).float(),
         ),
@@ -51,15 +48,15 @@ def test_features_extractor_learning(features_extractor):
                 "features": torch.tensor(
                     [
                         [
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
                         ]
                     ],
                     device=torch.device("cpu"),
@@ -73,7 +70,7 @@ def test_features_extractor_learning(features_extractor):
                     ],
                     device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
+                "mask": torch.zeros((1, 9), device=torch.device("cpu")),
             },
             torch.tensor([1], device=torch.device("cpu")).float(),
         ),
@@ -86,15 +83,15 @@ def test_features_extractor_learning(features_extractor):
                 "features": torch.tensor(
                     [
                         [
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
                         ]
                     ],
                     device=torch.device("cpu"),
@@ -108,7 +105,7 @@ def test_features_extractor_learning(features_extractor):
                     ],
                     device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
+                "mask": torch.zeros((1, 9), device=torch.device("cpu")),
             },
             torch.tensor([0], device=torch.device("cpu")).float(),
         ),
@@ -121,15 +118,16 @@ def test_features_extractor_learning(features_extractor):
                 "features": torch.tensor(
                     [
                         [
-                            [1, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
-                            [0.5, 0.3],
+                            [1, 1, 1, 1, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
+                            [0.5, 0.5, 0.5, 0.5, 0.3, 0.3, 0.3, 0.3],
                         ]
                     ],
                     device=torch.device("cpu"),
@@ -143,12 +141,12 @@ def test_features_extractor_learning(features_extractor):
                     ],
                     device=torch.device("cpu"),
                 ).long(),
-                "mask": torch.zeros((1, 81), device=torch.device("cpu")),
+                "mask": torch.zeros((1, 9), device=torch.device("cpu")),
             },
             torch.tensor([1], device=torch.device("cpu")).float(),
         ),
     ]
-    last_layer = torch.nn.Linear(10 * HIDDEN_DIM_FEATURES_EXTRACTOR, 1)
+    last_layer = torch.nn.Linear(10 * 64, 1)
     last_layer.to(torch.device("cpu"))
     optimizer = torch.optim.Adam(features_extractor.parameters())
     criterion = torch.nn.BCELoss()
@@ -156,7 +154,7 @@ def test_features_extractor_learning(features_extractor):
     for epoch in range(100):
         for x, y in dataset:
             embedded_features = features_extractor(x).squeeze()
-            prediction = torch.sigmoid(last_layer(embedded_features[:, 0:HIDDEN_DIM_FEATURES_EXTRACTOR].flatten().squeeze()))
+            prediction = torch.sigmoid(last_layer(embedded_features[:, 0:64].flatten().squeeze()))
             criterion.zero_grad()
             loss = criterion(prediction, y)
             loss.backward()
@@ -164,7 +162,7 @@ def test_features_extractor_learning(features_extractor):
 
     for x, y in dataset:
         embedded_features = features_extractor(x).squeeze()
-        prediction = torch.sigmoid(last_layer(embedded_features[:, 0:HIDDEN_DIM_FEATURES_EXTRACTOR].flatten().squeeze()))
+        prediction = torch.sigmoid(last_layer(embedded_features[:, 0:64].flatten().squeeze()))
         if torch.cuda.is_available():
             prediction = prediction.detach().cpu().numpy()
             y = y.detach().cpu().numpy()

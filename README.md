@@ -13,9 +13,20 @@ A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, tar
 - Relies on state-of-the art Deep Learning libraries: written with [Pytorch](), uses [stables-baselines3]() for RL, and [pytorch-geometric]() for graph neural networks
 
 ## Installation
-
 ```
 pip install -r requirements.txt
+```
+
+## Run Model:
+You can launch a training using this line (make sure to run visdom in another process before):
+```
+python3 train.py --n_j 6 --n_m 6 --total_timesteps 2000000 --n_validation_env 100 --validation_freq 1000 --n_steps_episode 256 --batch_size 128 --seed 42 --n_workers 8 --insertion_mode choose_forced_insertion --exp_name_appendix "my_run"
+```
+
+## Contribute
+If you want to contribute to wheatley, make sure to install the pre-commit hooks:
+```
+pre-commit install
 ```
 
 ## Technical details
@@ -35,9 +46,8 @@ pip install -r requirements.txt
  original implementeation value loss is different than ours
  - L2D updates the PPO model every n environment runs, Wheatley does every n steps, which is more practical
  - Wheatley uses batching
- - Wheatley input for actor is [node_embedding, node_embedding, graph_embedding]. For them, 
-   it's [node_embedding, graph_embedding]
  - Wheatley uses advanced GNN, such as gatv2 thanks to pytorch-geometric
  - Wheatley embeds more information into every node of the schedule graph, yielding more informed policies
  - Wheatley has support for bounded uncertain durations, including at node and reward levels.
+
 

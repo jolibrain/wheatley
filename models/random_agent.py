@@ -2,15 +2,19 @@ import numpy as np
 
 from env.env import Env
 
-from config import MAX_N_NODES
-
 
 class RandomAgent:
-    def __init__(self):
-        pass
+    def __init__(self, max_n_jobs, max_n_machines):
+        self.max_n_jobs = max_n_jobs
+        self.max_n_machines = max_n_machines
+        self.max_n_nodes = self.max_n_jobs * self.max_n_machines
 
-    def predict(self, env, force = False):
-        observation = env.reset(force)
+    def predict(self, problem_description, env_specification):
+        env = Env(
+            problem_description,
+            env_specification,
+        )
+        observation = env.reset()
         done = False
         while not done:
             action = self.select_action(observation)
@@ -19,11 +23,9 @@ class RandomAgent:
         return solution
 
     def select_action(self, observation):
-        real_mask = np.zeros((MAX_N_NODES, MAX_N_NODES))
-        n_nodes = observation["n_nodes"]
-        lil_mask = observation["mask"][0 : n_nodes * n_nodes].reshape(n_nodes, n_nodes)
-        real_mask[0:n_nodes, 0:n_nodes] = lil_mask
-        real_mask = real_mask.flatten()
+        real_mask = np.zeros(self.max_n_jobs)
+        mask = observation["mask"]
+        real_mask = mask.flatten()
         possible_actions = np.nonzero(real_mask)[0]
         action = np.random.choice(possible_actions)
         return action

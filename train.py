@@ -3,13 +3,14 @@ import os
 import numpy as np
 import torch
 
+from env.env_specification import EnvSpecification
 from models.agent import Agent
-from utils.utils import load_taillard_problem  # noqa E402
+from models.agent_specification import AgentSpecification
+from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
-from utils.utils import generate_problem,generate_problem_distrib
+from utils.utils import get_n_features, generate_deterministic_problem, generate_problem_distrib, load_taillard_problem
 
-from config import MAX_DURATION, MAX_N_JOBS, MAX_N_MACHINES, DURATION_MODE_BOUNDS, DURATION_DELTA
-from args import args, exp_name
+from args import args, exp_name, path
 
 
 def main():
@@ -17,122 +18,95 @@ def main():
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    if args.n_j > MAX_N_JOBS or args.n_m > MAX_N_MACHINES:
-        raise Exception("MAX_N_JOBS or MAX_N_MACHINES are too low for this setup")
-
-    print(
-        f"Launching training\n"
-        f"Problem size : {args.n_j} jobs, {args.n_m} machines\n"
-        f"Transition model : {args.transition_model_config}\n"
-        f"Reward model : {args.reward_model_config}\n"
-        f"Seed : {args.seed}\n"
-        f"Agent graph : {args.gconv_type}\n"
-        f"Graph pooling : {args.graph_pooling}\n"
-        f"Training time : {args.total_timesteps} timesteps"
-    )
-
+    # If we want to load a specific problem, under the taillard (extended) format, and train on it, we first do it.
+    # Note that this problem can be stochastic or deterministic
+    affectations, durations = None, None
     if args.load_problem is not None:
-        args.n_j, args.n_m, affectations, durations = load_taillard_problem(args.load_problem, taillard_offset=False, fixed_distrib = args.fixed_distrib)
-        print(affectations)
-        print(durations)
-
-    elif args.fixed_distrib:
-        affectations, durations = generate_problem_distrib(args.n_j, args.n_m, DURATION_MODE_BOUNDS, DURATION_DELTA)
-        print(affectations)
-        print("min")
-        print(durations[:,:,1])
-        print("max")
-        print(durations[:,:,2])
-        print("mode")
-        print(durations[:,:,3])
-    elif args.fixed_problem:
-        affectations, durations = generate_problem(args.n_j, args.n_m, MAX_DURATION)
-        print(affectations)
-        print(durations[:,:,0])
-    else:
-        affectations, durations = None, None
-
-    problem_description = ProblemDescription(
-        args.n_j,
-        args.n_m,
-        MAX_DURATION,
-        args.transition_model_config,
-        args.reward_model_config,
-        affectations,
-        durations,
-    )
-
-    path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
-    if args.retrain and os.path.exists(path):
-        agent = Agent.load(
-            path,
-            args.input_list,
-            args.add_force_insert_boolean,
-            args.slot_locking,
-            args.mlp_act,
-            args.full_force_insert,
+        args.n_j, args.n_m, affectations, durations = load_taillard_problem(
+            args.load_problem, taillard_offset=False, deterministic=(args.duration_type == "deterministic")
         )
+        args.fixed_problem = True
+
+    # Define problem and visualize it
+    problem_description = ProblemDescription(
+        transition_model_config=args.transition_model_config,
+        reward_model_config=args.reward_model_config,
+        deterministic=(args.duration_type == "deterministic"),
+        fixed=args.fixed_problem,
+        affectations=affectations,
+        durations=durations,
+        n_jobs=args.n_j,
+        n_machines=args.n_m,
+        max_duration=args.max_duration,
+        duration_mode_bounds=args.duration_mode_bounds,
+        duration_delta=args.duration_delta,
+    )
+    problem_description.print_self()
+
+    # Then specify the variables used for the training
+    training_specification = TrainingSpecification(
+        total_timesteps=args.total_timesteps,
+        n_validation_env=args.n_validation_env,
+        validation_freq=args.validation_freq,
+        display_env=exp_name,
+        path=path,
+        custom_heuristic_name=args.custom_heuristic_name,
+        ortools_strategy=args.ortools_strategy,
+        max_time_ortools=args.max_time_ortools,
+        scaling_constant_ortools=args.scaling_constant_ortools,
+    )
+    training_specification.print_self()
+
+    # If we want to use a pretrained Agent, we only have to load it (if it exists)
+    if args.retrain and os.path.exists(path + ".zip"):
+        print("Retraining an already existing agent\n")
+        agent = Agent.load(path)
+
+    # Else, we instantiate a new Agent
     else:
-        n_features = 2 + len(args.input_list)
-        if "duration" in args.input_list and args.fixed_distrib:
-            n_features += 3
-        if "one_hot_job_id" in args.input_list:
-            n_features += MAX_N_JOBS - 1
-        if "one_hot_machine_id" in args.input_list:
-            n_features += MAX_N_MACHINES - 1
-        if "total_job_time" in args.input_list and args.fixed_distrib:
-            n_features += 3
-        if "total_machine_time" in args.input_list and args.fixed_distrib:
-            n_features += 3
-        if "job_completion_percentage" in args.input_list and args.fixed_distrib:
-            n_features += 3
-        if "machine_completion_percentage" in args.input_list and args.fixed_distrib:
-            n_features += 3
-        if "mwkr" in args.input_list and args.fixed_distrib:
-            n_features += 3
-
-        if args.fixed_distrib:
-            n_features += 3
-
-        agent = Agent(
-            n_epochs=args.n_epochs,
+        env_specification = EnvSpecification(
+            max_n_jobs=args.max_n_j,
+            max_n_machines=args.max_n_m,
+            normalize_input=not args.dont_normalize_input,
+            input_list=args.features,
+            insertion_mode=args.insertion_mode,
+        )
+        env_specification.print_self()
+        agent_specification = AgentSpecification(
+            lr=args.lr,
             n_steps_episode=args.n_steps_episode,
             batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
             gamma=args.gamma,
             clip_range=args.clip_range,
             target_kl=args.target_kl,
             ent_coef=args.ent_coef,
             vf_coef=args.vf_coef,
-            lr=args.lr,
+            optimizer=args.optimizer,
+            freeze_graph=args.freeze_graph,
+            n_features=get_n_features(args.features, args.max_n_j, args.max_n_m),
             gconv_type=args.gconv_type,
             graph_has_relu=args.graph_has_relu,
             graph_pooling=args.graph_pooling,
-            optimizer=args.optimizer,
-            freeze_graph=args.freeze_graph,
-            input_dim_features_extractor=n_features,
-            add_force_insert_boolean=args.add_force_insert_boolean,
-            slot_locking=args.slot_locking,
             mlp_act=args.mlp_act,
             n_workers=args.n_workers,
-            device=torch.device("cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"),
-            input_list=args.input_list,
-            fixed_distrib = args.fixed_distrib
+            device=torch.device(args.device),
+            n_mlp_layers_features_extractor=args.n_mlp_layers_features_extractor,
+            n_layers_features_extractor=args.n_layers_features_extractor,
+            hidden_dim_features_extractor=args.hidden_dim_features_extractor,
+            n_attention_heads=args.n_attention_heads,
+            n_mlp_layers_actor=args.n_mlp_layers_actor,
+            hidden_dim_actor=args.hidden_dim_actor,
+            n_mlp_layers_critic=args.n_mlp_layers_critic,
+            hidden_dim_critic=args.hidden_dim_critic,
         )
+        agent_specification.print_self()
+        agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
 
-    agent.train(
-        problem_description,
-        total_timesteps=args.total_timesteps,
-        n_test_env=args.n_test_env,
-        eval_freq=args.eval_freq,
-        normalize_input=not args.dont_normalize_input,
-        display_env=exp_name,
-        path=path,
-        fixed_benchmark=args.fixed_benchmark,
-        full_force_insert=args.full_force_insert,
-        custom_heuristic_name=args.custom_heuristic_name,
-        ortools_strategy = args.ortools_strategy,
-        keep_same_testing_envs = not args.change_testing_envs
-    )
+    # And finally, we train the model on the specified training mode
+    # Note: The saving of the best model is hanlded in the agent.train method.
+    # We save every time we hit a min RL / OR-Tools ratio
+    agent.train(problem_description, training_specification)
 
 
 if __name__ == "__main__":

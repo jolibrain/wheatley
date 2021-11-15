@@ -1,4 +1,4 @@
-from copy import deepcopy
+import pickle
 import time
 
 import matplotlib.pyplot as plt
@@ -12,43 +12,60 @@ from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
-from utils.utils import load_benchmark, generate_problem_durations
+from utils.utils import generate_problem_durations
 
-class TestCallback(BaseCallback):
-    def __init__(self, env, n_test_env, display_env, path, fixed_benchmark, custom_name, ortools_strategy = "pessimistic", keep_same_testing_envs = True, verbose=2):
-        super(TestCallback, self).__init__(verbose=verbose)
-        self.testing_env = env
-        self.n_test_env = n_test_env
+
+class ValidationCallback(BaseCallback):
+    def __init__(
+        self,
+        problem_description,
+        env_specification,
+        n_workers,
+        device,
+        n_validation_env,
+        display_env,
+        path,
+        custom_name,
+        max_n_jobs,
+        max_n_machines,
+        max_time_ortools,
+        scaling_constant_ortools,
+        ortools_strategy="pessimistic",
+        verbose=2,
+    ):
+        super(ValidationCallback, self).__init__(verbose=verbose)
+
+        # Parameters
+        self.problem_description = problem_description
+        self.env_specification = env_specification
+        self.n_workers = n_workers
+        self.device = device
+
+        self.n_validation_env = n_validation_env
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
-        self.fixed_benchmark = fixed_benchmark
         self.ortools_strategy = ortools_strategy
-        self.keep_same_testing_envs = keep_same_testing_envs
 
-        self.n_jobs = self.testing_env.n_jobs
-        self.n_machines = self.testing_env.n_machines
-        self.max_duration = self.testing_env.max_duration
-        self.transition_model_config = self.testing_env.transition_model_config
-        self.reward_model_config = self.testing_env.reward_model_config
+        self.n_jobs = problem_description.n_jobs
+        self.n_machines = problem_description.n_machines
+        self.transition_model_config = problem_description.transition_model_config
+        self.reward_model_config = problem_description.reward_model_config
 
-        self.random_agent = RandomAgent()
-        if custom_name != "None":
-            self.custom_agent = CustomAgent(custom_name.lower())
         self.custom_name = custom_name
 
-        if self.fixed_benchmark:
-            self._init_testing_envs()
-            self.n_test_env = 100
-            self.testing_env = None
-        else:
-            if self.testing_env.durations.shape[2] > 1:
-                self.testing_env.durations[:,:,0] = -1
-            self.testing_envs = [deepcopy(self.testing_env) for _ in range(self.n_test_env)]
+        self.max_n_jobs = max_n_jobs
+        self.max_n_machines = max_n_machines
+        self.max_time_ortools = max_time_ortools
+        self.scaling_constant_ortools = scaling_constant_ortools
 
-            self.testing_env = None
+        # Comparative agents
+        self.random_agent = RandomAgent(self.max_n_jobs, self.max_n_machines)
+        if custom_name != "None":
+            self.custom_agent = CustomAgent(self.max_n_jobs, self.max_n_machines, custom_name.lower())
 
+        # Inner variables
+        self.validation_envs = [Env(problem_description, env_specification) for _ in range(self.n_validation_env)]
         self.makespan_ratio = 1000
-
         self.makespans = []
         self.ortools_makespans = []
         self.random_makespans = []
@@ -69,29 +86,8 @@ class TestCallback(BaseCallback):
         self.figure = None
         self.gantt_rl_img = None
         self.gantt_or_img = None
-
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
-
-
-    def _init_testing_envs(self):
-        data = load_benchmark(self.n_jobs, self.n_machines)
-        self.testing_envs = [
-            Env(
-                ProblemDescription(
-                    self.n_jobs,
-                    self.n_machines,
-                    self.max_duration,
-                    self.transition_model_config,
-                    self.reward_model_config,
-                    data[i][0],
-                    data[i][1],
-                ),
-                normalize_input=self.testing_env.normalize_input,
-                input_set=self.testing_env.input_set,
-            )
-            for i in range(data.shape[0])
-        ]
 
     def _on_step(self):
         self._evaluate_agent()
@@ -107,6 +103,15 @@ class TestCallback(BaseCallback):
         )
         if cur_ratio <= self.makespan_ratio:
             self.model.save(self.path)
+
+            # EVIL QUICK FIX OF DEATH
+            # The best thing to do would be to specify a AgentTrainer, responsible of training the agent and printing
+            # callbacks. This way, we could just do agent.save(path). This needs to rebuild the structure of the training.
+            with open(self.path + ".pickle", "wb") as f:
+                pickle.dump(
+                    {"env_specification": self.env_specification, "n_workers": self.n_workers, "device": self.device}, f
+                )
+
             self.makespan_ratio = cur_ratio
             print("Saving model")
             print(f"Current ratio : {cur_ratio:.3f}")
@@ -116,69 +121,59 @@ class TestCallback(BaseCallback):
         ortools_mean_makespan = 0
         random_mean_makespan = 0
         custom_mean_makespan = 0
-        for i in range(self.n_test_env):
-            obs = self.testing_envs[i].reset(force_regenerate_real_durations= \
-                                             not self.keep_same_testing_envs)
+        for i in range(self.n_validation_env):
+            obs = self.validation_envs[i].reset()
             done = False
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
-                obs, reward, done, info = self.testing_envs[i].step(action)
-            schedule = self.testing_envs[i].get_solution().schedule
+                obs, reward, done, info = self.validation_envs[i].step(action)
+            solution = self.validation_envs[i].get_solution()
+            schedule = solution.schedule
+            makespan = solution.get_makespan()
 
             if i == 0:
-                self.gantt_rl_img = self.testing_envs[i].render_solution(schedule)
+                self.gantt_rl_img = self.validation_envs[i].render_solution(schedule)
 
-            durations = self.testing_envs[i].durations[:,:,0]
-            mean_makespan += np.max(schedule + durations) / self.n_test_env
+            mean_makespan += makespan / self.n_validation_env
 
-            if self.keep_same_testing_envs and len(self.all_or_tools_makespan) == self.n_test_env:
-                or_tools_makespan = self.all_or_tools_makespan[i]
-                or_tools_schedule = self.all_or_tools_schedule[i]
-            else:
-                or_tools_makespan, or_tools_schedule = get_ortools_makespan(
-                    self.n_jobs,
-                    self.n_machines,
-                    self.max_duration,
-                    self.testing_envs[i].affectations,
-                    self.testing_envs[i].durations,
-                    self.ortools_strategy
-                )
-                if self.keep_same_testing_envs:
-                    self.all_or_tools_makespan.append(or_tools_makespan)
-                    self.all_or_tools_schedule.append(or_tools_schedule)
+            or_tools_makespan, or_tools_schedule = get_ortools_makespan(
+                self.validation_envs[i].transition_model.affectations,
+                self.validation_envs[i].transition_model.durations,
+                self.max_time_ortools,
+                self.scaling_constant_ortools,
+                self.ortools_strategy,
+            )
 
             if i == 0:
-                self.gantt_or_img = self.testing_envs[i].render_solution(or_tools_schedule, scaling=1.0)
-            ortools_mean_makespan += or_tools_makespan / self.n_test_env
+                self.gantt_or_img = self.validation_envs[i].render_solution(or_tools_schedule, scaling=1.0)
+            ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 
             random_mean_makespan += (
                 np.max(
                     self.random_agent.predict(
-                        self.testing_envs[i]
-                    ).schedule
-                    + self.testing_envs[i].durations[:,:,0]
+                        self.problem_description,
+                        self.env_specification,
+                    ).get_makespan()
                 )
-                / self.n_test_env
+                / self.n_validation_env
             )
             if self.custom_name != "None":
                 custom_mean_makespan += (
                     np.max(
                         self.custom_agent.predict(
                             ProblemDescription(
-                                self.testing_envs[i].n_jobs,
-                                self.testing_envs[i].n_machines,
-                                self.testing_envs[i].max_duration,
-                                self.testing_envs[i].transition_model_config,
-                                self.testing_envs[i].reward_model_config,
-                                self.testing_envs[i].affectations,
-                                self.testing_envs[i].durations,
+                                transition_model_config=self.validation_envs[i].transition_model_config,
+                                reward_model_config=self.validation_envs[i].reward_model_config,
+                                affectations=self.validation_envs[i].transition_model.affectations,
+                                durations=self.validation_envs[i].transition_model.durations,
+                                n_jobs=self.validation_envs[i].n_jobs,
+                                n_machines=self.validation_envs[i].n_machines,
                             ),
                             True,
                             None,
-                        ).schedule
-                        + self.testing_envs[i].durations
+                        ).get_makespan()
                     )
-                    / self.n_test_env
+                    / self.n_validation_env
                 )
         print("--- mean_makespan=", mean_makespan, " ---")
         self.makespans.append(mean_makespan)
@@ -207,8 +202,8 @@ class TestCallback(BaseCallback):
             opts["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]])
             opts2["legend"].append(self.custom_name + " / OR-tools")
             opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
-        self.vis.line(Y=np.array(Y_list).T, win="test_makespan", opts=opts)
-        self.vis.line(Y=np.stack(Y2_list).T, win="test_makespan_ratio", opts=opts2)
+        self.vis.line(Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
+        self.vis.line(Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
 
         if self.first_callback:
             self.first_callback = False

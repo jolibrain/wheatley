@@ -6,14 +6,6 @@ from torch_geometric.nn.conv import GINConv, GATv2Conv
 from models.mlp import MLP
 from utils.agent_observation import AgentObservation
 
-from config import (
-    MAX_N_NODES,
-    HIDDEN_DIM_FEATURES_EXTRACTOR,
-    N_LAYERS_FEATURES_EXTRACTOR,
-    N_MLP_LAYERS_FEATURES_EXTRACTOR,
-    N_ATTENTION_HEADS,
-)
-
 import sys
 
 
@@ -27,13 +19,20 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         freeze_graph,
         graph_has_relu,
         device,
+        max_n_nodes,
+        n_mlp_layers_features_extractor,
+        n_layers_features_extractor,
+        hidden_dim_features_extractor,
+        n_attention_heads,
     ):
+        self.max_n_nodes = max_n_nodes
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
             features_dim=(
-                (HIDDEN_DIM_FEATURES_EXTRACTOR * N_LAYERS_FEATURES_EXTRACTOR + input_dim_features_extractor) + MAX_N_NODES
+                (hidden_dim_features_extractor * n_layers_features_extractor + input_dim_features_extractor)
+                + self.max_n_nodes
             )
-            * (MAX_N_NODES + 1),
+            * (self.max_n_nodes + 1),
         )
         self.freeze_graph = freeze_graph
         self.device = device
@@ -41,7 +40,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
         self.graph_pooling = graph_pooling
-        self.n_layers_features_extractor = N_LAYERS_FEATURES_EXTRACTOR
+        self.n_layers_features_extractor = n_layers_features_extractor
         self.features_extractors = nn.ModuleList()
 
         if self.gconv_type == "gatv2":
@@ -52,10 +51,10 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 self.features_extractors.append(
                     GINConv(
                         MLP(
-                            n_layers=N_MLP_LAYERS_FEATURES_EXTRACTOR,
-                            input_dim=input_dim_features_extractor if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
-                            hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
-                            output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
+                            n_layers=n_mlp_layers_features_extractor,
+                            input_dim=input_dim_features_extractor if layer == 0 else hidden_dim_features_extractor,
+                            hidden_dim=hidden_dim_features_extractor,
+                            output_dim=hidden_dim_features_extractor,
                             batch_norm=False if self.freeze_graph else True,
                             activation="relu",
                             device=self.device,
@@ -66,22 +65,22 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             elif self.gconv_type == "gatv2":
                 self.features_extractors.append(
                     GATv2Conv(
-                        in_channels=input_dim_features_extractor if layer == 0 else HIDDEN_DIM_FEATURES_EXTRACTOR,
-                        out_channels=HIDDEN_DIM_FEATURES_EXTRACTOR, heads = N_ATTENTION_HEADS
+                        in_channels=input_dim_features_extractor if layer == 0 else hidden_dim_features_extractor,
+                        out_channels=hidden_dim_features_extractor,
+                        heads=n_attention_heads,
                     )
                 )
                 self.mlps.append(
                     MLP(
-                        n_layers=N_MLP_LAYERS_FEATURES_EXTRACTOR,
-                        input_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * N_ATTENTION_HEADS,
-                        hidden_dim=HIDDEN_DIM_FEATURES_EXTRACTOR * N_ATTENTION_HEADS,
-                        output_dim=HIDDEN_DIM_FEATURES_EXTRACTOR,
+                        n_layers=n_mlp_layers_features_extractor,
+                        input_dim=hidden_dim_features_extractor * n_attention_heads,
+                        hidden_dim=hidden_dim_features_extractor * n_attention_heads,
+                        output_dim=hidden_dim_features_extractor,
                         batch_norm=False,
                         activation="elu",
                         device=self.device,
                     )
                 )
-
 
             else:
                 print("Unknown gconv type ", self.gconv_type)
@@ -112,7 +111,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         for layer in range(self.n_layers_features_extractor):
             features = self.features_extractors[layer](features, edge_index)
             if self.gconv_type == "gatv2":
-                features =self.mlps[layer](features)
+                features = self.mlps[layer](features)
             if self.graph_has_relu:
                 features = torch.nn.functional.elu(features)
             features_list.append(features)
@@ -130,8 +129,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
         graph_and_nodes_embedding = torch.cat((graph_embedding.reshape(batch_size, 1, -1), features), dim=1)
 
-        mask = mask.reshape(batch_size, n_nodes, n_nodes)
-        extended_mask = torch.cat((torch.zeros((batch_size, 1, n_nodes), device=self.device), mask), dim=1)
+        extended_mask = torch.cat((torch.zeros((batch_size, 1), device=self.device), mask), dim=1).unsqueeze(2)
         embedded_features = torch.cat((graph_and_nodes_embedding, extended_mask), dim=2)
 
         return embedded_features

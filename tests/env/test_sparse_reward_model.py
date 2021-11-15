@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 
-from env.sparse_reward_model import SparseRewardModel
+from env.reward_models.sparse_reward_model import SparseRewardModel
 
 
 def test_evaluate(env_observation):

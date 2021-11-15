@@ -14,7 +14,7 @@ class L2DRewardModel(RewardModel):
         """
         features_t = obs.features
         features_tp = next_obs.features
-        H_st = torch.max(features_t[:, 1]).item()
-        H_stp = torch.max(features_tp[:, 1]).item()
+        H_st = torch.max(features_t[:, 7]).item()
+        H_stp = torch.max(features_tp[:, 7]).item()
         reward = H_st - H_stp
         return reward

@@ -21,7 +21,7 @@ class TasselRewardModel(RewardModel):
         job_id, task_id = node_to_job_and_task(scheduled_node_id, self.affectations.shape[1])
         cur_duration = self.durations[job_id, task_id]
 
-        ancient_idle_time = torch.sum(torch.max(features_t[:, 1].reshape(self.affectations.shape), axis=1).values)
-        new_idle_time = torch.sum(torch.max(features_tp[:, 1].reshape(self.affectations.shape), axis=1).values)
+        ancient_idle_time = torch.sum(torch.max(features_t[:, 7].reshape(self.affectations.shape), axis=1).values)
+        new_idle_time = torch.sum(torch.max(features_tp[:, 7].reshape(self.affectations.shape), axis=1).values)
         reward = (cur_duration / self.dividing_factor) - (new_idle_time - ancient_idle_time)
         return reward.item()

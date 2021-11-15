@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from env.tassel_reward_model import TasselRewardModel
+from env.reward_models.tassel_reward_model import TasselRewardModel
 from utils.env_observation import EnvObservation
 
 
@@ -12,17 +12,45 @@ def test_evaluate():
         3,
         9,
         2,
-        torch.tensor([[1, 5], [1, 10], [0, 15], [1, 11], [1, 17], [0, 23], [1, 18], [0, 25], [0, 32]]),
+        torch.tensor(
+            [
+                [1, 1, 1, 1, 5, 5, 5, 5],
+                [1, 1, 1, 1, 10, 10, 10, 10],
+                [0, 0, 0, 0, 15, 15, 15, 15],
+                [1, 1, 1, 1, 11, 11, 11, 11],
+                [1, 1, 1, 1, 17, 17, 17, 17],
+                [0, 0, 0, 0, 23, 23, 23, 23],
+                [1, 1, 1, 1, 18, 18, 18, 18],
+                [0, 0, 0, 0, 25, 25, 25, 25],
+                [0, 0, 0, 0, 32, 32, 32, 32],
+            ]
+        ),
         torch.tensor([[1, 2], [2, 1]]),
-        torch.zeros(81),
+        torch.zeros(9),
+        3,
+        3,
     )
     next_obs = EnvObservation(
         3,
         3,
         9,
         2,
-        torch.tensor([[1, 5], [1, 10], [0, 15], [1, 11], [1, 17], [1, 30], [1, 18], [0, 25], [0, 34]]),
+        torch.tensor(
+            [
+                [1, 1, 1, 1, 5, 5, 5, 5],
+                [1, 1, 1, 1, 10, 10, 10, 10],
+                [0, 0, 0, 0, 15, 15, 15, 15],
+                [1, 1, 1, 1, 11, 11, 11, 11],
+                [1, 1, 1, 1, 17, 17, 17, 17],
+                [1, 1, 1, 1, 30, 30, 30, 30],
+                [1, 1, 1, 1, 18, 18, 18, 18],
+                [0, 0, 0, 0, 25, 25, 25, 25],
+                [0, 0, 0, 0, 34, 34, 34, 34],
+            ]
+        ),
         torch.tensor([[1, 2], [2, 1]]),
-        torch.zeros(81),
+        torch.zeros(9),
+        3,
+        3,
     )
     assert rm.evaluate(obs, None, next_obs) == -3

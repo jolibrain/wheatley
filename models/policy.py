@@ -18,10 +18,39 @@ class Policy(ActorCriticPolicy):
         input_dim_features_extractor = kwargs.pop("input_dim_features_extractor")
         self.input_dim_features_extractor = input_dim_features_extractor
         self.ortho_init = True
+        max_n_nodes = kwargs.pop("max_n_nodes")
+        self.max_n_nodes = max_n_nodes
+        max_n_jobs = kwargs.pop("max_n_jobs")
+        self.max_n_jobs = max_n_jobs
+        n_layers_features_extractor = kwargs.pop("n_layers_features_extractor")
+        self.n_layers_features_extractor = n_layers_features_extractor
+        hidden_dim_features_extractor = kwargs.pop("hidden_dim_features_extractor")
+        self.hidden_dim_features_extractor = hidden_dim_features_extractor
+        n_mlp_layers_actor = kwargs.pop("n_mlp_layers_actor")
+        self.n_mlp_layers_actor = n_mlp_layers_actor
+        hidden_dim_actor = kwargs.pop("hidden_dim_actor")
+        self.hidden_dim_actor = hidden_dim_actor
+        n_mlp_layers_critic = kwargs.pop("n_mlp_layers_critic")
+        self.n_mlp_layers_critic = n_mlp_layers_critic
+        hidden_dim_critic = kwargs.pop("hidden_dim_critic")
+        self.hidden_dim_critic = hidden_dim_critic
         super(Policy, self).__init__(*args, **kwargs)
 
     def _build_mlp_extractor(self):
-        self.mlp_extractor = MLPExtractor(self.add_boolean, self.mlp_act, self._device, self.input_dim_features_extractor)
+        self.mlp_extractor = MLPExtractor(
+            self.add_boolean,
+            self.mlp_act,
+            self._device,
+            self.input_dim_features_extractor,
+            self.max_n_nodes,
+            self.max_n_jobs,
+            self.n_layers_features_extractor,
+            self.hidden_dim_features_extractor,
+            self.n_mlp_layers_actor,
+            self.hidden_dim_actor,
+            self.n_mlp_layers_critic,
+            self.hidden_dim_critic,
+        )
 
     # The four following functions should be checked, since they are re written from
     # stable_baselines3. We should also check that there are no other functions that

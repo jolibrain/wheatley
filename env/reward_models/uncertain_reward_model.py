@@ -4,22 +4,21 @@ from env.reward_model import RewardModel
 
 
 class UncertainRewardModel(RewardModel):
-    def __init__(self,config):
-        # 1 uses real completion time
-        # 2 is for min
-        # 3 is for max
-        # 4 is for mode
+    def __init__(self, config):
+        # 4 uses real completion time
+        # 5 is for min
+        # 6 is for max
+        # 7 is for mode
         if config == "optimistic":
-            self.index = 2
+            self.index = 5
         elif config == "pessimistic":
-            self.index = 3
+            self.index = 6
         elif config == "realistic":
-            self.index = 1
-        elif config == "averagistic":
             self.index = 4
+        elif config == "averagistic":
+            self.index = 7
         else:
             raise Exception("Reward model not recognized :  " + config)
-
 
     def evaluate(self, obs, action, next_obs):
         """

@@ -13,7 +13,7 @@ class SparseRewardModel(RewardModel):
         """
         features_tp = next_obs.features
         is_done = (features_tp[:, 0] == 1).all().item()
-        makespan = torch.max(features_tp[:, 1]).item()
+        makespan = torch.max(features_tp[:, 7]).item()
         # We don't want |reward| to be > 1. Since makespan is divided by longest task, we only have to divide by 2
         reward = makespan / 2
         return -reward if is_done else 0

@@ -1,14 +1,13 @@
 import numpy as np
 import torch
 
+from env.env_specification import EnvSpecification
 from models.agent import Agent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
-from utils.utils import generate_problem, load_benchmark
-from utils.utils_testing import test_agent, get_ortools_makespan
+from utils.utils_testing import get_ortools_makespan
 
-from config import MAX_DURATION
-from args import args, exp_name
+from args import args, exp_name, path
 
 
 def main():
@@ -17,21 +16,8 @@ def main():
     np.random.seed(args.seed)
 
     print("Loading agent")
-    path = "saved_networks/" + exp_name + ".zip" if args.path == "saved_networks/default_net" else args.path + ".zip"
-    agent = Agent.load(
-        path,
-        args.input_list,
-        args.add_force_insert_boolean,
-        args.slot_locking,
-        args.mlp_act,
-        args.n_workers,
-        torch.device("cuda:0" if torch.cuda.is_available() and not args.cpu else "cpu"),
-    )
-    random_agent = RandomAgent()
-
-    if args.fixed_benchmark:
-        args.n_test_problems = 100
-        problem_data = load_benchmark(args.n_j, args.n_m)
+    agent = Agent.load(path)
+    random_agent = RandomAgent(args.max_n_j, args.max_n_m)
 
     print(
         "Launching inference.\n"
@@ -43,23 +29,41 @@ def main():
     rl_makespans = []
     or_tools_makespans = []
     random_makespans = []
+
+    problem_description = ProblemDescription(
+        transition_model_config=args.transition_model_config,
+        reward_model_config=args.reward_model_config,
+        deterministic=(args.duration_type == "deterministic"),
+        fixed=args.fixed_problem,
+        n_jobs=args.n_j,
+        n_machines=args.n_m,
+        max_duration=args.max_duration,
+    )
+    env_specification = EnvSpecification(
+        max_n_jobs=args.max_n_j,
+        max_n_machines=args.max_n_m,
+        normalize_input=not args.dont_normalize_input,
+        input_list=args.features,
+        insertion_mode=args.insertion_mode,
+    )
+
     for i in range(args.n_test_problems):
         # Prints
-        if (i + 1) % (args.n_test_problems // 50) == 0:
+        if (i + 1) % (args.n_test_problems // args.test_print_every) == 0:
             print(f"{i+1}/{args.n_test_problems}")
 
-        affectations, durations = (
-            (problem_data[i][0], problem_data[i][1])
-            if args.fixed_benchmark
-            else generate_problem(args.n_j, args.n_m, MAX_DURATION)
-        )
-        problem_description = ProblemDescription(
-            args.n_j, args.n_m, MAX_DURATION, args.transition_model_config, args.reward_model_config, affectations, durations
-        )
+        # We use a frozen version of our problem_description, to have the same problem for RL, Random, and OR-Tools
+        frozen_problem_description = problem_description.get_frozen_version()
+        affectations, durations = frozen_problem_description.sample_problem()
 
-        rl_makespan = test_agent(agent, problem_description, not args.dont_normalize_input, args.full_force_insert)
-        random_makespan = test_agent(random_agent, problem_description, None, None)
-        or_tools_makespan = get_ortools_makespan(args.n_j, args.n_m, MAX_DURATION, affectations, durations)[0]
+        rl_makespan = agent.predict(frozen_problem_description).get_makespan()
+        random_makespan = random_agent.predict(frozen_problem_description, env_specification).get_makespan()
+        or_tools_makespan = get_ortools_makespan(
+            affectations,
+            durations,
+            args.max_time_ortools,
+            args.scaling_constant_ortools,
+        )[0]
 
         diff_percentage = 100 * (rl_makespan - or_tools_makespan) / or_tools_makespan
         rl_makespans.append(rl_makespan)

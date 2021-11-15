@@ -15,34 +15,33 @@ import cv2
 from problem.solution import Solution
 from utils.utils import node_to_job_and_task, job_and_task_to_node
 
-from config import MAX_N_MACHINES, MAX_N_JOBS
-
-COLORS = [tuple([random.random() for _ in range(3)]) for _ in range(MAX_N_MACHINES)]
-
 
 class State:
-    def __init__(self, affectations, durations, node_encoding="L2D"):
+    def __init__(self, affectations, durations, max_n_jobs, max_n_machines, deterministic=True, node_encoding="L2D"):
         self.affectations = affectations
         self.original_durations = durations
         self.n_jobs = self.affectations.shape[0]
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines
 
-        if len(COLORS) > self.n_machines:
-            self.colors = COLORS[: self.n_machines]
-        else:
-            self.colors = COLORS
-
+        self.max_n_jobs = max_n_jobs
+        self.max_n_machines = max_n_machines
         self.node_encoding = node_encoding
+        assert self.node_encoding in ["L2D", "DenseL2D"]
+        self.deterministic = deterministic
+
+        self.colors = self.generate_colors()
+
         if self.node_encoding == "DenseL2D":
             self.return_graph = None
-
         self.graph = None
 
         self.task_completion_times = None
         self.is_affected = None
         self.is_observed = None
-        self.durations = self.original_durations.copy()
+        self.durations = None
+        self.n_jobs_per_machine = None
+        self.n_machines_per_job = None
 
         # Used to compute the features
         self.max_duration = None
@@ -53,22 +52,9 @@ class State:
         self.machine_completion_time = None
         self.number_operations_scheduled = None
 
-        self.n_jobs_per_machine = np.zeros(self.n_machines)
-        for m in range(0, self.n_machines):
-            self.n_jobs_per_machine[m] = (self.affectations == m).sum()
-        #print('n_jobs_per_machine=',self.n_jobs_per_machine)
-        self.n_machines_per_job = np.zeros(self.n_jobs)
-        for j in range(0, self.n_jobs):
-            self.n_machines_per_job[j] = self.n_machines - (self.affectations[j] == -1).sum()
-        #print('n_machines_per_job=',self.n_machines_per_job)
-        
         self.reset()
 
     def reset(self):
-        # durations bounds will be overwritten during solving w/ uncertainty
-        self.durations = self.original_durations.copy()
-        if self.durations.shape[2] > 1:
-            self.durations[:,:,0] = -1
         self.graph = nx.DiGraph(
             [
                 (
@@ -79,7 +65,6 @@ class State:
                 for job_index in range(self.n_jobs)
             ]
         )
-
         if self.node_encoding == "DenseL2D":
             self.return_graph = deepcopy(self.graph)
             for machine_id in range(self.n_machines):
@@ -89,30 +74,71 @@ class State:
                         if second_node_id != first_node_id:
                             self.return_graph.add_edge(first_node_id, second_node_id)
 
-        if self.durations.shape[2] == 1:
-            self.task_completion_times = np.cumsum(self.durations, axis=1)
-        else: # uncertainty case
-            self.task_completion_times = np.empty_like(self.durations)
-            for i in range(1,self.durations.shape[2]): # do not use real durations drawn from distrib
-                self.task_completion_times[:,:,i] = np.cumsum(self.durations[:,:,i], axis=1)
-            # real task completion times are not known atm
-            self.task_completion_times[:,:,0] = np.zeros_like(self.durations[:,:,0])-1
-
+        # Instantiate features and pre features
+        self.durations = self.original_durations.copy()
+        self.task_completion_times = np.cumsum(self.durations, axis=1)
+        if not self.deterministic:
+            self.durations[:, :, 0] = -1
+            self.task_completion_times[:, :, 0] = -1
         self.is_affected = np.zeros_like(self.affectations)
-        self.is_observed = np.zeros_like(self.affectations)
-
-        # Used to compute the features
+        self.is_observed = np.ones_like(self.affectations) if self.deterministic else np.zeros_like(self.affectations)
+        self.n_jobs_per_machine = np.array([(self.affectations == m).sum() for m in range(self.n_machines)])
+        self.n_machines_per_job = np.array(
+            [self.n_machines - (self.affectations[j] == -1).sum() for j in range(self.n_jobs)]
+        )
+        self.number_operations_scheduled = np.zeros(self.n_jobs)
         self.max_duration = np.max(self.durations.flatten())
         self.max_completion_time = np.max(self.task_completion_times.flatten())
+
+        self.compute_pre_features()
+
+    def compute_pre_features(self):
+        self.task_completion_times = np.cumsum(self.durations, axis=1)
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                if self.durations[job_id, task_id, 0] == -1:
+                    self.task_completion_times[job_id, task_id:, 0] = -1
+
         self.total_job_time = np.sum(self.durations, axis=1)
-        self.total_machine_time = np.zeros((self.n_machines,self.durations.shape[2]))
+        for job_id in range(self.n_jobs):
+            if (self.durations[job_id, :, 0] == -1).any():
+                self.total_job_time[job_id, 0] = -1
+
+        self.total_machine_time = np.zeros((self.n_machines, 4))
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 if self.affectations[job_id, task_id] != -1:
-                    self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
-        self.job_completion_time = np.zeros((self.n_jobs,self.durations.shape[2]))
-        self.machine_completion_time = np.zeros((self.n_machines,self.durations.shape[2]))
-        self.number_operations_scheduled = np.zeros(self.n_jobs)
+                    if (
+                        self.total_machine_time[self.affectations[job_id, task_id]][0] == -1
+                        or self.durations[job_id, task_id][0] == -1
+                    ):
+                        self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
+                        self.total_machine_time[self.affectations[job_id, task_id]][0] = -1
+                    else:
+                        self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
+
+        self.job_completion_time = np.zeros((self.n_jobs, 4))
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                if self.is_affected[job_id, task_id] == 1 and self.affectations[job_id, task_id] != -1:
+                    if self.job_completion_time[job_id, 0] == -1 or self.durations[job_id, task_id, 0] == -1:
+                        self.job_completion_time[job_id] += self.durations[job_id, task_id]
+                        self.job_completion_time[job_id, 0] = -1
+                    else:
+                        self.job_completion_time[job_id] += self.durations[job_id, task_id]
+
+        self.machine_completion_time = np.zeros((self.n_machines, 4))
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                if self.is_affected[job_id, task_id] == 1 and self.affectations[job_id, task_id] != -1:
+                    if (
+                        self.machine_completion_time[self.affectations[job_id, task_id], 0] == -1
+                        or self.durations[job_id, task_id, 0] == -1
+                    ):
+                        self.machine_completion_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
+                        self.machine_completion_time[self.affectations[job_id, task_id], 0] = -1
+                    else:
+                        self.machine_completion_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
 
     def done(self):
         """
@@ -133,8 +159,8 @@ class State:
             return node_ids
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
-                node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                 if self.affectations[job_id, task_id] == machine_id:
+                    node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                     node_ids.append(node_id)
         return node_ids
 
@@ -143,93 +169,108 @@ class State:
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
         parameter of the Data object) that should be added to the graph.
-        Note, input_set can contains the following str: 'is_affected', 'completion_time', 'one_hot_machine_id',
-        'one_hot_job_id', 'duration', 'total_job_time', 'total_machine_time', 'job_completion_percentage',
-        'machine_completion_percentage', 'mopnr', 'mwkr', 'cr'
+        Note, input_set can contains the following str: 'one_hot_machine_id','one_hot_job_id',
+        'duration', 'total_job_time', 'total_machine_time', 'job_completion_percentage',
+        'machine_completion_percentage', 'mopnr', 'mwkr'
         """
-        if self.node_encoding in ["L2D", "DenseL2D"]:
-            for job_id in range(self.n_jobs):
-                for task_id in range(self.n_machines):
-                    machine_id = self.affectations[job_id, task_id]
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                machine_id = self.affectations[job_id, task_id]
+                node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
 
-                    node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
+                # Compute features
+                features = self.get_features(job_id, task_id, machine_id, normalize_input)
 
-                    # Mandatory eatures
-                    is_affected = self.is_affected[job_id, task_id]
-                    completion_time = self.task_completion_times[job_id, task_id] / (
-                        self.max_completion_time if normalize_input else 1
-                    )
+                node_vector = [node_id] + features["is_affected"].tolist() + features["completion_time"].tolist()
 
-                    # Other features
-                    one_hot_machine_id = self.to_one_hot(machine_id, MAX_N_MACHINES)
-                    one_hot_job_id = self.to_one_hot(job_id, MAX_N_JOBS)
-                    duration = self.durations[job_id, task_id]
-                    total_job_time = self.total_job_time[job_id]
-                    total_machine_time = self.total_machine_time[machine_id]
-                    job_completion_percentage = self.job_completion_time[job_id] / total_job_time
-                    machine_completion_percentage = self.machine_completion_time[machine_id] / total_machine_time
-                    original_duration = self.original_durations[job_id, task_id]
+                for input_name in input_list:
+                    if input_name == "is_affected" or input_name == "completion_time":
+                        pass  # already appended above
+                    node_vector = node_vector + features[input_name].tolist()
 
-                    # See https://hal.archives-ouvertes.fr/hal-00728900/document for the definition of these metrics
-                    mopnr = self.n_machines - self.number_operations_scheduled[job_id]
-                    mwkr = total_job_time - self.job_completion_time[job_id]
-                    cr = duration / (total_job_time - self.job_completion_time[job_id] + self.max_duration)
+                if self.node_encoding == "L2D":
+                    self.graph.nodes[node_id]["x"] = node_vector
+                elif self.node_encoding == "DenseL2D":
+                    self.return_graph.nodes[node_id]["x"] = node_vector
 
-                    if normalize_input:
-                        duration = duration / self.max_duration
-                        total_job_time = total_job_time / self.max_completion_time
-                        total_machine_time = total_machine_time / self.max_completion_time
-                        mopnr = mopnr / self.n_machines
-                        mwkr = mwkr / self.max_completion_time
+        nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
+        graph = torch_geometric.utils.from_networkx(nx_graph)
 
-                    node_vector = [node_id, is_affected] + completion_time.tolist()
+        # We have to reorder features, since the networx -> torch_geometric
+        # shuffles the nodes
+        node_ids = graph.x[:, 0].long()
+        features = torch.zeros((self.n_nodes, graph.x[:, 1:].shape[1]))
+        features[node_ids] = graph.x[:, 1:].float()
+        edge_index = node_ids[graph.edge_index]
 
-                    for input_name in input_list:
-                        if input_name in ["duration","total_job_time", "total_machine_time",
-                                          "job_completion_percentage","machine_completion_percentage",
-                                          "mwkr"]:
-                            node_vector += locals()[input_name].tolist()
-                        elif input_name[0:7] == "one_hot":
-                            node_vector = node_vector + locals()[input_name]
-                        elif input_name == "is_affected":
-                            pass # already appended above
-                        elif input_name == "completion_time":
-                            pass # already appended above
-                        else:
-                            node_vector.append(locals()[input_name])
+        return torch_geometric.data.Data(x=features, edge_index=edge_index)
 
-                    if self.node_encoding == "L2D":
-                        self.graph.nodes[node_id]["x"] = node_vector
-                    elif self.node_encoding == "DenseL2D":
-                        self.return_graph.nodes[node_id]["x"] = node_vector
+    def get_features(self, job_id, task_id, machine_id, normalize_input):
+        """
+        Returns the specified features in a dict.
+        The inputs are normalized if normalize_input is set to True
+        """
+        # Mandatory features
+        features = {}
+        features["is_affected"] = np.repeat(self.is_affected[job_id, task_id], 4)  # vector of size 4
+        features["completion_time"] = self.task_completion_times[job_id, task_id]  # vector of size 4
 
-            nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
-            graph = torch_geometric.utils.from_networkx(nx_graph)
+        # Other features
+        features["one_hot_machine_id"] = self.to_one_hot(machine_id, self.max_n_machines)  # vector of size max_n_jobs
+        features["one_hot_job_id"] = self.to_one_hot(job_id, self.max_n_jobs)  # vector of size max_n_machines
+        features["duration"] = self.durations[job_id, task_id]  # vector of size 4
+        features["total_job_time"] = self.total_job_time[job_id]  # vector of size 4
+        features["total_machine_time"] = self.total_machine_time[machine_id]  # vector of size 4
+        features["job_completion_percentage"] = self.job_completion_time[job_id] / features["total_job_time"]  # size 4
+        features["machine_completion_percentage"] = self.machine_completion_time[machine_id] / features["total_machine_time"]
+        # Checking consistency with knwoledge
+        for i in range(4):
+            if self.job_completion_time[job_id][i] == -1 or features["total_job_time"][i] == -1:
+                features["job_completion_percentage"][i] = -1
+            if self.machine_completion_time[machine_id][i] == -1 or features["total_machine_time"][i] == -1:
+                features["machine_completion_percentage"][i] = -1
 
-            # We have to reorder features, since the networx -> torch_geometric
-            # shuffles the nodes
-            node_ids = graph.x[:, 0].long()
-            features = torch.zeros((self.n_nodes, graph.x[:, 1:].shape[1]))
-            features[node_ids] = graph.x[:, 1:].float()
-            edge_index = node_ids[graph.edge_index]
+        # See https://hal.archives-ouvertes.fr/hal-00728900/document for the definition of these metrics
+        features["mopnr"] = np.repeat(self.n_machines - self.number_operations_scheduled[job_id], 4)  # vector of size 4
+        features["mwkr"] = features["total_job_time"] - self.job_completion_time[job_id]  # vector of size 4
+        # Checking consistency with knowledge
+        for i in range(4):
+            if features["total_job_time"][i] == -1 or self.job_completion_time[job_id][i] == -1:
+                features["mwkr"][i] = -1
 
-            return torch_geometric.data.Data(x=features, edge_index=edge_index)
+        if normalize_input:
+            features["completion_time"] = features["completion_time"] / self.max_completion_time
+            features["duration"] = features["duration"] / self.max_duration
+            features["total_job_time"] = features["total_job_time"] / self.max_completion_time
+            features["total_machine_time"] = features["total_machine_time"] / self.max_completion_time
+            features["mopnr"] = features["mopnr"] / self.n_machines
+            features["mwkr"] = features["mwkr"] / self.max_completion_time
+            # Checking consistency with knowledge
+            features["completion_time"][features["completion_time"] < 0] = -1
+            features["duration"][features["duration"] < 0] = -1
+            features["total_job_time"][features["total_job_time"] < 0] = -1
+            features["total_machine_time"][features["total_machine_time"] < 0] = -1
+            features["mwkr"][features["mwkr"] < 0] = -1
 
-        else:
-            raise Exception("Encoding not recognized")
+        return features
 
     def to_one_hot(self, index, max_index):
-        rep = [0] * max_index
+        rep = np.zeros(max_index)
         rep[index] = 1
         return rep
 
-    def observe_real_duration(self,node_id, do_update = True):
-            job_id,task_id = node_to_job_and_task(node_id, self.n_machines)
-            self.is_observed[job_id, task_id] = 1
-            self.durations[job_id, task_id][:3] = self.original_durations[job_id, task_id][0]
-            if do_update:
-                self._update_completion_times(node_id)
+    def observe_real_duration(self, node_id, do_update=True):
+        if self.deterministic:
+            return
+        job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
+        self.is_observed[job_id, task_id] = 1
+        self.durations[job_id, task_id][0] = self.original_durations[job_id, task_id][0]
 
+        # Re compute pre features using knowledge on durations
+        self.compute_pre_features()
+
+        if do_update:
+            self._update_completion_times(node_id)
 
     def _update_completion_times(self, node_id):
         """
@@ -238,42 +279,39 @@ class State:
         successors, ordered by their distance to the original node, choosing each time
         the max completion time of predecessors as starting time
         """
-
         priority_queue = PriorityQueue()
         priority_queue.put((0, node_id))
+
         while not priority_queue.empty():
             (distance, cur_node_id) = priority_queue.get()
             predecessors = list(self.graph.predecessors(cur_node_id))
-            all_pred_known = True
+
             if len(predecessors) == 0:
-                max_completion_time_predecessors = np.zeros(self.task_completion_times.shape[2])
+                max_completion_time_predecessors = np.zeros(4)
             else:
-                task_comp_time_pred = np.stack([self.task_completion_times[node_to_job_and_task(p, self.n_machines)]
-                                       for p in predecessors], axis=-1)
-                max_completion_time_predecessors = task_comp_time_pred.max(axis = -1)
-                if -1 in task_comp_time_pred[0,:]:
-                    all_pred_known  = False
+                task_comp_time_pred = np.stack(
+                    [self.task_completion_times[node_to_job_and_task(p, self.n_machines)] for p in predecessors]
+                )
+                # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
+                max_completion_time_predecessors = task_comp_time_pred.max(axis=0)
+                # For the real time, if one of the predecessors has an undefined end time, current node is also undefined
+                if -1 in task_comp_time_pred:
+                    max_completion_time_predecessors[0] = -1
 
-            if self.durations.shape[2] == 1:
-                new_completion_time =  max_completion_time_predecessors + \
-                                       self.durations[node_to_job_and_task(cur_node_id,
-                                                                           self.n_machines)]
-            else:
-                # min max modes are known
-                new_completion_time = max_completion_time_predecessors + \
-                                      self.durations[node_to_job_and_task(cur_node_id,
-                                                                          self.n_machines)]
-                # if some uncertainty remains : remove real value
-                if not all_pred_known   or \
-                   self.is_observed[node_to_job_and_task(cur_node_id, self.n_machines)] == 0:
-                    new_completion_time[0] = -1
-
-
+            new_completion_time = (
+                max_completion_time_predecessors + self.durations[node_to_job_and_task(cur_node_id, self.n_machines)]
+            )
+            # If there is any uncertainty, we remove the real duration value
+            if (
+                max_completion_time_predecessors[0] == -1
+                or self.is_observed[node_to_job_and_task(cur_node_id, self.n_machines)] == 0
+            ):
+                new_completion_time[0] = -1
             old_completion_time = self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)].copy()
             self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)] = new_completion_time
 
             # Only add the nodes in the queue if update is necessary
-            if not np.array_equal(old_completion_time,new_completion_time):
+            if not np.array_equal(old_completion_time, new_completion_time):
                 for successor in self.graph.successors(cur_node_id):
                     priority_queue.put((distance + 1, successor))
 
@@ -335,48 +373,88 @@ class State:
         """
         job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
         machine_id = self.affectations[job_id, task_id]
-        if machine_id == -1:
-            #self.is_affected[job_id, task_id] = 1
-            return 
-        else:
+        if machine_id != -1:
             self.is_affected[job_id, task_id] = 1
-            if self.durations.shape[2] > 1:
-                self.job_completion_time[job_id] += self.durations[job_id, task_id][3]
-                self.machine_completion_time[machine_id] += self.durations[job_id, task_id][3]
-            else:
-                self.job_completion_time[job_id] += self.durations[job_id, task_id][0]
-                self.machine_completion_time[machine_id] += self.durations[job_id, task_id][0]
+            self.job_completion_time[job_id] += self.durations[job_id, task_id]
+            self.machine_completion_time[machine_id] += self.durations[job_id, task_id]
+            if self.durations[job_id, task_id][0] == -1:
+                self.job_completion_time[job_id][0] = -1
+                self.machine_completion_time[machine_id][0] = -1
             self.number_operations_scheduled[job_id] += 1
 
-
-    def get_machine_occupancy(self, machine_id):
+    def get_machine_occupancy(self, machine_id, metric):
         """
         Returns a list of occupancy period on the wanted machine, under the form
         (occupancy_start_time, occupancy_duration, node_id)
         """
+        if metric == "realistic":
+            index = 0
+        elif metric == "optimistic":
+            index = 1
+        elif metric == "pessimistic":
+            index = 2
+        elif metric == "averagistic":
+            index = 3
+        else:
+            raise Exception("Metric for machine_occupancy not recognized")
         node_ids = self._get_machine_node_ids(machine_id)
         occupancy = []
         for node_id in node_ids:
             job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
             is_affected = self.is_affected[job_id, task_id]
+            duration = self.durations[job_id, task_id]
             if is_affected == 1:
-                duration = self.durations[job_id, task_id]
-                start_time = self.task_completion_times[job_id, task_id][0] - duration[0]
-                occupancy.append((start_time, duration[0], node_id))
+                start_time = self.task_completion_times[job_id, task_id][index] - duration[index]
+                if self.task_completion_times[job_id, task_id][index] == -1 or duration[index] == -1:
+                    start_time = -1
+                    raise Exception("get_machine_occupancy not supported for not observed metric. Please use averagistic")
+                occupancy.append((start_time, duration[index], node_id))
         occupancy.sort()
         return occupancy
 
     def get_solution(self):
         if not self.done():
             return False
-        schedule = self.task_completion_times[:,:,0] - self.durations[:,:,0]
+        schedule = self.task_completion_times[:, :, 0] - self.original_durations[:, :, 0]
         # we give schedule for real observed durations
-        return Solution(schedule=schedule)
+        return Solution(schedule=schedule, real_durations=self.original_durations[:, :, 0])
+
+    def get_first_unaffected_task(self, job_id):
+        """
+        Returns the id of the first task that wasn't affected. If all tasks are
+        affected, returns -1
+        """
+        if np.sum(self.is_affected[job_id]) == self.n_machines_per_job[job_id]:
+            return -1
+        return list(self.is_affected[job_id]).index(0)
+
+    def get_job_availability(self, job_id, task_id, metric):
+        if task_id == 0:
+            return 0
+        if metric == "realistic":
+            index = 0
+        elif metric == "optimistic":
+            index = 1
+        elif metric == "pessimistic":
+            index = 2
+        elif metric == "averagistic":
+            index = 3
+        else:
+            raise Exception("Metric for job_availability not recognized")
+        return self.task_completion_times[job_id, task_id - 1][index]
+
+    def generate_colors(self):
+        n = self.n_machines
+        p = 0
+        while p * p * p < n:
+            p += 1
+        scale = [(i / p) + 1 / (2 * p) for i in range(p)]
+        colors = [(si, sj, sk) for si in scale for sj in scale for sk in scale]
+        return tuple([color for color in colors])
 
     def render_solution(self, schedule, scaling=1.0):
         df = []
-        all_finish = schedule*scaling + self.durations[:,:,0]
-
+        all_finish = schedule * scaling + self.durations[:, :, 0]
         for job in range(self.n_jobs):
             i = 0
             while i < self.n_machines:
@@ -385,7 +463,7 @@ class State:
                     continue
                 dict_op = dict()
                 dict_op["Task"] = "Job {}".format(job)
-                start_sec = schedule[job][i]*scaling
+                start_sec = schedule[job][i] * scaling
                 finish_sec = all_finish[job][i]
                 dict_op["Start"] = datetime.datetime.fromtimestamp(start_sec)
                 dict_op["Finish"] = datetime.datetime.fromtimestamp(finish_sec)
@@ -408,17 +486,3 @@ class State:
                 return None
         else:
             return None
-
-    def get_first_unaffected_task(self, job_id):
-        """
-        Returns the id of the first task that wasn't affected. If all tasks are
-        affected, returns -1
-        """
-        if np.sum(self.is_affected[job_id]) == self.n_machines_per_job[job_id]:
-            return -1
-        return list(self.is_affected[job_id]).index(0)
-
-    def get_job_availability(self, job_id, task_id):
-        if task_id == 0:
-            return 0
-        return self.task_completion_times[job_id, task_id - 1]
