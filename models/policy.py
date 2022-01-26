@@ -81,6 +81,21 @@ class Policy(ActorCriticPolicy):
         # Setup optimizer with initial learning rate
         self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
+    def _get_latent(self, obs):
+        """
+        Get the latent code (i.e., activations of the last layer of each network)
+        for the different networks.
+
+        :param obs: Observation
+        :return: Latent codes
+            for the actor, the value function and for gSDE function
+        """
+        # Preprocess the observation if needed
+        features = self.extract_features(obs)
+        latent_pi, latent_vf = self.mlp_extractor(features)
+
+        return latent_pi, latent_vf
+        
     def forward(self, obs, deterministic=False):
         """
         Forward pass in all the networks (actor and critic)
@@ -88,7 +103,7 @@ class Policy(ActorCriticPolicy):
         stable_baselines3.common.polcies.ActorCriticPolicy, in order to compute actor
         and critic net in a certain way.
         """
-        latent_pi, latent_vf, _ = self._get_latent(obs)
+        latent_pi, latent_vf = self._get_latent(obs)
         values = latent_vf  # Modification here
         distribution = Categorical(latent_pi)  # And here
         actions = torch.argmax(distribution.probs, dim=1) if deterministic else distribution.sample()
@@ -100,7 +115,7 @@ class Policy(ActorCriticPolicy):
         return actions
 
     def evaluate_actions(self, obs, actions):
-        latent_pi, latent_vf, _ = self._get_latent(obs)
+        latent_pi, latent_vf = self._get_latent(obs)
         distribution = Categorical(latent_pi)
         log_prob = distribution.log_prob(actions)
         values = latent_vf
