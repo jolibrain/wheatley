@@ -114,6 +114,10 @@ class Policy(ActorCriticPolicy):
         actions, _, _ = self.forward(observation, deterministic)
         return actions
 
+    def predict_values(self, observation, deterministic=False):
+        _, values, _ = self.forward(observation, deterministic)
+        return values
+
     def evaluate_actions(self, obs, actions):
         latent_pi, latent_vf = self._get_latent(obs)
         distribution = Categorical(latent_pi)

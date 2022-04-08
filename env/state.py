@@ -164,7 +164,7 @@ class State:
                     node_ids.append(node_id)
         return node_ids
 
-    def to_torch_geometric(self, normalize_input, input_list):
+    def to_features_and_edge_index(self, normalize_input, input_list):
         """
         Returns self.graph under the form of a torch_geometric.data.Data object.
         The node_encoding arguments specifies what are the features (i.e. the x
@@ -203,7 +203,7 @@ class State:
         features[node_ids] = graph.x[:, 1:].float()
         edge_index = node_ids[graph.edge_index]
 
-        return torch_geometric.data.Data(x=features, edge_index=edge_index)
+        return features, edge_index
 
     def get_features(self, job_id, task_id, machine_id, normalize_input):
         """

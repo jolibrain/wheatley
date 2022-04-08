@@ -10,8 +10,6 @@ def test_evaluate():
     obs = EnvObservation(
         3,
         3,
-        9,
-        2,
         torch.tensor(
             [
                 [1, 1, 1, 1, 5, 5, 5, 5],
@@ -33,8 +31,6 @@ def test_evaluate():
     next_obs = EnvObservation(
         3,
         3,
-        9,
-        2,
         torch.tensor(
             [
                 [1, 1, 1, 1, 5, 5, 5, 5],

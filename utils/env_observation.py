@@ -2,21 +2,25 @@ import torch
 
 
 class EnvObservation:
-    def __init__(self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask, max_n_jobs, max_n_machines):
+    def __init__(self, n_jobs, n_machines, features, edge_index, mask, max_n_jobs, max_n_machines):
+        """
+        This should only hanlde cpu tensors, since it is used on the env side.
+        """
+        if features.is_cuda:
+            raise Exception("Please provide a cpu observation")
+
         self.n_jobs = n_jobs
         self.n_machines = n_machines
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
         self.max_n_nodes = self.max_n_jobs * self.max_n_machines
         self.max_n_edges = self.max_n_nodes ** 2
-        self.n_nodes = n_nodes
-        self.n_edges = n_edges
+        self.n_nodes = n_jobs * n_machines
+        self.n_edges = edge_index.shape[1]
         self.features = features
         self.edge_index = edge_index
         self.mask = mask
-        assert self.n_nodes == self.n_jobs * self.n_machines
         assert self.n_nodes == self.features.shape[0]
-        assert self.n_edges == self.edge_index.shape[1]
         assert self.n_nodes == self.mask.shape[0]
 
     def get_n_nodes(self):
@@ -24,29 +28,6 @@ class EnvObservation:
 
     def get_n_edges(self):
         return self.n_edges
-
-    @classmethod
-    def from_torch_geometric(cls, n_jobs, n_machines, graph, mask, max_n_jobs, max_n_machines):
-        """
-        This should only hanlde cpu tensors, since it is used on the env side.
-        """
-        if graph.x.is_cuda:
-            raise Exception("Please provide a cpu observation")
-
-        n_nodes = n_jobs * n_machines
-        n_edges = graph.edge_index.shape[1]
-
-        return cls(
-            n_jobs,
-            n_machines,
-            n_nodes,
-            n_edges,
-            graph.x,
-            graph.edge_index,
-            mask,
-            max_n_jobs,
-            max_n_machines,
-        )
 
     def to_gym_observation(self):
         """
@@ -67,6 +48,6 @@ class EnvObservation:
             "n_nodes": self.n_nodes,
             "n_edges": self.n_edges,
             "features": features.numpy(),
-            "edge_index": edge_index.numpy(),
+            "edge_index": edge_index.numpy().astype('int64'),
             "mask": mask.numpy(),
         }

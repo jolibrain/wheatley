@@ -29,45 +29,45 @@ class L2DTransitionModel(TransitionModel):
         else:
             raise Exception("Stochastic metric not recognized")
 
-    def run(self, node_id, force_insert):  # noqa
+    def run(self, state, node_id, force_insert):  # noqa
 
         # If the job_id is bigger that max job_id, we don't operate the action
-        job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
-        if job_id >= self.n_jobs:
+        job_id, task_id = node_to_job_and_task(node_id, state.n_machines)
+        if job_id >= state.n_jobs:
             self.useless_timesteps += 1
             return
 
-        if task_id != self.state.get_first_unaffected_task(job_id):
+        if task_id != state.get_first_unaffected_task(job_id):
             self.useless_timesteps += 1
             return
 
-        machine_id = self.affectations[job_id, task_id]
+        machine_id = state.affectations[job_id, task_id]
         if machine_id == -1:
             self.useless_timesteps += 1
             return
 
-        machine_occupancy = self.state.get_machine_occupancy(machine_id, self.metric)
-        job_availability_time = self.state.get_job_availability(job_id, task_id, self.metric)
+        machine_occupancy = state.get_machine_occupancy(machine_id, self.metric)
+        job_availability_time = state.get_job_availability(job_id, task_id, self.metric)
 
         # If no task is affected on machine, just affect it wherever possible and returns
         if not machine_occupancy:
-            self.state.affect_node(node_id)
+            state.affect_node(node_id)
             # Observe duration (for the uncertainty case)
             if self.observe_real_duration_when_affect:
-                self.state.observe_real_duration(node_id)
+                state.observe_real_duration(node_id)
             return
 
         # If forced insertion are not allowed
         if not force_insert:
             # Observe duration (for the uncertainty case)
             if self.observe_real_duration_when_affect:
-                self.state.observe_real_duration(node_id)
+                state.observe_real_duration(node_id)
 
-            job_duration = self.durations[job_id, task_id, self.metric_index]
+            job_duration = state.durations[job_id, task_id, self.metric_index]
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time + job_duration <= machine_occupancy[0][0]:
                 # Insert task before all other tasks
-                self.state.set_precedency(node_id, machine_occupancy[0][2])
+                state.set_precedency(node_id, machine_occupancy[0][2])
 
             else:
                 # Find where there are free times, and check if we can insert task
@@ -81,19 +81,19 @@ class L2DTransitionModel(TransitionModel):
                             break
                 if index == -1:
                     # The job can be inserted nowhere, so we add it at the end
-                    self.state.set_precedency(machine_occupancy[-1][2], node_id)
+                    state.set_precedency(machine_occupancy[-1][2], node_id)
                 else:
                     # The job is inserted between task_index and task_index+1
-                    self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
-                    self.state.set_precedency(machine_occupancy[index][2], node_id)
-                    self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
+                    state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
+                    state.set_precedency(machine_occupancy[index][2], node_id)
+                    state.set_precedency(node_id, machine_occupancy[index + 1][2])
 
         # If forced insertion is allowed and performed
         elif force_insert:
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time < machine_occupancy[0][0]:
                 # Insert task before all other tasks
-                self.state.set_precedency(node_id, machine_occupancy[0][2])
+                state.set_precedency(node_id, machine_occupancy[0][2])
 
             else:
                 # Find where there are free times, and check if we can insert task
@@ -107,25 +107,25 @@ class L2DTransitionModel(TransitionModel):
                             break
                 if index == -1:
                     # The job can be inserted nowhere, so we add it at the end
-                    self.state.set_precedency(machine_occupancy[-1][2], node_id)
+                    state.set_precedency(machine_occupancy[-1][2], node_id)
                 else:
                     # The job is inserted between task_index and task_index+1
-                    self.state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
-                    self.state.set_precedency(machine_occupancy[index][2], node_id)
-                    self.state.set_precedency(node_id, machine_occupancy[index + 1][2])
+                    state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
+                    state.set_precedency(machine_occupancy[index][2], node_id)
+                    state.set_precedency(node_id, machine_occupancy[index + 1][2])
 
-        self.state.affect_node(node_id)
+        state.affect_node(node_id)
         # Observe duration (for the uncertainty case)
         if self.observe_real_duration_when_affect:
-            self.state.observe_real_duration(node_id, True)
+            state.observe_real_duration(node_id, True)
 
-    def get_mask(self):
+    def get_mask(self, state):
         available_node_ids = []
-        for job_id in range(self.n_jobs):
-            task_id = self.state.get_first_unaffected_task(job_id)
-            if task_id != -1 and self.affectations[job_id, task_id] != -1:
-                available_node_ids.append(job_and_task_to_node(job_id, task_id, self.n_machines))
-        mask = torch.zeros(self.n_nodes)
+        for job_id in range(state.n_jobs):
+            task_id = state.get_first_unaffected_task(job_id)
+            if task_id != -1 and state.affectations[job_id, task_id] != -1:
+                available_node_ids.append(job_and_task_to_node(job_id, task_id, state.n_machines))
+        mask = torch.zeros(state.n_nodes)
         for node_id in available_node_ids:
             mask[node_id] = 1
         return mask

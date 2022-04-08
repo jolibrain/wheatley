@@ -104,8 +104,6 @@ def env_observation():
     return EnvObservation(
         n_jobs=3,
         n_machines=3,
-        n_nodes=9,
-        n_edges=8,
         features=torch.tensor(
             [
                 [0, 0, 0, 0, 15, 15, 15, 15],

@@ -88,6 +88,7 @@ class ValidationCallback(BaseCallback):
         self.gantt_or_img = None
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
+        self.time_to_ortools = []
 
     def _on_step(self):
         self._evaluate_agent()
@@ -137,8 +138,8 @@ class ValidationCallback(BaseCallback):
             mean_makespan += makespan / self.n_validation_env
 
             or_tools_makespan, or_tools_schedule = get_ortools_makespan(
-                self.validation_envs[i].transition_model.affectations,
-                self.validation_envs[i].transition_model.durations,
+                self.validation_envs[i].state.affectations,
+                self.validation_envs[i].state.durations,
                 self.max_time_ortools,
                 self.scaling_constant_ortools,
                 self.ortools_strategy,
@@ -182,6 +183,10 @@ class ValidationCallback(BaseCallback):
         self.custom_makespans.append(custom_mean_makespan)
 
     def _visdom_metrics(self):
+        self.vis.text(f"<h4>Total actions: {self.model.num_timesteps}</h4>",
+                win="total_actions", opts={"height": 100})
+
+        X = list(range(len(self.makespans)))
         Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]
         opts = {
             "legend": ["PPO", "Random", "OR-tools"],
@@ -202,8 +207,19 @@ class ValidationCallback(BaseCallback):
             opts["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]])
             opts2["legend"].append(self.custom_name + " / OR-tools")
             opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
-        self.vis.line(Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
-        self.vis.line(Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
+        self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
+        self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
+
+        # time to OR-tools
+        wins = 0
+        count = min(len(self.makespans), 100)
+        for i in range(1, count + 1):
+            if self.makespans[-i] <= self.ortools_makespans[-i]:
+                wins += 1
+        pct = 100 * wins / count
+        self.time_to_ortools.append(pct)
+        opts = { "title": "Time to OR-tools" }
+        self.vis.line(X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts)
 
         if self.first_callback:
             self.first_callback = False
@@ -224,30 +240,31 @@ class ValidationCallback(BaseCallback):
         self.total_timestepss.append(self.model.num_timesteps)
 
         figure, ax = plt.subplots(3, 4, figsize=(16, 12))
+        X = range(1, len(self.losses) + 1)
 
-        ax[0, 0].plot(self.entropy_losses)
+        ax[0, 0].plot(X, self.entropy_losses)
         ax[0, 0].set_title("entropy_loss")
-        ax[0, 1].plot(self.policy_gradient_losses)
+        ax[0, 1].plot(X, self.policy_gradient_losses)
         ax[0, 1].set_title("policy_gradient_loss")
-        ax[0, 2].plot(self.value_losses)
+        ax[0, 2].plot(X, self.value_losses)
         ax[0, 2].set_title("value_loss")
-        ax[0, 3].plot(self.losses)
+        ax[0, 3].plot(X, self.losses)
         ax[0, 3].set_title("loss")
-        ax[1, 0].plot(self.approx_kls)
+        ax[1, 0].plot(X, self.approx_kls)
         ax[1, 0].set_title("approx_kl")
-        ax[1, 1].plot(self.clip_fractions)
+        ax[1, 1].plot(X, self.clip_fractions)
         ax[1, 1].set_title("clip_fraction")
-        ax[1, 2].plot(self.explained_variances)
+        ax[1, 2].plot(X, self.explained_variances)
         ax[1, 2].set_title("explained_variance")
-        ax[1, 3].plot(self.clip_ranges)
+        ax[1, 3].plot(X, self.clip_ranges)
         ax[1, 3].set_title("clip_range")
-        ax[2, 0].plot(self.ep_len_means)
+        ax[2, 0].plot(X, self.ep_len_means)
         ax[2, 0].set_title("ep_len_mean")
-        ax[2, 1].plot(self.ep_rew_means)
+        ax[2, 1].plot(X, self.ep_rew_means)
         ax[2, 1].set_title("ep_rew_mean")
-        ax[2, 2].plot(self.fpss)
-        ax[2, 2].set_title("fps")
-        ax[2, 3].plot(self.total_timestepss)
+        ax[2, 2].plot(X, self.fpss)
+        ax[2, 2].set_title("actions_per_second")
+        ax[2, 3].plot(X, self.total_timestepss)
         ax[2, 3].set_title("total_timesteps")
 
         self.vis.matplot(figure, win="training")

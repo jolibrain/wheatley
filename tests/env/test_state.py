@@ -75,9 +75,9 @@ def test_get_machine_node_ids(state):
 
 
 def test_to_torch_geometric(state):
-    graph = state.to_torch_geometric(False, {})
+    features, edge_index = state.to_features_and_edge_index(False, {})
     assert torch.eq(
-        graph.x,
+        features,
         torch.tensor(
             [
                 [0, 0, 0, 0, 1, 1, 1, 1],
@@ -109,7 +109,7 @@ def test_to_torch_geometric(state):
         ),
     ).all()
     assert set(
-        [(graph.edge_index[0, i].item(), graph.edge_index[1, i].item()) for i in range(graph.edge_index.shape[1])]
+        [(edge_index[0, i].item(), edge_index[1, i].item()) for i in range(edge_index.shape[1])]
     ) == set(
         [
             (0, 1),

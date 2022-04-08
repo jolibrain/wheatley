@@ -14,6 +14,7 @@ from env.reward_models.tassel_reward_model import TasselRewardModel
 from env.reward_models.uncertain_reward_model import UncertainRewardModel
 from utils.env_observation import EnvObservation
 from utils.utils import get_n_features
+from env.state import State
 
 
 class Env(gym.Env):
@@ -68,35 +69,21 @@ class Env(gym.Env):
 
     def step(self, action):
         # Getting current observation
-        obs = EnvObservation.from_torch_geometric(
-            self.n_jobs,
-            self.n_machines,
-            self.transition_model.get_graph(self.env_specification.normalize_input, self.env_specification.input_list),
-            self.transition_model.get_mask(),
-            self.env_specification.max_n_jobs,
-            self.env_specification.max_n_machines,
-        )
+        obs = self.observe()
 
         # Running the transition model on the current action
         node_id, boolean = self._convert_action_to_node_id(action)
         if self.env_specification.insertion_mode == "no_forced_insertion":
-            self.transition_model.run(node_id, force_insert=False)
+            self.transition_model.run(self.state, node_id, force_insert=False)
         elif self.env_specification.insertion_mode == "full_forced_insertion":
-            self.transition_model.run(node_id, force_insert=True)
+            self.transition_model.run(self.state, node_id, force_insert=True)
         elif self.env_specification.insertion_mode == "choose_forced_insertion":
-            self.transition_model.run(node_id, force_insert=boolean)
+            self.transition_model.run(self.state, node_id, force_insert=boolean)
         elif self.env_specification.insertion_mode == "slot_locking":
-            self.transition_model.run(node_id, lock_slot=boolean)
+            self.transition_model.run(self.state, node_id, lock_slot=boolean)
 
         # Getting next observation
-        next_obs = EnvObservation.from_torch_geometric(
-            self.n_jobs,
-            self.n_machines,
-            self.transition_model.get_graph(self.env_specification.normalize_input, self.env_specification.input_list),
-            self.transition_model.get_mask(),
-            self.env_specification.max_n_jobs,
-            self.env_specification.max_n_machines,
-        )
+        next_obs = self.observe()
 
         # Getting the reward associated with the current action
         reward = self.reward_model.evaluate(
@@ -106,7 +93,7 @@ class Env(gym.Env):
         )
 
         # Getting final necessary information
-        done = self.transition_model.done()
+        done = self.done()
         gym_observation = next_obs.to_gym_observation()
         info = {"episode": {"r": reward, "l": 1 + self.n_steps * 2}}
         self.n_steps += 1
@@ -121,42 +108,46 @@ class Env(gym.Env):
         return node_id, boolean
 
     def reset(self):
+        # Reset the state by creating a new one
+        self._create_state()
+
         # Reset the transition model by creating a new one
         self._create_transition_model()
 
         # Get the new observation
-        observation = EnvObservation.from_torch_geometric(
-            self.n_jobs,
-            self.n_machines,
-            self.transition_model.get_graph(self.env_specification.normalize_input, self.env_specification.input_list),
-            self.transition_model.get_mask(),
-            self.env_specification.max_n_jobs,
-            self.env_specification.max_n_machines,
-        )
+        observation = self.observe()
 
         self.n_steps = 0
 
         return observation.to_gym_observation()
 
     def get_solution(self):
-        return self.transition_model.state.get_solution()
+        return self.state.get_solution()
 
     def render_solution(self, schedule, scaling=1.0):
-        return self.transition_model.state.render_solution(schedule, scaling)
+        return self.state.render_solution(schedule, scaling)
 
-    def _create_transition_model(self):
+    def _create_state(self):
         affectations, durations = self.problem_description.sample_problem()
-        if self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
-            self.transition_model = L2DTransitionModel(
+        self.state = State(
                 affectations,
                 durations,
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
+                )
+
+    def _create_transition_model(self):
+        if self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
+            self.transition_model = L2DTransitionModel(
+                self.state.affectations,
+                self.state.durations,
                 self.env_specification.max_n_jobs,
                 self.env_specification.max_n_machines,
             )
         elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode == "slot_locking":
             self.transition_model = SlotLockingTransitionModel(
-                affectations,
-                durations,
+                self.state.affectations,
+                self.state.durations,
                 self.env_specification.max_n_jobs,
                 self.env_specification.max_n_machines,
             )
@@ -187,3 +178,24 @@ class Env(gym.Env):
                 self.reward_model = SparseRewardModel()
             else:
                 raise Exception("Reward model not recognized")
+
+    def observe(self):
+        features, edge_index = self.state.to_features_and_edge_index(
+                self.env_specification.normalize_input,
+                self.env_specification.input_list,
+                )
+        return EnvObservation(
+            self.n_jobs,
+            self.n_machines,
+            features,
+            edge_index,
+            self.transition_model.get_mask(self.state),
+            self.env_specification.max_n_jobs,
+            self.env_specification.max_n_machines,
+        )
+
+    def done(self):
+        return self.state.done()
+
+    def is_uncertain(self):
+        return self.state.durations.shape[2] > 1

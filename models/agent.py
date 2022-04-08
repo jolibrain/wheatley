@@ -25,6 +25,7 @@ class Agent:
          - Either provide a valid env_specification and agent_specification
          - Or use the load method, to load an already saved Agent
         """
+        self.env_specification = env_specification
 
         # User must provide an agent_specification or a model at least.
         if agent_specification is None and model is None:
@@ -33,71 +34,13 @@ class Agent:
         # If a model is provided, we simply load the existing model.
         if model is not None:
             self.model = model
-            self.env_specification = env_specification
             return
 
         # Else, we have to build a new PPO instance.
-        # We have to create a fake_env to instantiate PPO.
-        fake_problem_description = ProblemDescription(
-            transition_model_config="L2D",
-            reward_model_config="Sparse",
-            fixed=True,
-            deterministic=True,
-            n_jobs=2,
-            n_machines=2,
-            max_duration=99,
-        )
-        env_fns = [lambda: Env(fake_problem_description, env_specification) for _ in range(agent_specification.n_workers)]
-        fake_env = DummyVecEnv(env_fns)
-
-        # Finally, we can build our PPO
-        self.model = PPO(
-            Policy,
-            fake_env,
-            learning_rate=agent_specification.lr,
-            n_steps=agent_specification.n_steps_episode,
-            batch_size=agent_specification.batch_size,
-            n_epochs=agent_specification.n_epochs,
-            gamma=agent_specification.gamma,
-            gae_lambda=1,  # To use same vanilla advantage function
-            clip_range=agent_specification.clip_range,
-            ent_coef=agent_specification.ent_coef,
-            vf_coef=agent_specification.ent_coef,
-            policy_kwargs={
-                "features_extractor_class": FeaturesExtractor,
-                "features_extractor_kwargs": {
-                    "input_dim_features_extractor": env_specification.n_features,
-                    "gconv_type": agent_specification.gconv_type,
-                    "graph_pooling": agent_specification.graph_pooling,
-                    "freeze_graph": agent_specification.freeze_graph,
-                    "graph_has_relu": agent_specification.graph_has_relu,
-                    "device": agent_specification.device,
-                    "max_n_nodes": env_specification.max_n_nodes,
-                    "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
-                    "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
-                    "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
-                    "n_attention_heads": agent_specification.n_attention_heads,
-                },
-                "optimizer_class": agent_specification.optimizer_class,
-                "add_boolean": env_specification.add_boolean,
-                "mlp_act": agent_specification.mlp_act,
-                "_device": agent_specification.device,
-                "input_dim_features_extractor": env_specification.n_features,
-                "max_n_nodes": env_specification.max_n_nodes,
-                "max_n_jobs": env_specification.max_n_jobs,
-                "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
-                "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
-                "n_mlp_layers_actor": agent_specification.n_mlp_layers_actor,
-                "hidden_dim_actor": agent_specification.hidden_dim_actor,
-                "n_mlp_layers_critic": agent_specification.n_mlp_layers_critic,
-                "hidden_dim_critic": agent_specification.hidden_dim_critic,
-            },
-            verbose=2,
-            device=agent_specification.device,
-        )
+        self.model = None
         self.n_workers = agent_specification.n_workers
         self.device = agent_specification.device
-        self.env_specification = env_specification
+        self.agent_specification = agent_specification
 
     def save(self, path):
         """Saving an agent corresponds to saving his model and a few args to specify how the model is working"""
@@ -142,7 +85,59 @@ class Agent:
         vec_env = DummyVecEnv(
             env_fns=[lambda: Env(problem_description, self.env_specification) for _ in range(self.n_workers)]
         )
-        self.model.set_env(vec_env)
+
+        # Finally, we can build our PPO
+        if self.model is None:
+            env_specification = self.env_specification
+            agent_specification = self.agent_specification
+            self.model = PPO(
+                Policy,
+                vec_env,
+                learning_rate=agent_specification.lr,
+                n_steps=agent_specification.n_steps_episode,
+                batch_size=agent_specification.batch_size,
+                n_epochs=agent_specification.n_epochs,
+                gamma=agent_specification.gamma,
+                gae_lambda=1,  # To use same vanilla advantage function
+                clip_range=agent_specification.clip_range,
+                ent_coef=agent_specification.ent_coef,
+                vf_coef=agent_specification.ent_coef,
+                policy_kwargs={
+                    "features_extractor_class": FeaturesExtractor,
+                    "features_extractor_kwargs": {
+                        "input_dim_features_extractor": env_specification.n_features,
+                        "gconv_type": agent_specification.gconv_type,
+                        "graph_pooling": agent_specification.graph_pooling,
+                        "freeze_graph": agent_specification.freeze_graph,
+                        "graph_has_relu": agent_specification.graph_has_relu,
+                        "device": agent_specification.device,
+                        "max_n_nodes": env_specification.max_n_nodes,
+                        "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
+                        "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
+                        "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
+                        "n_attention_heads": agent_specification.n_attention_heads,
+                    },
+                    "optimizer_class": agent_specification.optimizer_class,
+                    "add_boolean": env_specification.add_boolean,
+                    "mlp_act": agent_specification.mlp_act,
+                    "_device": agent_specification.device,
+                    "input_dim_features_extractor": env_specification.n_features,
+                    "max_n_nodes": env_specification.max_n_nodes,
+                    "max_n_jobs": env_specification.max_n_jobs,
+                    "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
+                    "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
+                    "n_mlp_layers_actor": agent_specification.n_mlp_layers_actor,
+                    "hidden_dim_actor": agent_specification.hidden_dim_actor,
+                    "n_mlp_layers_critic": agent_specification.n_mlp_layers_critic,
+                    "hidden_dim_critic": agent_specification.hidden_dim_critic,
+                },
+                verbose=2,
+                device=agent_specification.device,
+            )
+
+        # Load the vectorized environments in the existing model
+        else:
+            self.model.set_env(vec_env)
 
         # Launching training
         self.model.learn(training_specification.total_timesteps, callback=event_callback)
