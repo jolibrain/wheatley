@@ -4,6 +4,8 @@ from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.ppo import PPO
 from stable_baselines3.a2c import A2C
+from sb3_contrib.ppo_mask import MaskablePPO
+from sb3_contrib.common.maskable.utils import get_action_masks
 import torch
 
 from env.env import Env
@@ -53,7 +55,7 @@ class Agent:
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
         with open(path + ".pickle", "rb") as f:
             kwargs = pickle.load(f)
-        agent = cls(env_specification=kwargs["env_specification"], model=PPO.load(path))
+        agent = cls(env_specification=kwargs["env_specification"], model=MaskablePPO.load(path))
         agent.n_workers = kwargs["n_workers"]
         agent.device = kwargs["device"]
         return agent
@@ -90,7 +92,7 @@ class Agent:
         if self.model is None:
             env_specification = self.env_specification
             agent_specification = self.agent_specification
-            self.model = PPO(
+            self.model = MaskablePPO(
                 Policy,
                 vec_env,
                 learning_rate=agent_specification.lr,
@@ -150,7 +152,8 @@ class Agent:
         observation = env.reset()
         done = False
         while not done:
-            action, _ = self.model.predict(observation, deterministic=True)
+            action_masks = get_action_masks(env)
+            action, _ = self.model.predict(observation, deterministic=True, action_masks=action_masks)
             observation, reward, done, info = env.step(action)
 
         return env.get_solution()

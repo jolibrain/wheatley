@@ -24,7 +24,6 @@ def test_evaluate():
             ]
         ),
         torch.tensor([[1, 2], [2, 1]]),
-        torch.zeros(9),
         3,
         3,
     )
@@ -45,7 +44,6 @@ def test_evaluate():
             ]
         ),
         torch.tensor([[1, 2], [2, 1]]),
-        torch.zeros(9),
         3,
         3,
     )

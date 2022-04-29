@@ -4,7 +4,7 @@ import torch.nn as nn
 from env.reward_model import RewardModel
 
 
-class IntrisicRewardModel(RewardModel):
+class IntrinsicRewardModel(RewardModel):
     def __init__(self, observation_input_size, n_nodes):
         self.random_network = nn.Sequential(
             nn.Linear(observation_input_size, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, 16), nn.Sigmoid()

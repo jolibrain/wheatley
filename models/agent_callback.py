@@ -13,6 +13,7 @@ from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
 from utils.utils import generate_problem_durations
+from sb3_contrib.common.maskable.utils import get_action_masks
 
 
 class ValidationCallback(BaseCallback):
@@ -126,7 +127,8 @@ class ValidationCallback(BaseCallback):
             obs = self.validation_envs[i].reset()
             done = False
             while not done:
-                action, _ = self.model.predict(obs, deterministic=True)
+                action_masks = get_action_masks(self.validation_envs[i])
+                action, _ = self.model.predict(obs, deterministic=True, action_masks=action_masks)
                 obs, reward, done, info = self.validation_envs[i].step(action)
             solution = self.validation_envs[i].get_solution()
             schedule = solution.schedule

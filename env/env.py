@@ -6,7 +6,7 @@ import traceback
 
 from env.transition_models.l2d_transition_model import L2DTransitionModel
 from env.transition_models.slot_locking_transition_model import SlotLockingTransitionModel
-from env.reward_models.intrisic_reward_model import IntrisicRewardModel
+from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
 from env.reward_models.l2d_reward_model import L2DRewardModel
 from env.reward_models.meta_reward_model import MetaRewardModel
 from env.reward_models.sparse_reward_model import SparseRewardModel
@@ -54,7 +54,6 @@ class Env(gym.Env):
                     shape=(2, self.env_specification.max_n_edges),
                     dtype=np.int64,
                 ),
-                "mask": Box(low=0, high=1, shape=(self.env_specification.max_n_nodes,)),
             }
         )
 
@@ -166,7 +165,7 @@ class Env(gym.Env):
                     self.affectations, self.durations, self.env_specification.normalize_input
                 )
             elif self.reward_model_config == "Intrinsic":
-                self.reward_model = IntrisicRewardModel(self.n_features * self.n_nodes)
+                self.reward_model = IntrinsicRewardModel(self.n_features * self.n_nodes, self.n_nodes)
             else:
                 raise Exception("Reward model not recognized")
 
@@ -189,7 +188,6 @@ class Env(gym.Env):
             self.n_machines,
             features,
             edge_index,
-            self.transition_model.get_mask(self.state),
             self.env_specification.max_n_jobs,
             self.env_specification.max_n_machines,
         )
@@ -199,3 +197,6 @@ class Env(gym.Env):
 
     def is_uncertain(self):
         return self.state.durations.shape[2] > 1
+
+    def action_masks(self):
+        return self.transition_model.get_mask(self.state, self.env_specification.add_boolean)

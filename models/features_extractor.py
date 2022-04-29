@@ -101,7 +101,6 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         observation = AgentObservation.from_gym_observation(obs)
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()
-        mask = observation.get_mask()
 
         graph_state = observation.to_torch_geometric()
         features, edge_index = graph_state.x, graph_state.edge_index
@@ -129,7 +128,4 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
         graph_and_nodes_embedding = torch.cat((graph_embedding.reshape(batch_size, 1, -1), features), dim=1)
 
-        extended_mask = torch.cat((torch.zeros((batch_size, 1), device=self.device), mask), dim=1).unsqueeze(2)
-        embedded_features = torch.cat((graph_and_nodes_embedding, extended_mask), dim=2)
-
-        return embedded_features
+        return graph_and_nodes_embedding

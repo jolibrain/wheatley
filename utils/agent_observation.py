@@ -4,18 +4,16 @@ from torch_geometric.loader import DataLoader
 
 
 class AgentObservation:
-    def __init__(self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask):
+    def __init__(self, n_jobs, n_machines, n_nodes, n_edges, features, edge_index):
         self.n_jobs = n_jobs
         self.n_machines = n_machines
         self.n_nodes = n_nodes
         self.n_edges = n_edges
         self.features = features
         self.edge_index = edge_index
-        self.mask = mask
         assert self.n_nodes == self.n_jobs * self.n_machines
         assert self.n_nodes == self.features.shape[1]
         assert self.n_edges == self.edge_index.shape[2]
-        assert self.n_nodes == self.mask.shape[1]
 
     def get_batch_size(self):
         return self.features.shape[0]
@@ -25,9 +23,6 @@ class AgentObservation:
 
     def get_n_jobs(self):
         return self.n_jobs
-
-    def get_mask(self):
-        return self.mask
 
     @classmethod
     def from_gym_observation(cls, gym_observation):
@@ -64,8 +59,7 @@ class AgentObservation:
 
         features = gym_observation["features"][:, 0:n_nodes, :]
         edge_index = gym_observation["edge_index"][:, :, 0:n_edges].long()
-        mask = gym_observation["mask"][:, 0 : n_nodes ** 2]
-        return cls(n_jobs, n_machines, n_nodes, n_edges, features, edge_index, mask)
+        return cls(n_jobs, n_machines, n_nodes, n_edges, features, edge_index)
 
     def to_torch_geometric(self):
         """

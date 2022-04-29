@@ -2,7 +2,7 @@ import torch
 
 
 class EnvObservation:
-    def __init__(self, n_jobs, n_machines, features, edge_index, mask, max_n_jobs, max_n_machines):
+    def __init__(self, n_jobs, n_machines, features, edge_index, max_n_jobs, max_n_machines):
         """
         This should only hanlde cpu tensors, since it is used on the env side.
         """
@@ -19,9 +19,7 @@ class EnvObservation:
         self.n_edges = edge_index.shape[1]
         self.features = features
         self.edge_index = edge_index
-        self.mask = mask
         assert self.n_nodes == self.features.shape[0]
-        assert self.n_nodes == self.mask.shape[0]
 
     def get_n_nodes(self):
         return self.n_nodes
@@ -40,8 +38,6 @@ class EnvObservation:
         features[0 : self.get_n_nodes(), :] = self.features
         edge_index = torch.zeros((2, self.max_n_edges))
         edge_index[:, 0 : self.get_n_edges()] = self.edge_index
-        mask = torch.zeros(self.max_n_nodes)
-        mask[0 : self.n_nodes] = self.mask
         return {
             "n_jobs": self.n_jobs,
             "n_machines": self.n_machines,
@@ -49,5 +45,4 @@ class EnvObservation:
             "n_edges": self.n_edges,
             "features": features.numpy(),
             "edge_index": edge_index.numpy().astype('int64'),
-            "mask": mask.numpy(),
         }

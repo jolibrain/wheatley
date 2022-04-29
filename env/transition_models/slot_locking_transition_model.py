@@ -93,13 +93,13 @@ class SlotLockingTransitionModel(TransitionModel):
         if self.observe_real_duration_when_affect:
             state.observe_real_duration(node_id, True)
 
-    def get_mask(self, state):
+    def get_mask(self, state, add_boolean=False):
         available_node_ids = []
         for job_id in range(state.n_jobs):
             task_id = state.get_first_unaffected_task(job_id)
             if task_id != -1 and state.affectations[job_id, task_id] != -1:
                 available_node_ids.append(job_and_task_to_node(job_id, task_id, state.n_machines))
-        mask = torch.zeros(state.n_nodes)
+        mask = [ False ] * state.n_nodes
         for node_id in available_node_ids:
-            mask[node_id] = 1
-        return mask
+            mask[node_id] = True
+        return mask * (2 if add_boolean else 1)

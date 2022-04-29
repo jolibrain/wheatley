@@ -1,6 +1,7 @@
 import numpy as np
 
 from env.env import Env
+from sb3_contrib.common.maskable.utils import get_action_masks
 
 
 class RandomAgent:
@@ -17,15 +18,13 @@ class RandomAgent:
         observation = env.reset()
         done = False
         while not done:
-            action = self.select_action(observation)
+            action = self.select_action(env)
             observation, _, done, _ = env.step(action)
         solution = env.get_solution()
         return solution
 
-    def select_action(self, observation):
-        real_mask = np.zeros(self.max_n_jobs)
-        mask = observation["mask"]
-        real_mask = mask.flatten()
-        possible_actions = np.nonzero(real_mask)[0]
+    def select_action(self, env):
+        action_masks = get_action_masks(env)
+        possible_actions = np.nonzero(action_masks)[0]
         action = np.random.choice(possible_actions)
         return action

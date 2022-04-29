@@ -1,13 +1,14 @@
 from functools import partial
 import numpy as np
-from stable_baselines3.common.policies import ActorCriticPolicy
+from sb3_contrib.ppo_mask.policies import MaskableActorCriticPolicy
 import torch
 from torch.distributions import Categorical
 
 from models.mlp_extractor import MLPExtractor
+from sb3_contrib.common.maskable.distributions import MaskableDistribution, make_masked_proba_distribution
 
 
-class Policy(ActorCriticPolicy):
+class Policy(MaskableActorCriticPolicy):
     def __init__(self, *args, **kwargs):
         add_boolean = kwargs.pop("add_boolean")
         self.add_boolean = add_boolean
@@ -96,7 +97,7 @@ class Policy(ActorCriticPolicy):
 
         return latent_pi, latent_vf
         
-    def forward(self, obs, deterministic=False):
+    def forward(self, obs, deterministic=False, action_masks=None):
         """
         Forward pass in all the networks (actor and critic)
         Note : this is a reimplementation of the forward function of
@@ -105,22 +106,26 @@ class Policy(ActorCriticPolicy):
         """
         latent_pi, latent_vf = self._get_latent(obs)
         values = latent_vf  # Modification here
-        distribution = Categorical(latent_pi)  # And here
-        actions = torch.argmax(distribution.probs, dim=1) if deterministic else distribution.sample()
+        distribution = self.action_dist.proba_distribution(latent_pi)
+        if action_masks is not None:
+            distribution.apply_masking(action_masks)
+        actions = distribution.get_actions(deterministic=deterministic)
         log_prob = distribution.log_prob(actions)
         return actions, values, log_prob
 
-    def _predict(self, observation, deterministic=False):
-        actions, _, _ = self.forward(observation, deterministic)
+    def _predict(self, observation, deterministic=False, action_masks=None):
+        actions, _, _ = self.forward(observation, deterministic, action_masks)
         return actions
 
-    def predict_values(self, observation, deterministic=False):
-        _, values, _ = self.forward(observation, deterministic)
+    def predict_values(self, observation, deterministic=False, action_masks=None):
+        _, values, _ = self.forward(observation, deterministic, action_masks)
         return values
 
-    def evaluate_actions(self, obs, actions):
+    def evaluate_actions(self, obs, actions, action_masks=None):
         latent_pi, latent_vf = self._get_latent(obs)
-        distribution = Categorical(latent_pi)
+        distribution = self.action_dist.proba_distribution(latent_pi)
+        if action_masks is not None:
+            distribution.apply_masking(action_masks)
         log_prob = distribution.log_prob(actions)
         values = latent_vf
         return values, log_prob, distribution.entropy()

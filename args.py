@@ -122,7 +122,7 @@ parser.add_argument(
     "--reward_model_config",
     type=str,
     default="L2D",
-    choices=["L2D", "Sparse", "Tassel", "Instrinsic", "realistic", "optimistic", "pessimistic", "averagistic"],
+    choices=["L2D", "Sparse", "Tassel", "Intrinsic", "realistic", "optimistic", "pessimistic", "averagistic"],
     help="Which reward model to use, from L2D|Sparse|Tassel|Intrinsic in the deterministic case; "
     "for uncertainty (stochastic), you can use pessimistic|optimistic|realistic|averagistic|Sparse",
 )

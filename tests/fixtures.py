@@ -97,10 +97,6 @@ def state(affectations, durations):
 
 @fixture
 def env_observation():
-    mask = torch.zeros(9)
-    mask[0] = 1
-    mask[3] = 1
-    mask[6] = 1
     return EnvObservation(
         n_jobs=3,
         n_machines=3,
@@ -121,7 +117,6 @@ def env_observation():
             [[0, 2, 4, 5, 2, 3, 6, 7], [1, 3, 4, 2, 4, 5, 8, 6]],
             dtype=torch.int64,
         ),
-        mask=mask,
         max_n_jobs=3,
         max_n_machines=3,
     )

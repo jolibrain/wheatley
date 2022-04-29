@@ -52,21 +52,21 @@ class MLPExtractor(nn.Module):
             device=device,
         )
 
-    def forward(self, embedded_features):
+    def forward(self, graph_and_nodes_embedding):
         """
         Takes nodes_and_graph_embedding as input. This should be the output of the
         FeatureExtractor
         """
 
-        # First decompose the features into mask, graph_embedding and nodes_embedding
-        graph_embedding, nodes_embedding, mask = self._decompose_features(embedded_features)
+        # First decompose the features into graph_embedding and nodes_embedding
+        graph_embedding, nodes_embedding = self._decompose_features(graph_and_nodes_embedding)
         batch_size = graph_embedding.shape[0]
 
         # Then compute actor and critic
         value = self.critic(graph_embedding)
 
-        # Compute the pairs and apply the mask
-        pairs_to_compute, indexes = self._get_pairs_to_compute(graph_embedding, nodes_embedding, mask)
+        # Compute the pairs
+        pairs_to_compute, indexes = self._get_pairs_to_compute(graph_embedding, nodes_embedding)
 
         # Compute the probabilities
         probabilities = self.actor(pairs_to_compute)
@@ -100,7 +100,10 @@ class MLPExtractor(nn.Module):
             ] = shaped_pi_without_boolean
         return filled_pi, value
 
-    def _get_pairs_to_compute(self, g_embedding, n_embeddings, mask):
+    def _get_pairs_to_compute(self, g_embedding, n_embeddings):
+        batch_size = n_embeddings.shape[0]
+        n_nodes = n_embeddings.shape[1]
+        mask = torch.ones(batch_size, n_nodes, 1)
         indexes = []
         masked_tensors = []
 
@@ -117,16 +120,10 @@ class MLPExtractor(nn.Module):
             masked_tensors.append(masked_tensor)
         return torch.stack(masked_tensors), indexes
 
-    def _decompose_features(self, embedded_features):
-        graph_and_nodes_embedding, extended_mask = torch.split(
-            embedded_features,
-            [embedded_features.shape[2] - 1, 1],
-            dim=2,
-        )
+    def _decompose_features(self, graph_and_nodes_embedding):
         graph_embedding, nodes_embedding = torch.split(
             graph_and_nodes_embedding,
             [1, graph_and_nodes_embedding.shape[1] - 1],
             dim=1,
         )
-        mask = extended_mask[:, 1:]
-        return graph_embedding, nodes_embedding, mask
+        return graph_embedding, nodes_embedding
