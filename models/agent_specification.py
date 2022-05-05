@@ -13,6 +13,7 @@ class AgentSpecification:
         target_kl,
         ent_coef,
         vf_coef,
+        normalize_advantage,
         optimizer,
         freeze_graph,
         n_features,
@@ -40,6 +41,7 @@ class AgentSpecification:
         self.target_kl = target_kl
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
+        self.normalize_advantage = normalize_advantage
         self.optimizer = optimizer
         self.freeze_graph = (freeze_graph,)
         self.n_features = n_features
@@ -75,6 +77,7 @@ class AgentSpecification:
             f"Discount factor (gamma):          {self.gamma}\n"
             f"Entropy coefficient:              {self.ent_coef}\n"
             f"Value function coefficient:       {self.vf_coef}\n"
+            f"Normalize advantage:              {self.normalize_advantage}\n"
             f"Optimizer:                        {self.optimizer}\n"
             f"Freezing graph during training:   {'Yes' if self.freeze_graph else 'No'}\n"
             f"Graph convolution type:           {self.gconv_type.upper()}\n"

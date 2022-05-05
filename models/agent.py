@@ -103,7 +103,8 @@ class Agent:
                 gae_lambda=1,  # To use same vanilla advantage function
                 clip_range=agent_specification.clip_range,
                 ent_coef=agent_specification.ent_coef,
-                vf_coef=agent_specification.ent_coef,
+                vf_coef=agent_specification.vf_coef,
+                normalize_advantage=agent_specification.normalize_advantage,
                 policy_kwargs={
                     "features_extractor_class": FeaturesExtractor,
                     "features_extractor_kwargs": {

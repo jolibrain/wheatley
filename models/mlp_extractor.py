@@ -73,7 +73,9 @@ class MLPExtractor(nn.Module):
         if self.add_boolean:
             probabilities, boolean = torch.split(probabilities, [1, 1], dim=2)
             boolean = torch.sigmoid(boolean)
-        pi = F.softmax(probabilities, dim=1)
+        # pi = F.softmax(probabilities, dim=1)
+        # logits are expected at output, not probas
+        pi = probabilities
         if self.add_boolean:
             pi_without_boolean = pi * (1 - boolean)
             pi = pi * boolean

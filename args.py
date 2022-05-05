@@ -64,6 +64,7 @@ parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping para
 parser.add_argument("--target_kl", type=float, default=0.2, help="Limit the KL divergence between updates")
 parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
 parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
+parser.add_argument("--dont_normalize_advantage", action="store_true", help="Whether to not normalize PPO advantage")
 
 parser.add_argument(
     "--gconv_type",

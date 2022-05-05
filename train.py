@@ -82,6 +82,7 @@ def main():
             target_kl=args.target_kl,
             ent_coef=args.ent_coef,
             vf_coef=args.vf_coef,
+            normalize_advantage=not args.dont_normalize_advantage,
             optimizer=args.optimizer,
             freeze_graph=args.freeze_graph,
             n_features=get_n_features(args.features, args.max_n_j, args.max_n_m),
