@@ -13,3 +13,5 @@ torch_scatter
 plotly
 opencv-python
 sb3_contrib
+kaleido
+

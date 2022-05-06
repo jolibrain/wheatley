@@ -136,7 +136,7 @@ class ProblemDescription:
             if cur_n_j != durations.shape[0] or cur_n_m != durations.shape[1]:
                 raise Exception("Please provide affectations and durations of matching shapes")
             if (n_jobs is not None and n_jobs != cur_n_j) or (n_machines is not None and n_machines != cur_n_m):
-                raise Exception("Please provide n_jobs and n_machines that are consistent with affectations and durations")
+                raise Exception("Please provide n_jobs (" + str(n_jobs) + " vs " + str(cur_n_j) + ") and n_machines (" + str(n_machines) + " vs " + str(cur_n_m) + ") that are consistent with affectations and durations")
         elif n_jobs is None or n_machines is None:
             raise Exception("Please provide n_jobs and n_machines or affectations and durations")
 

@@ -43,7 +43,7 @@ class AgentSpecification:
         self.vf_coef = vf_coef
         self.normalize_advantage = normalize_advantage
         self.optimizer = optimizer
-        self.freeze_graph = (freeze_graph,)
+        self.freeze_graph = freeze_graph
         self.n_features = n_features
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
