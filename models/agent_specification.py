@@ -27,6 +27,8 @@ class AgentSpecification:
         n_layers_features_extractor,
         hidden_dim_features_extractor,
         n_attention_heads,
+        n_mlp_layers_shared,
+        hidden_dim_shared,
         n_mlp_layers_actor,
         hidden_dim_actor,
         n_mlp_layers_critic,
@@ -54,11 +56,20 @@ class AgentSpecification:
         self.n_mlp_layers_features_extractor = n_mlp_layers_features_extractor
         self.n_layers_features_extractor = n_layers_features_extractor
         self.hidden_dim_features_extractor = hidden_dim_features_extractor
+        self.n_mlp_layers_shared = n_mlp_layers_shared
+        self.hidden_dim_shared = hidden_dim_shared
         self.n_attention_heads = n_attention_heads
         self.n_mlp_layers_actor = n_mlp_layers_actor
         self.hidden_dim_actor = hidden_dim_actor
         self.n_mlp_layers_critic = n_mlp_layers_critic
         self.hidden_dim_critic = hidden_dim_critic
+
+        if mlp_act.lower() == "relu":
+            self.activation_fn = torch.nn.LeakyReLU
+        elif mlp_act.lower() == "tanh":
+            self.activation_fn = torch.nn.Tanh
+        else:
+            raise Exception("Activation not recognized")
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -66,6 +77,11 @@ class AgentSpecification:
             self.optimizer_class = torch.optim.SGD
         else:
             raise Exception("Optimizer not recognized")
+
+        shared = [hidden_dim_shared] * n_mlp_layers_shared
+        pi = [hidden_dim_actor] * n_mlp_layers_actor
+        vf = [hidden_dim_critic] * n_mlp_layers_critic
+        self.net_arch = shared + [dict(vf=vf, pi=pi)]
 
     def print_self(self):
         print(
@@ -92,19 +108,24 @@ class AgentSpecification:
         other_features_extractor_shape = f"{self.hidden_dim_features_extractor}" + "".join(
             [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_mlp_layers_features_extractor - 1)]
         )
+        shared_shape = (
+            f""
+            + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
+        )
         actor_shape = (
-            f"{self.hidden_dim_features_extractor * 2}"
-            + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor - 2)])
+            f""
+            + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)])
             + " -> 1"
         )
         critic_shape = (
-            f"{self.hidden_dim_features_extractor}"
-            + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic - 2)])
+            f""
+            + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)])
             + " -> 1"
         )
         print(
             f" - Features extractor: {self.gconv_type.upper()}({first_features_extractor_shape}) => "
             + f"{self.gconv_type.upper()}({other_features_extractor_shape}) x {self.n_layers_features_extractor - 1}"
         )
+        print(f" - Shared: {shared_shape}")
         print(f" - Actor: {actor_shape}")
         print(f" - Critic: {critic_shape}\n")

@@ -26,13 +26,10 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         n_attention_heads,
     ):
         self.max_n_nodes = max_n_nodes
+        features_dim=(input_dim_features_extractor + hidden_dim_features_extractor * n_layers_features_extractor) * 2
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
-            features_dim=(
-                (hidden_dim_features_extractor * n_layers_features_extractor + input_dim_features_extractor)
-                + self.max_n_nodes
-            )
-            * (self.max_n_nodes + 1),
+            features_dim=features_dim,
         )
         self.freeze_graph = freeze_graph
         self.device = device
@@ -126,6 +123,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             graph_embedding = torch.matmul(graph_pooling, features)
         else:
             raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
-        graph_and_nodes_embedding = torch.cat((graph_embedding.reshape(batch_size, 1, -1), features), dim=1)
+        graph_embedding = graph_embedding.reshape(batch_size, 1, -1)
 
-        return graph_and_nodes_embedding
+        # repeat the graph embedding to match the nodes embedding size
+        repeated = graph_embedding.expand(features.shape)
+        return torch.cat((features, repeated), dim=2)

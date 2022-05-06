@@ -146,7 +146,7 @@ def test_features_extractor_learning(features_extractor):
             torch.tensor([1], device=torch.device("cpu")).float(),
         ),
     ]
-    last_layer = torch.nn.Linear(10 * 64, 1)
+    last_layer = torch.nn.Linear(9 * 64, 1)
     last_layer.to(torch.device("cpu"))
     optimizer = torch.optim.Adam(features_extractor.parameters())
     criterion = torch.nn.BCELoss()

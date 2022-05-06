@@ -95,11 +95,15 @@ parser.add_argument("--n_layers_features_extractor", type=int, default=4, help="
 parser.add_argument("--hidden_dim_features_extractor", type=int, default=64, help="Dimension of hidden and output for GNN")
 parser.add_argument("--n_attention_heads", type=int, default=4, help="Dimension of hidden and output for GNN")
 parser.add_argument(
-    "--n_mlp_layers_actor", type=int, default=4, help="Number of MLP layers in actor (counting input and output"
+    "--n_mlp_layers_shared", type=int, default=0, help="Number of MLP layers in shared (excluding input and output"
+)
+parser.add_argument("--hidden_dim_shared", type=int, default=32, help="Hidden dim for shared")
+parser.add_argument(
+    "--n_mlp_layers_actor", type=int, default=2, help="Number of MLP layers in actor (excluding input and output"
 )
 parser.add_argument("--hidden_dim_actor", type=int, default=32, help="Hidden dim for actor")
 parser.add_argument(
-    "--n_mlp_layers_critic", type=int, default=4, help="Number of MLP layers in critic (counting input and output)"
+    "--n_mlp_layers_critic", type=int, default=2, help="Number of MLP layers in critic (excluding input and output)"
 )
 parser.add_argument("--hidden_dim_critic", type=int, default=32, help="Hidden dim for critic")
 

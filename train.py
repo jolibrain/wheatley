@@ -96,6 +96,8 @@ def main():
             n_layers_features_extractor=args.n_layers_features_extractor,
             hidden_dim_features_extractor=args.hidden_dim_features_extractor,
             n_attention_heads=args.n_attention_heads,
+            n_mlp_layers_shared=args.n_mlp_layers_shared,
+            hidden_dim_shared=args.hidden_dim_shared,
             n_mlp_layers_actor=args.n_mlp_layers_actor,
             hidden_dim_actor=args.hidden_dim_actor,
             n_mlp_layers_critic=args.n_mlp_layers_critic,
