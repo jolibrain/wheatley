@@ -210,7 +210,17 @@ class ValidationCallback(BaseCallback):
             opts2["legend"].append(self.custom_name + " / OR-tools")
             opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
-        self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
+        #self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
+
+        # ratio to OR-tools
+        opts = { "title": "PPO / OR-tools" }
+        ratio_to_ortools = np.array(self.makespans) / np.array(self.ortools_makespans)
+        self.vis.line(X=X, Y=ratio_to_ortools, win="ratio_to_ortools", opts=opts)
+
+        # distance to OR-tools
+        opts = { "title": "Distance to OR-tools" }
+        dist_to_ortools = np.array(self.makespans) - np.array(self.ortools_makespans)
+        self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
 
         # time to OR-tools
         wins = 0
@@ -220,7 +230,7 @@ class ValidationCallback(BaseCallback):
                 wins += 1
         pct = 100 * wins / count
         self.time_to_ortools.append(pct)
-        opts = { "title": "Time to OR-tools" }
+        opts = { "title": "Time to OR-tools %" }
         self.vis.line(X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts)
 
         if self.first_callback:
