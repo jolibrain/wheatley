@@ -99,7 +99,7 @@ class State:
                 if self.durations[job_id, task_id, 0] == -1:
                     self.task_completion_times[job_id, task_id:, 0] = -1
 
-        self.total_job_time = np.sum(self.durations, axis=1)
+        self.total_job_time = np.sum(np.where(self.durations < 0, 0, self.durations), axis=1)
         for job_id in range(self.n_jobs):
             if (self.durations[job_id, :, 0] == -1).any():
                 self.total_job_time[job_id, 0] = -1
@@ -149,7 +149,7 @@ class State:
         """
         for machine_id in range(self.n_machines):
             machine_sub_graph = self.graph.subgraph(self._get_machine_node_ids(machine_id))
-            if nx.algorithms.dag.dag_longest_path_length(machine_sub_graph) != self.n_jobs_per_machine[machine_id] - 1:
+            if self.n_jobs_per_machine[machine_id] > 0 and nx.algorithms.dag.dag_longest_path_length(machine_sub_graph) != self.n_jobs_per_machine[machine_id] - 1:
                 return False
         return True
 
@@ -228,6 +228,7 @@ class State:
         features["total_machine_time"] = self.total_machine_time[machine_id]  # vector of size 4
         features["job_completion_percentage"] = self.job_completion_time[job_id] / features["total_job_time"]  # size 4
         features["machine_completion_percentage"] = self.machine_completion_time[machine_id] / features["total_machine_time"]
+
         # Checking consistency with knwoledge
         for i in range(4):
             if self.job_completion_time[job_id][i] == -1 or features["total_job_time"][i] == -1:

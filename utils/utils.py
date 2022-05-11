@@ -3,13 +3,11 @@ from copy import deepcopy
 import numpy as np
 import torch
 
-
 def find_last_in_batch(start_index, bi, batch_indices):
     index = start_index
     while index < batch_indices.shape[0] - 1 and int(batch_indices[index + 1].item()) == bi:
         index += 1
     return index
-
 
 def get_exp_name(args):
     exp_name = (
@@ -222,3 +220,124 @@ def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True
         affectations = np.stack(np_lines)
 
         return n_j, n_m, affectations, durations
+
+
+def load_problem(problem_file, taillard_offset=False, deterministic=True, load_max_jobs=-1):
+    # Customized problem loader
+    # - support for bounded duration uncertainty
+    # - support for unattributed machines
+    # - support for columns < number of machines
+
+    if not deterministic:
+        print("Loading problem with uncertainties, using customized format")
+
+    with open(problem_file, "r") as f:
+        line = next(f)
+        while line[0] == "#":
+            line = next(f)
+            
+        # header
+        header = line
+        head_list = [int(i) for i in header.split()]
+        assert len(head_list) == 2
+        n_j = head_list[0]
+        n_m = head_list[1]
+
+        if load_max_jobs < 0:
+            real_n_j = n_j
+        else:
+            real_n_j = load_max_jobs
+        
+        line = next(f)
+        while line[0] == "#":
+            line = next(f)
+
+        # matrix of durations
+        np_lines = []
+        for j in range(n_j):
+            if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
+                dur_list = []
+                for i in line.split():
+                    add_dur = float(i)
+                    if add_dur == 0:
+                        add_dur = 0.1
+                    elif add_dur < 0:
+                        add_dur = -1.0
+                    dur_list.append(add_dur)
+                while len(dur_list) < n_m:
+                    dur_list.append(-1.0)
+                np_lines.append(np.array(dur_list))
+            line = next(f)
+        durations = np.stack(np_lines)
+
+        if deterministic:
+            durations = np.expand_dims(durations, axis=2)
+            durations = np.repeat(durations, 4, axis=2)
+        else:
+            mode_durations = durations
+
+            while line[0] == "#":
+                line = next(f)
+
+            np_lines = []
+            for j in range(n_j):
+                if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
+                    dur_list = []
+                    for i in line.split():
+                        add_dur = float(i)
+                        if add_dur == 0:
+                            add_dur = 0.1
+                        elif add_dur < 0:
+                            add_dur = -1.0
+                        dur_list.append(add_dur)
+                    while len(dur_list) < n_m:
+                        dur_list.append(-1.0)
+                    np_lines.append(np.array(dur_list))
+                line = next(f)
+            min_durations = np.stack(np_lines)
+
+            while line[0] == "#":
+                line = next(f)
+
+            np_lines = []
+            for j in range(n_j):
+                if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
+                    dur_list = []
+                    for i in line.split():
+                        add_dur = float(i)
+                        if add_dur == 0:
+                            add_dur = 0.1
+                        elif add_dur < 0:
+                            add_dur = -1.0
+                        dur_list.append(add_dur)
+                    while len(dur_list) < n_m:
+                        dur_list.append(-1.0)
+                    np_lines.append(np.array(dur_list))
+                line = next(f)
+            max_durations = np.stack(np_lines)
+
+            real_durations = np.zeros((real_n_j, n_m)) - 1
+
+            durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
+
+        while line[0] == "#":
+            line = next(f)
+
+        # matrix of affectations
+        if taillard_offset:
+            toffset = 1
+        else:
+            toffset = 0
+        np_lines = []
+        for j in range(n_j):
+            if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
+                aff_list = [int(i) - toffset for i in line.split()]  # Taillard spec has machines id start at 1
+                while len(aff_list) < n_m:
+                    aff_list.append(-1)
+                np_lines.append(np.array(aff_list))
+                line = next(f, "")
+                if line == "":
+                    break
+        affectations = np.stack(np_lines)
+
+        return real_n_j, n_m, affectations, durations

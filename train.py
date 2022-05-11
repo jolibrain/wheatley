@@ -8,7 +8,7 @@ from models.agent import Agent
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
-from utils.utils import get_n_features, generate_deterministic_problem, generate_problem_distrib, load_taillard_problem
+from utils.utils import get_n_features, generate_deterministic_problem, generate_problem_distrib, load_problem
 
 from args import args, exp_name, path
 
@@ -22,8 +22,9 @@ def main():
     # Note that this problem can be stochastic or deterministic
     affectations, durations = None, None
     if args.load_problem is not None:
-        args.n_j, args.n_m, affectations, durations = load_taillard_problem(
-            args.load_problem, taillard_offset=False, deterministic=(args.duration_type == "deterministic")
+        args.n_j, args.n_m, affectations, durations = load_problem(
+            args.load_problem, taillard_offset=False, deterministic=(args.duration_type == "deterministic"),
+            load_max_jobs=args.load_max_jobs
         )
         args.fixed_problem = True
 

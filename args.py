@@ -201,6 +201,9 @@ parser.add_argument(
     "--load_problem", type=str, default=None, help="Load problem in Taillard format (machine numbering starts at 0)"
 )
 parser.add_argument(
+    "--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem"
+)
+parser.add_argument(
     "--scaling_constant_ortools", type=int, default=1000, help="Factor for OR-Tools, since it only solves integer problems"
 )
 
