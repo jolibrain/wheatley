@@ -5,6 +5,7 @@ from torch_geometric.nn.conv import GINConv, GATv2Conv, EGConv, PDNConv
 
 from models.mlp import MLP
 from utils.agent_observation import AgentObservation
+from utils.utils import find_last_in_batch
 
 import sys
 
@@ -33,6 +34,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         )
         self.freeze_graph = freeze_graph
         self.device = device
+
+        self.hidden_dim_features_extractor = hidden_dim_features_extractor
 
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
@@ -121,6 +124,28 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         graph_state = observation.to_torch_geometric()
         features, edge_index = graph_state.x, graph_state.edge_index
 
+        if self.graph_pooling == "learn":
+            n_batch = int(torch.max(graph_state.batch).item()) + 1
+            graphnode = torch.zeros((n_batch, graph_state.x.shape[1])).to(features.device)
+
+            first_in_batch = [0]
+            last_in_batch = []
+            for bi in range(n_batch):
+                last_in_batch.append(find_last_in_batch(first_in_batch[bi], bi, graph_state.batch))
+                first_in_batch.append(last_in_batch[bi] + 1)
+
+            ei0 = []
+            ei1 = []
+            for i in range(n_batch):
+                ei0 += [n_nodes + i] * (last_in_batch[i] - first_in_batch[i] + 1)
+                ei1 += list(range(first_in_batch[i], last_in_batch[i] + 1))
+
+            edge_index_0 = torch.cat([edge_index[0], torch.LongTensor(ei0 + ei1).to(features.device)])
+            edge_index_1 = torch.cat([edge_index[1], torch.LongTensor(ei1 + ei0).to(features.device)])
+            edge_index = torch.stack([edge_index_0, edge_index_1])
+
+            features = torch.cat([features, graphnode], dim=0)
+
         # Compute graph embeddings
         features_list = [features]
         for layer in range(self.n_layers_features_extractor):
@@ -131,6 +156,11 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 features = torch.nn.functional.elu(features)
             features_list.append(features)
         features = torch.cat(features_list, axis=1)  # The final embedding is concatenation of all layers embeddings
+
+        if self.graph_pooling == "learn":
+            graph_embedding = features[n_nodes * batch_size :, :]
+            features = features[: n_nodes * batch_size, :]
+
         features = features.reshape(batch_size, n_nodes, -1)
 
         # Create graph embedding and concatenate
@@ -140,8 +170,11 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         elif self.graph_pooling == "avg":
             graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
             graph_embedding = torch.matmul(graph_pooling, features)
+        elif self.graph_pooling == "learn":
+            pass
         else:
             raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
+
         graph_embedding = graph_embedding.reshape(batch_size, 1, -1)
 
         # repeat the graph embedding to match the nodes embedding size

@@ -74,7 +74,11 @@ parser.add_argument(
     help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2",
 )
 parser.add_argument(
-    "--graph_pooling", type=str, default="max", choices=["max", "average"], help="which pooling to use (avg or max)"
+    "--graph_pooling",
+    type=str,
+    default="max",
+    choices=["max", "average", "learn"],
+    help="which pooling to use (avg , max or learn)",
 )
 parser.add_argument(
     "--mlp_act",

@@ -4,6 +4,13 @@ import numpy as np
 import torch
 
 
+def find_last_in_batch(start_index, bi, batch_indices):
+    index = start_index
+    while index < batch_indices.shape[0] - 1 and int(batch_indices[index + 1].item()) == bi:
+        index += 1
+    return index
+
+
 def get_exp_name(args):
     exp_name = (
         f"{args.n_j}j{args.n_m}m_{args.duration_type}_{args.seed}seed_{args.transition_model_config}_"
