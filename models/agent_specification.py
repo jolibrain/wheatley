@@ -27,6 +27,10 @@ class AgentSpecification:
         n_layers_features_extractor,
         hidden_dim_features_extractor,
         n_attention_heads,
+        reverse_adj,
+        residual_gnn,
+        normalize_gnn,
+        conflicts_edges,
         n_mlp_layers_shared,
         hidden_dim_shared,
         n_mlp_layers_actor,
@@ -59,6 +63,10 @@ class AgentSpecification:
         self.n_mlp_layers_shared = n_mlp_layers_shared
         self.hidden_dim_shared = hidden_dim_shared
         self.n_attention_heads = n_attention_heads
+        self.reverse_adj = reverse_adj
+        self.residual_gnn = residual_gnn
+        self.normalize_gnn = normalize_gnn
+        self.conflicts_edges = conflicts_edges
         self.n_mlp_layers_actor = n_mlp_layers_actor
         self.hidden_dim_actor = hidden_dim_actor
         self.n_mlp_layers_critic = n_mlp_layers_critic
@@ -108,20 +116,9 @@ class AgentSpecification:
         other_features_extractor_shape = f"{self.hidden_dim_features_extractor}" + "".join(
             [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_mlp_layers_features_extractor - 1)]
         )
-        shared_shape = (
-            f""
-            + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
-        )
-        actor_shape = (
-            f""
-            + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)])
-            + " -> 1"
-        )
-        critic_shape = (
-            f""
-            + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)])
-            + " -> 1"
-        )
+        shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
+        actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
+        critic_shape = f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
         print(
             f" - Features extractor: {self.gconv_type.upper()}({first_features_extractor_shape}) => "
             + f"{self.gconv_type.upper()}({other_features_extractor_shape}) x {self.n_layers_features_extractor - 1}"

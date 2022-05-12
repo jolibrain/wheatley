@@ -38,11 +38,13 @@ def get_exp_name(args):
 
 
 def get_n_features(input_list, max_n_jobs, max_n_machines):
+    if "one_hot_machine_id" in input_list:
+        input_list.remove("one_hot_machine_id")
     n_features = 4 * (2 + len(input_list))
     if "one_hot_job_id" in input_list:
         n_features += max_n_jobs - 4
-    if "one_hot_machine_id" in input_list:
-        n_features += max_n_machines - 4
+    n_features += max_n_machines
+
     return n_features
 
 

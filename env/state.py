@@ -181,11 +181,16 @@ class State:
                 # Compute features
                 features = self.get_features(job_id, task_id, machine_id, normalize_input)
 
-                node_vector = [node_id] + features["is_affected"].tolist() + features["completion_time"].tolist()
+                node_vector = (
+                    [node_id]
+                    + features["is_affected"].tolist()
+                    + features["completion_time"].tolist()
+                    + features["one_hot_machine_id"].tolist()
+                )
 
                 for input_name in input_list:
-                    if input_name == "is_affected" or input_name == "completion_time":
-                        pass  # already appended above
+                    if input_name in ["is_affected", "completion_time", "one_hot_machine_id"]:
+                        continue  # already appended above
                     node_vector = node_vector + features[input_name].tolist()
 
                 if self.node_encoding == "L2D":

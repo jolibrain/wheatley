@@ -102,6 +102,10 @@ parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=4, he
 parser.add_argument("--n_layers_features_extractor", type=int, default=4, help="Number of layers of GNN")
 parser.add_argument("--hidden_dim_features_extractor", type=int, default=64, help="Dimension of hidden and output for GNN")
 parser.add_argument("--n_attention_heads", type=int, default=4, help="Dimension of hidden and output for GNN")
+parser.add_argument("--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN")
+parser.add_argument("--residual_gnn", action="store_true", help="use residual connection in GNN")
+parser.add_argument("--normalize_gnn", action="store_true", help="normalize gnn everywhere")
+parser.add_argument("--conflicts_edges", action="store_true", help="add edges in GNN for machine conflicts")
 parser.add_argument(
     "--n_mlp_layers_shared", type=int, default=0, help="Number of MLP layers in shared (excluding input and output"
 )
@@ -181,7 +185,12 @@ parser.add_argument(
     "--dont_normalize_input", default=False, action="store_true", help="Default is dividing input by constant"
 )
 parser.add_argument("--fixed_problem", default=False, action="store_true", help="Fix affectations and durations")
-parser.add_argument("--max_edges_upper_bound_factor", type=int, default=-1, help="Upper bound factor to max_n_edges, allows lowering the overall memory usage")
+parser.add_argument(
+    "--max_edges_upper_bound_factor",
+    type=int,
+    default=-1,
+    help="Upper bound factor to max_n_edges, allows lowering the overall memory usage",
+)
 
 # =================================================OTHER====================================================================
 parser.add_argument(

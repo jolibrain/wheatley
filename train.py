@@ -70,7 +70,7 @@ def main():
             normalize_input=not args.dont_normalize_input,
             input_list=args.features,
             insertion_mode=args.insertion_mode,
-            max_edges_factor=args.max_edges_upper_bound_factor
+            max_edges_factor=args.max_edges_upper_bound_factor,
         )
         env_specification.print_self()
         agent_specification = AgentSpecification(
@@ -97,6 +97,10 @@ def main():
             n_layers_features_extractor=args.n_layers_features_extractor,
             hidden_dim_features_extractor=args.hidden_dim_features_extractor,
             n_attention_heads=args.n_attention_heads,
+            reverse_adj=args.reverse_adj_in_gnn,
+            residual_gnn=args.residual_gnn,
+            normalize_gnn=args.normalize_gnn,
+            conflicts_edges=args.conflicts_edges,
             n_mlp_layers_shared=args.n_mlp_layers_shared,
             hidden_dim_shared=args.hidden_dim_shared,
             n_mlp_layers_actor=args.n_mlp_layers_actor,
