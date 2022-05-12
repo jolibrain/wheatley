@@ -47,7 +47,7 @@ def main():
     training_specification = TrainingSpecification(
         total_timesteps=args.total_timesteps,
         n_validation_env=args.n_validation_env,
-        validation_freq=args.validation_freq,
+        validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,
         custom_heuristic_name=args.custom_heuristic_name,

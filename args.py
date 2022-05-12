@@ -51,7 +51,7 @@ parser.add_argument(
 
 # =================================================VALIDATION SPECIFICATION=================================================
 parser.add_argument("--n_validation_env", type=int, default=20, help="Number of validation environments ")
-parser.add_argument("--validation_freq", type=int, default=1000, help="Number of steps between each evaluation")
+parser.add_argument("--validation_freq", type=int, default=-1, help="Number of steps between each evaluation")
 parser.add_argument("--max_time_ortools", type=int, default=3, help="Max compute time for ortools (in seconds)")
 
 # =================================================TESTING SPECIFICATION====================================================
