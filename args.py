@@ -31,7 +31,7 @@ parser.add_argument(
 parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
 parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
 
-# =================================================TRAINING SPECIFIATION====================================================
+# =================================================TRAINING SPECIFICATION====================================================
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
 parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs for updating the agent's parameters")
 parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
@@ -181,6 +181,7 @@ parser.add_argument(
     "--dont_normalize_input", default=False, action="store_true", help="Default is dividing input by constant"
 )
 parser.add_argument("--fixed_problem", default=False, action="store_true", help="Fix affectations and durations")
+parser.add_argument("--max_edges_upper_bound_factor", type=int, default=-1, help="Upper bound factor to max_n_edges, allows lowering the overall memory usage")
 
 # =================================================OTHER====================================================================
 parser.add_argument(

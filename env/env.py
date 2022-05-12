@@ -37,6 +37,10 @@ class Env(gym.Env):
             self.env_specification.input_list, self.env_specification.max_n_jobs, self.env_specification.max_n_machines
         )
         self.action_space = Discrete(self.env_specification.max_n_nodes * (2 if self.env_specification.add_boolean else 1))
+        if self.env_specification.max_edges_factor > 0:
+            shape = (2, self.env_specification.max_edges_factor * self.env_specification.max_n_nodes)
+        else:
+            shape = (2, self.env_specification.max_n_edges)
         self.observation_space = Dict(
             {
                 "n_jobs": Discrete(self.env_specification.max_n_jobs + 1),
@@ -51,7 +55,7 @@ class Env(gym.Env):
                 "edge_index": Box(
                     low=0,
                     high=self.env_specification.max_n_nodes,
-                    shape=(2, self.env_specification.max_n_edges),
+                    shape=shape,
                     dtype=np.int64,
                 ),
             }
@@ -129,11 +133,11 @@ class Env(gym.Env):
     def _create_state(self):
         affectations, durations = self.problem_description.sample_problem()
         self.state = State(
-                affectations,
-                durations,
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
-                )
+            affectations,
+            durations,
+            self.env_specification.max_n_jobs,
+            self.env_specification.max_n_machines,
+        )
 
     def _create_transition_model(self):
         if self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
@@ -180,9 +184,9 @@ class Env(gym.Env):
 
     def observe(self):
         features, edge_index = self.state.to_features_and_edge_index(
-                self.env_specification.normalize_input,
-                self.env_specification.input_list,
-                )
+            self.env_specification.normalize_input,
+            self.env_specification.input_list,
+        )
         return EnvObservation(
             self.n_jobs,
             self.n_machines,
@@ -190,6 +194,7 @@ class Env(gym.Env):
             edge_index,
             self.env_specification.max_n_jobs,
             self.env_specification.max_n_machines,
+            self.env_specification.max_edges_factor
         )
 
     def done(self):

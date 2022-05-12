@@ -70,6 +70,7 @@ def main():
             normalize_input=not args.dont_normalize_input,
             input_list=args.features,
             insertion_mode=args.insertion_mode,
+            max_edges_factor=args.max_edges_upper_bound_factor
         )
         env_specification.print_self()
         agent_specification = AgentSpecification(
