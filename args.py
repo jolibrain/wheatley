@@ -70,14 +70,18 @@ parser.add_argument(
     "--gconv_type",
     type=str,
     default="gatv2",
-    choices=["gin", "gatv2"],
+    choices=["gin", "gatv2", "eg", "pdn"],
     help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2",
 )
 parser.add_argument(
     "--graph_pooling", type=str, default="max", choices=["max", "average"], help="which pooling to use (avg or max)"
 )
 parser.add_argument(
-    "--mlp_act", type=str, default="tanh", choices=["relu", "tanh"], help="agent mlp extractor activation type, relu or tanh"
+    "--mlp_act",
+    type=str,
+    default="tanh",
+    choices=["relu", "tanh", "elu", "gelu"],
+    help="agent mlp extractor activation type, relu or tanh",
 )
 parser.add_argument(
     "--ortools_strategy",

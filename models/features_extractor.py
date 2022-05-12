@@ -1,7 +1,7 @@
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch
 import torch.nn as nn
-from torch_geometric.nn.conv import GINConv, GATv2Conv
+from torch_geometric.nn.conv import GINConv, GATv2Conv, EGConv, PDNConv
 
 from models.mlp import MLP
 from utils.agent_observation import AgentObservation
@@ -26,7 +26,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         n_attention_heads,
     ):
         self.max_n_nodes = max_n_nodes
-        features_dim=(input_dim_features_extractor + hidden_dim_features_extractor * n_layers_features_extractor) * 2
+        features_dim = (input_dim_features_extractor + hidden_dim_features_extractor * n_layers_features_extractor) * 2
         super(FeaturesExtractor, self).__init__(
             observation_space=observation_space,
             features_dim=features_dim,
@@ -76,6 +76,25 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                         batch_norm=False,
                         activation="elu",
                         device=self.device,
+                    )
+                )
+
+            elif self.gconv_type == "eg":
+                self.features_extractors.append(
+                    EGConv(
+                        in_channels=hidden_dim_features_extractor,
+                        out_channels=hidden_dim_features_extractor,
+                        aggregators=["sum", "mean", "symnorm", "min", "max", "var", "std"],
+                    )
+                )
+
+            elif self.gconv_type == "pdn":
+                self.features_extractors.append(
+                    PDNConv(
+                        in_channels=hidden_dim_features_extractor,
+                        out_channels=hidden_dim_features_extractor,
+                        edge_dim=1,
+                        hidden_channels=16,
                     )
                 )
 

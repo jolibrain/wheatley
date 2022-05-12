@@ -41,6 +41,8 @@ class MLP(nn.Module):
             self.activation_layer = nn.LeakyReLU()
         elif activation == "elu":
             self.activation_layer = nn.ELU()
+        elif activation == "gelu":
+            self.activation_layer = nn.GELU()
         else:
             raise Exception("Activation not recognized")
         self.to(device)
