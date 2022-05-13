@@ -75,6 +75,7 @@ def main():
         env_specification.print_self()
         agent_specification = AgentSpecification(
             lr=args.lr,
+            fe_lr=args.fe_lr,
             n_steps_episode=args.n_steps_episode,
             batch_size=args.batch_size,
             n_epochs=args.n_epochs,

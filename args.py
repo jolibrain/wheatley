@@ -36,7 +36,8 @@ parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Numbe
 parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs for updating the agent's parameters")
 parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
-parser.add_argument("--lr", type=float, default=2e-5, help="Learning rate")
+parser.add_argument("--lr", type=float, default=2e-5, help="Default Learning rate")
+parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
 parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd"], help="Which optimizer to use")
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 parser.add_argument(

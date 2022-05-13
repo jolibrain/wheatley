@@ -106,6 +106,10 @@ class Agent:
                 vf_coef=agent_specification.vf_coef,
                 normalize_advantage=agent_specification.normalize_advantage,
                 policy_kwargs={
+                    "optimizer_kwargs": {
+                        "fe_lr": agent_specification.fe_lr,
+                        "lr": agent_specification.lr,
+                    },
                     "features_extractor_class": FeaturesExtractor,
                     "features_extractor_kwargs": {
                         "input_dim_features_extractor": env_specification.n_features,

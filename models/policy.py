@@ -4,8 +4,8 @@ from sb3_contrib.ppo_mask.policies import MaskableActorCriticPolicy
 from torch import nn
 import torch
 
-class Policy(MaskableActorCriticPolicy):
 
+class Policy(MaskableActorCriticPolicy):
     def _build(self, lr_schedule):
         """
         Create the networks and the optimizer.
@@ -35,8 +35,12 @@ class Policy(MaskableActorCriticPolicy):
             for module, gain in module_gains.items():
                 module.apply(partial(self.init_weights, gain=gain))
 
-        # Setup optimizer with initial learning rate
-        self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
+        fe_lr = self.optimizer_kwargs["fe_lr"] if self.optimizer_kwargs["fe_lr"] is not None else self.optimizer_kwargs["lr"]
+        pgroup = [
+            {"params": self.features_extractor.parameters(), "lr": fe_lr},
+        ]
+
+        self.optimizer = self.optimizer_class(pgroup, lr=lr_schedule(1))
 
     def value_net(self, latent_pi):
         values = self.full_value_net(latent_pi)

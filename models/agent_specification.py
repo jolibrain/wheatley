@@ -5,6 +5,7 @@ class AgentSpecification:
     def __init__(
         self,
         lr,
+        fe_lr,
         n_steps_episode,
         batch_size,
         n_epochs,
@@ -39,6 +40,7 @@ class AgentSpecification:
         hidden_dim_critic,
     ):
         self.lr = lr
+        self.fe_lr = fe_lr
         self.n_steps_episode = n_steps_episode
         self.batch_size = batch_size
         self.n_epochs = n_epochs
