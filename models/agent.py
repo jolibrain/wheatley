@@ -1,7 +1,7 @@
 import pickle
 
 from stable_baselines3.common.callbacks import EveryNTimesteps
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.ppo import PPO
 from stable_baselines3.a2c import A2C
 from sb3_contrib.ppo_mask import MaskablePPO
@@ -14,6 +14,12 @@ from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
 
+def make_proc_env(problem_description, env_specification):
+    def _init():
+        env = Env(problem_description, env_specification)
+        return env
+        
+    return _init
 
 class Agent:
     def __init__(
@@ -84,9 +90,7 @@ class Agent:
         event_callback = EveryNTimesteps(n_steps=training_specification.validation_freq, callback=validation_callback)
 
         # Creating the vectorized environments
-        vec_env = DummyVecEnv(
-            env_fns=[lambda: Env(problem_description, self.env_specification) for _ in range(self.n_workers)]
-        )
+        vec_env = SubprocVecEnv([make_proc_env(problem_description, self.env_specification) for _ in range(self.n_workers)])
 
         # Finally, we can build our PPO
         if self.model is None:
