@@ -51,23 +51,27 @@ class L2DTransitionModel(TransitionModel):
 
         # If no task is affected on machine, just affect it wherever possible and returns
         if not machine_occupancy:
-            state.affect_node(node_id)
             # Observe duration (for the uncertainty case)
             if self.observe_real_duration_when_affect:
-                state.observe_real_duration(node_id)
+                state.observe_real_duration(node_id, do_update=False)
+            state.update_completion_times(node_id)
+            state.affect_node(node_id)
             return
 
         # If forced insertion are not allowed
         if not force_insert:
             # Observe duration (for the uncertainty case)
             if self.observe_real_duration_when_affect:
-                state.observe_real_duration(node_id)
+                state.observe_real_duration(node_id, do_update=False)
+                state.update_completion_times(node_id)
 
             job_duration = state.durations[job_id, task_id, self.metric_index]
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time + job_duration <= machine_occupancy[0][0]:
                 # Insert task before all other tasks
-                state.set_precedency(node_id, machine_occupancy[0][2])
+                state.set_precedency(node_id, machine_occupancy[0][2], do_update=False)
+                state.update_completion_times(machine_occupancy[0][2])
+                state.affect_node(node_id)
 
             else:
                 # Find where there are free times, and check if we can insert task
@@ -81,19 +85,27 @@ class L2DTransitionModel(TransitionModel):
                             break
                 if index == -1:
                     # The job can be inserted nowhere, so we add it at the end
-                    state.set_precedency(machine_occupancy[-1][2], node_id)
+                    state.set_precedency(machine_occupancy[-1][2], node_id, do_update=False)
+                    state.update_completion_times(node_id)
+                    state.affect_node(node_id)
                 else:
                     # The job is inserted between task_index and task_index+1
                     state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
-                    state.set_precedency(machine_occupancy[index][2], node_id)
-                    state.set_precedency(node_id, machine_occupancy[index + 1][2])
+                    state.set_precedency(machine_occupancy[index][2], node_id, do_update=False)
+                    state.set_precedency(node_id, machine_occupancy[index + 1][2], do_update=False)
+                    state.update_completion_times(node_id)
+                    state.affect_node(node_id)
 
         # If forced insertion is allowed and performed
         elif force_insert:
+            if self.observe_real_duration_when_affect:
+                state.observe_real_duration(node_id, do_update=False)
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time < machine_occupancy[0][0]:
                 # Insert task before all other tasks
-                state.set_precedency(node_id, machine_occupancy[0][2])
+                state.set_precedency(node_id, machine_occupancy[0][2], do_update=False)
+                state.affect_node(node_id)
+                state.update_completion_times(node_id)
 
             else:
                 # Find where there are free times, and check if we can insert task
@@ -107,17 +119,16 @@ class L2DTransitionModel(TransitionModel):
                             break
                 if index == -1:
                     # The job can be inserted nowhere, so we add it at the end
-                    state.set_precedency(machine_occupancy[-1][2], node_id)
+                    state.set_precedency(machine_occupancy[-1][2], node_id, do_update=False)
+                    state.affect_node(node_id)
+                    state.update_completion_times(node_id)
                 else:
                     # The job is inserted between task_index and task_index+1
                     state.remove_precedency(machine_occupancy[index][2], machine_occupancy[index + 1][2])
-                    state.set_precedency(machine_occupancy[index][2], node_id)
-                    state.set_precedency(node_id, machine_occupancy[index + 1][2])
-
-        state.affect_node(node_id)
-        # Observe duration (for the uncertainty case)
-        if self.observe_real_duration_when_affect:
-            state.observe_real_duration(node_id, True)
+                    state.set_precedency(machine_occupancy[index][2], node_id, do_update=False)
+                    state.set_precedency(node_id, machine_occupancy[index + 1][2], do_update=False)
+                    state.affect_node(node_id)
+                    state.update_completion_times(node_id)
 
     def get_mask(self, state, add_boolean=False):
         available_node_ids = []
@@ -125,7 +136,7 @@ class L2DTransitionModel(TransitionModel):
             task_id = state.get_first_unaffected_task(job_id)
             if task_id != -1 and state.affectations[job_id, task_id] != -1:
                 available_node_ids.append(job_and_task_to_node(job_id, task_id, state.n_machines))
-        mask = [ False ] * state.n_nodes
+        mask = [False] * state.n_nodes
         for node_id in available_node_ids:
             mask[node_id] = True
         return mask * (2 if add_boolean else 1)

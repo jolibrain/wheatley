@@ -190,19 +190,28 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 edge_index_1 = torch.cat([edge_index[1], torch.LongTensor(ei1).to(edge_index[0].device)])
                 edge_index = torch.stack([edge_index_0, edge_index_1])
 
+        batch_id = graph_state.batch
+
         if self.graph_pooling == "learn":
             graphnode = torch.zeros((n_batch, graph_state.x.shape[1])).to(features.device)
             ei0 = []
             ei1 = []
             for i in range(n_batch):
-                ei0 += [n_nodes + i] * (last_in_batch[i] - first_in_batch[i] + 1)
+                ei0 += [graph_state.x.shape[0] + i] * (last_in_batch[i] - first_in_batch[i] + 1)
                 ei1 += list(range(first_in_batch[i], last_in_batch[i] + 1))
 
-            edge_index_0 = torch.cat([edge_index[0], torch.LongTensor(ei0 + ei1).to(features.device)])
-            edge_index_1 = torch.cat([edge_index[1], torch.LongTensor(ei1 + ei0).to(features.device)])
+            if not self.reverse_adj:
+                edge_index_0 = torch.cat([edge_index[0], torch.LongTensor(ei0).to(features.device)])
+                edge_index_1 = torch.cat([edge_index[1], torch.LongTensor(ei1).to(features.device)])
+            else:
+                edge_index_0 = torch.cat([edge_index[0], torch.LongTensor(ei1).to(features.device)])
+                edge_index_1 = torch.cat([edge_index[1], torch.LongTensor(ei0).to(features.device)])
             edge_index = torch.stack([edge_index_0, edge_index_1])
 
             features = torch.cat([features, graphnode], dim=0)
+
+            batch_id = torch.cat([batch_id, torch.LongTensor(list(range(n_batch))).to(batch_id.device)])
+
         if not self.reverse_adj:
             edge_index = torch.stack([edge_index[1], edge_index[0]])
 
@@ -210,11 +219,11 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         features_list = [features]
 
         if self.normalize:
-            features = self.norm0(features, graph_state.batch)
+            features = self.norm0(features, batch_id)
         features_list.append(features)
         features = self.embedder(features)
         if self.normalize:
-            features = self.norm1(features, graph_state.batch)
+            features = self.norm1(features, batch_id)
         features_list.append(features)
 
         for layer in range(self.n_layers_features_extractor):
@@ -224,17 +233,17 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             if self.graph_has_relu:
                 features = torch.nn.functional.elu(features)
             if self.normalize:
-                features = self.norms[layer](features, graph_state.batch)
+                features = self.norms[layer](features, batch_id)
             features_list.append(features)
             if self.residual:
                 features += features_list[-2]
                 if self.normalize:
-                    features = self.normsbis[layer](features, graph_state.batch)
+                    features = self.normsbis[layer](features, batch_id)
         features = torch.cat(features_list, axis=1)  # The final embedding is concatenation of all layers embeddings
 
         if self.graph_pooling == "learn":
-            graph_embedding = features[n_nodes * batch_size :, :]
-            features = features[: n_nodes * batch_size, :]
+            graph_embedding = features[graph_state.x.shape[0] :, :]
+            features = features[: graph_state.x.shape[0], :]
 
         features = features.reshape(batch_size, n_nodes, -1)
 

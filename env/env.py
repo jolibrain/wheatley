@@ -137,6 +137,7 @@ class Env(gym.Env):
             durations,
             self.env_specification.max_n_jobs,
             self.env_specification.max_n_machines,
+            self.deterministic,
         )
 
     def _create_transition_model(self):
@@ -194,7 +195,7 @@ class Env(gym.Env):
             edge_index,
             self.env_specification.max_n_jobs,
             self.env_specification.max_n_machines,
-            self.env_specification.max_edges_factor
+            self.env_specification.max_edges_factor,
         )
 
     def done(self):
