@@ -24,7 +24,7 @@ def main():
     if args.load_problem is not None:
         args.n_j, args.n_m, affectations, durations = load_problem(
             args.load_problem, taillard_offset=False, deterministic=(args.duration_type == "deterministic"),
-            load_max_jobs=args.load_max_jobs
+            load_max_jobs=args.load_max_jobs, generate_bounds=args.generate_duration_bounds
         )
         args.fixed_problem = True
 

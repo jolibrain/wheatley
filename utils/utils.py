@@ -3,6 +3,8 @@ from copy import deepcopy
 import numpy as np
 import torch
 
+import sys
+
 def find_last_in_batch(start_index, bi, batch_indices):
     index = start_index
     while index < batch_indices.shape[0] - 1 and int(batch_indices[index + 1].item()) == bi:
@@ -110,6 +112,8 @@ def generate_problem_durations(durations):
     n_machines = durations.shape[1]
     for j in range(n_jobs):
         for m in range(n_machines):
+            if durations[j, m, 3] < 0.0:
+                continue
             if durations[j, m, 1] == durations[j, m, 2]:
                 ret_durations[j, m, 0] = durations[j, m, 1]
             else:
@@ -144,7 +148,7 @@ def job_and_task_to_node(job_id, task_id, n_machines):
 
 def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True):
     # http://jobshop.jjvh.nl/explanation.php#taillard_def
-
+    
     if not deterministic:
         print("Loading problem with uncertainties, using extended taillard format")
 
@@ -222,14 +226,18 @@ def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True
         return n_j, n_m, affectations, durations
 
 
-def load_problem(problem_file, taillard_offset=False, deterministic=True, load_max_jobs=-1):
+def load_problem(problem_file, taillard_offset=False, deterministic=True, load_max_jobs=-1, generate_bounds=-1.0):
     # Customized problem loader
     # - support for bounded duration uncertainty
     # - support for unattributed machines
     # - support for columns < number of machines
 
+    print('generate_bounds=',generate_bounds)
+    
     if not deterministic:
         print("Loading problem with uncertainties, using customized format")
+        if generate_bounds > 0:
+            print("Generating random duration bounds of ", generate_bounds, " %")
 
     with open(problem_file, "r") as f:
         line = next(f)
@@ -255,7 +263,40 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
         # matrix of durations
         np_lines = []
         for j in range(n_j):
-            if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
+            dur_list = []
+            for i in line.split():
+                add_dur = float(i)
+                if add_dur == 0:
+                    add_dur = 0.1
+                elif add_dur < 0:
+                    add_dur = -1.0
+                dur_list.append(add_dur)
+            while len(dur_list) < n_m:
+                dur_list.append(-1.0)
+            np_lines.append(np.array(dur_list))
+            line = next(f)
+        durations = np.stack(np_lines)
+        if load_max_jobs > 0:
+            durations = durations[:load_max_jobs]
+
+        if deterministic:
+            durations = np.expand_dims(durations, axis=2)
+            durations = np.repeat(durations, 4, axis=2)
+        elif generate_bounds > 0.0:
+            mode_durations = durations
+            min_durations = np.subtract(durations, generate_bounds * durations)
+            max_durations = np.add(durations, generate_bounds * durations)
+            real_durations = np.zeros((real_n_j, n_m)) - 1
+            durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
+            #sys.exit()
+        else:
+            mode_durations = durations
+
+            while line[0] == "#":
+                line = next(f)
+
+            np_lines = []
+            for j in range(n_j):
                 dur_list = []
                 for i in line.split():
                     add_dur = float(i)
@@ -267,54 +308,31 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
                 while len(dur_list) < n_m:
                     dur_list.append(-1.0)
                 np_lines.append(np.array(dur_list))
-            line = next(f)
-        durations = np.stack(np_lines)
-
-        if deterministic:
-            durations = np.expand_dims(durations, axis=2)
-            durations = np.repeat(durations, 4, axis=2)
-        else:
-            mode_durations = durations
-
-            while line[0] == "#":
-                line = next(f)
-
-            np_lines = []
-            for j in range(n_j):
-                if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
-                    dur_list = []
-                    for i in line.split():
-                        add_dur = float(i)
-                        if add_dur == 0:
-                            add_dur = 0.1
-                        elif add_dur < 0:
-                            add_dur = -1.0
-                        dur_list.append(add_dur)
-                    while len(dur_list) < n_m:
-                        dur_list.append(-1.0)
-                    np_lines.append(np.array(dur_list))
                 line = next(f)
             min_durations = np.stack(np_lines)
+            if load_max_jobs > 0:
+                min_durations = min_durations[:load_max_jobs]
 
             while line[0] == "#":
                 line = next(f)
 
             np_lines = []
             for j in range(n_j):
-                if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
-                    dur_list = []
-                    for i in line.split():
-                        add_dur = float(i)
-                        if add_dur == 0:
-                            add_dur = 0.1
-                        elif add_dur < 0:
-                            add_dur = -1.0
-                        dur_list.append(add_dur)
-                    while len(dur_list) < n_m:
-                        dur_list.append(-1.0)
-                    np_lines.append(np.array(dur_list))
+                dur_list = []
+                for i in line.split():
+                    add_dur = float(i)
+                    if add_dur == 0:
+                        add_dur = 0.1
+                    elif add_dur < 0:
+                        add_dur = -1.0
+                    dur_list.append(add_dur)
+                while len(dur_list) < n_m:
+                    dur_list.append(-1.0)
+                np_lines.append(np.array(dur_list))
                 line = next(f)
             max_durations = np.stack(np_lines)
+            if load_max_jobs > 0:
+                max_durations = max_durations[:load_max_jobs]
 
             real_durations = np.zeros((real_n_j, n_m)) - 1
 

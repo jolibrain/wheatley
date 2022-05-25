@@ -204,6 +204,9 @@ parser.add_argument(
     "--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem"
 )
 parser.add_argument(
+    "--generate_duration_bounds", type=float, default=-1.0, help="Generate duration bounds in % of the true value, e.g. 0.05 for 5% uncertainty"
+)
+parser.add_argument(
     "--scaling_constant_ortools", type=int, default=1000, help="Factor for OR-Tools, since it only solves integer problems"
 )
 
