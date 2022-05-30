@@ -160,20 +160,7 @@ class State:
                 ]
 
     def done(self):
-        """
-        The problem is solved when each machine is completely ordered, meaning that we
-        know for each machine exactly which job is first, which is second, etc...
-        In order to check this, we check that the longest path in every machine subgraph
-        contains exactly n-1 edges where n is the number of jobs
-        """
-        for machine_id in range(self.n_machines):
-            machine_sub_graph = self.graph.subgraph(self._get_machine_node_ids(machine_id))
-            if (
-                self.n_jobs_per_machine[machine_id] > 0
-                and nx.algorithms.dag.dag_longest_path_length(machine_sub_graph) != self.n_jobs_per_machine[machine_id] - 1
-            ):
-                return False
-        return True
+        return np.all(self.is_affected[np.where(self.affectations >= 0)] > 0)
 
     def _get_machine_node_ids(self, machine_id):
         node_ids = []
