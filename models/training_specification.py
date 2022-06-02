@@ -10,6 +10,7 @@ class TrainingSpecification:
         ortools_strategy,
         max_time_ortools,
         scaling_constant_ortools,
+        vecenv_type,
     ):
         self.total_timesteps = total_timesteps
         self.n_validation_env = n_validation_env
@@ -20,6 +21,7 @@ class TrainingSpecification:
         self.ortools_strategy = ortools_strategy
         self.max_time_ortools = max_time_ortools
         self.scaling_constant_ortools = scaling_constant_ortools
+        self.vecenv_type = vecenv_type
 
     def print_self(self):
         print(

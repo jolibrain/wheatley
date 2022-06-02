@@ -30,6 +30,13 @@ parser.add_argument(
 )
 parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
 parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
+parser.add_argument(
+    "--vecenv_type",
+    type=str,
+    default="subproc",
+    choices=["subproc", "dummy"],
+    help="Use SubprocEnv or DummyVecEnv in SB3",
+)
 
 # =================================================TRAINING SPECIFICATION====================================================
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")

@@ -55,6 +55,7 @@ def main():
         ortools_strategy=args.ortools_strategy,
         max_time_ortools=args.max_time_ortools,
         scaling_constant_ortools=args.scaling_constant_ortools,
+        vecenv_type=args.vecenv_type,
     )
     training_specification.print_self()
 
