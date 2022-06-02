@@ -103,6 +103,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                         in_channels=hidden_dim_features_extractor,
                         out_channels=hidden_dim_features_extractor,
                         heads=n_attention_heads,
+                        add_self_loops=False,
                     )
                 )
                 self.mlps.append(

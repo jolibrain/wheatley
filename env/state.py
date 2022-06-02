@@ -14,7 +14,7 @@ import plotly.figure_factory as ff
 import cv2
 
 from problem.solution import Solution
-from utils.utils import node_to_job_and_task, job_and_task_to_node
+from utils.utils import node_to_job_and_task, job_and_task_to_node, from_networkx
 
 
 class State:
@@ -222,14 +222,16 @@ class State:
                     self.return_graph.nodes[node_id]["x"] = node_vector
 
         nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
-        graph = torch_geometric.utils.from_networkx(nx_graph)
+
+        graph = from_networkx(nx_graph)
 
         # We have to reorder features, since the networx -> torch_geometric
-        # shuffles the nodes
+        # shuffles the nodes because of iterating through nodes not in node_id order
+        # but edge index stays ok
         node_ids = graph.x[:, 0].long()
+        edge_index = graph.edge_index
         features = torch.zeros((self.n_nodes, graph.x[:, 1:].shape[1]))
         features[node_ids] = graph.x[:, 1:].float()
-        edge_index = node_ids[graph.edge_index]
 
         return features, edge_index
 

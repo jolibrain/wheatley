@@ -43,7 +43,7 @@ parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Numbe
 parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs for updating the agent's parameters")
 parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
-parser.add_argument("--lr", type=float, default=2e-5, help="Default Learning rate")
+parser.add_argument("--lr", type=float, default=1e-3, help="Default Learning rate")
 parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
 parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd"], help="Which optimizer to use")
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
@@ -84,7 +84,7 @@ parser.add_argument(
 parser.add_argument(
     "--graph_pooling",
     type=str,
-    default="max",
+    default="learn",
     choices=["max", "average", "learn"],
     help="which pooling to use (avg , max or learn)",
 )
@@ -178,10 +178,10 @@ parser.add_argument(
     nargs="+",
     default=[
         "duration",
-        "total_job_time",
-        "total_machine_time",
-        "job_completion_percentage",
-        "machine_completion_percentage",
+        # "total_job_time",
+        # "total_machine_time",
+        # "job_completion_percentage",
+        # "machine_completion_percentage",
         "mopnr",
         "mwkr",
     ],
@@ -207,11 +207,12 @@ parser.add_argument(
 parser.add_argument(
     "--load_problem", type=str, default=None, help="Load problem in Taillard format (machine numbering starts at 0)"
 )
+parser.add_argument("--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem")
 parser.add_argument(
-    "--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem"
-)
-parser.add_argument(
-    "--generate_duration_bounds", type=float, default=-1.0, help="Generate duration bounds in % of the true value, e.g. 0.05 for 5% uncertainty"
+    "--generate_duration_bounds",
+    type=float,
+    default=-1.0,
+    help="Generate duration bounds in % of the true value, e.g. 0.05 for 5% uncertainty",
 )
 parser.add_argument(
     "--scaling_constant_ortools", type=int, default=1000, help="Factor for OR-Tools, since it only solves integer problems"
