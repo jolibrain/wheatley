@@ -141,7 +141,7 @@ class ValidationCallback(BaseCallback):
 
             or_tools_makespan, or_tools_schedule = get_ortools_makespan(
                 self.validation_envs[i].state.affectations,
-                self.validation_envs[i].state.durations,
+                self.validation_envs[i].state.original_durations,
                 self.max_time_ortools,
                 self.scaling_constant_ortools,
                 self.ortools_strategy,
@@ -154,8 +154,7 @@ class ValidationCallback(BaseCallback):
             random_mean_makespan += (
                 np.max(
                     self.random_agent.predict(
-                        self.problem_description,
-                        self.env_specification,
+                        self.validation_envs[i],
                     ).get_makespan()
                 )
                 / self.n_validation_env

@@ -110,9 +110,14 @@ class Env(gym.Env):
         node_id = action % self.env_specification.max_n_nodes
         return node_id, boolean
 
-    def reset(self):
+    def reset(self, soft=False):
+        # Reset the internal state, but do not sample a new problem
+        if soft:
+            self.state.reset()
+
         # Reset the state by creating a new one
-        self._create_state()
+        else:
+            self._create_state()
 
         # Reset the transition model by creating a new one
         self._create_transition_model()

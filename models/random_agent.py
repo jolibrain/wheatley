@@ -10,12 +10,9 @@ class RandomAgent:
         self.max_n_machines = max_n_machines
         self.max_n_nodes = self.max_n_jobs * self.max_n_machines
 
-    def predict(self, problem_description, env_specification):
-        env = Env(
-            problem_description,
-            env_specification,
-        )
-        observation = env.reset()
+    def predict(self, env):
+        # soft reset to evaluate the same sampled problem as PPO
+        observation = env.reset(soft=True)
         done = False
         while not done:
             action = self.select_action(env)

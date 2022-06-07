@@ -20,7 +20,7 @@ from utils.utils import node_to_job_and_task, job_and_task_to_node, from_network
 class State:
     def __init__(self, affectations, durations, max_n_jobs, max_n_machines, deterministic=True, node_encoding="L2D"):
         self.affectations = affectations
-        self.original_durations = durations
+        self.original_durations = durations.copy()
         self.n_jobs = self.affectations.shape[0]
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines

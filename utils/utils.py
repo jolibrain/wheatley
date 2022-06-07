@@ -284,6 +284,15 @@ def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True
         return n_j, n_m, affectations, durations
 
 
+def check_sanity(affectations, durations):
+    for job, (affs, durs) in enumerate(zip(affectations, durations)):
+        for machine, (aff, dur) in enumerate(zip(affs, durs)):
+            if aff == -1 and any(x != -1 for x in dur):
+                raise Exception("affectations and durations should be only -1 for job " + str(job) + " machine " + str(machine))
+            if aff != -1 and any(x == -1 for x in dur[1:]):
+                raise Exception("affectations and durations should not be -1 for job " + str(job) + " machine " + str(machine))
+
+
 def load_problem(problem_file, taillard_offset=False, deterministic=True, load_max_jobs=-1, generate_bounds=-1.0):
     # Customized problem loader
     # - support for bounded duration uncertainty
@@ -342,8 +351,18 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
             durations = np.repeat(durations, 4, axis=2)
         elif generate_bounds > 0.0:
             mode_durations = durations
-            min_durations = np.subtract(durations, generate_bounds * durations)
-            max_durations = np.add(durations, generate_bounds * durations)
+            min_durations = np.subtract(
+                    durations,
+                    generate_bounds * durations,
+                    out=durations.copy(),
+                    where=durations!=-1,
+            )
+            max_durations = np.add(
+                    durations,
+                    generate_bounds * durations,
+                    out=durations.copy(),
+                    where=durations!=-1
+            )
             real_durations = np.zeros((real_n_j, n_m)) - 1
             durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
             # sys.exit()
@@ -415,5 +434,7 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
                 if line == "":
                     break
         affectations = np.stack(np_lines)
+
+        check_sanity(affectations, durations)
 
         return real_n_j, n_m, affectations, durations
