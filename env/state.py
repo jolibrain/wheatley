@@ -14,11 +14,13 @@ import plotly.figure_factory as ff
 import cv2
 
 from problem.solution import Solution
-from utils.utils import node_to_job_and_task, job_and_task_to_node, from_networkx
+from utils.utils import node_to_job_and_task, job_and_task_to_node, get_n_features
 
 
 class State:
-    def __init__(self, affectations, durations, max_n_jobs, max_n_machines, deterministic=True, node_encoding="L2D"):
+    def __init__(
+        self, affectations, durations, max_n_jobs, max_n_machines, deterministic=True, node_encoding="L2D", feature_list=[]
+    ):
         self.affectations = affectations
         self.original_durations = durations.copy()
         self.n_jobs = self.affectations.shape[0]
@@ -41,8 +43,13 @@ class State:
             self.return_graph = None
         self.graph = None
 
-        self.task_completion_times = None
-        self.is_affected = None
+        # cache
+        self.same_job = {}
+
+        self.init_features_offset(feature_list)
+        self.features = torch.zeros((self.n_nodes, get_n_features(feature_list, self.max_n_jobs, self.max_n_machines)))
+
+        self.affected = None
         self.is_observed = None
         self.durations = None
         self.n_jobs_per_machine = None
@@ -56,9 +63,66 @@ class State:
         self.total_machine_time_job_task = None
         self.job_completion_time = None
         self.machine_completion_time = None
-        self.number_operations_scheduled = None
 
         self.reset()
+
+    def reset_is_affected(self):
+        self.affected = np.zeros_like(self.affectations)
+        self.features[:, 0] = 0
+
+    def is_affected(self, job_id, task_id):
+        return self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), 0].item()
+
+    def affect(self, node_id):
+        self.features[node_id, 0] = 1
+        self.affected[node_to_job_and_task(node_id, self.max_n_machines)] = 1
+
+    def set_all_task_completion_times(self, tct):
+        self.features[:, 1:5] = torch.as_tensor(tct).reshape((self.max_n_jobs * self.max_n_machines, -1))
+
+    def reset_task_completion_times(self):
+        tct = np.cumsum(np.where(self.original_durations < 0, 0, self.original_durations), axis=1)
+        if not self.deterministic:
+            tct[:, :, 0] = -1
+        else:
+            tct[:, :, 0] = np.where(self.durations[:, :, 0] == -1, -1, tct[:, :, 0])
+        self.features[:, 1:5] = torch.as_tensor(tct).clone().reshape((self.max_n_jobs * self.max_n_machines, -1))
+
+    def get_task_completion_times(self, node_id):
+        return self.features[node_id, 1:5]
+
+    def get_all_task_completion_times(self):
+        return self.features[:, 1:5]
+
+    def set_task_completion_times(self, node_id, ct):
+        j, t = node_to_job_and_task(node_id, self.max_n_machines)
+        self.features[node_id, 1:5] = ct.clone()
+
+    def set_one_hot_machine_id(self):
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                machine_id = self.affectations[job_id, task_id]
+                node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
+                if machine_id == -1:
+                    self.features[node_id, 5 : 5 + self.max_n_machines] = torch.zeros(self.max_n_machines)
+                else:
+                    self.features[node_id, 5 : 5 + self.max_n_machines] = torch.as_tensor(
+                        self.one_hot_machine_id[machine_id]
+                    )
+
+    def reset_durations(self):
+        self.durations = self.original_durations.copy()
+        self.durations[:, :, 0] = -1
+        if "duration" in self.features_offset:
+            dof = self.features_offset["duration"]
+            self.features[:, dof[0] : dof[1]] = torch.as_tensor(self.durations).reshape(-1, 4).clone()
+
+    def get_durations(self, node_id):
+        if "duration" in self.features_offset:
+            dof = self.features_offset["duration"]
+            durs = self.features[node_id, dof[0] : dof[1]]
+            return durs.clone()
+        return torch.as_tensor(self.durations[node_to_job_and_task(node_id, self.max_n_machines)], dtype=torch.float)
 
     def reset(self):
         self.graph = nx.DiGraph(
@@ -74,43 +138,50 @@ class State:
         if self.node_encoding == "DenseL2D":
             self.return_graph = deepcopy(self.graph)
             for machine_id in range(self.n_machines):
-                node_ids = self._get_machine_node_ids(machine_id)
+                node_ids = self.on_machine(machine_id)
                 for first_node_id in node_ids:
                     for second_node_id in node_ids:
                         if second_node_id != first_node_id:
                             self.return_graph.add_edge(first_node_id, second_node_id)
 
-        # Instantiate features and pre features
-        self.durations = self.original_durations.copy()
-        self.task_completion_times = np.cumsum(self.durations, axis=1)
-        if not self.deterministic:
-            self.durations[:, :, 0] = -1
-            self.task_completion_times[:, :, 0] = -1
-        self.is_affected = np.zeros_like(self.affectations)
-        self.is_observed = np.ones_like(self.affectations) if self.deterministic else np.zeros_like(self.affectations)
+        self.reset_durations()
+        self.reset_task_completion_times()
+        self.reset_is_affected()
+        self.set_one_hot_machine_id()
+
+        self.is_observed = np.zeros_like(self.affectations)
         self.n_jobs_per_machine = np.array([(self.affectations == m).sum() for m in range(self.n_machines)])
         self.n_machines_per_job = np.array(
             [self.n_machines - (self.affectations[j] == -1).sum() for j in range(self.n_jobs)]
         )
-        self.number_operations_scheduled = np.zeros(self.n_jobs)
         self.max_duration = np.max(self.durations.flatten())
-        self.max_completion_time = np.max(self.task_completion_times.flatten())
+        self.max_completion_time = torch.max(self.features[:, 1:5].flatten()).item()
 
         self.compute_pre_features()
 
     def compute_pre_features(self):
-        self.task_completion_times = np.cumsum(np.where(self.durations < 0, 0, self.durations), axis=1)
-        for job_id in range(self.n_jobs):
-            for task_id in range(self.n_machines):
-                if self.durations[job_id, task_id, 0] == -1:
-                    self.task_completion_times[job_id, task_id:, 0] = -1
 
-        self.total_job_time = np.sum(np.where(self.durations < 0, 0, self.durations), axis=1)
+        self.total_job_time = np.sum(np.where(self.original_durations < 0, 0, self.original_durations), axis=1)
         for job_id in range(self.n_jobs):
             if (self.durations[job_id, :, 0] == -1).any():
                 self.total_job_time[job_id, 0] = -1
+        self.total_job_time = torch.as_tensor(self.total_job_time, dtype=torch.float)
 
-        self.total_machine_time = np.zeros((self.n_machines, 4))
+        if "selectable" in self.features_offset:
+            of = self.features_offset["selectable"]
+            self.features[:, of[0] : of[1]] = 0
+            for j in range(self.max_n_jobs):
+                if self.affectations[j, 0] != -1:
+                    self.features[job_and_task_to_node(j, 0, self.max_n_machines), of[0] : of[1]] = 1
+
+        if "total_job_time" in self.features_offset:
+            tjtof = self.features_offset["total_job_time"]
+            bc = np.broadcast_to(self.total_job_time[:, None, :], (self.max_n_jobs, self.max_n_machines, 4)).reshape(
+                (self.max_n_jobs * self.max_n_machines, 4)
+            )
+            self.features[:, tjtof[0] : tjtof[1]] = torch.as_tensor(bc)
+
+        self.total_machine_time = torch.zeros((self.n_machines, 4))
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 if self.affectations[job_id, task_id] != -1:
@@ -122,56 +193,145 @@ class State:
                         self.total_machine_time[self.affectations[job_id, task_id]][0] = -1
                     else:
                         self.total_machine_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
-        self.total_machine_time_job_task = np.zeros((self.n_jobs, self.n_machines, 4))
+
+        self.total_machine_time_job_task = torch.zeros((self.n_jobs, self.n_machines, 4))
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 self.total_machine_time_job_task[job_id, task_id] = self.total_machine_time[
                     self.affectations[job_id, task_id]
                 ]
+                if "total_machine_time" in self.features_offset:
+                    tmtof = self.features_offset["total_machine_time"]
+                    self.features[
+                        job_and_task_to_node(job_id, task_id, self.max_n_machines), tmtof[0] : tmtof[1]
+                    ] = self.total_machine_time[self.affectations[job_id, task_id]]
 
-        self.job_completion_time = np.zeros((self.n_jobs, 4))
-        for job_id in range(self.n_jobs):
-            for task_id in range(self.n_machines):
-                if self.is_affected[job_id, task_id] == 1 and self.affectations[job_id, task_id] != -1:
-                    if self.job_completion_time[job_id, 0] == -1 or self.durations[job_id, task_id, 0] == -1:
-                        self.job_completion_time[job_id] += self.durations[job_id, task_id]
-                        self.job_completion_time[job_id, 0] = -1
-                    else:
-                        self.job_completion_time[job_id] += self.durations[job_id, task_id]
+        self.job_completion_time = torch.zeros((self.n_jobs, 4))
 
-        self.machine_completion_time = np.zeros((self.n_machines, 4))
-        for job_id in range(self.n_jobs):
-            for task_id in range(self.n_machines):
-                if self.is_affected[job_id, task_id] == 1 and self.affectations[job_id, task_id] != -1:
-                    if (
-                        self.machine_completion_time[self.affectations[job_id, task_id], 0] == -1
-                        or self.durations[job_id, task_id, 0] == -1
-                    ):
-                        self.machine_completion_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
-                        self.machine_completion_time[self.affectations[job_id, task_id], 0] = -1
-                    else:
-                        self.machine_completion_time[self.affectations[job_id, task_id]] += self.durations[job_id, task_id]
+        if "job_completion_percentage" in self.features_offset:
+            tjpof = self.features_offset["job_completion_percentage"]
+            jcp = self.job_completion_time / self.total_job_time
+            jcp = torch.where(self.total_job_time < 0, torch.Tensor([-1.0]), jcp)
+            jcpb = (
+                jcp.unsqueeze_(1)
+                .expand((self.max_n_jobs, self.max_n_machines, 4))
+                .reshape((self.max_n_jobs * self.max_n_machines, 4))
+            )
+            self.features[:, tjpof[0] : tjpof[1]] = jcpb
 
-        self.machine_completion_time_job_task = np.zeros((self.n_jobs, self.n_machines, 4))
+        self.machine_completion_time = torch.zeros((self.n_machines, 4))
+
+        self.machine_completion_time_job_task = torch.zeros((self.n_jobs, self.n_machines, 4))
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 self.machine_completion_time_job_task[job_id, task_id] = self.machine_completion_time[
                     self.affectations[job_id, task_id]
                 ]
+                if "machine_completion_percentage" in self.features_offset:
+                    mcpof = self.features_offset["machine_completion_percentage"]
+                    self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0] : mcpof[1]] = (
+                        self.machine_completion_time_job_task[job_id, task_id]
+                        / self.total_machine_time_job_task[job_id, task_id]
+                    )
+                    if self.total_machine_time_job_task[job_id, task_id][0] < 0:
+                        self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0]] = -1
+
+        if "mopnr" in self.features_offset:
+            mopnr = np.sum(self.affectations != -1, axis=1)
+            mopnr = np.broadcast_to(mopnr[:, None], (self.max_n_jobs, self.max_n_machines)).flatten()
+            self.features[:, self.features_offset["mopnr"][0]] = torch.as_tensor(mopnr)
+
+        if "mwkr" in self.features_offset:
+            mwkr = self.total_job_time - self.job_completion_time
+            mwkr = (
+                mwkr.unsqueeze_(1)
+                .expand((self.max_n_jobs, self.max_n_machines, 4))
+                .reshape((self.max_n_jobs * self.max_n_machines, 4))
+            )
+            of = self.features_offset["mwkr"]
+            self.features[:, of[0] : of[1]] = mwkr
+
+        if "one_hot_job_id" in self.features_offset:
+            ohji = np.zeros((self.max_n_jobs, self.max_n_jobs))  # vector of size max_
+            for i in range(self.max_n_jobs):
+                ohji[i][i] = 1
+            ohji = np.broadcast_to(ohji[:, None, :], (self.max_n_jobs, self.max_n_machines, self.max_n_jobs))
+            ohji = np.reshape(ohji, (self.max_n_jobs * self.max_n_machines, self.max_n_jobs))
+            of = self.features_offset["one_hot_job_id"]
+            self.features[:, of[0] : of[1]] = torch.as_tensor(ohji)
 
     def done(self):
-        return np.all(self.is_affected[np.where(self.affectations >= 0)] > 0)
+        return np.all(self.affected[np.where(self.affectations >= 0)] > 0)
 
-    def _get_machine_node_ids(self, machine_id):
-        node_ids = []
-        if machine_id == -1:
-            return node_ids
-        for job_id in range(self.n_jobs):
-            for task_id in range(self.n_machines):
-                if self.affectations[job_id, task_id] == machine_id:
-                    node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
-                    node_ids.append(node_id)
-        return node_ids
+    def init_features_offset(self, input_list):
+        self.features_offset = {}
+        self.features_offset["is_affected"] = [0, 1]
+        self.features_offset["tct"] = [1, 5]
+        self.features_offset["one_hot_machine_id"] = [5, 5 + self.max_n_machines]
+        n = 5 + self.max_n_machines
+        for input_name in input_list:
+            if input_name in ["is_affected", "completion_time", "one_hot_machine_id"]:
+                continue  # already appended above
+            if input_name == "one_hot_job_id":
+                self.features_offset[input_name] = [n, n + self.max_n_jobs]
+                n += self.max_n_jobs
+            elif input_name == "mopnr":
+                self.features_offset[input_name] = [n, n + 1]
+                n += 1
+            elif input_name == "selectable":
+                self.features_offset[input_name] = [n, n + 1]
+                n += 1
+            else:
+                self.features_offset[input_name] = [n, n + 4]
+                n += 4
+
+    def normalize_features(self, normalize):
+        if not normalize:
+            return self.features
+        else:
+            features = self.features.clone()
+            features[:, 1:5] /= self.max_duration
+            features[:, 1] = torch.where(features[:, 1] < 0, torch.Tensor([-1.0]), features[:, 1])
+            # if "duration" in self.features_offset:
+            try:
+                dof = self.features_offset["duration"]
+                features[:, dof[0] : dof[1]] /= self.max_duration
+                features[:, dof[0]] = torch.where(features[:, dof[0]] < 0, torch.Tensor([-1.0]), features[:, dof[0]])
+            except KeyError:
+                pass
+            # if "total_job_time" in self.features_offset:
+            try:
+                tjo = self.features_offset["total_job_time"]
+                features[:, tjo[0] : tjo[1]] /= self.max_completion_time
+                features[:, tjo[0]] = torch.where(features[:, tjo[0]] < 0, torch.Tensor([-1.0]), features[:, tjo[0]])
+            except KeyError:
+                pass
+
+            # if "total_machine_time" in self.features_offset:
+            try:
+                tmo = self.features_offset["total_machine_time"]
+                features[:, tmo[0] : tmo[1]] /= self.max_completion_time
+                features[:, tmo[0]] = torch.where(features[:, tmo[0]] < 0, torch.Tensor([-1.0]), features[:, tmo[0]])
+            except KeyError:
+                pass
+
+            # if "mopnr" in self.features_offset:
+            try:
+                features[:, self.features_offset["mopnr"][0]] /= self.n_machines
+            except KeyError:
+                pass
+
+            # if "mwkr" in self.features_offset:
+            try:
+                of = self.features_offset["mwkr"]
+                features[:, of[0] : of[1]] /= self.max_completion_time
+                features[:, of[0] : of[1]] = torch.where(
+                    features[:, of[0] : of[1]] < 0, torch.Tensor([-1]), features[:, of[0] : of[1]]
+                )
+            except KeyError:
+                pass
+
+            return features
 
     def to_features_and_edge_index(self, normalize_input, input_list):
         """
@@ -183,226 +343,59 @@ class State:
         'machine_completion_percentage', 'mopnr', 'mwkr'
         """
 
-        all_features = self.get_all_features_at_once(normalize_input, input_list)
-
-        if normalize_input:
-            tct = self.task_completion_times / self.max_completion_time
-        else:
-            tct = self.task_completion_times
-
-        tct[tct < 0] = -1
-
-        for job_id in range(self.n_jobs):
-            for task_id in range(self.n_machines):
-                machine_id = self.affectations[job_id, task_id]
-                node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
-
-                # Compute features, old stype
-                # features = self.get_features(job_id, task_id, machine_id, normalize_input, input_list)
-
-                node_vector = (
-                    [node_id]
-                    + [self.is_affected[job_id, task_id]] * 4
-                    + tct[job_id, task_id].tolist()
-                    + self.one_hot_machine_id[machine_id].tolist()
-                )
-
-                for input_name in input_list:
-                    if input_name in ["is_affected", "completion_time", "one_hot_machine_id"]:
-                        continue  # already appended above
-                    # test for feature equality
-                    # assert(features[input_name] == all_features[input_name][job_id,task_id]).all()
-                    # features, old style
-                    # node_vector = node_vector + all_features[input_name][job_id,task_id].tolist()
-                    node_vector = node_vector + all_features[input_name][job_id, task_id].tolist()
-
-                if self.node_encoding == "L2D":
-                    self.graph.nodes[node_id]["x"] = node_vector
-                elif self.node_encoding == "DenseL2D":
-                    self.return_graph.nodes[node_id]["x"] = node_vector
+        features = self.normalize_features(normalize_input)
 
         nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
-
-        graph = from_networkx(nx_graph)
-
-        # We have to reorder features, since the networx -> torch_geometric
-        # shuffles the nodes because of iterating through nodes not in node_id order
-        # but edge index stays ok
-        node_ids = graph.x[:, 0].long()
-        edge_index = graph.edge_index
-        features = torch.zeros((self.n_nodes, graph.x[:, 1:].shape[1]))
-        features[node_ids] = graph.x[:, 1:].float()
+        edge_index = torch.as_tensor(list(nx_graph.edges), dtype=torch.long).t().contiguous()
 
         return features, edge_index
 
-    def get_all_features_at_once(self, normalize_input, input_list):
-        features = {}
-
-        if "one_hot_job_id" in input_list:
-            ohji = np.zeros((self.max_n_jobs, self.max_n_jobs))  # vector of size max_
-            for i in range(self.max_n_jobs):
-                ohji[i][i] = 1
-            features["one_hot_job_id"] = np.broadcast_to(ohji[:, None, :], (self.n_jobs, self.n_machines, self.n_jobs))
-
-        if "duration" in input_list:
-            features["duration"] = self.durations
-
-        if "total_job_time" in input_list or "job_completion_percentage" in input_list or "mwkr" in input_list:
-            features["total_job_time"] = np.broadcast_to(self.total_job_time[:, None, :], (self.n_jobs, self.n_machines, 4))
-
-        if "total_machine_time" in input_list or "machine_completion_percentage" in input_list:
-            features["total_machine_time"] = self.total_machine_time_job_task
-
-        if "job_completion_percentage" in input_list:
-            features["job_completion_percentage"] = (
-                np.broadcast_to(self.job_completion_time[:, None, :], (self.n_jobs, self.n_machines, 4))
-                / features["total_job_time"]
-            )
-            features["job_completion_percentage"][
-                np.broadcast_to(self.job_completion_time[:, None, :], (self.n_jobs, self.n_machines, 4)) == -1
-            ] = -1
-            features["job_completion_percentage"][features["total_job_time"] == -1] = -1
-
-        if "machine_completion_percentage" in input_list:
-            features["machine_completion_percentage"] = np.where(
-                np.broadcast_to((self.affectations == -1)[:, :, None], (self.n_jobs, self.n_machines, 4)),
-                -1,
-                self.machine_completion_time_job_task / features["total_machine_time"],
-            )
-            features["machine_completion_percentage"][self.machine_completion_time_job_task == -1] = -1
-            features["machine_completion_percentage"][features["total_machine_time"] == -1] = -1
-
-        if "mwkr" in input_list:
-            features["mwkr"] = features["total_job_time"] - np.broadcast_to(
-                self.job_completion_time[:, None, :], (self.n_jobs, self.n_machines, 4)
-            )
-
-        if "mopnr" in input_list:
-            mopnr = np.broadcast_to(np.asarray([self.n_machines]), (self.n_jobs)) - self.number_operations_scheduled
-            features["mopnr"] = np.broadcast_to(mopnr[:, None, None], (self.n_jobs, self.n_machines, 4))
-
-        if normalize_input:
-            if "duration" in input_list:
-                features["duration"] = features["duration"] / self.max_duration
-            if "total_job_time" in input_list:
-                features["total_job_time"] = features["total_job_time"] / self.max_completion_time
-            if "total_machine_time" in input_list:
-                features["total_machine_time"] = features["total_machine_time"] / self.max_completion_time
-            if "mwkr" in input_list:
-                features["mwkr"] = features["mwkr"] / self.max_completion_time
-            if "mopnr" in input_list:
-                features["mopnr"] = features["mopnr"] / self.n_machines
-
-        if "mwkr" in input_list:
-            features["mwkr"][features["mwkr"] < 0] = -1
-
-        if "total_job_time" in input_list:
-            ftjt = np.copy(features["total_job_time"])
-            ftjt[ftjt < 0] = -1
-            features["total_job_time"] = ftjt
-
-        if "duration" in input_list:
-            features["duration"][features["duration"] < 0] = -1
-        if "completion_time" in input_list:
-            features["completion_time"][features["completion_time"] < 0] = -1
-        if "total_machine_time" in input_list:
-            features["total_machine_time"][features["total_machine_time"] < 0] = -1
-
-        return features
-
-    def get_features(self, job_id, task_id, machine_id, normalize_input, input_list):
-        """
-        Returns the specified features in a dict.
-        The inputs are normalized if normalize_input is set to True
-        """
-        # Mandatory features
-        features = {}
-        # features["is_affected"] = np.repeat(self.is_affected[job_id, task_id], 4)  # vector of size 4
-        # features["completion_time"] = self.task_completion_times[job_id, task_id]  # vector of size 4
-
-        # Other features
-        # features["one_hot_machine_id"] = self.to_one_hot(machine_id, self.max_n_machines)  # vector of size max_n_jobs
-        if "one_hot_job_id" in input_list:
-            features["one_hot_job_id"] = self.to_one_hot(job_id, self.max_n_jobs)  # vector of size max_n_machines
-        if "duration" in input_list:
-            features["duration"] = self.durations[job_id, task_id]  # vector of size 4
-        if "total_job_time" in input_list or "job_completion_percentage" in input_list or "mwkr" in input_list:
-            features["total_job_time"] = self.total_job_time[job_id]  # vector of size 4
-        if "total_machine_time" in input_list or "machine_completion_percentage" in input_list:
-            features["total_machine_time"] = self.total_machine_time[machine_id]  # vector of size 4
-        if "job_completion_percentage" in input_list:
-            features["job_completion_percentage"] = self.job_completion_time[job_id] / features["total_job_time"]  # size 4
-        if "machine_completion_percentage" in input_list:
-            features["machine_completion_percentage"] = (
-                self.machine_completion_time[machine_id] / features["total_machine_time"]
-            )
-
-        # Checking consistency with knwoledge
-        for i in range(4):
-            if "job_completion_percentage" in input_list:
-                if self.job_completion_time[job_id][i] == -1 or features["total_job_time"][i] == -1:
-                    features["job_completion_percentage"][i] = -1
-            if "machine_completion_percentage" in input_list:
-                if (
-                    machine_id == -1
-                    or self.machine_completion_time[machine_id][i] == -1
-                    or features["total_machine_time"][i] == -1
-                ):
-                    features["machine_completion_percentage"][i] = -1
-
-        # See https://hal.archives-ouvertes.fr/hal-00728900/document for the definition of these metrics
-        if "mopnr" in input_list:
-            features["mopnr"] = np.repeat(self.n_machines - self.number_operations_scheduled[job_id], 4)  # vector of size 4
-        if "mwkr" in input_list:
-            features["mwkr"] = features["total_job_time"] - self.job_completion_time[job_id]  # vector of size 4
-        # Checking consistency with knowledge
-        for i in range(4):
-            if features["total_job_time"][i] == -1 or self.job_completion_time[job_id][i] == -1:
-                features["mwkr"][i] = -1
-
-        if normalize_input:
-            if "completion_time" in input_list:
-                features["completion_time"] = features["completion_time"] / self.max_completion_time
-            if "duration" in input_list:
-                features["duration"] = features["duration"] / self.max_duration
-            if "total_job_time" in input_list:
-                features["total_job_time"] = features["total_job_time"] / self.max_completion_time
-            if "total_machine_time" in input_list:
-                features["total_machine_time"] = features["total_machine_time"] / self.max_completion_time
-            if "mopnr" in input_list:
-                features["mopnr"] = features["mopnr"] / self.n_machines
-            if "mwkr" in input_list:
-                features["mwkr"] = features["mwkr"] / self.max_completion_time
-        # Checking consistency with knowledge
-        if "completion_time" in input_list:
-            features["completion_time"][features["completion_time"] < 0] = -1
-        if "duration" in input_list:
-            features["duration"][features["duration"] < 0] = -1
-        if "total_job_time" in input_list:
-            features["total_job_time"][features["total_job_time"] < 0] = -1
-        if "total_machine_time" in input_list:
-            features["total_machine_time"][features["total_machine_time"] < 0] = -1
-        if "mwkr" in input_list:
-            features["mwkr"][features["mwkr"] < 0] = -1
-
-        return features
-
-    def to_one_hot(self, index, max_index):
-        rep = np.zeros(max_index)
-        rep[index] = 1
-        return rep
-
     def observe_real_duration(self, node_id, do_update=True):
-        if self.deterministic:
-            return
         job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
         self.is_observed[job_id, task_id] = 1
         self.durations[job_id, task_id][:] = self.original_durations[job_id, task_id][0]
+        if "duration" in self.features_offset:
+            dof = self.features_offset["duration"]
+            self.features[node_id, dof[0] : dof[1]] = self.original_durations[job_id, task_id][0]
 
         if do_update:
             self.update_completion_times(node_id)
 
-    def update_completion_times(self, node_id):
+    def update_completion_times_in_order(self):
+        priority_queue = PriorityQueue()
+        nodes = list(self.graph.nodes)
+        for n in nodes:
+            predecessors = list(self.graph.predecessors(n))
+            if not predecessors:
+                priority_queue.put((0, n))
+        while not priority_queue.empty():
+            (distance, cur_node_id) = priority_queue.get()
+            predecessors = list(self.graph.predecessors(cur_node_id))
+
+            if len(predecessors) == 0:
+                max_completion_time_predecessors = torch.zeros(4)
+            else:
+                task_comp_time_pred = torch.stack([self.get_task_completion_times(p) for p in predecessors])
+                # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
+                max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
+                # For the real time, if one of the predecessors has an undefined end time, current node is also undefined
+                if -1 in task_comp_time_pred:
+                    max_completion_time_predecessors[0] = -1
+
+            new_completion_time = max_completion_time_predecessors + self.get_durations(cur_node_id)
+            # If there is any uncertainty, we remove the real duration value
+            if (
+                max_completion_time_predecessors[0] == -1
+                or self.is_observed[node_to_job_and_task(cur_node_id, self.n_machines)] == 0
+            ):
+                new_completion_time[0] = -1
+
+            self.set_task_completion_times(cur_node_id, new_completion_time)
+            # Force update all nodes for external use
+            for successor in self.graph.successors(cur_node_id):
+                priority_queue.put((distance + 1, successor))
+
+    def update_completion_times(self, node_id, rec=True):
         """
         This function is supposed to update the starting time of the selected node
         and all of its succesors. To do so, it travels through the whole graph of
@@ -417,31 +410,29 @@ class State:
             predecessors = list(self.graph.predecessors(cur_node_id))
 
             if len(predecessors) == 0:
-                max_completion_time_predecessors = np.zeros(4)
+                max_completion_time_predecessors = torch.zeros(4)
             else:
-                task_comp_time_pred = np.stack(
-                    [self.task_completion_times[node_to_job_and_task(p, self.n_machines)] for p in predecessors]
-                )
+                task_comp_time_pred = torch.stack([self.get_task_completion_times(p) for p in predecessors])
                 # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
-                max_completion_time_predecessors = task_comp_time_pred.max(axis=0)
+                max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
                 # For the real time, if one of the predecessors has an undefined end time, current node is also undefined
                 if -1 in task_comp_time_pred:
                     max_completion_time_predecessors[0] = -1
 
-            new_completion_time = (
-                max_completion_time_predecessors + self.durations[node_to_job_and_task(cur_node_id, self.n_machines)]
-            )
+            new_completion_time = max_completion_time_predecessors + self.get_durations(cur_node_id)
             # If there is any uncertainty, we remove the real duration value
             if (
                 max_completion_time_predecessors[0] == -1
                 or self.is_observed[node_to_job_and_task(cur_node_id, self.n_machines)] == 0
             ):
                 new_completion_time[0] = -1
-            old_completion_time = self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)].copy()
-            self.task_completion_times[node_to_job_and_task(cur_node_id, self.n_machines)] = new_completion_time
+
+            if rec:
+                old_completion_time = self.get_task_completion_times(cur_node_id)
+            self.set_task_completion_times(cur_node_id, new_completion_time)
 
             # Only add the nodes in the queue if update is necessary
-            if not np.array_equal(old_completion_time, new_completion_time):
+            if rec and not torch.equal(old_completion_time, new_completion_time):
                 for successor in self.graph.successors(cur_node_id):
                     priority_queue.put((distance + 1, successor))
 
@@ -494,6 +485,21 @@ class State:
         else:
             raise Exception("Operation not recognized")
 
+    def node_same_job(self, jid):
+        if jid in self.same_job:
+            return self.same_job[jid]
+
+        sj = []
+        for t in range(self.max_n_machines):
+            if self.affectations[jid, t] != -1:
+                sj.append(job_and_task_to_node(jid, t, self.max_n_machines))
+            self.same_job[jid] = sj
+        return sj
+
+    def on_machine(self, machine_id):
+        coord = np.asarray(self.affectations == machine_id).nonzero()
+        return [job_and_task_to_node(j[0], j[1], self.max_n_machines) for j in zip(coord[0], coord[1])]
+
     def affect_node(self, node_id):
         """
         Sets the self.is_affected to 1 for the current node_id.
@@ -505,19 +511,86 @@ class State:
 
         job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
         machine_id = self.affectations[job_id, task_id]
-        same_machine = np.asarray(self.affectations == machine_id).nonzero()
 
         if machine_id != -1:
-            self.is_affected[job_id, task_id] = 1
-            self.job_completion_time[job_id] += self.durations[job_id, task_id]
-            self.machine_completion_time[machine_id] += self.durations[job_id, task_id]
-            for coord in zip(same_machine[0], same_machine[1]):
-                self.machine_completion_time_job_task[coord[0], coord[1]] += self.durations[job_id, task_id]
-            if self.durations[job_id, task_id][0] == -1:
-                self.job_completion_time[job_id][0] = -1
-                self.machine_completion_time[machine_id][0] = -1
-                self.machine_completion_time_job_task[job_id, task_id, 0] = -1
-            self.number_operations_scheduled[job_id] += 1
+            self.features[node_id, self.features_offset["is_affected"][0]] = 1
+            self.affect(node_id)
+
+            if "mwkr" in self.features_offset or "job_completion_percentage" in self.features_offset:
+                if self.job_completion_time[job_id][0] < 0:
+                    self.job_completion_time[job_id][0] = self.get_durations(node_id)[0]
+                else:
+                    self.job_completion_time[job_id][0] += self.get_durations(node_id)[0]
+
+            if (
+                "mwkr" in self.features_offset
+                or "total_job_time" in self.features_offset
+                or "job_completion_percentage" in self.features_offset
+            ):
+                if self.total_job_time[job_id][0] < 0:
+                    self.total_job_time[job_id][0] = self.get_durations(node_id)[0]
+                else:
+                    self.total_job_time[job_id][0] += self.get_durations(node_id)[0]
+
+            if "job_completion_percentage" in self.features_offset:
+                tjpof = self.features_offset["job_completion_percentage"]
+                for nid in self.node_same_job(job_id):
+                    self.features[nid, self.features_offset["job_completion_percentage"][0]] = (
+                        self.job_completion_time[job_id][0] / self.total_job_time[job_id][0]
+                    )
+
+            if "total_job_time" in self.features_offset:
+                for nid in self.node_same_job(job_id):
+                    self.features[nid, self.features_offset["total_job_time"][0]] = self.total_job_time[job_id][0]
+
+            if "total_machine_time" in self.features_offset or "machine_completion_percentage" in self.features_offset:
+                for nid in self.on_machine(machine_id):
+                    jid, tid = node_to_job_and_task(nid, self.max_n_machines)
+                    if self.total_machine_time_job_task[jid, tid][0] < 0:
+                        self.total_machine_time_job_task[jid, tid][0] = self.get_durations(node_id)[0]
+                    else:
+                        self.total_machine_time_job_task[jid, tid][0] += self.get_durations(node_id)[0]
+
+                if self.total_machine_time[machine_id][0] < 0:
+                    self.total_machine_time[machine_id][0] = self.get_durations(node_id)[0]
+                else:
+                    self.total_machine_time[machine_id][0] += self.get_durations(node_id)[0]
+            if "total_machine_time" in self.features_offset:
+                for nid in self.on_machine(machine_id):
+                    self.features[nid, self.features_offset["total_machine_time"][0]] = self.total_machine_time[machine_id][
+                        0
+                    ]
+
+            if "machine_completion_percentage" in self.features_offset:
+                self.machine_completion_time[machine_id] += self.get_durations(node_id)
+                same_machine = np.asarray(self.affectations == machine_id).nonzero()
+                for coord in zip(same_machine[0], same_machine[1]):
+                    self.machine_completion_time_job_task[coord[0], coord[1]] += self.get_durations(node_id)
+                if self.get_durations(node_id)[0] == -1:
+                    self.job_completion_time[job_id][0] = -1
+                    self.machine_completion_time[machine_id][0] = -1
+                    self.machine_completion_time_job_task[job_id, task_id, 0] = -1
+                for nid in self.on_machine(machine_id):
+                    mcpo = self.features_offset["machine_completion_percentage"]
+                    self.features[nid, mcpo[0] : mcpo[1]] = (
+                        self.machine_completion_time[machine_id] / self.total_machine_time[machine_id]
+                    )
+
+            if "mopnr" in self.features_offset:
+                for nid in self.node_same_job(job_id):
+                    self.features[nid, self.features_offset["mopnr"][0]] -= 1
+
+            if "mwkr" in self.features_offset:
+                of = self.features_offset["mwkr"]
+                for nid in self.node_same_job(job_id):
+                    self.features[nid, of[0] : of[1]] = self.total_job_time[job_id] - self.job_completion_time[job_id]
+
+            if "selectable" in self.features_offset:
+                for successor in self.graph.successors(node_id):
+                    parents = list(self.graph.predecessors(successor)).remove(node_id)
+                    parents_affected = self.features[parents, self.features_offset["is_affected"][0]]
+                    if torch.all(parents_affected.flatten() == 1):
+                        self.features[successor, self.features_offset["selectable"][0]] = 1
 
     def get_machine_occupancy(self, machine_id, metric):
         """
@@ -534,25 +607,28 @@ class State:
             index = 3
         else:
             raise Exception("Metric for machine_occupancy not recognized")
-        node_ids = self._get_machine_node_ids(machine_id)
+        node_ids = self.on_machine(machine_id)
         occupancy = []
         for node_id in node_ids:
             job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
-            is_affected = self.is_affected[job_id, task_id]
-            duration = self.durations[job_id, task_id]
+            is_affected = self.is_affected(job_id, task_id)
+            duration = self.get_durations(node_id)
             if is_affected == 1:
-                start_time = self.task_completion_times[job_id, task_id][index] - duration[index]
-                if self.task_completion_times[job_id, task_id][index] == -1 or duration[index] == -1:
+                tct = self.get_task_completion_times(node_id)[index].item()
+                if tct == -1 or duration[index].item() == -1:
                     start_time = -1
                     raise Exception("get_machine_occupancy not supported for not observed metric. Please use averagistic")
-                occupancy.append((start_time, duration[index], node_id))
+                else:
+                    start_time = tct - duration[index].item()
+                occupancy.append((start_time, duration[index].item(), node_id))
         occupancy.sort()
         return occupancy
 
     def get_solution(self):
         if not self.done():
             return False
-        schedule = self.task_completion_times[:, :, 0] - self.original_durations[:, :, 0]
+        tct = self.features[:, 1].reshape((self.max_n_jobs, self.max_n_machines, 1)).squeeze_(2).numpy()
+        schedule = tct - self.original_durations[:, :, 0]
         # we give schedule for real observed durations
         return Solution(schedule=schedule, real_durations=self.original_durations[:, :, 0])
 
@@ -561,9 +637,9 @@ class State:
         Returns the id of the first task that wasn't affected. If all tasks are
         affected, returns -1
         """
-        if np.sum(self.is_affected[job_id]) == self.n_machines_per_job[job_id]:
+        if np.sum(self.affected[job_id]) == self.n_machines_per_job[job_id]:
             return -1
-        return list(self.is_affected[job_id]).index(0)
+        return list(self.affected[job_id]).index(0)
 
     def get_job_availability(self, job_id, task_id, metric):
         if task_id == 0:
@@ -578,7 +654,8 @@ class State:
             index = 3
         else:
             raise Exception("Metric for job_availability not recognized")
-        return self.task_completion_times[job_id, task_id - 1][index]
+        tct = self.features[job_and_task_to_node(job_id, task_id - 1, self.max_n_machines)]
+        return tct[index].item()
 
     def generate_colors(self):
         n = self.n_machines
@@ -624,7 +701,7 @@ class State:
         else:
             return None
 
-    def display(self):
+    def display(self, fname="state.png"):
         print("affectation\n", self.affectations)
         plt.clf()
         pos = {}
@@ -632,14 +709,25 @@ class State:
             for m in range(0, self.n_machines):
                 pos[j * self.n_machines + m] = (m, -j)
 
-        if self.deterministic:
-            print("task_completion_times\n", self.task_completion_times[:, :, 0])
-        else:
-            print("task_completion_times\n", self.task_completion_times[:, :, :])
-        # print("isaffected\n", self.is_affected)
+        print("task_completion_times\n", self.features[:, 1:5])
+
+        # print("machine id", self.features[:, 5 : 5 + self.max_n_machines])
+
+        if "duration" in self.features_offset:
+            dof = self.features_offset["duration"]
+            print("durations", self.features[:, dof[0] : dof[1]])
+
+        # if "monpr" in self.features_offset:
+        #     of = self.features_offset["mopnr"]
+        #     print("mopnr", self.features[:, of[0] : of[1]])
+
+        # if "mwkr" in self.features_offset:
+        #     of = self.features_offset["mwkr"]
+        #     print("mwkr", self.features[:, of[0] : of[1]])
+
+        # print("isaffected\n", self.affected)
         # print("is observed\n", self.is_observed)
-        # print("durations\n", self.durations[:, :, :])
-        print("drawing graph")
-        nx.draw_networkx(self.graph, pos, with_labels=True)
-        # nx.draw_planar(self.graph, with_labels=True)
-        plt.savefig("state.png")
+        # print("drawing graph")
+        # nx.draw_networkx(self.graph, pos, with_labels=True)
+        # # nx.draw_planar(self.graph, with_labels=True)
+        # plt.savefig(fname)

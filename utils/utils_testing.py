@@ -13,6 +13,7 @@ from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
 from utils.utils import generate_data
+import torch
 
 
 def get_ortools_makespan(
@@ -47,22 +48,25 @@ def get_ortools_makespan(
         state.observe_real_duration(i, do_update=True)
         state.affect_node(i)
     # we will use get_machine_occupancy_max_endtime which rely on task_completion_times
-    state.task_completion_times = np.expand_dims(solution.schedule, 2) + durations
+    state.set_all_task_completion_times(np.expand_dims(solution.schedule, 2) + durations)
 
-    occupancies = []
-
-    for m in range(n_m):
-        occupancies.append(state.get_machine_occupancy(m, ortools_strategy))
+    occupancies = [state.get_machine_occupancy(m, ortools_strategy) for m in range(n_m)]
 
     state.reset()  # reset task_completion times in particular
+
     for i in range(n_j * n_m):
-        state.observe_real_duration(i, do_update=True)
+        state.observe_real_duration(i, do_update=False)
         state.affect_node(i)
 
     for o in occupancies:
         nodes_occ = [el[2] for el in o]
         for i in range(len(nodes_occ) - 1):
-            state.set_precedency(nodes_occ[i], nodes_occ[i + 1])
+            state.set_precedency(nodes_occ[i], nodes_occ[i + 1], do_update=False)
 
-    makespan = np.max(state.task_completion_times[:, :, 0])
-    return makespan, state.task_completion_times[:, :, 0] - durations[:, :, 0]
+    state.update_completion_times_in_order()
+
+    tct = state.get_all_task_completion_times()[:, 0].reshape(state.max_n_jobs, state.max_n_machines, 1).squeeze_(2).numpy()
+
+    makespan = torch.max(state.get_all_task_completion_times()[:, 0].flatten())
+
+    return makespan, tct - durations[:, :, 0]

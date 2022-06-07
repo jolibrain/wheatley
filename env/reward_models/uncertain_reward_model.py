@@ -10,13 +10,13 @@ class UncertainRewardModel(RewardModel):
         # 6 is for max
         # 7 is for mode
         if config == "optimistic":
-            self.index = 5
+            self.index = 2
         elif config == "pessimistic":
-            self.index = 6
+            self.index = 3
         elif config == "realistic":
-            self.index = 4
+            self.index = 1
         elif config == "averagistic":
-            self.index = 7
+            self.index = 4
         else:
             raise Exception("Reward model not recognized :  " + config)
 

@@ -143,6 +143,7 @@ class Env(gym.Env):
             self.env_specification.max_n_jobs,
             self.env_specification.max_n_machines,
             self.deterministic,
+            feature_list=self.env_specification.input_list,
         )
 
     def _create_transition_model(self):

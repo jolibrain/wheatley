@@ -9,66 +9,6 @@ import torch_geometric.data
 import sys
 
 
-def find_last_in_batch(start_index, bi, batch_indices):
-    index = start_index
-    while index < batch_indices.shape[0] - 1 and int(batch_indices[index + 1].item()) == bi:
-        index += 1
-    return index
-
-
-def from_networkx(G):
-    r"""Converts a :obj:`networkx.Graph` or :obj:`networkx.DiGraph` to a
-    :class:`torch_geometric.data.Data` instance.
-
-    Args:
-        G (networkx.Graph or networkx.DiGraph): A networkx graph.
-        group_node_attrs (List[str] or all, optional): The node attributes to
-            be concatenated and added to :obj:`data.x`. (default: :obj:`None`)
-        group_edge_attrs (List[str] or all, optional): The edge attributes to
-            be concatenated and added to :obj:`data.edge_attr`.
-            (default: :obj:`None`)
-
-    .. note::
-
-        All :attr:`group_node_attrs` and :attr:`group_edge_attrs` values must
-        be numeric.
-    """
-    import networkx as nx
-
-    edges = list(G.edges)
-
-    edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
-
-    data = defaultdict(list)
-
-    node_attrs = list(next(iter(G.nodes(data=True)))[-1].keys())
-
-    edge_attrs = list(next(iter(G.edges(data=True)))[-1].keys())
-
-    for i, (_, feat_dict) in enumerate(G.nodes(data=True)):
-        for key, value in feat_dict.items():
-            data[str(key)].append(value)
-
-    for i, (_, _, feat_dict) in enumerate(G.edges(data=True)):
-        for key, value in feat_dict.items():
-            key = f"edge_{key}" if key in node_attrs else key
-            data[str(key)].append(value)
-
-    for key, value in data.items():
-        try:
-            data[key] = torch.tensor(value)
-        except ValueError:
-            pass
-
-    data["edge_index"] = edge_index.view(2, -1)
-    data = torch_geometric.data.Data.from_dict(data)
-
-    if data.x is None and data.pos is None:
-        data.num_nodes = G.number_of_nodes()
-
-    return data
-
-
 def get_exp_name(args):
     exp_name = (
         f"{args.n_j}j{args.n_m}m_{args.duration_type}_{args.seed}seed_{args.transition_model_config}_"
@@ -98,11 +38,19 @@ def get_exp_name(args):
 def get_n_features(input_list, max_n_jobs, max_n_machines):
     if "one_hot_machine_id" in input_list:
         input_list.remove("one_hot_machine_id")
-    n_features = 4 * (2 + len(input_list))
+    # 4 for task completion times, 1 for is_affected, max_n_machines for mandatory one_hot_machine_id
+    n_features = 5 + max_n_machines
+    # most features make 4 values
+    n_features += 4 * len(input_list)
+    # except one_hot_job_id
     if "one_hot_job_id" in input_list:
         n_features += max_n_jobs - 4
-    n_features += max_n_machines
-
+    # except for mopnr
+    if "mopnr" in input_list:
+        n_features -= 3
+    # except for selectable
+    if "selectable" in input_list:
+        n_features -= 3
     return n_features
 
 
