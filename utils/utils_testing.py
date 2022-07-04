@@ -42,10 +42,9 @@ def get_ortools_makespan(
     state = State(affectations, durations, affectations.shape[0], affectations.shape[1])
     state.reset()
 
-    # observe all real durations
-
+    # use the same durations to compute machines occupancies
+    state.durations = state.original_durations
     for i in range(n_j * n_m):
-        state.observe_real_duration(i, do_update=True)
         state.affect_node(i)
     # we will use get_machine_occupancy_max_endtime which rely on task_completion_times
     state.set_all_task_completion_times(np.expand_dims(solution.schedule, 2) + durations)
@@ -54,6 +53,7 @@ def get_ortools_makespan(
 
     state.reset()  # reset task_completion times in particular
 
+    # observe all real durations
     for i in range(n_j * n_m):
         state.observe_real_duration(i, do_update=False)
         state.affect_node(i)
@@ -63,7 +63,7 @@ def get_ortools_makespan(
         for i in range(len(nodes_occ) - 1):
             state.set_precedency(nodes_occ[i], nodes_occ[i + 1], do_update=False)
 
-    state.update_completion_times_in_order()
+    state.update_completion_times_from_sinks()
 
     tct = state.get_all_task_completion_times()[:, 0].reshape(state.max_n_jobs, state.max_n_machines, 1).squeeze_(2).numpy()
 

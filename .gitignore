@@ -5,3 +5,4 @@ __pycache__
 *.svg
 profile.data
 profile.pdf
+benchmark/*.csv

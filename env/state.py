@@ -8,7 +8,6 @@ import torch
 import torch_geometric
 
 import datetime
-import random
 import pandas as pd
 import plotly.figure_factory as ff
 import cv2
@@ -361,6 +360,50 @@ class State:
         if do_update:
             self.update_completion_times(node_id)
 
+    def update_completion_times_from(self, node_id):
+        # check if node is already solved
+        completion_times = self.get_task_completion_times(node_id)
+        if max(completion_times) != -1:
+            return completion_times
+
+        # recursively solve the predecessors
+        predecessors = list(self.graph.predecessors(node_id))
+        task_comp_time_pred = torch.stack([self.update_completion_times_from(p) for p in predecessors])
+        # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
+        max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
+        # For the real time, if one of the predecessors has an undefined end time, current node is also undefined
+        if -1 in task_comp_time_pred:
+            max_completion_time_predecessors[0] = -1
+
+        new_completion_time = max_completion_time_predecessors + self.get_durations(node_id)
+        # If there is any uncertainty, we remove the real duration value
+        if (
+            max_completion_time_predecessors[0] == -1
+            or self.is_observed[node_to_job_and_task(node_id, self.n_machines)] == 0
+        ):
+            new_completion_time[0] = -1
+
+        # update the node (now solved) and return to successor
+        self.set_task_completion_times(node_id, new_completion_time)
+        return new_completion_time
+
+    def update_completion_times_from_sinks(self):
+        sinks = []
+        nodes = list(self.graph.nodes)
+        for n in nodes:
+            successors = list(self.graph.successors(n))
+            if len(successors) == 0:
+                sinks.append(n)
+            # reset all completion times for memoization
+            completion_times = torch.ones(4) * -1
+            # set completion times for source nodes
+            predecessors = list(self.graph.predecessors(n))
+            if len(predecessors) == 0:
+                completion_times = self.get_durations(n)
+            self.set_task_completion_times(n, completion_times)
+        for sink in sinks:
+            self.update_completion_times_from(sink)
+
     def update_completion_times_in_order(self):
         priority_queue = PriorityQueue()
         nodes = list(self.graph.nodes)
@@ -428,7 +471,7 @@ class State:
                 new_completion_time[0] = -1
 
             if rec:
-                old_completion_time = self.get_task_completion_times(cur_node_id)
+                old_completion_time = self.get_task_completion_times(cur_node_id).clone()
             self.set_task_completion_times(cur_node_id, new_completion_time)
 
             # Only add the nodes in the queue if update is necessary
@@ -668,7 +711,7 @@ class State:
 
     def render_solution(self, schedule, scaling=1.0):
         df = []
-        all_finish = schedule * scaling + self.durations[:, :, 0]
+        all_finish = schedule * scaling + self.original_durations[:, :, 0]
         for job in range(self.n_jobs):
             i = 0
             while i < self.n_machines:

@@ -24,6 +24,7 @@ class ValidationCallback(BaseCallback):
         n_workers,
         device,
         n_validation_env,
+        fixed_validation,
         display_env,
         path,
         custom_name,
@@ -43,6 +44,7 @@ class ValidationCallback(BaseCallback):
         self.device = device
 
         self.n_validation_env = n_validation_env
+        self.fixed_validation = fixed_validation
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
         self.ortools_strategy = ortools_strategy
@@ -91,6 +93,12 @@ class ValidationCallback(BaseCallback):
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
 
+        # Compute OR-Tools solutions once if validations are fixed
+        if fixed_validation:
+            self.fixed_ortools = []
+            for i in range(self.n_validation_env):
+                self.fixed_ortools.append(self._get_ortools_makespan(i))
+
     def _on_step(self):
         self._evaluate_agent()
         self._save_if_best_model()
@@ -118,13 +126,22 @@ class ValidationCallback(BaseCallback):
             print("Saving model")
             print(f"Current ratio : {cur_ratio:.3f}")
 
+    def _get_ortools_makespan(self, i):
+            return get_ortools_makespan(
+                    self.validation_envs[i].state.affectations,
+                    self.validation_envs[i].state.original_durations,
+                    self.max_time_ortools,
+                    self.scaling_constant_ortools,
+                    self.ortools_strategy,
+            )
+
     def _evaluate_agent(self):
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
         custom_mean_makespan = 0
         for i in range(self.n_validation_env):
-            obs = self.validation_envs[i].reset()
+            obs = self.validation_envs[i].reset(soft=self.fixed_validation)
             done = False
             while not done:
                 action_masks = get_action_masks(self.validation_envs[i])
@@ -139,13 +156,10 @@ class ValidationCallback(BaseCallback):
 
             mean_makespan += makespan / self.n_validation_env
 
-            or_tools_makespan, or_tools_schedule = get_ortools_makespan(
-                self.validation_envs[i].state.affectations,
-                self.validation_envs[i].state.original_durations,
-                self.max_time_ortools,
-                self.scaling_constant_ortools,
-                self.ortools_strategy,
-            )
+            if self.fixed_validation:
+                or_tools_makespan, or_tools_schedule = self.fixed_ortools[i]
+            else:
+                or_tools_makespan, or_tools_schedule = self._get_ortools_makespan(i)
 
             if i == 0:
                 self.gantt_or_img = self.validation_envs[i].render_solution(or_tools_schedule, scaling=1.0)

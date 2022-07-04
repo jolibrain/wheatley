@@ -29,6 +29,9 @@ class Env(gym.Env):
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
         self.n_jobs = problem_description.n_jobs
+        # adjust n_jobs if we are going to sample
+        if env_specification.sample_n_jobs != -1:
+            self.n_jobs = env_specification.sample_n_jobs
         self.n_machines = problem_description.n_machines
         self.n_nodes = self.n_machines * self.n_jobs
         self.deterministic = problem_description.deterministic
@@ -135,8 +138,21 @@ class Env(gym.Env):
     def render_solution(self, schedule, scaling=1.0):
         return self.state.render_solution(schedule, scaling)
 
+    def sample_jobs(self, input_affectations, input_durations):
+        sample = self.env_specification.sample_n_jobs
+        if sample == -1:
+            return input_affectations, input_durations
+        assert sample <= len(input_affectations)
+        assert sample <= len(input_durations)
+        ids = list(range(len(input_durations)))
+        samples = np.random.choice(ids, sample, replace=False)
+        affectations = np.array([ input_affectations[i] for i in samples ])
+        durations = np.array([ input_durations[i] for i in samples ])
+        return affectations, durations
+
     def _create_state(self):
         affectations, durations = self.problem_description.sample_problem()
+        affectations, durations = self.sample_jobs(affectations, durations)
         self.state = State(
             affectations,
             durations,

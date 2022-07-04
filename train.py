@@ -48,6 +48,7 @@ def main():
     training_specification = TrainingSpecification(
         total_timesteps=args.total_timesteps,
         n_validation_env=args.n_validation_env,
+        fixed_validation=args.fixed_validation,
         validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,
@@ -73,6 +74,7 @@ def main():
             input_list=args.features,
             insertion_mode=args.insertion_mode,
             max_edges_factor=args.max_edges_upper_bound_factor,
+            sample_n_jobs=args.sample_n_jobs,
         )
         env_specification.print_self()
         agent_specification = AgentSpecification(
