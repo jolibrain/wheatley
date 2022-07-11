@@ -225,7 +225,9 @@ class ValidationCallback(BaseCallback):
         wins = 0
         count = min(len(self.makespans), 100)
         for i in range(1, count + 1):
-            if self.makespans[-i] <= self.ortools_makespans[-i]:
+            ppo = self.makespans[-i]
+            ortools = self.ortools_makespans[-i]
+            if ppo <= ortools or np.isclose(ppo, ortools):
                 wins += 1
         pct = 100 * wins / count
         self.time_to_ortools.append(pct)
