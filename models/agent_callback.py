@@ -5,6 +5,7 @@ import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import safe_mean
 import visdom
+import csv
 
 from env.env import Env
 from models.custom_agent import CustomAgent
@@ -94,6 +95,8 @@ class ValidationCallback(BaseCallback):
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
+        self.best_makespan_wheatley = float("inf")
+        self.best_makespan_ortools = float("inf")
 
         # Compute OR-Tools solutions once if validations are fixed
         if fixed_validation:
@@ -163,6 +166,20 @@ class ValidationCallback(BaseCallback):
                 batch_dict.setdefault(key, []).append(value)
         return batch_dict
 
+    def save_csv(self, name, makespan, schedule):
+            f = open(self.path + "." + name + ".csv", "w")
+            writer = csv.writer(f)
+            writer.writerow([ "makespan", makespan ])
+            writer.writerow([])
+            header = [ "" ]
+            for i in range(self.max_n_machines):
+                header.append("task " + str(i) + " start time")
+            writer.writerow(header)
+            for i in range(self.max_n_jobs):
+                line = [ "job " + str(i) ] + schedule[i].tolist()
+                writer.writerow(line)
+            f.close()
+
     def _evaluate_agent(self):
         # compute the solutions in parallel if we use batch_size
         batch_size = self.validation_batch_size
@@ -207,6 +224,10 @@ class ValidationCallback(BaseCallback):
             if i == 0:
                 self.gantt_rl_img = self.validation_envs[i].render_solution(schedule)
 
+            if makespan < self.best_makespan_wheatley:
+                self.best_makespan_wheatley = makespan
+                self.save_csv("wheatley", makespan, schedule)
+
             mean_makespan += makespan / self.n_validation_env
 
             if self.fixed_validation:
@@ -216,6 +237,11 @@ class ValidationCallback(BaseCallback):
 
             if i == 0:
                 self.gantt_or_img = self.validation_envs[i].render_solution(or_tools_schedule, scaling=1.0)
+
+            if or_tools_makespan < self.best_makespan_ortools:
+                self.best_makespan_ortools = or_tools_makespan
+                self.save_csv("ortools", or_tools_makespan.item(), or_tools_schedule)
+
             ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 
             if self.fixed_random_validation:
