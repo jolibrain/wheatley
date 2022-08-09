@@ -1,6 +1,6 @@
 import pickle
 import time
-
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
@@ -198,8 +198,14 @@ class ValidationCallback(BaseCallback):
         self.custom_makespans.append(custom_mean_makespan)
 
     def _visdom_metrics(self):
-        self.vis.text(f"<h4>Total actions: {self.model.num_timesteps}</h4>",
-                win="total_actions", opts={"height": 100})
+        commandline = " ".join(sys.argv)
+        html = f"""
+            <div style="padding: 5px">
+                <h4>Total actions: {self.model.num_timesteps}</h4>
+                <code>{commandline}</code>
+            </div>
+        """
+        self.vis.text(html, win="html", opts={"height": 120})
 
         X = list(range(len(self.makespans)))
         Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]

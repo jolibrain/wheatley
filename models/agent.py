@@ -70,7 +70,6 @@ class Agent:
         self,
         problem_description,
         training_specification,
-        logger=None
     ):
         # First setup callbacks during training
         validation_callback = ValidationCallback(
@@ -149,10 +148,6 @@ class Agent:
         # Load the vectorized environments in the existing model
         else:
             self.model.set_env(vec_env)
-
-        # Custom logger if the user asked for it
-        if logger is not None:
-            self.model.set_logger(logger)
 
         # Launching training
         self.model.learn(training_specification.total_timesteps, callback=event_callback)
