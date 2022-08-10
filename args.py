@@ -59,9 +59,10 @@ parser.add_argument(
 
 # =================================================VALIDATION SPECIFICATION=================================================
 parser.add_argument("--n_validation_env", type=int, default=20, help="Number of validation environments ")
-parser.add_argument("--fixed_validation", default=False, action="store_true", help="For each validation, use the same problems/durations sampling and the same OR-Tools solutions")
+parser.add_argument("--fixed_validation", type=int, default=0, help="Use the same problems/durations sampling/OR-Tools solutions and average N random solutions")
 parser.add_argument("--validation_freq", type=int, default=-1, help="Number of steps between each evaluation")
 parser.add_argument("--max_time_ortools", type=int, default=3, help="Max compute time for ortools (in seconds)")
+parser.add_argument("--validation_batch_size", type=int, default=0, help="Batch size for predictions of actions")
 
 # =================================================TESTING SPECIFICATION====================================================
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")

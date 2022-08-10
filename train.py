@@ -49,6 +49,7 @@ def main():
         total_timesteps=args.total_timesteps,
         n_validation_env=args.n_validation_env,
         fixed_validation=args.fixed_validation,
+        validation_batch_size=args.validation_batch_size,
         validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,

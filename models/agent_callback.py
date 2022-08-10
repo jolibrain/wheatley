@@ -25,6 +25,7 @@ class ValidationCallback(BaseCallback):
         device,
         n_validation_env,
         fixed_validation,
+        validation_batch_size,
         display_env,
         path,
         custom_name,
@@ -45,6 +46,7 @@ class ValidationCallback(BaseCallback):
 
         self.n_validation_env = n_validation_env
         self.fixed_validation = fixed_validation
+        self.validation_batch_size = validation_batch_size
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
         self.ortools_strategy = ortools_strategy
@@ -93,11 +95,17 @@ class ValidationCallback(BaseCallback):
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
 
-        # Compute OR-Tools solutions once if validations are fixed
+        # Compute OR-Tools and random solutions once if validations are fixed
         if fixed_validation:
+            print("Computing fixed validation", end="", flush=True)
             self.fixed_ortools = []
+            self.fixed_random = []
             for i in range(self.n_validation_env):
                 self.fixed_ortools.append(self._get_ortools_makespan(i))
+                makespans = [ self._get_random_makespan(i) for n in range(fixed_validation) ]
+                self.fixed_random.append(sum(makespans) / len(makespans))
+                print(".", end="", flush=True)
+            print()
 
     def _on_step(self):
         self._evaluate_agent()
@@ -127,26 +135,64 @@ class ValidationCallback(BaseCallback):
             print(f"Current ratio : {cur_ratio:.3f}")
 
     def _get_ortools_makespan(self, i):
-            return get_ortools_makespan(
-                    self.validation_envs[i].state.affectations,
-                    self.validation_envs[i].state.original_durations,
-                    self.max_time_ortools,
-                    self.scaling_constant_ortools,
-                    self.ortools_strategy,
-            )
+        return get_ortools_makespan(
+                self.validation_envs[i].state.affectations,
+                self.validation_envs[i].state.original_durations,
+                self.max_time_ortools,
+                self.scaling_constant_ortools,
+                self.ortools_strategy,
+        )
+
+    def _get_random_makespan(self, i):
+        return self .random_agent.predict(
+                self.validation_envs[i]
+                ).get_makespan()
+
+    # transform list of dicts to dict of lists
+    def _list_to_dict(self, batch_list):
+        batch_dict = {}
+        for obs in batch_list:
+            for key, value in obs.items():
+                batch_dict.setdefault(key, []).append(value)
+        return batch_dict
 
     def _evaluate_agent(self):
+        # compute the solutions in parallel if we use batch_size
+        batch_size = self.validation_batch_size
+        if batch_size:
+            envs = self.validation_envs
+            all_obs = [ env.reset(soft=self.fixed_validation) for env in envs ]
+            while envs:
+                all_masks = [ get_action_masks(env) for env in envs ]
+                all_actions = []
+                for i in range(0, len(envs), batch_size):
+                    actions, _ = self.model.predict(
+                            self._list_to_dict(all_obs[i:i+batch_size]),
+                            action_masks=all_masks[i:i+batch_size],
+                            deterministic=True)
+                    all_actions += list(actions)
+                all_obs = []
+                todo_envs = []
+                for env, action in zip(envs, all_actions):
+                    obs, reward, done, info = env.step(action)
+                    if done:
+                        continue
+                    all_obs.append(obs)
+                    todo_envs.append(env)
+                envs = todo_envs
+
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
         custom_mean_makespan = 0
         for i in range(self.n_validation_env):
-            obs = self.validation_envs[i].reset(soft=self.fixed_validation)
-            done = False
-            while not done:
-                action_masks = get_action_masks(self.validation_envs[i])
-                action, _ = self.model.predict(obs, deterministic=True, action_masks=action_masks)
-                obs, reward, done, info = self.validation_envs[i].step(action)
+            if not batch_size:
+                obs = self.validation_envs[i].reset(soft=self.fixed_validation)
+                done = False
+                while not done:
+                    action_masks = get_action_masks(self.validation_envs[i])
+                    action, _ = self.model.predict(obs, deterministic=True, action_masks=action_masks)
+                    obs, reward, done, info = self.validation_envs[i].step(action)
             solution = self.validation_envs[i].get_solution()
             schedule = solution.schedule
             makespan = solution.get_makespan()
@@ -165,14 +211,12 @@ class ValidationCallback(BaseCallback):
                 self.gantt_or_img = self.validation_envs[i].render_solution(or_tools_schedule, scaling=1.0)
             ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 
-            random_mean_makespan += (
-                np.max(
-                    self.random_agent.predict(
-                        self.validation_envs[i],
-                    ).get_makespan()
-                )
-                / self.n_validation_env
-            )
+            if self.fixed_validation:
+                random_makespan = self.fixed_random[i]
+            else:
+                random_makespan = self._get_random_makespan(i)
+            random_mean_makespan += random_makespan / self.n_validation_env
+
             if self.custom_name != "None":
                 custom_mean_makespan += (
                     np.max(

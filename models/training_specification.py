@@ -4,6 +4,7 @@ class TrainingSpecification:
         total_timesteps,
         n_validation_env,
         fixed_validation,
+        validation_batch_size,
         validation_freq,
         display_env,
         path,
@@ -16,6 +17,7 @@ class TrainingSpecification:
         self.total_timesteps = total_timesteps
         self.n_validation_env = n_validation_env
         self.fixed_validation = fixed_validation
+        self.validation_batch_size = validation_batch_size
         self.validation_freq = validation_freq
         self.display_env = display_env
         self.path = path
