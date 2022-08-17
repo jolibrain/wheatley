@@ -228,10 +228,12 @@ class State:
                 ]
                 if "machine_completion_percentage" in self.features_offset:
                     mcpof = self.features_offset["machine_completion_percentage"]
-                    self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0] : mcpof[1]] = (
+                    result = (
                         self.machine_completion_time_job_task[job_id, task_id]
                         / self.total_machine_time_job_task[job_id, task_id]
                     )
+                    result[result != result] = 0
+                    self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0] : mcpof[1]] = result
                     if self.total_machine_time_job_task[job_id, task_id][0] < 0:
                         self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0]] = -1
 
