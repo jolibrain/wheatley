@@ -59,7 +59,8 @@ parser.add_argument(
 
 # =================================================VALIDATION SPECIFICATION=================================================
 parser.add_argument("--n_validation_env", type=int, default=20, help="Number of validation environments ")
-parser.add_argument("--fixed_validation", type=int, default=0, help="Use the same problems/durations sampling/OR-Tools solutions and average N random solutions")
+parser.add_argument("--fixed_validation", action="store_true", help="Use the same problems/durations sampling and OR-Tools solutions")
+parser.add_argument("--fixed_random_validation", type=int, default=0, help="Average the random solutions over N random runs, requires --fixed_validation")
 parser.add_argument("--validation_freq", type=int, default=-1, help="Number of steps between each evaluation")
 parser.add_argument("--max_time_ortools", type=int, default=3, help="Max compute time for ortools (in seconds)")
 parser.add_argument("--validation_batch_size", type=int, default=0, help="Batch size for predictions of actions")
@@ -250,6 +251,10 @@ if args.max_n_m == -1:
     args.max_n_m = args.n_m
 elif args.max_n_m < args.n_m:
     raise Exception("Max number of machines should be higher than current number of machines")
+
+# fixed_random_validation requires fixed_validation
+if args.fixed_random_validation and not args.fixed_validation:
+    raise Exception("--fixed_random_validation requires --fixed_validation")
 
 # Sorting the features
 args.features = sorted(args.features)

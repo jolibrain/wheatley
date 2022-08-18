@@ -1,7 +1,6 @@
 import pickle
 import time
 import sys
-import matplotlib.pyplot as plt
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import safe_mean
@@ -25,6 +24,7 @@ class ValidationCallback(BaseCallback):
         device,
         n_validation_env,
         fixed_validation,
+        fixed_random_validation,
         validation_batch_size,
         display_env,
         path,
@@ -46,6 +46,7 @@ class ValidationCallback(BaseCallback):
 
         self.n_validation_env = n_validation_env
         self.fixed_validation = fixed_validation
+        self.fixed_random_validation = fixed_random_validation
         self.validation_batch_size = validation_batch_size
         self.vis = visdom.Visdom(env=display_env)
         self.path = path
@@ -88,20 +89,26 @@ class ValidationCallback(BaseCallback):
         self.fpss = []
         self.total_timestepss = []
         self.first_callback = True
-        self.figure = None
         self.gantt_rl_img = None
         self.gantt_or_img = None
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
 
-        # Compute OR-Tools and random solutions once if validations are fixed
+        # Compute OR-Tools solutions once if validations are fixed
         if fixed_validation:
-            print("Computing fixed validation", end="", flush=True)
+            print("Computing fixed OR-Tools solutions", end="", flush=True)
             self.fixed_ortools = []
-            self.fixed_random = []
             for i in range(self.n_validation_env):
                 self.fixed_ortools.append(self._get_ortools_makespan(i))
+                print(".", end="", flush=True)
+            print()
+
+        # Compute random solutions once if validations are fixed
+        if fixed_random_validation:
+            print("Computing fixed random solutions", end="", flush=True)
+            self.fixed_random = []
+            for i in range(self.n_validation_env):
                 makespans = [ self._get_random_makespan(i) for n in range(fixed_validation) ]
                 self.fixed_random.append(sum(makespans) / len(makespans))
                 print(".", end="", flush=True)
@@ -211,7 +218,7 @@ class ValidationCallback(BaseCallback):
                 self.gantt_or_img = self.validation_envs[i].render_solution(or_tools_schedule, scaling=1.0)
             ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 
-            if self.fixed_validation:
+            if self.fixed_random_validation:
                 random_makespan = self.fixed_random[i]
             else:
                 random_makespan = self._get_random_makespan(i)
@@ -249,7 +256,7 @@ class ValidationCallback(BaseCallback):
                 <code>{commandline}</code>
             </div>
         """
-        self.vis.text(html, win="html", opts={"height": 120})
+        self.vis.text(html, win="html", opts={"width": 372, "height": 336})
 
         X = list(range(len(self.makespans)))
         Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]
@@ -316,37 +323,23 @@ class ValidationCallback(BaseCallback):
         self.fpss.append(int(self.model.num_timesteps / (time.time() - self.model.start_time)))
         self.total_timestepss.append(self.model.num_timesteps)
 
-        figure, ax = plt.subplots(3, 4, figsize=(16, 12))
-        X = range(1, len(self.losses) + 1)
-
-        ax[0, 0].plot(X, self.entropy_losses)
-        ax[0, 0].set_title("entropy_loss")
-        ax[0, 1].plot(X, self.policy_gradient_losses)
-        ax[0, 1].set_title("policy_gradient_loss")
-        ax[0, 2].plot(X, self.value_losses)
-        ax[0, 2].set_title("value_loss")
-        ax[0, 3].plot(X, self.losses)
-        ax[0, 3].set_title("loss")
-        ax[1, 0].plot(X, self.approx_kls)
-        ax[1, 0].set_title("approx_kl")
-        ax[1, 1].plot(X, self.clip_fractions)
-        ax[1, 1].set_title("clip_fraction")
-        ax[1, 2].plot(X, self.explained_variances)
-        ax[1, 2].set_title("explained_variance")
-        ax[1, 3].plot(X, self.clip_ranges)
-        ax[1, 3].set_title("clip_range")
-        ax[2, 0].plot(X, self.ep_len_means)
-        ax[2, 0].set_title("ep_len_mean")
-        ax[2, 1].plot(X, self.ep_rew_means)
-        ax[2, 1].set_title("ep_rew_mean")
-        ax[2, 2].plot(X, self.fpss)
-        ax[2, 2].set_title("actions_per_second")
-        ax[2, 3].plot(X, self.total_timestepss)
-        ax[2, 3].set_title("total_timesteps")
-
-        self.vis.matplot(figure, win="training")
-        plt.close(self.figure)
-        self.figure = figure
+        charts = {
+                "entropy_loss":         self.entropy_losses,
+                "policy_gradient_loss": self.policy_gradient_losses,
+                "value_loss":           self.value_losses,
+                "loss":                 self.losses,
+                "approx_kl":            self.approx_kls,
+                "clip_fraction":        self.clip_fractions,
+                "explained_variance":   self.explained_variances,
+                "clip_range":           self.clip_ranges,
+                "ep_len_mean":          self.ep_len_means,
+                "ep_rew_mean":          self.ep_rew_means,
+                "actions_per_second":   self.fpss,
+                "total_timesteps":      self.total_timestepss,
+        }
+        X = list(range(1, len(self.losses) + 1))
+        for title, data in charts.items():
+            self.vis.line(X=X, Y=data, win=title, opts={"title": title})
 
         if self.gantt_rl_img is not None:
             self.vis.image(self.gantt_rl_img, opts={"caption": "Gantt RL schedule"}, win="rl_schedule")

@@ -79,6 +79,7 @@ class Agent:
             device=self.device,
             n_validation_env=training_specification.n_validation_env,
             fixed_validation=training_specification.fixed_validation,
+            fixed_random_validation=training_specification.fixed_random_validation,
             validation_batch_size=training_specification.validation_batch_size,
             display_env=training_specification.display_env,
             path=training_specification.path,
