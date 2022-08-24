@@ -23,8 +23,12 @@ def main():
     affectations, durations = None, None
     if args.load_problem is not None:
         args.n_j, args.n_m, affectations, durations = load_problem(
-            args.load_problem, taillard_offset=False, deterministic=(args.duration_type == "deterministic"),
-            load_max_jobs=args.load_max_jobs, generate_bounds=args.generate_duration_bounds
+            args.load_problem,
+            taillard_offset=False,
+            deterministic=(args.duration_type == "deterministic"),
+            load_from_job=args.load_from_job,
+            load_max_jobs=args.load_max_jobs,
+            generate_bounds=args.generate_duration_bounds,
         )
         args.fixed_problem = True
 
@@ -77,6 +81,7 @@ def main():
             insertion_mode=args.insertion_mode,
             max_edges_factor=args.max_edges_upper_bound_factor,
             sample_n_jobs=args.sample_n_jobs,
+            chunk_n_jobs=args.chunk_n_jobs,
         )
         env_specification.print_self()
         agent_specification = AgentSpecification(

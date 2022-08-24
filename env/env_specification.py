@@ -11,6 +11,7 @@ class EnvSpecification:
         insertion_mode,
         max_edges_factor,
         sample_n_jobs,
+        chunk_n_jobs,
     ):
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
@@ -21,6 +22,7 @@ class EnvSpecification:
         self.insertion_mode = insertion_mode
         self.max_edges_factor = max_edges_factor
         self.sample_n_jobs = sample_n_jobs
+        self.chunk_n_jobs = chunk_n_jobs
         self.add_boolean = (insertion_mode == "choose_forced_insertion") or (insertion_mode == "slot_locking")
         self.n_features = get_n_features(self.input_list, self.max_n_jobs, self.max_n_machines)
 

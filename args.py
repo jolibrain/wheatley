@@ -211,8 +211,10 @@ parser.add_argument(
 parser.add_argument(
     "--load_problem", type=str, default=None, help="Load problem in Taillard format (machine numbering starts at 0)"
 )
+parser.add_argument("--load_from_job", type=int, default=0, help="Start load at job n from problem")
 parser.add_argument("--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem")
 parser.add_argument("--sample_n_jobs", type=int, default=-1, help="Sample n jobs from problem during reset")
+parser.add_argument("--chunk_n_jobs", type=int, default=-1, help="Pick a chunk of n jobs from problem during reset")
 parser.add_argument(
     "--generate_duration_bounds",
     type=float,
@@ -252,9 +254,11 @@ if args.max_n_m == -1:
 elif args.max_n_m < args.n_m:
     raise Exception("Max number of machines should be higher than current number of machines")
 
-# fixed_random_validation requires fixed_validation
+# Incompatible options
 if args.fixed_random_validation and not args.fixed_validation:
     raise Exception("--fixed_random_validation requires --fixed_validation")
+if args.sample_n_jobs != -1 and args.chunk_n_jobs != -1:
+    raise Exception("--sample_n_jobs and --chunk_n_jobs are incompatible")
 
 # Sorting the features
 args.features = sorted(args.features)

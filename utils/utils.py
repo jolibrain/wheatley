@@ -241,7 +241,7 @@ def check_sanity(affectations, durations):
                 raise Exception("affectations and durations should not be -1 for job " + str(job) + " machine " + str(machine))
 
 
-def load_problem(problem_file, taillard_offset=False, deterministic=True, load_max_jobs=-1, generate_bounds=-1.0):
+def load_problem(problem_file, taillard_offset=False, deterministic=True, load_from_job=0, load_max_jobs=-1, generate_bounds=-1.0):
     # Customized problem loader
     # - support for bounded duration uncertainty
     # - support for unattributed machines
@@ -266,11 +266,6 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
         n_j = head_list[0]
         n_m = head_list[1]
 
-        if load_max_jobs < 0:
-            real_n_j = n_j
-        else:
-            real_n_j = load_max_jobs
-
         line = next(f)
         while line[0] == "#":
             line = next(f)
@@ -291,8 +286,6 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
             np_lines.append(np.array(dur_list))
             line = next(f)
         durations = np.stack(np_lines)
-        if load_max_jobs > 0:
-            durations = durations[:load_max_jobs]
 
         if deterministic:
             durations = np.expand_dims(durations, axis=2)
@@ -311,7 +304,7 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
                     out=durations.copy(),
                     where=durations!=-1
             )
-            real_durations = np.zeros((real_n_j, n_m)) - 1
+            real_durations = np.zeros((n_j, n_m)) - 1
             durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
             # sys.exit()
         else:
@@ -335,8 +328,6 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
                 np_lines.append(np.array(dur_list))
                 line = next(f)
             min_durations = np.stack(np_lines)
-            if load_max_jobs > 0:
-                min_durations = min_durations[:load_max_jobs]
 
             while line[0] == "#":
                 line = next(f)
@@ -356,10 +347,8 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
                 np_lines.append(np.array(dur_list))
                 line = next(f)
             max_durations = np.stack(np_lines)
-            if load_max_jobs > 0:
-                max_durations = max_durations[:load_max_jobs]
 
-            real_durations = np.zeros((real_n_j, n_m)) - 1
+            real_durations = np.zeros((n_j, n_m)) - 1
 
             durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
 
@@ -373,16 +362,21 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_m
             toffset = 0
         np_lines = []
         for j in range(n_j):
-            if load_max_jobs < 0 or len(np_lines) < load_max_jobs:
-                aff_list = [int(i) - toffset for i in line.split()]  # Taillard spec has machines id start at 1
-                while len(aff_list) < n_m:
-                    aff_list.append(-1)
-                np_lines.append(np.array(aff_list))
-                line = next(f, "")
-                if line == "":
-                    break
+            aff_list = [int(i) - toffset for i in line.split()]  # Taillard spec has machines id start at 1
+            while len(aff_list) < n_m:
+                aff_list.append(-1)
+            np_lines.append(np.array(aff_list))
+            line = next(f, "")
+            if line == "":
+                break
         affectations = np.stack(np_lines)
+
+        if load_max_jobs == -1:
+            load_max_jobs = n_j
+
+        affectations = affectations[load_from_job:load_from_job+load_max_jobs]
+        durations = durations[load_from_job:load_from_job+load_max_jobs]
 
         check_sanity(affectations, durations)
 
-        return real_n_j, n_m, affectations, durations
+        return len(affectations), n_m, affectations, durations
