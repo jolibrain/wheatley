@@ -323,6 +323,13 @@ class ValidationCallback(BaseCallback):
         self.fpss.append(int(self.model.num_timesteps / (time.time() - self.model.start_time)))
         self.total_timestepss.append(self.model.num_timesteps)
 
+        X = list(range(1, len(self.losses) + 1))
+        Y_list = [self.losses, self.value_losses, self.policy_gradient_losses, self.entropy_losses]
+        opts = {
+            "legend": ["loss", "value_loss", "policy_gradient_loss", "entropy_loss"],
+        }
+        self.vis.line(X=X, Y=np.array(Y_list).T, win="losses", opts=opts)
+
         charts = {
                 "entropy_loss":         self.entropy_losses,
                 "policy_gradient_loss": self.policy_gradient_losses,
@@ -337,7 +344,6 @@ class ValidationCallback(BaseCallback):
                 "actions_per_second":   self.fpss,
                 "total_timesteps":      self.total_timestepss,
         }
-        X = list(range(1, len(self.losses) + 1))
         for title, data in charts.items():
             self.vis.line(X=X, Y=data, win=title, opts={"title": title})
 
