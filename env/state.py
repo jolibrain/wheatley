@@ -153,7 +153,7 @@ class State:
         self.n_machines_per_job = np.array(
             [self.n_machines - (self.affectations[j] == -1).sum() for j in range(self.n_jobs)]
         )
-        self.max_duration = np.max(self.durations.flatten())
+        self.max_duration = np.max(self.original_durations.flatten())
         self.max_completion_time = torch.max(self.features[:, 1:5].flatten()).item()
 
         self.compute_pre_features()
@@ -288,12 +288,11 @@ class State:
 
     def normalize_features(self, normalize):
         if not normalize:
-            return self.features
+            return self.features.clone()
         else:
             features = self.features.clone()
-            features[:, 1:5] /= self.max_duration
+            features[:, 1:5] /= self.max_completion_time
             features[:, 1] = torch.where(features[:, 1] < 0, torch.Tensor([-1.0]), features[:, 1])
-            # if "duration" in self.features_offset:
             try:
                 dof = self.features_offset["duration"]
                 features[:, dof[0] : dof[1]] /= self.max_duration

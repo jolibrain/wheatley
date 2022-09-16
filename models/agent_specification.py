@@ -78,6 +78,10 @@ class AgentSpecification:
             self.activation_fn = torch.nn.LeakyReLU
         elif mlp_act.lower() == "tanh":
             self.activation_fn = torch.nn.Tanh
+        elif mlp_act.lower() == "elu":
+            self.activation_fn = torch.nn.ELU
+        elif mlp_act.lower() == "gelu":
+            self.activation_fn = torch.nn.GELU
         else:
             raise Exception("Activation not recognized")
 

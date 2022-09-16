@@ -28,6 +28,10 @@ class UncertainRewardModel(RewardModel):
         features_t = obs.features
         features_tp = next_obs.features
         H_st = torch.max(features_t[:, self.index]).item()
+        if H_st < 0:
+            H_st = 0
         H_stp = torch.max(features_tp[:, self.index]).item()
+        if H_stp < 0:
+            H_stp = 0
         reward = H_st - H_stp
         return reward

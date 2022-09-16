@@ -14,12 +14,14 @@ from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
 
+
 def make_proc_env(problem_description, env_specification):
     def _init():
         env = Env(problem_description, env_specification)
         return env
-        
+
     return _init
+
 
 class Agent:
     def __init__(
@@ -131,6 +133,7 @@ class Agent:
                         "max_n_nodes": env_specification.max_n_nodes,
                         "max_n_machines": env_specification.max_n_machines,
                         "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
+                        "activation_features_extractor": agent_specification.activation_fn,
                         "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
                         "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
                         "n_attention_heads": agent_specification.n_attention_heads,

@@ -1,11 +1,11 @@
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch
 import torch.nn as nn
-from torch_geometric.nn.conv import GINConv, GATv2Conv, EGConv, PDNConv
+from torch_geometric.nn.conv import GINEConv, GATv2Conv, EGConv, PDNConv
 
 from models.mlp import MLP
 from utils.agent_observation import AgentObservation
-from torch_geometric.nn.norm import GraphNorm
+from torch_geometric.nn.norm import GraphNorm, BatchNorm
 import sys
 
 
@@ -22,6 +22,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         max_n_nodes,
         max_n_machines,
         n_mlp_layers_features_extractor,
+        activation_features_extractor,
         n_layers_features_extractor,
         hidden_dim_features_extractor,
         n_attention_heads,
@@ -100,17 +101,21 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 self.normsbis.append(GraphNorm(hidden_dim_features_extractor))
 
             if self.gconv_type == "gin":
+                mlp = torch.nn.Sequential()
+                for _ in range(n_mlp_layers_features_extractor - 1):
+                    mlp.append(torch.nn.Linear(hidden_dim_features_extractor, hidden_dim_features_extractor))
+                    mlp.append(activation_features_extractor())
+                    if normalize:
+                        mlp.append(BatchNorm(hidden_dim_features_extractor))
+
+                mlp.append(torch.nn.Linear(hidden_dim_features_extractor, hidden_dim_features_extractor))
+                if normalize:
+                    mlp.append(BatchNorm(hidden_dim_features_extractor))
+
                 self.features_extractors.append(
-                    GINConv(
-                        MLP(
-                            n_layers=n_mlp_layers_features_extractor,
-                            input_dim=hidden_dim_features_extractor,
-                            hidden_dim=hidden_dim_features_extractor,
-                            output_dim=hidden_dim_features_extractor,
-                            batch_norm=False if self.freeze_graph else True,
-                            activation="relu",
-                            device=self.device,
-                        )
+                    GINEConv(
+                        mlp,
+                        edge_dim=hidden_dim_features_extractor,
                     )
                 )
 
