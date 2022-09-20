@@ -723,6 +723,8 @@ class State:
                 dict_op["Task"] = "Job {}".format(job)
                 start_sec = schedule[job][i] * scaling
                 finish_sec = all_finish[job][i]
+                start_sec += 315532800
+                finish_sec += 315532800
                 dict_op["Start"] = datetime.datetime.fromtimestamp(start_sec)
                 dict_op["Finish"] = datetime.datetime.fromtimestamp(finish_sec)
                 dict_op["Resource"] = "Machine {}".format(self.affectations[job][i])
