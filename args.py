@@ -59,8 +59,15 @@ parser.add_argument(
 
 # =================================================VALIDATION SPECIFICATION=================================================
 parser.add_argument("--n_validation_env", type=int, default=20, help="Number of validation environments ")
-parser.add_argument("--fixed_validation", action="store_true", help="Use the same problems/durations sampling and OR-Tools solutions")
-parser.add_argument("--fixed_random_validation", type=int, default=0, help="Average the random solutions over N random runs, requires --fixed_validation")
+parser.add_argument(
+    "--fixed_validation", action="store_true", help="Use the same problems/durations sampling and OR-Tools solutions"
+)
+parser.add_argument(
+    "--fixed_random_validation",
+    type=int,
+    default=0,
+    help="Average the random solutions over N random runs, requires --fixed_validation",
+)
 parser.add_argument("--validation_freq", type=int, default=-1, help="Number of steps between each evaluation")
 parser.add_argument("--max_time_ortools", type=int, default=3, help="Max compute time for ortools (in seconds)")
 parser.add_argument("--validation_batch_size", type=int, default=0, help="Batch size for predictions of actions")
@@ -81,7 +88,7 @@ parser.add_argument(
     "--gconv_type",
     type=str,
     default="gatv2",
-    choices=["gin", "gatv2", "eg", "pdn"],
+    choices=["gin", "gatv2", "pna", "dgn", "gcn2"],
     help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2",
 )
 parser.add_argument(
@@ -92,11 +99,18 @@ parser.add_argument(
     help="which pooling to use (avg , max or learn)",
 )
 parser.add_argument(
+    "--mlp_act_graph",
+    type=str,
+    default="tanh",
+    choices=["relu", "tanh", "elu", "gelu", "selu"],
+    help="agent mlp extractor activation type",
+)
+parser.add_argument(
     "--mlp_act",
     type=str,
     default="tanh",
-    choices=["relu", "tanh", "elu", "gelu"],
-    help="agent mlp extractor activation type, relu or tanh",
+    choices=["relu", "tanh", "elu", "gelu", "selu"],
+    help="agent mlp extractor activation type",
 )
 parser.add_argument(
     "--ortools_strategy",
@@ -106,6 +120,7 @@ parser.add_argument(
     help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic realistic means omiscient, "
     "ie sees the future",
 )
+parser.add_argument("--fe_type", type=str, default="pyg", help="feature extractor type in [pyg|dgl]", choices=["pyg", "dgl"])
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
@@ -116,7 +131,13 @@ parser.add_argument("--n_attention_heads", type=int, default=4, help="Dimension 
 parser.add_argument("--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN")
 parser.add_argument("--residual_gnn", action="store_true", help="use residual connection in GNN")
 parser.add_argument("--normalize_gnn", action="store_true", help="normalize gnn everywhere")
-parser.add_argument("--conflicts_edges", action="store_true", help="add edges in GNN for machine conflicts")
+parser.add_argument(
+    "--conflicts",
+    type=str,
+    help="machine conflcit encoding in [att|clique|node]",
+    default="att",
+    choices=["att", "clique", "node"],
+)
 parser.add_argument(
     "--n_mlp_layers_shared", type=int, default=0, help="Number of MLP layers in shared (excluding input and output"
 )
@@ -150,7 +171,19 @@ parser.add_argument(
     "--reward_model_config",
     type=str,
     default="L2D",
-    choices=["L2D", "Sparse", "Tassel", "Intrinsic", "realistic", "optimistic", "pessimistic", "averagistic"],
+    choices=[
+        "L2D",
+        "L2D_optimistic",
+        "L2D_pessimistic",
+        "L2D_averagistic",
+        "Sparse",
+        "Tassel",
+        "Intrinsic",
+        "realistic",
+        "optimistic",
+        "pessimistic",
+        "averagistic",
+    ],
     help="Which reward model to use, from L2D|Sparse|Tassel|Intrinsic in the deterministic case; "
     "for uncertainty (stochastic), you can use pessimistic|optimistic|realistic|averagistic|Sparse",
 )
@@ -180,12 +213,12 @@ parser.add_argument(
     type=str,
     nargs="+",
     default=[
-        # "selectable",
+        "selectable",
         "duration",
-        # "total_job_time",
-        # "total_machine_time",
-        # "job_completion_percentage",
-        # "machine_completion_percentage",
+        "total_job_time",
+        "total_machine_time",
+        "job_completion_percentage",
+        "machine_completion_percentage",
         "mopnr",
         "mwkr",
     ],

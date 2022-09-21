@@ -35,22 +35,27 @@ class MLP(nn.Module):
                     self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
                 else:
                     self.batch_norms.append(nn.BatchNorm1d(output_dim))
-        if activation == "tanh":
-            self.activation_layer = nn.Tanh()
-        elif activation == "relu":
-            self.activation_layer = nn.LeakyReLU()
-        elif activation == "elu":
-            self.activation_layer = nn.ELU()
-        elif activation == "gelu":
-            self.activation_layer = nn.GELU()
+        if type(activation) == str:
+            if activation == "tanh":
+                self.activation_layer = nn.Tanh()
+            elif activation == "relu":
+                self.activation_layer = nn.LeakyReLU()
+            elif activation == "elu":
+                self.activation_layer = nn.ELU()
+            elif activation == "gelu":
+                self.activation_layer = nn.GELU()
+            elif activation == "selu":
+                self.activation_layer = nn.SELU()
+            else:
+                raise Exception("Activation not recognized")
         else:
-            raise Exception("Activation not recognized")
+            self.activation_layer = activation()
         self.to(device)
 
     def forward(self, x):
         for layer in range(self.n_layers - 2):
             if self.batch_norm:
-                x = self.activation_layer(self.batch_norms[layer](self.layers[layer](x)))
+                x = self.batch_norms[layer](self.activation_layer(self.layers[layer](x)))
             else:
                 x = self.activation_layer(self.layers[layer](x))
         return self.layers[self.n_layers - 2](x)

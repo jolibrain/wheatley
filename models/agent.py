@@ -12,6 +12,7 @@ from env.env import Env
 from models.agent_callback import ValidationCallback
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
+from models.features_extractor_dgl import FeaturesExtractorDGL
 from problem.problem_description import ProblemDescription
 
 
@@ -104,6 +105,10 @@ class Agent:
         if self.model is None:
             env_specification = self.env_specification
             agent_specification = self.agent_specification
+            if agent_specification.fe_type == "dgl":
+                fe_type = FeaturesExtractorDGL
+            else:
+                fe_type = FeaturesExtractor
             self.model = MaskablePPO(
                 Policy,
                 vec_env,
@@ -122,7 +127,7 @@ class Agent:
                         "fe_lr": agent_specification.fe_lr,
                         "lr": agent_specification.lr,
                     },
-                    "features_extractor_class": FeaturesExtractor,
+                    "features_extractor_class": fe_type,
                     "features_extractor_kwargs": {
                         "input_dim_features_extractor": env_specification.n_features,
                         "gconv_type": agent_specification.gconv_type,
@@ -133,14 +138,15 @@ class Agent:
                         "max_n_nodes": env_specification.max_n_nodes,
                         "max_n_machines": env_specification.max_n_machines,
                         "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
-                        "activation_features_extractor": agent_specification.activation_fn,
+                        "activation_features_extractor": agent_specification.activation_fn_graph,
                         "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
                         "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
+                        "activation_features_extractor": agent_specification.activation_fn,
                         "n_attention_heads": agent_specification.n_attention_heads,
                         "reverse_adj": agent_specification.reverse_adj,
                         "residual": agent_specification.residual_gnn,
                         "normalize": agent_specification.normalize_gnn,
-                        "conflicts_edges": agent_specification.conflicts_edges,
+                        "conflicts": agent_specification.conflicts,
                     },
                     "optimizer_class": agent_specification.optimizer_class,
                     "activation_fn": agent_specification.activation_fn,

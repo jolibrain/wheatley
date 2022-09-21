@@ -22,6 +22,7 @@ class AgentSpecification:
         graph_has_relu,
         graph_pooling,
         mlp_act,
+        mlp_act_graph,
         n_workers,
         device,
         n_mlp_layers_features_extractor,
@@ -31,13 +32,14 @@ class AgentSpecification:
         reverse_adj,
         residual_gnn,
         normalize_gnn,
-        conflicts_edges,
+        conflicts,
         n_mlp_layers_shared,
         hidden_dim_shared,
         n_mlp_layers_actor,
         hidden_dim_actor,
         n_mlp_layers_critic,
         hidden_dim_critic,
+        fe_type,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -57,6 +59,7 @@ class AgentSpecification:
         self.graph_has_relu = graph_has_relu
         self.graph_pooling = graph_pooling
         self.mlp_act = mlp_act
+        self.mlp_act_graph = mlp_act_graph
         self.n_workers = n_workers
         self.device = device
         self.n_mlp_layers_features_extractor = n_mlp_layers_features_extractor
@@ -68,11 +71,12 @@ class AgentSpecification:
         self.reverse_adj = reverse_adj
         self.residual_gnn = residual_gnn
         self.normalize_gnn = normalize_gnn
-        self.conflicts_edges = conflicts_edges
+        self.conflicts = conflicts
         self.n_mlp_layers_actor = n_mlp_layers_actor
         self.hidden_dim_actor = hidden_dim_actor
         self.n_mlp_layers_critic = n_mlp_layers_critic
         self.hidden_dim_critic = hidden_dim_critic
+        self.fe_type = fe_type
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -82,6 +86,21 @@ class AgentSpecification:
             self.activation_fn = torch.nn.ELU
         elif mlp_act.lower() == "gelu":
             self.activation_fn = torch.nn.GELU
+        elif mlp_act.lower() == "selu":
+            self.activation_fn = torch.nn.SELU
+        else:
+            raise Exception("Activation not recognized")
+
+        if mlp_act_graph.lower() == "relu":
+            self.activation_fn_graph = torch.nn.LeakyReLU
+        elif mlp_act_graph.lower() == "tanh":
+            self.activation_fn_graph = torch.nn.Tanh
+        elif mlp_act_graph.lower() == "elu":
+            self.activation_fn_graph = torch.nn.ELU
+        elif mlp_act_graph.lower() == "gelu":
+            self.activation_fn_graph = torch.nn.GELU
+        elif mlp_act_graph.lower() == "selu":
+            self.activation_fn_graph = torch.nn.SELU
         else:
             raise Exception("Activation not recognized")
 
@@ -113,14 +132,15 @@ class AgentSpecification:
             f"Graph convolution type:           {self.gconv_type.upper()}\n"
             f"Add (R)eLU between graph layers:  {'Yes' if self.graph_has_relu else 'No'}\n"
             f"Graph pooling type:               {self.graph_pooling.title()}\n"
-            f"Activation function of actor:     {self.mlp_act.title()}\n"
+            f"Activation function of agent:     {self.mlp_act.title()}\n"
+            f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
             f"Net shapes:"
         )
         first_features_extractor_shape = f"{self.n_features}" + "".join(
-            [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_mlp_layers_features_extractor - 1)]
+            [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
         )
         other_features_extractor_shape = f"{self.hidden_dim_features_extractor}" + "".join(
-            [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_mlp_layers_features_extractor - 1)]
+            [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
         )
         shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
         actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"

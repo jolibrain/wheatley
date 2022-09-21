@@ -112,7 +112,7 @@ class ValidationCallback(BaseCallback):
             print("Computing fixed random solutions", end="", flush=True)
             self.fixed_random = []
             for i in range(self.n_validation_env):
-                makespans = [ self._get_random_makespan(i) for n in range(fixed_validation) ]
+                makespans = [self._get_random_makespan(i) for n in range(fixed_validation)]
                 self.fixed_random.append(sum(makespans) / len(makespans))
                 print(".", end="", flush=True)
             print()
@@ -146,17 +146,15 @@ class ValidationCallback(BaseCallback):
 
     def _get_ortools_makespan(self, i):
         return get_ortools_makespan(
-                self.validation_envs[i].state.affectations,
-                self.validation_envs[i].state.original_durations,
-                self.max_time_ortools,
-                self.scaling_constant_ortools,
-                self.ortools_strategy,
+            self.validation_envs[i].state.affectations,
+            self.validation_envs[i].state.original_durations,
+            self.max_time_ortools,
+            self.scaling_constant_ortools,
+            self.ortools_strategy,
         )
 
     def _get_random_makespan(self, i):
-        return self .random_agent.predict(
-                self.validation_envs[i]
-                ).get_makespan()
+        return self.random_agent.predict(self.validation_envs[i]).get_makespan()
 
     # transform list of dicts to dict of lists
     def _list_to_dict(self, batch_list):
@@ -167,33 +165,34 @@ class ValidationCallback(BaseCallback):
         return batch_dict
 
     def save_csv(self, name, makespan, schedule):
-            f = open(self.path + "." + name + ".csv", "w")
-            writer = csv.writer(f)
-            writer.writerow([ "makespan", makespan ])
-            writer.writerow([])
-            header = [ "" ]
-            for i in range(self.max_n_machines):
-                header.append("task " + str(i) + " start time")
-            writer.writerow(header)
-            for i in range(self.max_n_jobs):
-                line = [ "job " + str(i) ] + schedule[i].tolist()
-                writer.writerow(line)
-            f.close()
+        f = open(self.path + "." + name + ".csv", "w")
+        writer = csv.writer(f)
+        writer.writerow(["makespan", makespan])
+        writer.writerow([])
+        header = [""]
+        for i in range(self.max_n_machines):
+            header.append("task " + str(i) + " start time")
+        writer.writerow(header)
+        for i in range(self.max_n_jobs):
+            line = ["job " + str(i)] + schedule[i].tolist()
+            writer.writerow(line)
+        f.close()
 
     def _evaluate_agent(self):
         # compute the solutions in parallel if we use batch_size
         batch_size = self.validation_batch_size
         if batch_size:
             envs = self.validation_envs
-            all_obs = [ env.reset(soft=self.fixed_validation) for env in envs ]
+            all_obs = [env.reset(soft=self.fixed_validation) for env in envs]
             while envs:
-                all_masks = [ get_action_masks(env) for env in envs ]
+                all_masks = [get_action_masks(env) for env in envs]
                 all_actions = []
                 for i in range(0, len(envs), batch_size):
                     actions, _ = self.model.predict(
-                            self._list_to_dict(all_obs[i:i+batch_size]),
-                            action_masks=all_masks[i:i+batch_size],
-                            deterministic=True)
+                        self._list_to_dict(all_obs[i : i + batch_size]),
+                        action_masks=all_masks[i : i + batch_size],
+                        deterministic=True,
+                    )
                     all_actions += list(actions)
                 all_obs = []
                 todo_envs = []
@@ -306,15 +305,15 @@ class ValidationCallback(BaseCallback):
             opts2["legend"].append(self.custom_name + " / OR-tools")
             opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
-        #self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
+        # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
 
         # ratio to OR-tools
-        opts = { "title": "PPO / OR-tools" }
+        opts = {"title": "PPO / OR-tools"}
         ratio_to_ortools = np.array(self.makespans) / np.array(self.ortools_makespans)
         self.vis.line(X=X, Y=ratio_to_ortools, win="ratio_to_ortools", opts=opts)
 
         # distance to OR-tools
-        opts = { "title": "Distance to OR-tools" }
+        opts = {"title": "Distance to OR-tools"}
         dist_to_ortools = np.array(self.makespans) - np.array(self.ortools_makespans)
         self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
 
@@ -328,7 +327,7 @@ class ValidationCallback(BaseCallback):
                 wins += 1
         pct = 100 * wins / count
         self.time_to_ortools.append(pct)
-        opts = { "title": "Time to OR-tools %" }
+        opts = {"title": "Time to OR-tools %"}
         self.vis.line(X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts)
 
         if self.first_callback:
@@ -357,18 +356,18 @@ class ValidationCallback(BaseCallback):
         self.vis.line(X=X, Y=np.array(Y_list).T, win="losses", opts=opts)
 
         charts = {
-                "entropy_loss":         self.entropy_losses,
-                "policy_gradient_loss": self.policy_gradient_losses,
-                "value_loss":           self.value_losses,
-                "loss":                 self.losses,
-                "approx_kl":            self.approx_kls,
-                "clip_fraction":        self.clip_fractions,
-                "explained_variance":   self.explained_variances,
-                "clip_range":           self.clip_ranges,
-                "ep_len_mean":          self.ep_len_means,
-                "ep_rew_mean":          self.ep_rew_means,
-                "actions_per_second":   self.fpss,
-                "total_timesteps":      self.total_timestepss,
+            "entropy_loss": self.entropy_losses,
+            "policy_gradient_loss": self.policy_gradient_losses,
+            "value_loss": self.value_losses,
+            "loss": self.losses,
+            "approx_kl": self.approx_kls,
+            "clip_fraction": self.clip_fractions,
+            "explained_variance": self.explained_variances,
+            "clip_range": self.clip_ranges,
+            "ep_len_mean": self.ep_len_means,
+            "ep_rew_mean": self.ep_rew_means,
+            "actions_per_second": self.fpss,
+            "total_timesteps": self.total_timestepss,
         }
         for title, data in charts.items():
             self.vis.line(X=X, Y=data, win=title, opts={"title": title})

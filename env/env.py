@@ -8,6 +8,7 @@ from env.transition_models.l2d_transition_model import L2DTransitionModel
 from env.transition_models.slot_locking_transition_model import SlotLockingTransitionModel
 from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
 from env.reward_models.l2d_reward_model import L2DRewardModel
+from env.reward_models.l2d_estim_reward_model import L2DEstimRewardModel
 from env.reward_models.meta_reward_model import MetaRewardModel
 from env.reward_models.sparse_reward_model import SparseRewardModel
 from env.reward_models.tassel_reward_model import TasselRewardModel
@@ -146,8 +147,8 @@ class Env(gym.Env):
             return input_affectations, input_durations
         assert chunk <= self.problem_description.n_jobs
         start = np.random.randint(self.problem_description.n_jobs - chunk + 1)
-        affectations = input_affectations[start:start+chunk]
-        durations = input_durations[start:start+chunk]
+        affectations = input_affectations[start : start + chunk]
+        durations = input_durations[start : start + chunk]
         return affectations, durations
 
     def sample_jobs(self, input_affectations, input_durations):
@@ -157,8 +158,8 @@ class Env(gym.Env):
         assert sample <= self.problem_description.n_jobs
         ids = list(range(len(input_durations)))
         samples = np.random.choice(ids, sample, replace=False)
-        affectations = np.array([ input_affectations[i] for i in samples ])
-        durations = np.array([ input_durations[i] for i in samples ])
+        affectations = np.array([input_affectations[i] for i in samples])
+        durations = np.array([input_durations[i] for i in samples])
         return affectations, durations
 
     def _create_state(self):
@@ -197,6 +198,12 @@ class Env(gym.Env):
         if self.deterministic:
             if self.reward_model_config == "L2D":
                 self.reward_model = L2DRewardModel()
+            elif self.reward_model_config == "L2D_optimistic":
+                self.reward_model = L2DEstimRewardModel(estim="optimistic")
+            elif self.reward_model_config == "L2D_pessimistic":
+                self.reward_model = L2DEstimRewardModel(estim="pessimistic")
+            elif self.reward_model_config == "L2D_averagistic":
+                self.reward_model = L2DEstimRewardModel(estim="averagistic")
             elif self.reward_model_config == "Sparse":
                 self.reward_model = SparseRewardModel()
             elif self.reward_model_config == "Tassel":

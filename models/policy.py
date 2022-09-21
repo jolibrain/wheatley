@@ -6,6 +6,10 @@ import torch
 
 
 class Policy(MaskableActorCriticPolicy):
+    def extract_features(self, obs):
+        # skip preprocessing
+        return self.features_extractor(obs)
+
     def _build(self, lr_schedule):
         """
         Create the networks and the optimizer.
@@ -28,7 +32,7 @@ class Policy(MaskableActorCriticPolicy):
             module_gains = {
                 self.features_extractor: np.sqrt(2),
                 self.mlp_extractor: np.sqrt(2),
-                self.action_net: 0.01,
+                self.action_net: 1,
                 self.full_value_net: 1,
                 self.reduce_value_net: 1,
             }

@@ -22,17 +22,17 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         max_n_nodes,
         max_n_machines,
         n_mlp_layers_features_extractor,
-        activation_features_extractor,
         n_layers_features_extractor,
         hidden_dim_features_extractor,
+        activation_features_extractor,
         n_attention_heads,
         reverse_adj,
         residual=True,
         normalize=False,
-        conflicts_edges=False,
+        conflicts="att",
     ):
 
-        self.conflicts_as_clique = True
+        self.conflicts = conflicts
         self.highmem_conflict_clique = False
         self.mediummem_conflict_clique = True
         self.residual = residual
@@ -49,8 +49,8 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         self.device = device
         self.reverse_adj = reverse_adj
 
+        self.activation_fe = activation_features_extractor
         self.hidden_dim_features_extractor = hidden_dim_features_extractor
-        self.conflicts_edges = conflicts_edges
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
         self.graph_pooling = graph_pooling
@@ -62,16 +62,22 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         # precedencies 1
         # graph pooling 2
         # optional conflicts_edges   from 3 to self.max_n_machines+3 + reverse in case of node conflict
-        if self.conflicts_edges:
-            if self.conflicts_as_clique:
-                nmachineid = self.max_n_machines
-            else:
-                nmachineid = self.max_n_machines * 2
+        if self.conflicts == "clique":
+            nmachineid = self.max_n_machines
+        elif self.conflicts == "node":
+            nmachineid = self.max_n_machines * 2
+        if self.conflicts in ["clique", "node"]:
             for layer in range(self.n_layers_features_extractor):
-                self.edge_embedder.append(torch.nn.Embedding(3 + nmachineid, hidden_dim_features_extractor))
+                if self.gconv_type in ["gcn2"]:
+                    self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
+                else:
+                    self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, hidden_dim_features_extractor))
         else:
             for layer in range(self.n_layers_features_extractor):
-                self.edge_embedder.append(torch.nn.Embedding(3, hidden_dim_features_extractor))
+                if self.gconv_type in ["gcn2"]:
+                    self.edge_embedder.append(torch.nn.Embedding(5, 1))
+                else:
+                    self.edge_embedder.append(torch.nn.Embedding(5, hidden_dim_features_extractor))
 
         if self.normalize:
             self.norms = nn.ModuleList()
@@ -83,7 +89,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             hidden_dim=hidden_dim_features_extractor,
             output_dim=hidden_dim_features_extractor,
             batch_norm=False,
-            activation="elu",
+            activation=self.activation_fe,
             device=self.device,
         )
 
@@ -113,9 +119,16 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                     mlp.append(BatchNorm(hidden_dim_features_extractor))
 
                 self.features_extractors.append(
-                    GINEConv(
-                        mlp,
-                        edge_dim=hidden_dim_features_extractor,
+                    GINConv(
+                        MLP(
+                            n_layers=n_mlp_layers_features_extractor,
+                            input_dim=hidden_dim_features_extractor,
+                            hidden_dim=hidden_dim_features_extractor,
+                            output_dim=hidden_dim_features_extractor,
+                            batch_norm=False if self.freeze_graph else True,
+                            activation=self.activation_fe,
+                            device=self.device,
+                        )
                     )
                 )
 
@@ -136,7 +149,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                         hidden_dim=hidden_dim_features_extractor * n_attention_heads,
                         output_dim=hidden_dim_features_extractor,
                         batch_norm=False,
-                        activation="elu",
+                        activation=self.activation_fe,
                         device=self.device,
                     )
                 )
@@ -177,11 +190,11 @@ class FeaturesExtractor(BaseFeaturesExtractor):
         problem.
         """
         torch.set_printoptions(profile="full")
-        observation = AgentObservation.from_gym_observation(obs)
+        observation = AgentObservation.from_gym_observation(obs, False, self.conflicts, self.max_n_machines)
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()
 
-        graph_state = observation.to_torch_geometric()
+        graph_state = observation.to_graph()
         features, edge_index = graph_state.x, graph_state.edge_index
         n_batch = graph_state.num_graphs
 
@@ -224,141 +237,140 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 )
             node_offset += n_batch
 
-        if self.conflicts_edges:
+        nnodes = graph_state.x.shape[0]
+        if self.conflicts == "clique":
 
-            nnodes = graph_state.x.shape[0]
+            # add bidirectional edges in case of machine conflict in order for GNN to be able
+            # to pass messages
 
-            if self.conflicts_as_clique:
-                # add bidirectional edges in case of machine conflict in order for GNN to be able
-                # to pass messages
+            if self.highmem_conflict_clique:
 
-                if self.highmem_conflict_clique:
+                machine = features[:nnodes, 5 : 5 + self.max_n_machines]
+                mmax = torch.max(machine, dim=1)
+                machineid = torch.where(mmax[0] == 0, -1, mmax[1])
+                aff1 = features[:nnodes, 0].unsqueeze(0).expand(nnodes, nnodes)
+                aff2 = features[:nnodes, 0].unsqueeze(1).expand(nnodes, nnodes)
+                b1 = graph_state.batch.unsqueeze(0).expand(nnodes, nnodes)
+                b2 = graph_state.batch.unsqueeze(1).expand(nnodes, nnodes)
+                m1 = machineid.unsqueeze(0).expand(nnodes, nnodes)
+                # put m2 unaffected to -2 so that they unaffected task are not considered in conflict
+                m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(nnodes, nnodes)
+                # same machine and same batch
+                cond = torch.logical_and(torch.eq(m1, m2), torch.eq(b1, b2))
+                # and not both already affected
+                cond = torch.logical_and(cond, torch.logical_not(torch.logical_and(aff1, aff2)))
+                # and no self loops
+                cond = torch.logical_and(
+                    cond, torch.logical_not(torch.diag(torch.BoolTensor([True] * nnodes).to(features.device)))
+                )
+                conflicts = torch.where(cond, 1, 0).nonzero(as_tuple=True)
+                ei0new = conflicts[0]
+                ei1new = conflicts[1]
+                ceanew = machineid[ei0new] + 3
 
-                    machine = features[:nnodes, 5 : 5 + self.max_n_machines]
+                edge_index_0 = torch.cat([edge_index[0], ei0new])
+                edge_index_1 = torch.cat([edge_index[1], ei1new])
+                edge_index = torch.stack([edge_index_0, edge_index_1])
+                for layer in range(self.n_layers_features_extractor):
+                    edge_attr[layer] = torch.cat([edge_attr[layer], self.edge_embedder[layer](ceanew)])
+            elif self.mediummem_conflict_clique:
+
+                for bi in torch.arange(0, n_batch, dtype=torch.long, device=features.device):
+                    machine = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 5 : 5 + self.max_n_machines]
+                    nnodes = graph_state.ptr[bi + 1] - graph_state.ptr[bi]
+                    aff = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 0]
                     mmax = torch.max(machine, dim=1)
                     machineid = torch.where(mmax[0] == 0, -1, mmax[1])
-                    aff1 = features[:nnodes, 0].unsqueeze(0).expand(nnodes, nnodes)
-                    aff2 = features[:nnodes, 0].unsqueeze(1).expand(nnodes, nnodes)
-                    b1 = graph_state.batch.unsqueeze(0).expand(nnodes, nnodes)
-                    b2 = graph_state.batch.unsqueeze(1).expand(nnodes, nnodes)
+                    aff1 = aff.unsqueeze(0).expand(nnodes, nnodes)
+                    aff2 = aff.unsqueeze(1).expand(nnodes, nnodes)
                     m1 = machineid.unsqueeze(0).expand(nnodes, nnodes)
-                    # put m2 unaffected to -2 so that they unaffected task are not considered in conflict
                     m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(nnodes, nnodes)
-                    # same machine and same batch
-                    cond = torch.logical_and(torch.eq(m1, m2), torch.eq(b1, b2))
-                    # and not both already affected
-                    cond = torch.logical_and(cond, torch.logical_not(torch.logical_and(aff1, aff2)))
-                    # and no self loops
+                    cond = torch.logical_and(torch.eq(m1, m2), torch.logical_not(torch.logical_and(aff1, aff2)))
                     cond = torch.logical_and(
                         cond, torch.logical_not(torch.diag(torch.BoolTensor([True] * nnodes).to(features.device)))
                     )
                     conflicts = torch.where(cond, 1, 0).nonzero(as_tuple=True)
-                    ei0new = conflicts[0]
-                    ei1new = conflicts[1]
-                    ceanew = machineid[ei0new] + 3
-
+                    ei0new = conflicts[0] + graph_state.ptr[bi]
+                    ei1new = conflicts[1] + graph_state.ptr[bi]
+                    ceanew = machineid[conflicts[0]] + 3
                     edge_index_0 = torch.cat([edge_index[0], ei0new])
                     edge_index_1 = torch.cat([edge_index[1], ei1new])
                     edge_index = torch.stack([edge_index_0, edge_index_1])
                     for layer in range(self.n_layers_features_extractor):
                         edge_attr[layer] = torch.cat([edge_attr[layer], self.edge_embedder[layer](ceanew)])
-                elif self.mediummem_conflict_clique:
 
-                    for bi in torch.arange(0, n_batch, dtype=torch.long, device=features.device):
-                        machine = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 5 : 5 + self.max_n_machines]
-                        nnodes = graph_state.ptr[bi + 1] - graph_state.ptr[bi]
-                        aff = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 0]
-                        mmax = torch.max(machine, dim=1)
-                        machineid = torch.where(mmax[0] == 0, -1, mmax[1])
-                        aff1 = aff.unsqueeze(0).expand(nnodes, nnodes)
-                        aff2 = aff.unsqueeze(1).expand(nnodes, nnodes)
-                        m1 = machineid.unsqueeze(0).expand(nnodes, nnodes)
-                        m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(nnodes, nnodes)
-                        cond = torch.logical_and(torch.eq(m1, m2), torch.logical_not(torch.logical_and(aff1, aff2)))
-                        cond = torch.logical_and(
-                            cond, torch.logical_not(torch.diag(torch.BoolTensor([True] * nnodes).to(features.device)))
-                        )
-                        conflicts = torch.where(cond, 1, 0).nonzero(as_tuple=True)
-                        ei0new = conflicts[0] + graph_state.ptr[bi]
-                        ei1new = conflicts[1] + graph_state.ptr[bi]
-                        ceanew = machineid[conflicts[0]] + 3
-                        edge_index_0 = torch.cat([edge_index[0], ei0new])
-                        edge_index_1 = torch.cat([edge_index[1], ei1new])
-                        edge_index = torch.stack([edge_index_0, edge_index_1])
-                        for layer in range(self.n_layers_features_extractor):
-                            edge_attr[layer] = torch.cat([edge_attr[layer], self.edge_embedder[layer](ceanew)])
-
-                else:
-                    nnodes = graph_state.x.shape[0]
-                    ei0 = None
-                    ei1 = None
-                    cea = None
-                    featcpu = features[:nnodes].to("cpu")
-                    machinecpu = featcpu[:, 5 : 5 + self.max_n_machines]
-                    aff = featcpu[:, 0]
-                    for bi in torch.arange(0, n_batch, dtype=torch.long):
-                        for ni1 in torch.arange(graph_state.ptr[bi], graph_state.ptr[bi + 1], dtype=torch.long):
-                            machine1 = machinecpu[ni1]
-                            if torch.all(machine1 == 0):
+            else:
+                nnodes = graph_state.x.shape[0]
+                ei0 = None
+                ei1 = None
+                cea = None
+                featcpu = features[:nnodes].to("cpu")
+                machinecpu = featcpu[:, 5 : 5 + self.max_n_machines]
+                aff = featcpu[:, 0]
+                for bi in torch.arange(0, n_batch, dtype=torch.long):
+                    for ni1 in torch.arange(graph_state.ptr[bi], graph_state.ptr[bi + 1], dtype=torch.long):
+                        machine1 = machinecpu[ni1]
+                        if torch.all(machine1 == 0):
+                            continue
+                        aff1 = aff[ni1] == 1.0
+                        mid = (torch.argmax(machine1) + 3).reshape(1)
+                        ni1_ = ni1.reshape(1)
+                        for ni2 in torch.arange(ni1 + 1, graph_state.ptr[bi + 1], dtype=torch.long):
+                            machine2 = machinecpu[ni2]
+                            if torch.all(machine2 == 0):
                                 continue
-                            aff1 = aff[ni1] == 1.0
-                            mid = (torch.argmax(machine1) + 3).reshape(1)
-                            ni1_ = ni1.reshape(1)
-                            for ni2 in torch.arange(ni1 + 1, graph_state.ptr[bi + 1], dtype=torch.long):
-                                machine2 = machinecpu[ni2]
-                                if torch.all(machine2 == 0):
-                                    continue
-                                aff2 = aff[ni2] == 1.0
-                                if torch.equal(machine1, machine2) and (not (aff1 and aff2)):
-                                    ni2_ = ni2.reshape(1)
-                                    if ei0 is None:
-                                        ei0 = torch.cat([ni1_, ni2_])
-                                        ei1 = torch.cat([ni2_, ni1_])
-                                        cea = torch.cat([mid, mid])
-                                    else:
-                                        ei0 = torch.cat([ei0, ni1_, ni2_])
-                                        ei1 = torch.cat([ei1, ni2_, ni1_])
-                                        cea = torch.cat([cea, mid, mid])
+                            aff2 = aff[ni2] == 1.0
+                            if torch.equal(machine1, machine2) and (not (aff1 and aff2)):
+                                ni2_ = ni2.reshape(1)
+                                if ei0 is None:
+                                    ei0 = torch.cat([ni1_, ni2_])
+                                    ei1 = torch.cat([ni2_, ni1_])
+                                    cea = torch.cat([mid, mid])
+                                else:
+                                    ei0 = torch.cat([ei0, ni1_, ni2_])
+                                    ei1 = torch.cat([ei1, ni2_, ni1_])
+                                    cea = torch.cat([cea, mid, mid])
 
-                    if ei0 is not None:
-                        edge_index_0 = torch.cat([edge_index[0], ei0.to(features.device)])
-                        edge_index_1 = torch.cat([edge_index[1], ei1.to(features.device)])
-                        edge_index = torch.stack([edge_index_0, edge_index_1])
-                        cea = cea.to(features.device)
-                        for layer in range(self.n_layers_features_extractor):
-                            edge_attr[layer] = torch.cat(
-                                [
-                                    edge_attr[layer],
-                                    self.edge_embedder[layer](cea),
-                                ]
-                            )
+                if ei0 is not None:
+                    edge_index_0 = torch.cat([edge_index[0], ei0.to(features.device)])
+                    edge_index_1 = torch.cat([edge_index[1], ei1.to(features.device)])
+                    edge_index = torch.stack([edge_index_0, edge_index_1])
+                    cea = cea.to(features.device)
+                    for layer in range(self.n_layers_features_extractor):
+                        edge_attr[layer] = torch.cat(
+                            [
+                                edge_attr[layer],
+                                self.edge_embedder[layer](cea),
+                            ]
+                        )
 
-            else:  # 1 virtual node per machine
+        elif self.conflicts == "node":  # 1 virtual node per machine
 
-                machine = features[:nnodes, 5 : 5 + self.max_n_machines]
-                mmax = torch.max(machine, dim=1)
-                machineid = torch.where(mmax[0] == 0, -1, mmax[1])
-                machine_nodes = torch.zeros((n_batch * self.max_n_machines, features.shape[1])).to(features.device)
-                features = torch.cat([features, machine_nodes], dim=0)
+            machine = features[:nnodes, 5 : 5 + self.max_n_machines]
+            mmax = torch.max(machine, dim=1)
+            machineid = torch.where(mmax[0] == 0, -1, mmax[1])
+            machine_nodes = torch.zeros((n_batch * self.max_n_machines, features.shape[1])).to(features.device)
+            features = torch.cat([features, machine_nodes], dim=0)
 
-                if self.normalize:
-                    nbid = [[i] * self.max_n_machines for i in range(n_batch)]
-                    nbid = [x for xs in nbid for x in xs]
-                    batch_id = torch.cat([batch_id, torch.LongTensor(nbid).to(batch_id.device)])
+            if self.normalize:
+                nbid = [[i] * self.max_n_machines for i in range(n_batch)]
+                nbid = [x for xs in nbid for x in xs]
+                batch_id = torch.cat([batch_id, torch.LongTensor(nbid).to(batch_id.device)])
 
-                idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)[0]
-                machineid = machineid[idxaffected]
-                bid = graph_state.batch[idxaffected]
-                targetmachinenode = bid * self.max_n_machines + machineid + node_offset
-                edge_index_0 = torch.cat([edge_index[0], idxaffected, targetmachinenode])
-                edge_index_1 = torch.cat([edge_index[1], targetmachinenode, idxaffected])
-                edge_index = torch.stack([edge_index_0, edge_index_1])
-                machine_embeder = torch.cat([(machineid + 3), (machineid + 3 + self.max_n_machines)])
-                node_offset += n_batch * self.max_n_machines
-                for layer in range(self.n_layers_features_extractor):
-                    edge_attr[layer] = torch.cat([edge_attr[layer], self.edge_embedder[layer](machine_embeder)])
+            idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)[0]
+            machineid = machineid[idxaffected]
+            bid = graph_state.batch[idxaffected]
+            targetmachinenode = bid * self.max_n_machines + machineid + node_offset
+            edge_index_0 = torch.cat([edge_index[0], idxaffected, targetmachinenode])
+            edge_index_1 = torch.cat([edge_index[1], targetmachinenode, idxaffected])
+            edge_index = torch.stack([edge_index_0, edge_index_1])
+            machine_embeder = torch.cat([(machineid + 3), (machineid + 3 + self.max_n_machines)])
+            node_offset += n_batch * self.max_n_machines
+            for layer in range(self.n_layers_features_extractor):
+                edge_attr[layer] = torch.cat([edge_attr[layer], self.edge_embedder[layer](machine_embeder)])
 
-            features[:, 5 : 5 + self.max_n_machines] = 0
+            if self.conflicts != "att":
+                features[:, 5 : 5 + self.max_n_machines] = 0
 
         if not self.reverse_adj:
             edge_index = torch.stack([edge_index[1], edge_index[0]])

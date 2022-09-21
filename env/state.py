@@ -28,9 +28,11 @@ class State:
 
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
+
+        # no more one hot due to perf issues when adding conflcits as cliques
         self.one_hot_machine_id = np.zeros((max_n_machines, max_n_machines))
         for i in range(max_n_machines):
-            self.one_hot_machine_id[i][i] = 1
+            self.one_hot_machine_id[i][:] = i
 
         self.node_encoding = node_encoding
         assert self.node_encoding in ["L2D", "DenseL2D"]
@@ -97,13 +99,14 @@ class State:
         j, t = node_to_job_and_task(node_id, self.max_n_machines)
         self.features[node_id, 1:5] = ct.clone()
 
+    # no more one hot due to perf issues when adding conflcits as cliques
     def set_one_hot_machine_id(self):
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 machine_id = self.affectations[job_id, task_id]
                 node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
                 if machine_id == -1:
-                    self.features[node_id, 5 : 5 + self.max_n_machines] = torch.zeros(self.max_n_machines)
+                    self.features[node_id, 5 : 5 + self.max_n_machines] = torch.zeros(self.max_n_machines) - 1
                 else:
                     self.features[node_id, 5 : 5 + self.max_n_machines] = torch.as_tensor(
                         self.one_hot_machine_id[machine_id]
@@ -371,7 +374,10 @@ class State:
         predecessors = list(self.graph.predecessors(node_id))
         task_comp_time_pred = torch.stack([self.update_completion_times_from(p) for p in predecessors])
         # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
-        max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
+        # max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
+        ii = task_comp_time_pred.argmax(0)
+        max_completion_time_predecessors = task_comp_time_pred.gather(0, ii.unsqueeze(0)).squeeze(0)
+
         # For the real time, if one of the predecessors has an undefined end time, current node is also undefined
         if -1 in task_comp_time_pred:
             max_completion_time_predecessors[0] = -1
@@ -458,7 +464,9 @@ class State:
             else:
                 task_comp_time_pred = torch.stack([self.get_task_completion_times(p) for p in predecessors])
                 # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
-                max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
+                # max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
+                ii = task_comp_time_pred.argmax(0)
+                max_completion_time_predecessors = task_comp_time_pred.gather(0, ii.unsqueeze(0)).squeeze(0)
                 # For the real time, if one of the predecessors has an undefined end time, current node is also undefined
                 if -1 in task_comp_time_pred:
                     max_completion_time_predecessors[0] = -1

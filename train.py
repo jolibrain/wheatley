@@ -103,6 +103,7 @@ def main():
             graph_has_relu=args.graph_has_relu,
             graph_pooling=args.graph_pooling,
             mlp_act=args.mlp_act,
+            mlp_act_graph=args.mlp_act_graph,
             n_workers=args.n_workers,
             device=torch.device(args.device),
             n_mlp_layers_features_extractor=args.n_mlp_layers_features_extractor,
@@ -112,13 +113,14 @@ def main():
             reverse_adj=args.reverse_adj_in_gnn,
             residual_gnn=args.residual_gnn,
             normalize_gnn=args.normalize_gnn,
-            conflicts_edges=args.conflicts_edges,
+            conflicts=args.conflicts,
             n_mlp_layers_shared=args.n_mlp_layers_shared,
             hidden_dim_shared=args.hidden_dim_shared,
             n_mlp_layers_actor=args.n_mlp_layers_actor,
             hidden_dim_actor=args.hidden_dim_actor,
             n_mlp_layers_critic=args.n_mlp_layers_critic,
             hidden_dim_critic=args.hidden_dim_critic,
+            fe_type=args.fe_type,
         )
         agent_specification.print_self()
         agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
