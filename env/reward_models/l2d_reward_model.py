@@ -23,4 +23,4 @@ class L2DRewardModel(RewardModel):
             H_stp = 0
         reward = H_st - H_stp
 
-        return -reward
+        return reward
