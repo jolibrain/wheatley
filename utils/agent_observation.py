@@ -1,5 +1,6 @@
 import torch
 from torch_geometric.data import Data, Batch
+from utils.utils import put_back_one_hot_encoding_unbatched
 import dgl
 import time
 
@@ -60,9 +61,10 @@ class AgentObservation:
             n_nodes = gym_observation["n_nodes"].long()
             n_edges = gym_observation["n_edges"].long()
             features = gym_observation["features"]
-            features[:, :, 5 : 5 + max_n_machines] = torch.nn.functional.one_hot(
-                features[:, :, 5].long(), num_classes=max_n_machines
-            )
+
+            # put back one_hot encoding
+            features = put_back_one_hot_encoding_unbatched(features, max_n_machines)
+
             edge_index = gym_observation["edge_index"].long()
             # collating is much faster on cpu due to transfer of incs
             orig_device = features.device

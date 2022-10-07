@@ -236,12 +236,18 @@ def check_sanity(affectations, durations):
     for job, (affs, durs) in enumerate(zip(affectations, durations)):
         for machine, (aff, dur) in enumerate(zip(affs, durs)):
             if aff == -1 and any(x != -1 for x in dur):
-                raise Exception("affectations and durations should be only -1 for job " + str(job) + " machine " + str(machine))
+                raise Exception(
+                    "affectations and durations should be only -1 for job " + str(job) + " machine " + str(machine)
+                )
             if aff != -1 and any(x == -1 for x in dur[1:]):
-                raise Exception("affectations and durations should not be -1 for job " + str(job) + " machine " + str(machine))
+                raise Exception(
+                    "affectations and durations should not be -1 for job " + str(job) + " machine " + str(machine)
+                )
 
 
-def load_problem(problem_file, taillard_offset=False, deterministic=True, load_from_job=0, load_max_jobs=-1, generate_bounds=-1.0):
+def load_problem(
+    problem_file, taillard_offset=False, deterministic=True, load_from_job=0, load_max_jobs=-1, generate_bounds=-1.0
+):
     # Customized problem loader
     # - support for bounded duration uncertainty
     # - support for unattributed machines
@@ -293,17 +299,12 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_f
         elif generate_bounds > 0.0:
             mode_durations = durations
             min_durations = np.subtract(
-                    durations,
-                    generate_bounds * durations,
-                    out=durations.copy(),
-                    where=durations!=-1,
+                durations,
+                generate_bounds * durations,
+                out=durations.copy(),
+                where=durations != -1,
             )
-            max_durations = np.add(
-                    durations,
-                    generate_bounds * durations,
-                    out=durations.copy(),
-                    where=durations!=-1
-            )
+            max_durations = np.add(durations, generate_bounds * durations, out=durations.copy(), where=durations != -1)
             real_durations = np.zeros((n_j, n_m)) - 1
             durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
             # sys.exit()
@@ -374,9 +375,40 @@ def load_problem(problem_file, taillard_offset=False, deterministic=True, load_f
         if load_max_jobs == -1:
             load_max_jobs = n_j
 
-        affectations = affectations[load_from_job:load_from_job+load_max_jobs]
-        durations = durations[load_from_job:load_from_job+load_max_jobs]
+        affectations = affectations[load_from_job : load_from_job + load_max_jobs]
+        durations = durations[load_from_job : load_from_job + load_max_jobs]
 
         check_sanity(affectations, durations)
 
         return len(affectations), n_m, affectations, durations
+
+
+def put_back_one_hot_encoding_unbatched(
+    features,
+    max_n_machines,
+):
+    machineid = features[:, :, 5].long()
+    idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)
+    features[idxaffected][:, 5 : 5 + max_n_machines] = torch.nn.functional.one_hot(
+        features[idxaffected][:, 5].long(), num_classes=max_n_machines
+    ).float()
+
+    idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)
+    features[idxnonaffected][:, 5 : 5 + max_n_machines] = torch.zeros(len(idxnonaffected[0]), max_n_machines) - 1
+    return features
+
+
+def put_back_one_hot_encoding_batched(
+    features,
+    num_nodes,
+    max_n_machines,
+):
+    machineid = features[:num_nodes, 5].long()
+    idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)[0]
+    features[idxaffected, 5 : 5 + max_n_machines] = torch.nn.functional.one_hot(
+        features[idxaffected, 5].long(), num_classes=max_n_machines
+    ).float()
+
+    idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)[0]
+    features[idxnonaffected, 5 : 5 + max_n_machines] = torch.zeros(len(idxnonaffected), max_n_machines) - 1
+    return features

@@ -4,7 +4,10 @@ from stable_baselines3.common.callbacks import EveryNTimesteps
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from stable_baselines3.ppo import PPO
 from stable_baselines3.a2c import A2C
-from sb3_contrib.ppo_mask import MaskablePPO
+
+# from sb3_contrib.ppo_mask import MaskablePPO
+from models.maskable_ppo_custom import MaskablePPOCustom
+
 from sb3_contrib.common.maskable.utils import get_action_masks
 import torch
 
@@ -64,7 +67,7 @@ class Agent:
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
         with open(path + ".pickle", "rb") as f:
             kwargs = pickle.load(f)
-        agent = cls(env_specification=kwargs["env_specification"], model=MaskablePPO.load(path))
+        agent = cls(env_specification=kwargs["env_specification"], model=MaskablePPOCustom.load(path))
         agent.n_workers = kwargs["n_workers"]
         agent.device = kwargs["device"]
         return agent
@@ -109,7 +112,7 @@ class Agent:
                 fe_type = FeaturesExtractorDGL
             else:
                 fe_type = FeaturesExtractor
-            self.model = MaskablePPO(
+            self.model = MaskablePPOCustom(
                 Policy,
                 vec_env,
                 learning_rate=agent_specification.lr,
@@ -141,7 +144,6 @@ class Agent:
                         "activation_features_extractor": agent_specification.activation_fn_graph,
                         "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
                         "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
-                        "activation_features_extractor": agent_specification.activation_fn,
                         "n_attention_heads": agent_specification.n_attention_heads,
                         "reverse_adj": agent_specification.reverse_adj,
                         "residual": agent_specification.residual_gnn,

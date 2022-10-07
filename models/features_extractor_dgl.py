@@ -6,6 +6,7 @@ import dgl
 from dgl.nn import GINEConv, EGATConv, PNAConv, MaxPooling, AvgPooling, DGNConv, GCN2Conv
 from dgl import LaplacianPE
 from utils.agent_observation import AgentObservation
+from utils.utils import put_back_one_hot_encoding_batched
 
 
 class FeaturesExtractorDGL(BaseFeaturesExtractor):
@@ -175,7 +176,6 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
 
     def forward(self, obs):
 
-        orig_device = obs["features"].device
         observation = AgentObservation.from_gym_observation(
             obs, use_dgl=True, conflicts=self.conflicts, max_n_machines=self.max_n_machines
         )
@@ -247,7 +247,7 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                     data={"type": torch.LongTensor([5 + 2 * self.max_n_machines] * len(machinepoolindex))},
                 )
 
-        g = g.to(orig_device)
+        g = g.to(self.device)
         features = g.ndata["feat"]
 
         if self.conflicts in ["clique", "node"]:
@@ -255,17 +255,7 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
             features[:num_nodes, 5 : 5 + self.max_n_machines] = 0
         else:
             # put back one one encoding
-            machineid = features[:num_nodes, 5].long()
-            idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)[0]
-            features[idxaffected, 5 : 5 + self.max_n_machines] = (
-                torch.nn.functional.one_hot(features[:num_nodes, 5].long(), num_classes=self.max_n_machines)
-                .float()
-                .to(orig_device)
-            )
-            idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)[0]
-            features[idxnonaffected, 5 : 5 + self.max_n_machines] = (
-                torch.zeros(len(idxnonaffected), self.max_n_machines).to(orig_device) - 1
-            )
+            features = put_back_one_hot_encoding_batched(features, num_nodes, self.max_n_machines)
 
         if self.graph_pooling == "learn":
             features[poolnodes] = self.node_embedder(torch.LongTensor([0] * len(poolnodes)).to(features.device))
