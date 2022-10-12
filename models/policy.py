@@ -45,6 +45,7 @@ class Policy(MaskableActorCriticPolicy):
         ]
 
         self.optimizer = self.optimizer_class(pgroup, lr=lr_schedule(1))
+        print("optimizer", self.optimizer)
 
     def value_net(self, latent_pi):
         values = self.full_value_net(latent_pi)

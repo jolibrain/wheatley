@@ -10,10 +10,16 @@ import sys
 
 
 def get_exp_name(args):
+
     exp_name = (
         f"{args.n_j}j{args.n_m}m_{args.duration_type}_{args.seed}seed_{args.transition_model_config}_"
-        + f"{args.reward_model_config}_{args.gconv_type}_{args.graph_pooling}"
+        + f"{args.reward_model_config}_{args.fe_type}"
     )
+    if args.fe_type != "tokengt":
+        exp_name += f"_{args.gconv_type}_{args.graph_pooling}"
+    else:
+        exp_name += f"_POOL{args.layer_pooling}_DROP{args.dropout}"
+    exp_name += f"_L{args.n_layers_features_extractor}_HD{args.hidden_dim_features_extractor}_{args.n_attention_heads}heads_{args.conflicts}_LR{args.lr}"
     if args.dont_normalize_input:
         exp_name += "_DNI"
     if args.fixed_problem:
@@ -410,5 +416,17 @@ def put_back_one_hot_encoding_batched(
     ).float()
 
     idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)[0]
-    features[idxnonaffected, 5 : 5 + max_n_machines] = torch.zeros(len(idxnonaffected), max_n_machines) - 1
+    features[idxnonaffected, 5 : 5 + max_n_machines] = (
+        torch.zeros(len(idxnonaffected), max_n_machines, device=features.device) - 1
+    )
     return features
+
+
+def lr_schedule_linear(top, end, percent_warmup, x_orig):
+    x = 1 - x_orig
+    if x < percent_warmup:
+        lr = end + (top - end) * (x / percent_warmup)
+    else:
+        lr = top - (top - end) * ((x - percent_warmup) / (1 - percent_warmup))
+
+    return lr

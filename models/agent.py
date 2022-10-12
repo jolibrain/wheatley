@@ -16,7 +16,11 @@ from models.agent_callback import ValidationCallback
 from models.policy import Policy
 from models.features_extractor import FeaturesExtractor
 from models.features_extractor_dgl import FeaturesExtractorDGL
+from models.features_extractor_tokengt import FeaturesExtractorTokenGT
 from problem.problem_description import ProblemDescription
+from utils.utils import lr_schedule_linear
+
+from functools import partial
 
 
 def make_proc_env(problem_description, env_specification):
@@ -110,12 +114,60 @@ class Agent:
             agent_specification = self.agent_specification
             if agent_specification.fe_type == "dgl":
                 fe_type = FeaturesExtractorDGL
-            else:
+            elif agent_specification.fe_type == "pyg":
                 fe_type = FeaturesExtractor
+            elif agent_specification.fe_type == "tokengt":
+                fe_type = FeaturesExtractorTokenGT
+            else:
+                print("unknown fe_type: ", agent_specification.fe_type)
+
+            if agent_specification.fe_type in ["dgl", "pyg"]:
+                fe_kwargs = {
+                    "input_dim_features_extractor": env_specification.n_features,
+                    "gconv_type": agent_specification.gconv_type,
+                    "graph_pooling": agent_specification.graph_pooling,
+                    "freeze_graph": agent_specification.freeze_graph,
+                    "graph_has_relu": agent_specification.graph_has_relu,
+                    "device": agent_specification.device,
+                    "max_n_nodes": env_specification.max_n_nodes,
+                    "max_n_machines": env_specification.max_n_machines,
+                    "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
+                    "activation_features_extractor": agent_specification.activation_fn_graph,
+                    "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
+                    "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
+                    "n_attention_heads": agent_specification.n_attention_heads,
+                    "reverse_adj": agent_specification.reverse_adj,
+                    "residual": agent_specification.residual_gnn,
+                    "normalize": agent_specification.normalize_gnn,
+                    "conflicts": agent_specification.conflicts,
+                }
+            elif agent_specification.fe_type == "tokengt":
+                fe_kwargs = {
+                    "input_dim_features_extractor": env_specification.n_features,
+                    "device": agent_specification.device,
+                    "max_n_nodes": env_specification.max_n_nodes,
+                    "max_n_machines": env_specification.max_n_machines,
+                    "conflicts": agent_specification.conflicts,
+                    "encoder_layers": agent_specification.n_layers_features_extractor,
+                    "encoder_embed_dim": agent_specification.hidden_dim_features_extractor,
+                    "encoder_ffn_embed_dim": agent_specification.hidden_dim_features_extractor,
+                    "encoder_attention_heads": agent_specification.n_attention_heads,
+                    "activation_fn": agent_specification.activation_fn_graph,
+                    "lap_node_id": True,
+                    "lap_node_id_k": env_specification.max_n_nodes,
+                    "lap_node_id_sign_flip": True,
+                    "type_id": True,
+                    "transformer_flavor": agent_specification.transformer_flavor,
+                    "layer_pooling": agent_specification.layer_pooling,
+                    "dropout": agent_specification.dropout,
+                    "attention_dropout": agent_specification.dropout,
+                    "act_dropout": agent_specification.dropout,
+                }
             self.model = MaskablePPOCustom(
                 Policy,
                 vec_env,
                 learning_rate=agent_specification.lr,
+                # learning_rate=partial(lr_schedule_linear, agent_specification.lr, 1e-9, 0.1),
                 n_steps=agent_specification.n_steps_episode,
                 batch_size=agent_specification.batch_size,
                 n_epochs=agent_specification.n_epochs,
@@ -131,25 +183,7 @@ class Agent:
                         "lr": agent_specification.lr,
                     },
                     "features_extractor_class": fe_type,
-                    "features_extractor_kwargs": {
-                        "input_dim_features_extractor": env_specification.n_features,
-                        "gconv_type": agent_specification.gconv_type,
-                        "graph_pooling": agent_specification.graph_pooling,
-                        "freeze_graph": agent_specification.freeze_graph,
-                        "graph_has_relu": agent_specification.graph_has_relu,
-                        "device": agent_specification.device,
-                        "max_n_nodes": env_specification.max_n_nodes,
-                        "max_n_machines": env_specification.max_n_machines,
-                        "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
-                        "activation_features_extractor": agent_specification.activation_fn_graph,
-                        "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
-                        "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
-                        "n_attention_heads": agent_specification.n_attention_heads,
-                        "reverse_adj": agent_specification.reverse_adj,
-                        "residual": agent_specification.residual_gnn,
-                        "normalize": agent_specification.normalize_gnn,
-                        "conflicts": agent_specification.conflicts,
-                    },
+                    "features_extractor_kwargs": fe_kwargs,
                     "optimizer_class": agent_specification.optimizer_class,
                     "activation_fn": agent_specification.activation_fn,
                     "net_arch": agent_specification.net_arch,

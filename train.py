@@ -102,6 +102,7 @@ def main():
             gconv_type=args.gconv_type,
             graph_has_relu=args.graph_has_relu,
             graph_pooling=args.graph_pooling,
+            layer_pooling=args.layer_pooling,
             mlp_act=args.mlp_act,
             mlp_act_graph=args.mlp_act_graph,
             n_workers=args.n_workers,
@@ -121,6 +122,8 @@ def main():
             n_mlp_layers_critic=args.n_mlp_layers_critic,
             hidden_dim_critic=args.hidden_dim_critic,
             fe_type=args.fe_type,
+            transformer_flavor=args.transformer_flavor,
+            dropout=args.dropout,
         )
         agent_specification.print_self()
         agent = Agent(env_specification=env_specification, agent_specification=agent_specification)

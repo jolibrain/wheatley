@@ -21,6 +21,7 @@ class AgentSpecification:
         gconv_type,
         graph_has_relu,
         graph_pooling,
+        layer_pooling,
         mlp_act,
         mlp_act_graph,
         n_workers,
@@ -40,6 +41,8 @@ class AgentSpecification:
         n_mlp_layers_critic,
         hidden_dim_critic,
         fe_type,
+        transformer_flavor,
+        dropout,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -58,6 +61,7 @@ class AgentSpecification:
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
         self.graph_pooling = graph_pooling
+        self.layer_pooling = layer_pooling
         self.mlp_act = mlp_act
         self.mlp_act_graph = mlp_act_graph
         self.n_workers = n_workers
@@ -77,6 +81,8 @@ class AgentSpecification:
         self.n_mlp_layers_critic = n_mlp_layers_critic
         self.hidden_dim_critic = hidden_dim_critic
         self.fe_type = fe_type
+        self.transformer_flavor = transformer_flavor
+        self.dropout = dropout
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -91,6 +97,7 @@ class AgentSpecification:
         else:
             raise Exception("Activation not recognized")
 
+        self.mlp_act_graph = mlp_act_graph
         if mlp_act_graph.lower() == "relu":
             self.activation_fn_graph = torch.nn.LeakyReLU
         elif mlp_act_graph.lower() == "tanh":
@@ -108,6 +115,8 @@ class AgentSpecification:
             self.optimizer_class = torch.optim.Adam
         elif optimizer.lower() == "sgd":
             self.optimizer_class = torch.optim.SGD
+        elif optimizer.lower() == "adamw":
+            self.optimizer_class = torch.optim.AdamW
         else:
             raise Exception("Optimizer not recognized")
 
@@ -128,27 +137,49 @@ class AgentSpecification:
             f"Value function coefficient:       {self.vf_coef}\n"
             f"Normalize advantage:              {self.normalize_advantage}\n"
             f"Optimizer:                        {self.optimizer}\n"
-            f"Freezing graph during training:   {'Yes' if self.freeze_graph else 'No'}\n"
-            f"Graph convolution type:           {self.gconv_type.upper()}\n"
-            f"Add (R)eLU between graph layers:  {'Yes' if self.graph_has_relu else 'No'}\n"
-            f"Graph pooling type:               {self.graph_pooling.title()}\n"
-            f"Activation function of agent:     {self.mlp_act.title()}\n"
-            f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
-            f"Net shapes:"
+            f"Features extractor type:          {self.fe_type}\n"
+            f"Layer Pooling:                    {self.layer_pooling}\n"
+            f"Dropout:                          {self.dropout}\n"
         )
-        first_features_extractor_shape = f"{self.n_features}" + "".join(
-            [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
-        )
-        other_features_extractor_shape = f"{self.hidden_dim_features_extractor}" + "".join(
-            [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
-        )
-        shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
-        actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
-        critic_shape = f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
-        print(
-            f" - Features extractor: {self.gconv_type.upper()}({first_features_extractor_shape}) => "
-            + f"{self.gconv_type.upper()}({other_features_extractor_shape}) x {self.n_layers_features_extractor - 1}"
-        )
-        print(f" - Shared: {shared_shape}")
-        print(f" - Actor: {actor_shape}")
-        print(f" - Critic: {critic_shape}\n")
+        if self.fe_type == "tokengt":
+            print(f"Net shapes:")
+            shape = f"{self.n_features} -> ( {self.hidden_dim_features_extractor} / {self.n_attention_heads} ) x {self.n_layers_features_extractor}"
+
+            shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
+            actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
+            critic_shape = (
+                f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
+            )
+            print(f" - Features extractor: TokenGT/{self.mlp_act_graph} {shape}")
+            print(f" - Shared: {shared_shape}")
+            print(f" - Actor: {actor_shape}")
+            print(f" - Critic: {critic_shape}\n")
+        else:
+            print(
+                f"Convolutional FE\n"
+                f"Freezing graph during training:   {'Yes' if self.freeze_graph else 'No'}\n"
+                f"Graph convolution type:           {self.gconv_type.upper()}\n"
+                f"Add (R)eLU between graph layers:  {'Yes' if self.graph_has_relu else 'No'}\n"
+                f"Graph pooling type:               {self.graph_pooling.title()}\n"
+                f"Activation function of agent:     {self.mlp_act.title()}\n"
+                f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
+                f"Net shapes:"
+            )
+            first_features_extractor_shape = f"{self.n_features}" + "".join(
+                [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
+            )
+            other_features_extractor_shape = f"{self.hidden_dim_features_extractor}" + "".join(
+                [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
+            )
+            shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
+            actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
+            critic_shape = (
+                f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
+            )
+            print(
+                f" - Features extractor: {self.gconv_type.upper()}({first_features_extractor_shape}) => "
+                + f"{self.gconv_type.upper()}({other_features_extractor_shape}) x {self.n_layers_features_extractor - 1}"
+            )
+            print(f" - Shared: {shared_shape}")
+            print(f" - Actor: {actor_shape}")
+            print(f" - Critic: {critic_shape}\n")

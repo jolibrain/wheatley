@@ -16,7 +16,7 @@ class EnvSpecification:
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
         self.max_n_nodes = max_n_jobs * max_n_machines
-        self.max_n_edges = self.max_n_nodes ** 2
+        self.max_n_edges = self.max_n_nodes**2
         self.normalize_input = normalize_input
         self.input_list = input_list
         self.insertion_mode = insertion_mode
@@ -33,6 +33,6 @@ class EnvSpecification:
             f"Max size:                         {self.max_n_jobs} x {self.max_n_machines}\n"
             f"Input normalization:              {'Yes' if self.normalize_input else 'No'}\n"
             f"Insertion mode:                   {self.insertion_mode.lower().title().replace('_', ' ')}\n"
-            f"List of features:"
+            f"List of features:\n - Task Completion Times\n - Machine Id"
         )
         print(" - " + "\n - ".join(print_input_list) + "\n")

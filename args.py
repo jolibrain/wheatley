@@ -45,7 +45,7 @@ parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
 parser.add_argument("--lr", type=float, default=1e-3, help="Default Learning rate")
 parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
-parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd"], help="Which optimizer to use")
+parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd", "adamw"], help="Which optimizer to use")
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 parser.add_argument(
     "--custom_heuristic_name", default="None", choices=["None", "mwkr", "mopnr"], help="Which custom heuristic to run"
@@ -99,6 +99,13 @@ parser.add_argument(
     help="which pooling to use (avg , max or learn)",
 )
 parser.add_argument(
+    "--layer_pooling",
+    type=str,
+    default="all",
+    choices=["last", "all"],
+    help="use all or only last layer as node value, used only in tokengt",
+)
+parser.add_argument(
     "--mlp_act_graph",
     type=str,
     default="tanh",
@@ -112,6 +119,7 @@ parser.add_argument(
     choices=["relu", "tanh", "elu", "gelu", "selu"],
     help="agent mlp extractor activation type",
 )
+parser.add_argument("--dropout", type=float, default=0.0, help="dropout ratio")
 parser.add_argument(
     "--ortools_strategy",
     type=str,
@@ -120,7 +128,16 @@ parser.add_argument(
     help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic realistic means omiscient, "
     "ie sees the future",
 )
-parser.add_argument("--fe_type", type=str, default="pyg", help="feature extractor type in [pyg|dgl]", choices=["pyg", "dgl"])
+parser.add_argument(
+    "--fe_type", type=str, default="pyg", help="feature extractor type in [pyg|dgl]", choices=["pyg", "dgl", "tokengt"]
+)
+parser.add_argument(
+    "--transformer_flavor",
+    type=str,
+    default="vanilla",
+    help="transformer implementation for tokengt",
+    choices=["vanilla", "linear", "performer"],
+)
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
