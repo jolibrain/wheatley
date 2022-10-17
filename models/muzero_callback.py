@@ -47,28 +47,54 @@ class MuZeroCallback():
         state.pop('vis', None)
         return state
 
-    def get_ortools_trajectory(self, env):
-        ortools_makespan, ortools_schedule = get_ortools_makespan(
+    def get_ortools_schedule(self, env):
+        _, ortools_schedule = get_ortools_makespan(
             env.state.affectations,
             env.state.original_durations,
             self.max_time_ortools,
             self.scaling_constant_ortools,
             self.ortools_strategy,
         )
-        nodes_time = ortools_schedule.flatten()
+        return ortools_schedule
 
+    def get_ortools_actions(self, env, ortools_schedule):
+        nodes_time = ortools_schedule.flatten()
+        nodes_machine = env.state.affectations.flatten()
+        nodes_affected = env.state.affected.flatten()
+
+        # for each machine, get the first node time to be scheduled
+        machine_next = {}
+        for node_id, machine_id in enumerate(nodes_machine):
+            if machine_id == -1:
+                continue
+            if nodes_affected[node_id]:
+                continue
+            previous = machine_next.get(machine_id, float("inf"))
+            current = nodes_time[node_id]
+            if current < previous:
+                machine_next[machine_id] = current
+
+        # for each valid action, check if it is the minimum node time for this machine
+        mask = env.action_masks()
+        valid_actions = [ node for node, masked in enumerate(mask) if masked == True ]
+        ortools_actions = []
+        for action in valid_actions:
+            machine_id = nodes_machine[action]
+            if nodes_time[action] != machine_next[machine_id]:
+                continue
+            ortools_actions.append(action)
+
+        return ortools_actions
+
+    def get_ortools_trajectory(self, env):
+        schedule = self.get_ortools_schedule(env)
         trajectory = []
         env.reset(soft=True)
         while not env.done():
-            mask = env.action_masks()
-            actions = [ node for node, masked in enumerate(mask) if masked == True ]
-            actions_time = nodes_time[actions]
-            actions_first = np.where(actions_time == np.amin(actions_time))[0]
-            action_index = np.random.choice(actions_first)
-            action = actions[action_index]
+            actions = self.get_ortools_actions(env, schedule)
+            action = np.random.choice(actions)
             env.step(action)
             trajectory.append(action)
-
         env.reset(soft=True) # we want MuZero to apply the trajectory to the same problem
         return trajectory
 
