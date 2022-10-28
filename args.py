@@ -181,7 +181,7 @@ parser.add_argument(
     "--transition_model_config",
     type=str,
     default="L2D",
-    choices=["L2D", "SlotLocking"],
+    choices=["simple", "L2D", "SlotLocking"],
     help="Which transition model to use",
 )
 parser.add_argument(

@@ -5,6 +5,7 @@ import sys
 import traceback
 
 from env.transition_models.l2d_transition_model import L2DTransitionModel
+from env.transition_models.simple_transition_model import SimpleTransitionModel
 from env.transition_models.slot_locking_transition_model import SlotLockingTransitionModel
 from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
 from env.reward_models.l2d_reward_model import L2DRewardModel
@@ -176,7 +177,14 @@ class Env(gym.Env):
         )
 
     def _create_transition_model(self):
-        if self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
+        if self.transition_model_config == "simple":
+            self.transition_model = SimpleTransitionModel(
+                self.state.affectations,
+                self.state.durations,
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
+            )
+        elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
             self.transition_model = L2DTransitionModel(
                 self.state.affectations,
                 self.state.durations,
