@@ -162,6 +162,7 @@ class Agent:
                     "dropout": agent_specification.dropout,
                     "attention_dropout": agent_specification.dropout,
                     "act_dropout": agent_specification.dropout,
+                    "cache_lap_node_id": agent_specification.cache_lap_node_id,
                 }
             self.model = MaskablePPOCustom(
                 Policy,

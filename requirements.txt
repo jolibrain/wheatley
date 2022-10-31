@@ -14,4 +14,4 @@ plotly
 opencv-python
 sb3_contrib
 kaleido
-
+numba

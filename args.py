@@ -139,6 +139,9 @@ parser.add_argument(
     choices=["vanilla", "linear", "performer"],
 )
 parser.add_argument(
+    "--cache_lap_node_id", action="store_true", help="enable laplacian cache for tokengt"
+)
+parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
 parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=4, help="Number of MLP layers in each GNN")

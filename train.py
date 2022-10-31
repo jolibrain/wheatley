@@ -124,6 +124,7 @@ def main():
             fe_type=args.fe_type,
             transformer_flavor=args.transformer_flavor,
             dropout=args.dropout,
+            cache_lap_node_id=args.cache_lap_node_id,
         )
         agent_specification.print_self()
         agent = Agent(env_specification=env_specification, agent_specification=agent_specification)

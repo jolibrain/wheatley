@@ -43,6 +43,7 @@ class AgentSpecification:
         fe_type,
         transformer_flavor,
         dropout,
+        cache_lap_node_id,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -83,6 +84,7 @@ class AgentSpecification:
         self.fe_type = fe_type
         self.transformer_flavor = transformer_flavor
         self.dropout = dropout
+        self.cache_lap_node_id = cache_lap_node_id
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU

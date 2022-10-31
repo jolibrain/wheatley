@@ -21,7 +21,7 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
         lap_node_id_k=16,
         lap_node_id_sign_flip=False,
         lap_node_id_eig_dropout=0.0,
-        cache_lap_node_id=True,
+        cache_lap_node_id=False,
         type_id=True,
         stochastic_depth=False,
         transformer_flavor="linear",

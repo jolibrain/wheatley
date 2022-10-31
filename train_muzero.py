@@ -17,6 +17,7 @@ from muzero_general.muzero import MuZero
 from env.env import Env
 from models.features_extractor import FeaturesExtractor
 from models.features_extractor_dgl import FeaturesExtractorDGL
+from models.features_extractor_tokengt import FeaturesExtractorTokenGT
 from models.muzero_callback import MuZeroCallback
 
 
@@ -109,6 +110,7 @@ def main():
             gconv_type=args.gconv_type,
             graph_has_relu=args.graph_has_relu,
             graph_pooling=args.graph_pooling,
+            layer_pooling=args.layer_pooling,
             mlp_act=args.mlp_act,
             mlp_act_graph=args.mlp_act_graph,
             n_workers=args.n_workers,
@@ -128,6 +130,9 @@ def main():
             n_mlp_layers_critic=args.n_mlp_layers_critic,
             hidden_dim_critic=args.hidden_dim_critic,
             fe_type=args.fe_type,
+            transformer_flavor=args.transformer_flavor,
+            dropout=args.dropout,
+            cache_lap_node_id=args.cache_lap_node_id,
         )
         #agent_specification.print_self()
         #agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
@@ -151,42 +156,71 @@ def main():
     config.observation_space = env.observation_space
 
     # create a specific FeaturesExtractor for our observation_space
-    features_extractor_kwargs = {
-        "observation_space": env.observation_space,
-        "input_dim_features_extractor": env_specification.n_features,
-        "gconv_type": agent_specification.gconv_type,
-        "graph_pooling": agent_specification.graph_pooling,
-        "freeze_graph": agent_specification.freeze_graph,
-        "graph_has_relu": agent_specification.graph_has_relu,
-        "device": agent_specification.device,
-        "max_n_nodes": env_specification.max_n_nodes,
-        "max_n_machines": env_specification.max_n_machines,
-        "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
-        "activation_features_extractor": agent_specification.activation_fn_graph,
-        "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
-        "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
-        "n_attention_heads": agent_specification.n_attention_heads,
-        "reverse_adj": agent_specification.reverse_adj,
-        "residual": agent_specification.residual_gnn,
-        "normalize": agent_specification.normalize_gnn,
-        "conflicts": agent_specification.conflicts,
-    }
+    if agent_specification.fe_type in ["dgl", "pyg"]:
+        fe_kwargs = {
+            "observation_space": env.observation_space,
+            "input_dim_features_extractor": env_specification.n_features,
+            "gconv_type": agent_specification.gconv_type,
+            "graph_pooling": agent_specification.graph_pooling,
+            "freeze_graph": agent_specification.freeze_graph,
+            "graph_has_relu": agent_specification.graph_has_relu,
+            "device": agent_specification.device,
+            "max_n_nodes": env_specification.max_n_nodes,
+            "max_n_machines": env_specification.max_n_machines,
+            "n_mlp_layers_features_extractor": agent_specification.n_mlp_layers_features_extractor,
+            "activation_features_extractor": agent_specification.activation_fn_graph,
+            "n_layers_features_extractor": agent_specification.n_layers_features_extractor,
+            "hidden_dim_features_extractor": agent_specification.hidden_dim_features_extractor,
+            "n_attention_heads": agent_specification.n_attention_heads,
+            "reverse_adj": agent_specification.reverse_adj,
+            "residual": agent_specification.residual_gnn,
+            "normalize": agent_specification.normalize_gnn,
+            "conflicts": agent_specification.conflicts,
+        }
+    elif agent_specification.fe_type == "tokengt":
+        fe_kwargs = {
+            "observation_space": env.observation_space,
+            "input_dim_features_extractor": env_specification.n_features,
+            "device": agent_specification.device,
+            "max_n_nodes": env_specification.max_n_nodes,
+            "max_n_machines": env_specification.max_n_machines,
+            "conflicts": agent_specification.conflicts,
+            "encoder_layers": agent_specification.n_layers_features_extractor,
+            "encoder_embed_dim": agent_specification.hidden_dim_features_extractor,
+            "encoder_ffn_embed_dim": agent_specification.hidden_dim_features_extractor,
+            "encoder_attention_heads": agent_specification.n_attention_heads,
+            "activation_fn": agent_specification.activation_fn_graph,
+            "lap_node_id": True,
+            "lap_node_id_k": env_specification.max_n_nodes,
+            "lap_node_id_sign_flip": True,
+            "type_id": True,
+            "transformer_flavor": agent_specification.transformer_flavor,
+            "layer_pooling": agent_specification.layer_pooling,
+            "dropout": agent_specification.dropout,
+            "attention_dropout": agent_specification.dropout,
+            "act_dropout": agent_specification.dropout,
+            "cache_lap_node_id": agent_specification.cache_lap_node_id,
+        }
     if agent_specification.fe_type == "dgl":
         fe_type = FeaturesExtractorDGL
-    else:
+    elif agent_specification.fe_type == "pyg":
         fe_type = FeaturesExtractor
-    features_extractor = fe_type(**features_extractor_kwargs)
+    elif agent_specification.fe_type == "tokengt":
+        fe_type = FeaturesExtractorTokenGT
+    else:
+        print("unknown fe_type: ", agent_specification.fe_type)
+    features_extractor = fe_type(**fe_kwargs)
 
     # add the features extractor to MuZero configuration so MuZero can use it for representation
     config.features_extractor = features_extractor
-    config.observation_shape = (1, 1, features_extractor.max_n_nodes * features_extractor.features_dim)
+    config.observation_shape = (1, 1, env_specification.max_n_nodes * features_extractor.features_dim)
 
     # set config values that depend on problem size
     config.action_space = list(range(env.action_space.n))
     # unless the user set it manually
     for attribute in ['max_moves', 'num_unroll_steps', 'td_steps']:
         if getattr(config, attribute) is None:
-            setattr(config, attribute, features_extractor.max_n_nodes)
+            setattr(config, attribute, env_specification.max_n_nodes)
 
     # add our Visdom callback
     config.wheatley_callback = MuZeroCallback(
