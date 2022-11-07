@@ -6,7 +6,9 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg
 import dgl.backend as F
 import dgl
-from numba import jit
+
+# from numba import jit
+# from tinydb import Query
 
 
 def get_activation_fn(activation: str) -> Callable:
@@ -26,15 +28,15 @@ def get_activation_fn(activation: str) -> Callable:
         raise RuntimeError("--activation-fn {} not supported".format(activation))
 
 
-@jit(forceobj=True)
+# @jit(forceobj=True)
 def get_laplacian_pe_simple(g, cache=None):
 
     if cache is not None:
-        np.set_printoptions(threshold=np.inf)
         edges = g.edges()
         key = (tuple(edges[0].tolist()), tuple(edges[1].tolist()))
         if key in cache:
             return cache[key]
+
     A = g.adj(scipy_fmt="csr")  # adjacency matrix
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
     L = sparse.eye(g.num_nodes()) - N @ A @ N
@@ -42,7 +44,11 @@ def get_laplacian_pe_simple(g, cache=None):
     EigVal, EigVec = np.linalg.eigh(L.toarray())
     ret = torch.from_numpy(EigVec).float()
     if cache is not None:
-        cache[key] = ret
+        cachesize = len(cache) * ret.nelement() * ret.element_size()
+        if cachesize < 1e9:
+            cache[key] = ret
+        else:
+            cache = {}
     return ret
 
 
