@@ -119,6 +119,8 @@ class AgentSpecification:
             self.optimizer_class = torch.optim.SGD
         elif optimizer.lower() == "adamw":
             self.optimizer_class = torch.optim.AdamW
+        elif optimizer.lower() == "radam":
+            self.optimizer_class = torch.optim.RAdam
         else:
             raise Exception("Optimizer not recognized")
 

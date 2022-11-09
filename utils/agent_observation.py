@@ -59,7 +59,7 @@ class AgentObservation:
 
     @classmethod
     def add_conflicts_cliques(cls, g, features, nnodes, max_n_machines):
-        machineid = features[:, 5].long()
+        machineid = features[:, 6].long()
         m1 = machineid.unsqueeze(0).expand(nnodes, nnodes)
         # put m2 unaffected to -2 so that unaffected task are not considered in conflict
         m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(nnodes, nnodes)

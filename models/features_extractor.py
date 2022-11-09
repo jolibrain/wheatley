@@ -245,7 +245,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
 
             if self.highmem_conflict_clique:
 
-                machine = features[:nnodes, 5 : 5 + self.max_n_machines]
+                machine = features[:nnodes, 6 : 6 + self.max_n_machines]
                 mmax = torch.max(machine, dim=1)
                 machineid = torch.where(mmax[0] == 0, -1, mmax[1])
                 aff1 = features[:nnodes, 0].unsqueeze(0).expand(nnodes, nnodes)
@@ -276,7 +276,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
             elif self.mediummem_conflict_clique:
 
                 for bi in torch.arange(0, n_batch, dtype=torch.long, device=features.device):
-                    machine = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 5 : 5 + self.max_n_machines]
+                    machine = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 6 : 6 + self.max_n_machines]
                     nnodes = graph_state.ptr[bi + 1] - graph_state.ptr[bi]
                     aff = features[graph_state.ptr[bi] : graph_state.ptr[bi + 1], 0]
                     mmax = torch.max(machine, dim=1)
@@ -305,7 +305,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 ei1 = None
                 cea = None
                 featcpu = features[:nnodes].to("cpu")
-                machinecpu = featcpu[:, 5 : 5 + self.max_n_machines]
+                machinecpu = featcpu[:, 6 : 6 + self.max_n_machines]
                 aff = featcpu[:, 0]
                 for bi in torch.arange(0, n_batch, dtype=torch.long):
                     for ni1 in torch.arange(graph_state.ptr[bi], graph_state.ptr[bi + 1], dtype=torch.long):
@@ -346,7 +346,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
 
         elif self.conflicts == "node":  # 1 virtual node per machine
 
-            machine = features[:nnodes, 5 : 5 + self.max_n_machines]
+            machine = features[:nnodes, 6 : 6 + self.max_n_machines]
             mmax = torch.max(machine, dim=1)
             machineid = torch.where(mmax[0] == 0, -1, mmax[1])
             machine_nodes = torch.zeros((n_batch * self.max_n_machines, features.shape[1])).to(features.device)
@@ -370,7 +370,7 @@ class FeaturesExtractor(BaseFeaturesExtractor):
                 edge_attr[layer] = torch.cat([edge_attr[layer], self.edge_embedder[layer](machine_embeder)])
 
             if self.conflicts != "att":
-                features[:, 5 : 5 + self.max_n_machines] = 0
+                features[:, 6 : 6 + self.max_n_machines] = 0
 
         if not self.reverse_adj:
             edge_index = torch.stack([edge_index[1], edge_index[0]])

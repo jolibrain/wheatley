@@ -215,7 +215,7 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         features = g.ndata["feat"]
 
         if self.conflicts == "node":
-            machineid = features[:num_nodes, 5].long()
+            machineid = features[:num_nodes, 6].long()
             batchid = []
             for i, nn in enumerate(origbnn):
                 batchid.extend([i] * nn)
@@ -252,7 +252,7 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
 
         if self.conflicts in ["clique", "node"]:
             # remove machine id
-            features[:num_nodes, 5 : 5 + self.max_n_machines] = 0
+            features[:num_nodes, 6 : 6 + self.max_n_machines] = 0
         else:
             # put back one one encoding
             features = put_back_one_hot_encoding_batched(features, num_nodes, self.max_n_machines)

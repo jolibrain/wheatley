@@ -106,9 +106,9 @@ class State:
                 machine_id = self.affectations[job_id, task_id]
                 node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
                 if machine_id == -1:
-                    self.features[node_id, 5 : 5 + self.max_n_machines] = torch.zeros(self.max_n_machines) - 1
+                    self.features[node_id, 6 : 6 + self.max_n_machines] = torch.zeros(self.max_n_machines) - 1
                 else:
-                    self.features[node_id, 5 : 5 + self.max_n_machines] = torch.as_tensor(
+                    self.features[node_id, 6 : 6 + self.max_n_machines] = torch.as_tensor(
                         self.one_hot_machine_id[machine_id]
                     )
 
@@ -169,12 +169,11 @@ class State:
                 self.total_job_time[job_id, 0] = -1
         self.total_job_time = torch.as_tensor(self.total_job_time, dtype=torch.float)
 
-        if "selectable" in self.features_offset:
-            of = self.features_offset["selectable"]
-            self.features[:, of[0] : of[1]] = 0
-            for j in range(self.max_n_jobs):
-                if self.affectations[j, 0] != -1:
-                    self.features[job_and_task_to_node(j, 0, self.max_n_machines), of[0] : of[1]] = 1
+        of = self.features_offset["selectable"]
+        self.features[:, of[0] : of[1]] = 0
+        for j in range(self.max_n_jobs):
+            if self.affectations[j, 0] != -1:
+                self.features[job_and_task_to_node(j, 0, self.max_n_machines), of[0] : of[1]] = 1
 
         if "total_job_time" in self.features_offset:
             tjtof = self.features_offset["total_job_time"]
@@ -271,18 +270,16 @@ class State:
         self.features_offset = {}
         self.features_offset["is_affected"] = [0, 1]
         self.features_offset["tct"] = [1, 5]
-        self.features_offset["one_hot_machine_id"] = [5, 5 + self.max_n_machines]
-        n = 5 + self.max_n_machines
+        self.features_offset["selectable"] = [5, 6]
+        self.features_offset["one_hot_machine_id"] = [6, 6 + self.max_n_machines]
+        n = 6 + self.max_n_machines
         for input_name in input_list:
-            if input_name in ["is_affected", "completion_time", "one_hot_machine_id"]:
+            if input_name in ["is_affected", "completion_time", "one_hot_machine_id", "selectable"]:
                 continue  # already appended above
             if input_name == "one_hot_job_id":
                 self.features_offset[input_name] = [n, n + self.max_n_jobs]
                 n += self.max_n_jobs
             elif input_name == "mopnr":
-                self.features_offset[input_name] = [n, n + 1]
-                n += 1
-            elif input_name == "selectable":
                 self.features_offset[input_name] = [n, n + 1]
                 n += 1
             else:
@@ -637,12 +634,12 @@ class State:
                 for nid in self.node_same_job(job_id):
                     self.features[nid, of[0] : of[1]] = self.total_job_time[job_id] - self.job_completion_time[job_id]
 
-            if "selectable" in self.features_offset:
-                for successor in self.graph.successors(node_id):
-                    parents = list(self.graph.predecessors(successor)).remove(node_id)
-                    parents_affected = self.features[parents, self.features_offset["is_affected"][0]]
-                    if torch.all(parents_affected.flatten() == 1):
-                        self.features[successor, self.features_offset["selectable"][0]] = 1
+            self.features[node_id, self.features_offset["selectable"][0]] = 0
+            for successor in self.graph.successors(node_id):
+                parents = list(self.graph.predecessors(successor))
+                parents_affected = self.features[parents, self.features_offset["is_affected"][0]]
+                if torch.all(parents_affected.flatten() == 1):
+                    self.features[successor, self.features_offset["selectable"][0]] = 1
 
     def get_machine_occupancy(self, machine_id, metric):
         """
@@ -765,7 +762,7 @@ class State:
 
         print("task_completion_times\n", self.features[:, 1:5])
 
-        # print("machine id", self.features[:, 5 : 5 + self.max_n_machines])
+        # print("machine id", self.features[:, 6 : 6 + self.max_n_machines])
 
         if "duration" in self.features_offset:
             dof = self.features_offset["duration"]

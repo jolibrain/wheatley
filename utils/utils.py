@@ -44,8 +44,11 @@ def get_exp_name(args):
 def get_n_features(input_list, max_n_jobs, max_n_machines):
     if "one_hot_machine_id" in input_list:
         input_list.remove("one_hot_machine_id")
+    if "selectable" in input_list:
+        input_list.remove("selectable")
     # 4 for task completion times, 1 for is_affected, max_n_machines for mandatory one_hot_machine_id
-    n_features = 5 + max_n_machines
+    # 1 for mandatory selectable
+    n_features = 6 + max_n_machines
     # most features make 4 values
     n_features += 4 * len(input_list)
     # except one_hot_job_id
@@ -53,9 +56,6 @@ def get_n_features(input_list, max_n_jobs, max_n_machines):
         n_features += max_n_jobs - 4
     # except for mopnr
     if "mopnr" in input_list:
-        n_features -= 3
-    # except for selectable
-    if "selectable" in input_list:
         n_features -= 3
     return n_features
 
@@ -393,14 +393,14 @@ def put_back_one_hot_encoding_unbatched(
     features,
     max_n_machines,
 ):
-    machineid = features[:, :, 5].long()
+    machineid = features[:, :, 6].long()
     idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)
-    features[idxaffected][:, 5 : 5 + max_n_machines] = torch.nn.functional.one_hot(
-        features[idxaffected][:, 5].long(), num_classes=max_n_machines
+    features[idxaffected][:, 6 : 6 + max_n_machines] = torch.nn.functional.one_hot(
+        features[idxaffected][:, 6].long(), num_classes=max_n_machines
     ).float()
 
     idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)
-    features[idxnonaffected][:, 5 : 5 + max_n_machines] = torch.zeros(len(idxnonaffected[0]), max_n_machines) - 1
+    features[idxnonaffected][:, 6 : 6 + max_n_machines] = torch.zeros(len(idxnonaffected[0]), max_n_machines) - 1
     return features
 
 
@@ -409,14 +409,14 @@ def put_back_one_hot_encoding_batched(
     num_nodes,
     max_n_machines,
 ):
-    machineid = features[:num_nodes, 5].long()
+    machineid = features[:num_nodes, 6].long()
     idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)[0]
-    features[idxaffected, 5 : 5 + max_n_machines] = torch.nn.functional.one_hot(
-        features[idxaffected, 5].long(), num_classes=max_n_machines
+    features[idxaffected, 6 : 6 + max_n_machines] = torch.nn.functional.one_hot(
+        features[idxaffected, 6].long(), num_classes=max_n_machines
     ).float()
 
     idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)[0]
-    features[idxnonaffected, 5 : 5 + max_n_machines] = (
+    features[idxnonaffected, 6 : 6 + max_n_machines] = (
         torch.zeros(len(idxnonaffected), max_n_machines, device=features.device) - 1
     )
     return features

@@ -45,7 +45,9 @@ parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
 parser.add_argument("--lr", type=float, default=1e-3, help="Default Learning rate")
 parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
-parser.add_argument("--optimizer", type=str, default="adam", choices=["adam", "sgd", "adamw"], help="Which optimizer to use")
+parser.add_argument(
+    "--optimizer", type=str, default="adam", choices=["adam", "sgd", "adamw", "radam"], help="Which optimizer to use"
+)
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 parser.add_argument(
     "--custom_heuristic_name", default="None", choices=["None", "mwkr", "mopnr"], help="Which custom heuristic to run"
@@ -138,9 +140,7 @@ parser.add_argument(
     help="transformer implementation for tokengt",
     choices=["vanilla", "linear", "performer"],
 )
-parser.add_argument(
-    "--cache_lap_node_id", action="store_true", help="enable laplacian cache for tokengt"
-)
+parser.add_argument("--cache_lap_node_id", action="store_true", help="enable laplacian cache for tokengt")
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
