@@ -99,6 +99,7 @@ class Agent:
             max_time_ortools=training_specification.max_time_ortools,
             scaling_constant_ortools=training_specification.scaling_constant_ortools,
             ortools_strategy=training_specification.ortools_strategy,
+            validate_on_total_data=training_specification.validate_on_total_data,
         )
         event_callback = EveryNTimesteps(n_steps=training_specification.validation_freq, callback=validation_callback)
 

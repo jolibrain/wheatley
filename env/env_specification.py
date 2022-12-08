@@ -12,6 +12,7 @@ class EnvSpecification:
         max_edges_factor,
         sample_n_jobs,
         chunk_n_jobs,
+        observe_conflicts_as_cliques,
     ):
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
@@ -25,6 +26,7 @@ class EnvSpecification:
         self.chunk_n_jobs = chunk_n_jobs
         self.add_boolean = (insertion_mode == "choose_forced_insertion") or (insertion_mode == "slot_locking")
         self.n_features = get_n_features(self.input_list, self.max_n_jobs, self.max_n_machines)
+        self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
 
     def print_self(self):
         print_input_list = [el.lower().title().replace("_", " ") for el in self.input_list]

@@ -40,33 +40,80 @@ class Env(gym.Env):
         self.n_nodes = self.n_machines * self.n_jobs
         self.deterministic = problem_description.deterministic
 
+        self.observe_conflicts_as_cliques = env_specification.observe_conflicts_as_cliques
+
         self.n_features = get_n_features(
             self.env_specification.input_list, self.env_specification.max_n_jobs, self.env_specification.max_n_machines
         )
         self.action_space = Discrete(self.env_specification.max_n_nodes * (2 if self.env_specification.add_boolean else 1))
+
+        if self.observe_conflicts_as_cliques:
+            n_conflict_edges = (
+                self.env_specification.max_n_jobs
+                * self.env_specification.max_n_jobs
+                * (self.env_specification.max_n_machines)
+            )
+
+            shape_conflict_edges = (2, n_conflict_edges)
+
         if self.env_specification.max_edges_factor > 0:
             shape = (2, self.env_specification.max_edges_factor * self.env_specification.max_n_nodes)
         else:
             shape = (2, self.env_specification.max_n_edges)
-        self.observation_space = Dict(
-            {
-                "n_jobs": Discrete(self.env_specification.max_n_jobs + 1),
-                "n_machines": Discrete(self.env_specification.max_n_machines + 1),
-                "n_nodes": Discrete(self.env_specification.max_n_nodes + 1),
-                "n_edges": Discrete(self.env_specification.max_n_edges + 1),
-                "features": Box(
-                    low=0,
-                    high=1000 * self.env_specification.max_n_machines,
-                    shape=(self.env_specification.max_n_nodes, self.n_features),
-                ),
-                "edge_index": Box(
-                    low=0,
-                    high=self.env_specification.max_n_nodes,
-                    shape=shape,
-                    dtype=np.int64,
-                ),
-            }
-        )
+
+        if self.observe_conflicts_as_cliques:
+            self.observation_space = Dict(
+                {
+                    "n_jobs": Discrete(self.env_specification.max_n_jobs + 1),
+                    "n_machines": Discrete(self.env_specification.max_n_machines + 1),
+                    "n_nodes": Discrete(self.env_specification.max_n_nodes + 1),
+                    "n_edges": Discrete(self.env_specification.max_n_edges + 1),
+                    "features": Box(
+                        low=0,
+                        high=1000 * self.env_specification.max_n_machines,
+                        shape=(self.env_specification.max_n_nodes, self.n_features),
+                    ),
+                    "edge_index": Box(
+                        low=0,
+                        high=self.env_specification.max_n_nodes,
+                        shape=shape,
+                        dtype=np.int64,
+                    ),
+                    "n_conflict_edges": Discrete(n_conflict_edges),
+                    "conflicts_edges": Box(
+                        low=0,
+                        high=self.env_specification.max_n_nodes,
+                        shape=(2, n_conflict_edges),
+                        dtype=np.int64,
+                    ),
+                    "conflicts_edges_machineid": Box(
+                        low=0,
+                        high=self.env_specification.max_n_machines,
+                        shape=(2, n_conflict_edges),
+                        dtype=np.int64,
+                    ),
+                }
+            )
+        else:
+            self.observation_space = Dict(
+                {
+                    "n_jobs": Discrete(self.env_specification.max_n_jobs + 1),
+                    "n_machines": Discrete(self.env_specification.max_n_machines + 1),
+                    "n_nodes": Discrete(self.env_specification.max_n_nodes + 1),
+                    "n_edges": Discrete(self.env_specification.max_n_edges + 1),
+                    "features": Box(
+                        low=0,
+                        high=1000 * self.env_specification.max_n_machines,
+                        shape=(self.env_specification.max_n_nodes, self.n_features),
+                    ),
+                    "edge_index": Box(
+                        low=0,
+                        high=self.env_specification.max_n_nodes,
+                        shape=shape,
+                        dtype=np.int64,
+                    ),
+                }
+            )
 
         self.transition_model = None
         self.reward_model = None
@@ -154,11 +201,13 @@ class Env(gym.Env):
 
     def sample_jobs(self, input_affectations, input_durations):
         sample = self.env_specification.sample_n_jobs
+        self.sampled_jobs = None
         if sample == -1:
             return input_affectations, input_durations
         assert sample <= self.problem_description.n_jobs
         ids = list(range(len(input_durations)))
         samples = np.random.choice(ids, sample, replace=False)
+        self.sampled_jobs = samples
         affectations = np.array([input_affectations[i] for i in samples])
         durations = np.array([input_durations[i] for i in samples])
         return affectations, durations
@@ -174,6 +223,7 @@ class Env(gym.Env):
             self.env_specification.max_n_machines,
             self.deterministic,
             feature_list=self.env_specification.input_list,
+            observe_conflicts_as_cliques=self.observe_conflicts_as_cliques,
         )
 
     def _create_transition_model(self):
@@ -233,19 +283,39 @@ class Env(gym.Env):
                 raise Exception("Reward model not recognized")
 
     def observe(self):
-        features, edge_index = self.state.to_features_and_edge_index(
-            self.env_specification.normalize_input,
-            self.env_specification.input_list,
-        )
-        return EnvObservation(
-            self.n_jobs,
-            self.n_machines,
-            features,
-            edge_index,
-            self.env_specification.max_n_jobs,
-            self.env_specification.max_n_machines,
-            self.env_specification.max_edges_factor,
-        )
+        if self.observe_conflicts_as_cliques:
+            features, edge_index, conflicts_edges, conflicts_edges_machineid = self.state.to_features_and_edge_index(
+                self.env_specification.normalize_input,
+                self.env_specification.input_list,
+            )
+            return EnvObservation(
+                self.n_jobs,
+                self.n_machines,
+                features,
+                edge_index,
+                conflicts_edges,
+                conflicts_edges_machineid,
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
+                self.env_specification.max_edges_factor,
+            )
+
+        else:
+            features, edge_index = self.state.to_features_and_edge_index(
+                self.env_specification.normalize_input,
+                self.env_specification.input_list,
+            )
+            return EnvObservation(
+                self.n_jobs,
+                self.n_machines,
+                features,
+                edge_index,
+                None,
+                None,
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
+                self.env_specification.max_edges_factor,
+            )
 
     def done(self):
         return self.state.done()
@@ -254,4 +324,6 @@ class Env(gym.Env):
         return self.state.durations.shape[2] > 1
 
     def action_masks(self):
-        return self.transition_model.get_mask(self.state, self.env_specification.add_boolean)
+        mask = self.transition_model.get_mask(self.state, self.env_specification.add_boolean)
+        mask += [False] * (self.env_specification.max_n_jobs * self.env_specification.max_n_machines - len(mask))
+        return mask

@@ -144,7 +144,7 @@ parser.add_argument("--cache_lap_node_id", action="store_true", help="enable lap
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
-parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=4, help="Number of MLP layers in each GNN")
+parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=2, help="Number of MLP layers in each GNN")
 parser.add_argument("--n_layers_features_extractor", type=int, default=4, help="Number of layers of GNN")
 parser.add_argument("--hidden_dim_features_extractor", type=int, default=64, help="Dimension of hidden and output for GNN")
 parser.add_argument("--n_attention_heads", type=int, default=4, help="Dimension of hidden and output for GNN")
@@ -268,6 +268,12 @@ parser.add_argument("--load_from_job", type=int, default=0, help="Start load at 
 parser.add_argument("--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem")
 parser.add_argument("--sample_n_jobs", type=int, default=-1, help="Sample n jobs from problem during reset")
 parser.add_argument("--chunk_n_jobs", type=int, default=-1, help="Pick a chunk of n jobs from problem during reset")
+parser.add_argument(
+    "--validate_on_total_data",
+    default=False,
+    action="store_true",
+    help="set to do validation on total data and not on sample_n_jobs sampled jobs",
+)
 parser.add_argument(
     "--generate_duration_bounds",
     type=float,

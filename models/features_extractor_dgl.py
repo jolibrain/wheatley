@@ -250,13 +250,6 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         g = g.to(self.device)
         features = g.ndata["feat"]
 
-        if self.conflicts in ["clique", "node"]:
-            # remove machine id
-            features[:num_nodes, 6 : 6 + self.max_n_machines] = 0
-        else:
-            # put back one one encoding
-            features = put_back_one_hot_encoding_batched(features, num_nodes, self.max_n_machines)
-
         if self.graph_pooling == "learn":
             features[poolnodes] = self.node_embedder(torch.LongTensor([0] * len(poolnodes)).to(features.device))
 
@@ -321,12 +314,14 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         elif self.graph_pooling == "learn":
             graph_embedding = features[num_nodes : num_nodes + batch_size, :]
         else:
-            print("GP", self.graph_pooling)
             raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
+
+        node_features = torch.nn.functional.pad(
+            node_features, (0, 0, 0, self.max_n_nodes - node_features.shape[1]), mode="constant", value=0.0
+        )
 
         graph_embedding = graph_embedding.reshape(batch_size, 1, -1)
         # repeat the graph embedding to match the nodes embedding size
-
         repeated = graph_embedding.expand(node_features.shape)
         ret = torch.cat((node_features, repeated), dim=2)
         return ret

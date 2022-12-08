@@ -65,7 +65,7 @@ def get_ortools_makespan(
 
     state.update_completion_times_from_sinks()
 
-    tct = state.get_all_task_completion_times()[:, 0].reshape(state.max_n_jobs, state.max_n_machines, 1).squeeze_(2).numpy()
+    tct = state.get_all_task_completion_times()[:, 0].reshape(n_j, n_m, 1).squeeze_(2).numpy()
 
     makespan = torch.max(state.get_all_task_completion_times()[:, 0].flatten())
 

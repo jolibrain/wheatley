@@ -3,7 +3,6 @@ from .tokengt.tokengt_graph_encoder import init_graphormer_params, TokenGTGraphE
 import torch
 from torch.nn import LayerNorm
 from utils.agent_observation import AgentObservation
-from utils.utils import put_back_one_hot_encoding_batched
 
 
 class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
@@ -63,6 +62,7 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
             features_dim=features_dim,
         )
         self.max_n_machines = max_n_machines
+        self.max_n_nodes = max_n_nodes
         self.conflicts = conflicts
         self.device = device
         self.laplacian_pe = lap_node_id
@@ -117,7 +117,6 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
             add_self_loops=False,
             device=self.device,
             do_batch=False,
-            put_back_one_hot_encoding=False,
             compute_laplacian_pe=self.laplacian_pe,
             laplacian_pe_cache=self.laplacian_pe_cache,
             bidir=True,
@@ -140,6 +139,10 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
             # last LN does no good
             istates = [self.activation_fn()(self.lm_head_transform_weight(rep)) for rep in inner_states]
             node_rep = torch.cat(istates, dim=2)[:, 2 : max_node_num + 2, :]
+        node_rep = torch.nn.functional.pad(
+            node_rep, (0, 0, 0, self.max_n_nodes - node_rep.shape[1]), mode="constant", value=0.0
+        )
         graph_rep = graph_rep.unsqueeze(1).expand(-1, node_rep.shape[1], -1)
         ret = torch.cat([node_rep, graph_rep], dim=2)
+        # ret  =torch.nn.functional.pad(ret, (0, 0, 0, self.max_n_nodes - ret.shape[1]), mode="constant", value=0.0)
         return ret

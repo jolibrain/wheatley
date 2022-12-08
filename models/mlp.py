@@ -14,8 +14,8 @@ class MLP(nn.Module):
         device,
     ):
         super(MLP, self).__init__()
-        if n_layers < 3:
-            raise Exception("Number of layers must be >= 3")
+        if n_layers < 1:
+            raise Exception("Number of layers must be >= 1")
         self.n_layers = n_layers
         self.layers = torch.nn.ModuleList()
         self.batch_norm = batch_norm
@@ -23,18 +23,18 @@ class MLP(nn.Module):
         if self.batch_norm:
             self.batch_norms = torch.nn.ModuleList()
 
-        for i in range(self.n_layers - 1):
-            if i == 0:
-                self.layers.append(nn.Linear(input_dim, hidden_dim))
-            elif i < self.n_layers - 2:
+        if self.n_layers == 1:
+            self.layers.append(nn.Linear(input_dim, output_dim))
+        else:
+            self.layers.append(nn.Linear(input_dim, hidden_dim))
+            for i in range(self.n_layers - 2):
                 self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-            else:
-                self.layers.append(nn.Linear(hidden_dim, output_dim))
-            if self.batch_norm:
-                if i < self.n_layers - 2:
+                if self.batch_norm:
                     self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-                else:
-                    self.batch_norms.append(nn.BatchNorm1d(output_dim))
+            self.layers.append(nn.Linear(hidden_dim, output_dim))
+            if self.batch_norm:
+                self.batch_norms.append(nn.BatchNorm1d(output_dim))
+
         if type(activation) == str:
             if activation == "tanh":
                 self.activation_layer = nn.Tanh()
@@ -53,9 +53,9 @@ class MLP(nn.Module):
         self.to(device)
 
     def forward(self, x):
-        for layer in range(self.n_layers - 2):
+        for layer in range(self.n_layers - 1):
             if self.batch_norm:
                 x = self.batch_norms[layer](self.activation_layer(self.layers[layer](x)))
             else:
                 x = self.activation_layer(self.layers[layer](x))
-        return self.layers[self.n_layers - 2](x)
+        return self.layers[-1](x)

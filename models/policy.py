@@ -3,6 +3,22 @@ import numpy as np
 from sb3_contrib.ppo_mask.policies import MaskableActorCriticPolicy
 from torch import nn
 import torch
+from .mlp import MLP
+
+
+class GraphExtractor(nn.Module):
+    def __init__(self):
+        super(GraphExtractor, self).__init__()
+
+    def forward(self, features):
+        return features, features[:, 0, features.shape[2] // 2 :]
+
+    def forward_actor(self, features):
+        return features
+
+    def forward_critic(self, features):
+        # filter out node specific features
+        return features[:, 0, features.shape[2] // 2 :]
 
 
 class Policy(MaskableActorCriticPolicy):
@@ -16,11 +32,26 @@ class Policy(MaskableActorCriticPolicy):
         :param lr_schedule: Learning rate schedule
             lr_schedule(1) is the initial learning rate
         """
-        self._build_mlp_extractor()
+        self.mlp_extractor = GraphExtractor()
 
-        self.action_net = nn.Linear(self.mlp_extractor.latent_dim_pi, 1)
-        self.full_value_net = nn.Linear(self.mlp_extractor.latent_dim_vf, 1)
-        self.reduce_value_net = nn.Linear(3, 1)
+        self.action_net = MLP(
+            len(self.net_arch[0]["pi"]),
+            self.features_dim,
+            self.net_arch[0]["pi"][0],
+            1,
+            False,
+            self.activation_fn,
+            self.device,
+        )
+        self.value_net = MLP(
+            len(self.net_arch[0]["vf"]),
+            self.features_dim // 2,
+            self.net_arch[0]["vf"][0],
+            1,
+            False,
+            self.activation_fn,
+            self.device,
+        )
 
         # Init weights: use orthogonal initialization
         # with small initial weight for the output
@@ -30,11 +61,10 @@ class Policy(MaskableActorCriticPolicy):
             # features_extractor/mlp values are
             # originally from openai/baselines (default gains/init_scales).
             module_gains = {
-                self.features_extractor: np.sqrt(2),
-                self.mlp_extractor: np.sqrt(2),
+                # self.features_extractor: np.sqrt(2),
+                self.features_extractor: 1,
                 self.action_net: 1,
-                self.full_value_net: 1,
-                self.reduce_value_net: 1,
+                self.value_net: 1,
             }
             for module, gain in module_gains.items():
                 module.apply(partial(self.init_weights, gain=gain))
@@ -46,12 +76,3 @@ class Policy(MaskableActorCriticPolicy):
 
         self.optimizer = self.optimizer_class(pgroup, lr=lr_schedule(1))
         print("optimizer", self.optimizer)
-
-    def value_net(self, latent_pi):
-        values = self.full_value_net(latent_pi)
-        mini = values.min(dim=1)[0]
-        maxi = values.max(dim=1)[0]
-        mean = values.mean(dim=1)
-        mini_maxi_mean = torch.cat((mini, maxi, mean), dim=1)
-        value = self.reduce_value_net(mini_maxi_mean)
-        return value

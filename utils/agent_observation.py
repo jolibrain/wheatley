@@ -1,6 +1,5 @@
 import torch
 from torch_geometric.data import Data, Batch
-from utils.utils import put_back_one_hot_encoding_unbatched, put_back_one_hot_encoding_batched
 from models.tokengt.utils import get_laplacian_pe_simple
 import dgl
 import time
@@ -35,15 +34,9 @@ class AgentObservation:
         if bidir:
             type1 = [2] * n_edges
 
-            gnew = dgl.graph(
-                (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
-                num_nodes=nnodes,
-            )
+            gnew = dgl.graph((torch.cat([edges0, edges1]), torch.cat([edges1, edges0])), num_nodes=nnodes)
         else:
-            gnew = dgl.graph(
-                (edges0, edges1),
-                num_nodes=nnodes,
-            )
+            gnew = dgl.graph((edges0, edges1), num_nodes=nnodes)
 
         gnew.ndata["feat"] = feats
         if bidir:
@@ -56,6 +49,11 @@ class AgentObservation:
         # print("machine_one_hot", machine_one_hot)
 
         return torch.max(machine_one_hot, dim=1)
+
+    @classmethod
+    def add_conflicts_cliques2(cls, g, cedges, mid):
+        g.add_edges(cedges[0], cedges[1], data={"type": mid[0] + 5})
+        return g
 
     @classmethod
     def add_conflicts_cliques(cls, g, features, nnodes, max_n_machines):
@@ -78,7 +76,6 @@ class AgentObservation:
         max_n_machines=-1,
         add_self_loops=True,
         device=None,
-        put_back_one_hot_encoding=False,
         do_batch=True,
         compute_laplacian_pe=False,
         laplacian_pe_cache=None,
@@ -89,9 +86,6 @@ class AgentObservation:
             n_nodes = gym_observation["n_nodes"].long()
             n_edges = gym_observation["n_edges"].long()
             features = gym_observation["features"]
-
-            # put back one_hot encoding
-            features = put_back_one_hot_encoding_unbatched(features, max_n_machines)
 
             edge_index = gym_observation["edge_index"].long()
             # collating is much faster on cpu due to transfer of incs
@@ -104,10 +98,15 @@ class AgentObservation:
             return cls(graph.to(orig_device), use_dgl)
         else:
             # here again, batching on CPU...
-            n_nodes = gym_observation["n_nodes"].to(torch.device("cpu")).long()
-            n_edges = gym_observation["n_edges"].to(torch.device("cpu")).long()
-            edge_index = gym_observation["edge_index"].to(torch.device("cpu")).long()
+            n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
+            n_edges = gym_observation["n_edges"].long().to(torch.device("cpu"))
+            edge_index = gym_observation["edge_index"].long().to(torch.device("cpu"))
             orig_feat = gym_observation["features"].to(torch.device("cpu"))
+
+            if conflicts == "clique":
+                n_conflict_edges = gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
+                conflicts_edges = gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
+                conflicts_edges_machineid = gym_observation["conflicts_edges_machineid"].long().to(torch.device("cpu"))
 
             graphs = []
             if do_batch:
@@ -121,14 +120,18 @@ class AgentObservation:
                 )
 
                 if conflicts == "clique":
-                    gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
+                    gnew = AgentObservation.add_conflicts_cliques2(
+                        gnew,
+                        conflicts_edges[i, :, : n_conflict_edges[i].item()],
+                        conflicts_edges_machineid[i, :, : n_conflict_edges[i].item()],
+                    )
+                    # gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
+
                 if add_self_loops:
                     gnew = dgl.add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
                 if compute_laplacian_pe:
                     gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(gnew, laplacian_pe_cache)
                 gnew = gnew.to(device)
-                if put_back_one_hot_encoding:
-                    gnew.ndata["feat"] = put_back_one_hot_encoding_batched(gnew.ndata["feat"], None, max_n_machines)
                 graphs.append(gnew)
                 if do_batch:
                     batch_num_nodes.append(gnew.num_nodes())

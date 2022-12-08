@@ -49,6 +49,7 @@ def main():
     problem_description.print_self()
 
     # Then specify the variables used for the training
+
     training_specification = TrainingSpecification(
         total_timesteps=args.total_timesteps,
         n_validation_env=args.n_validation_env,
@@ -63,6 +64,7 @@ def main():
         max_time_ortools=args.max_time_ortools,
         scaling_constant_ortools=args.scaling_constant_ortools,
         vecenv_type=args.vecenv_type,
+        validate_on_total_data=args.validate_on_total_data,
     )
     training_specification.print_self()
 
@@ -73,6 +75,10 @@ def main():
 
     # Else, we instantiate a new Agent
     else:
+        if args.conflicts == "clique":
+            observe_clique = True
+        else:
+            observe_clique = False
         env_specification = EnvSpecification(
             max_n_jobs=args.max_n_j,
             max_n_machines=args.max_n_m,
@@ -82,6 +88,7 @@ def main():
             max_edges_factor=args.max_edges_upper_bound_factor,
             sample_n_jobs=args.sample_n_jobs,
             chunk_n_jobs=args.chunk_n_jobs,
+            observe_conflicts_as_cliques=observe_clique,
         )
         env_specification.print_self()
         agent_specification = AgentSpecification(

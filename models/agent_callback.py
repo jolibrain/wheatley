@@ -6,6 +6,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import safe_mean
 import visdom
 import csv
+import copy
 
 from env.env import Env
 from models.custom_agent import CustomAgent
@@ -35,13 +36,18 @@ class ValidationCallback(BaseCallback):
         max_time_ortools,
         scaling_constant_ortools,
         ortools_strategy="pessimistic",
+        validate_on_total_data=False,
         verbose=2,
     ):
         super(ValidationCallback, self).__init__(verbose=verbose)
 
         # Parameters
         self.problem_description = problem_description
-        self.env_specification = env_specification
+        if validate_on_total_data:
+            self.env_specification = copy.deepcopy(env_specification)
+            self.env_specification.sample_n_jobs = -1
+        else:
+            self.env_specification = env_specification
         self.n_workers = n_workers
         self.device = device
 
@@ -71,7 +77,7 @@ class ValidationCallback(BaseCallback):
             self.custom_agent = CustomAgent(self.max_n_jobs, self.max_n_machines, custom_name.lower())
 
         # Inner variables
-        self.validation_envs = [Env(problem_description, env_specification) for _ in range(self.n_validation_env)]
+        self.validation_envs = [Env(self.problem_description, self.env_specification) for _ in range(self.n_validation_env)]
         self.makespan_ratio = 1000
         self.makespans = []
         self.ortools_makespans = []
@@ -164,16 +170,18 @@ class ValidationCallback(BaseCallback):
                 batch_dict.setdefault(key, []).append(value)
         return batch_dict
 
-    def save_csv(self, name, makespan, schedule):
+    def save_csv(self, name, makespan, schedule, sampled_jobs):
         f = open(self.path + "." + name + ".csv", "w")
         writer = csv.writer(f)
+        if sampled_jobs is not None:
+            writer.writerow(["sampled jobs", sampled_jobs])
         writer.writerow(["makespan", makespan])
         writer.writerow([])
         header = [""]
         for i in range(self.max_n_machines):
             header.append("task " + str(i) + " start time")
         writer.writerow(header)
-        for i in range(self.max_n_jobs):
+        for i in range(schedule.shape[0]):
             line = ["job " + str(i)] + schedule[i].tolist()
             writer.writerow(line)
         f.close()
@@ -225,7 +233,7 @@ class ValidationCallback(BaseCallback):
 
             if makespan < self.best_makespan_wheatley:
                 self.best_makespan_wheatley = makespan
-                self.save_csv("wheatley", makespan, schedule)
+                self.save_csv("wheatley", makespan, schedule, self.validation_envs[i].sampled_jobs)
 
             mean_makespan += makespan / self.n_validation_env
 
@@ -239,7 +247,7 @@ class ValidationCallback(BaseCallback):
 
             if or_tools_makespan < self.best_makespan_ortools:
                 self.best_makespan_ortools = or_tools_makespan
-                self.save_csv("ortools", or_tools_makespan.item(), or_tools_schedule)
+                self.save_csv("ortools", or_tools_makespan.item(), or_tools_schedule, self.validation_envs[i].sampled_jobs)
 
             ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 

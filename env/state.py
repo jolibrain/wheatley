@@ -18,21 +18,33 @@ from utils.utils import node_to_job_and_task, job_and_task_to_node, get_n_featur
 
 class State:
     def __init__(
-        self, affectations, durations, max_n_jobs, max_n_machines, deterministic=True, node_encoding="L2D", feature_list=[]
+        self,
+        affectations,
+        durations,
+        max_n_jobs,
+        max_n_machines,
+        deterministic=True,
+        node_encoding="L2D",
+        feature_list=[],
+        observe_conflicts_as_cliques=False,
     ):
         self.affectations = affectations
         self.original_durations = durations.copy()
         self.n_jobs = self.affectations.shape[0]
         self.n_machines = self.affectations.shape[1]
         self.n_nodes = self.n_jobs * self.n_machines
+        self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
 
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
 
         # no more one hot due to perf issues when adding conflcits as cliques
+        self.not_one_hot_machine_id = np.zeros((max_n_machines, max_n_machines))
+        for i in range(max_n_machines):
+            self.not_one_hot_machine_id[i][:] = i
         self.one_hot_machine_id = np.zeros((max_n_machines, max_n_machines))
         for i in range(max_n_machines):
-            self.one_hot_machine_id[i][:] = i
+            self.one_hot_machine_id[i][i] = 1
 
         self.node_encoding = node_encoding
         assert self.node_encoding in ["L2D", "DenseL2D"]
@@ -65,6 +77,16 @@ class State:
         self.job_completion_time = None
         self.machine_completion_time = None
 
+        if self.observe_conflicts_as_cliques:
+            self.set_not_one_hot_machine_id()
+            self.compute_conflicts_cliques()
+        self.set_one_hot_machine_id()
+        self.n_jobs_per_machine = np.array([(self.affectations == m).sum() for m in range(self.n_machines)])
+        self.n_machines_per_job = np.array(
+            [self.n_machines - (self.affectations[j] == -1).sum() for j in range(self.n_jobs)]
+        )
+        self.max_duration = np.max(self.original_durations.flatten())
+
         self.reset()
 
     def reset_is_affected(self):
@@ -79,7 +101,7 @@ class State:
         self.affected[node_to_job_and_task(node_id, self.max_n_machines)] = 1
 
     def set_all_task_completion_times(self, tct):
-        self.features[:, 1:5] = torch.as_tensor(tct).reshape((self.max_n_jobs * self.max_n_machines, -1))
+        self.features[:, 1:5] = torch.as_tensor(tct).reshape((self.n_jobs * self.n_machines, -1))
 
     def reset_task_completion_times(self):
         tct = np.cumsum(np.where(self.original_durations < 0, 0, self.original_durations), axis=1)
@@ -87,7 +109,7 @@ class State:
             tct[:, :, 0] = -1
         else:
             tct[:, :, 0] = np.where(self.durations[:, :, 0] == -1, -1, tct[:, :, 0])
-        self.features[:, 1:5] = torch.as_tensor(tct).clone().reshape((self.max_n_jobs * self.max_n_machines, -1))
+        self.features[:, 1:5] = torch.as_tensor(tct).clone().reshape((self.n_jobs * self.n_machines, -1))
 
     def get_task_completion_times(self, node_id):
         return self.features[node_id, 1:5]
@@ -100,13 +122,25 @@ class State:
         self.features[node_id, 1:5] = ct.clone()
 
     # no more one hot due to perf issues when adding conflcits as cliques
-    def set_one_hot_machine_id(self):
+    def set_not_one_hot_machine_id(self):
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 machine_id = self.affectations[job_id, task_id]
                 node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
                 if machine_id == -1:
                     self.features[node_id, 6 : 6 + self.max_n_machines] = torch.zeros(self.max_n_machines) - 1
+                else:
+                    self.features[node_id, 6 : 6 + self.max_n_machines] = torch.as_tensor(
+                        self.not_one_hot_machine_id[machine_id]
+                    )
+
+    def set_one_hot_machine_id(self):
+        for job_id in range(self.n_jobs):
+            for task_id in range(self.n_machines):
+                machine_id = self.affectations[job_id, task_id]
+                node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
+                if machine_id == -1:
+                    self.features[node_id, 6 : 6 + self.max_n_machines] = torch.zeros(self.max_n_machines)
                 else:
                     self.features[node_id, 6 : 6 + self.max_n_machines] = torch.as_tensor(
                         self.one_hot_machine_id[machine_id]
@@ -149,17 +183,21 @@ class State:
         self.reset_durations()
         self.reset_task_completion_times()
         self.reset_is_affected()
-        self.set_one_hot_machine_id()
 
         self.is_observed = np.zeros_like(self.affectations)
-        self.n_jobs_per_machine = np.array([(self.affectations == m).sum() for m in range(self.n_machines)])
-        self.n_machines_per_job = np.array(
-            [self.n_machines - (self.affectations[j] == -1).sum() for j in range(self.n_jobs)]
-        )
-        self.max_duration = np.max(self.original_durations.flatten())
         self.max_completion_time = torch.max(self.features[:, 1:5].flatten()).item()
 
         self.compute_pre_features()
+
+    def compute_conflicts_cliques(self):
+        machineid = self.features[:, 6].long()
+        m1 = machineid.unsqueeze(0).expand(self.n_nodes, self.n_nodes)
+        # put m2 unaffected to -2 so that unaffected task are not considered in conflict
+        m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(self.n_nodes, self.n_nodes)
+        cond = torch.logical_and(torch.eq(m1, m2), torch.logical_not(torch.diag(torch.BoolTensor([True] * self.n_nodes))))
+        self.conflicts_edges = torch.where(cond, 1, 0).nonzero(as_tuple=True)
+        self.conflicts_edges_machineid = machineid[self.conflicts_edges[0]]
+        self.conflicts_edges = torch.stack(self.conflicts_edges)
 
     def compute_pre_features(self):
 
@@ -171,14 +209,14 @@ class State:
 
         of = self.features_offset["selectable"]
         self.features[:, of[0] : of[1]] = 0
-        for j in range(self.max_n_jobs):
+        for j in range(self.n_jobs):
             if self.affectations[j, 0] != -1:
                 self.features[job_and_task_to_node(j, 0, self.max_n_machines), of[0] : of[1]] = 1
 
         if "total_job_time" in self.features_offset:
             tjtof = self.features_offset["total_job_time"]
-            bc = np.broadcast_to(self.total_job_time[:, None, :], (self.max_n_jobs, self.max_n_machines, 4)).reshape(
-                (self.max_n_jobs * self.max_n_machines, 4)
+            bc = np.broadcast_to(self.total_job_time[:, None, :], (self.n_jobs, self.max_n_machines, 4)).reshape(
+                (self.n_jobs * self.max_n_machines, 4)
             )
             self.features[:, tjtof[0] : tjtof[1]] = torch.as_tensor(bc)
 
@@ -215,8 +253,8 @@ class State:
             jcp = torch.where(self.total_job_time < 0, torch.Tensor([-1.0]), jcp)
             jcpb = (
                 jcp.unsqueeze_(1)
-                .expand((self.max_n_jobs, self.max_n_machines, 4))
-                .reshape((self.max_n_jobs * self.max_n_machines, 4))
+                .expand((self.n_jobs, self.max_n_machines, 4))
+                .reshape((self.n_jobs * self.max_n_machines, 4))
             )
             self.features[:, tjpof[0] : tjpof[1]] = jcpb
 
@@ -241,15 +279,15 @@ class State:
 
         if "mopnr" in self.features_offset:
             mopnr = np.sum(self.affectations != -1, axis=1)
-            mopnr = np.broadcast_to(mopnr[:, None], (self.max_n_jobs, self.max_n_machines)).flatten()
+            mopnr = np.broadcast_to(mopnr[:, None], (self.n_jobs, self.max_n_machines)).flatten()
             self.features[:, self.features_offset["mopnr"][0]] = torch.as_tensor(mopnr)
 
         if "mwkr" in self.features_offset:
             mwkr = self.total_job_time - self.job_completion_time
             mwkr = (
                 mwkr.unsqueeze_(1)
-                .expand((self.max_n_jobs, self.max_n_machines, 4))
-                .reshape((self.max_n_jobs * self.max_n_machines, 4))
+                .expand((self.n_jobs, self.max_n_machines, 4))
+                .reshape((self.n_jobs * self.max_n_machines, 4))
             )
             of = self.features_offset["mwkr"]
             self.features[:, of[0] : of[1]] = mwkr
@@ -348,6 +386,8 @@ class State:
         nx_graph = self.graph if self.node_encoding == "L2D" else self.return_graph
         edge_index = torch.as_tensor(list(nx_graph.edges), dtype=torch.long).t().contiguous()
 
+        if self.observe_conflicts_as_cliques:
+            return features, edge_index, self.conflicts_edges, self.conflicts_edges_machineid
         return features, edge_index
 
     def observe_real_duration(self, node_id, do_update=True):
@@ -676,7 +716,7 @@ class State:
     def get_solution(self):
         if not self.done():
             return False
-        tct = self.features[:, 1].reshape((self.max_n_jobs, self.max_n_machines, 1)).squeeze_(2).numpy()
+        tct = self.features[:, 1].reshape((self.n_jobs, self.max_n_machines, 1)).squeeze_(2).numpy()
         schedule = tct - self.original_durations[:, :, 0]
         # we give schedule for real observed durations
         return Solution(schedule=schedule, real_durations=self.original_durations[:, :, 0])

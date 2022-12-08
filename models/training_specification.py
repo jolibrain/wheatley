@@ -14,6 +14,7 @@ class TrainingSpecification:
         max_time_ortools,
         scaling_constant_ortools,
         vecenv_type,
+        validate_on_total_data,
     ):
         self.total_timesteps = total_timesteps
         self.n_validation_env = n_validation_env
@@ -28,6 +29,7 @@ class TrainingSpecification:
         self.max_time_ortools = max_time_ortools
         self.scaling_constant_ortools = scaling_constant_ortools
         self.vecenv_type = vecenv_type
+        self.validate_on_total_data = validate_on_total_data
 
     def print_self(self):
         print(
@@ -35,4 +37,5 @@ class TrainingSpecification:
             f"Number of timesteps (total)       {self.total_timesteps}\n"
             f"Validation frequency:             {self.validation_freq}\n"
             f"Episodes per validation session:  {self.n_validation_env}\n"
+            f"Validate on total data:           {self.validate_on_total_data}\n"
         )
