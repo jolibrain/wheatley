@@ -169,12 +169,10 @@ class AgentSpecification:
                 f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
                 f"Net shapes:"
             )
-            first_features_extractor_shape = f"{self.n_features}" + "".join(
-                [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
-            )
-            other_features_extractor_shape = f"{self.hidden_dim_features_extractor}" + "".join(
-                [f" -> {self.hidden_dim_features_extractor}" for _ in range(self.n_layers_features_extractor - 1)]
-            )
+            first_features_extractor_shape = f"{self.n_features} -> {self.hidden_dim_features_extractor}"
+
+            other_features_extractor_shape = f"{self.hidden_dim_features_extractor} -> {self.hidden_dim_features_extractor}"
+
             shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
             actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
             critic_shape = (

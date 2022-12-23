@@ -91,6 +91,11 @@ def main():
             observe_conflicts_as_cliques=observe_clique,
         )
         env_specification.print_self()
+        if args.batch_size == 1 and not args.dont_normalize_advantage:
+            print(
+                "batch size 1 and normalize advantage are not compatible\neither set --batch_size to > 1  or append --dont_normalize_advantage"
+            )
+            exit()
         agent_specification = AgentSpecification(
             lr=args.lr,
             fe_lr=args.fe_lr,
