@@ -3,6 +3,7 @@ import numpy as np
 from sb3_contrib.ppo_mask.policies import MaskableActorCriticPolicy
 from torch import nn
 import torch
+from torch.distributions.utils import probs_to_logits, logits_to_probs
 from .mlp import MLP
 
 
@@ -76,3 +77,22 @@ class Policy(MaskableActorCriticPolicy):
 
         self.optimizer = self.optimizer_class(pgroup, lr=lr_schedule(1))
         print("optimizer", self.optimizer)
+
+
+class RPOPolicy(Policy):
+    def set_rpo_smoothing_param(self, sp):
+        self.rpo_smoothing_param = sp
+
+    def _get_action_dist_from_latent(self, latent_pi):
+        action_logits = self.action_net(latent_pi)
+        action_probs = logits_to_probs(action_logits.view(-1, action_logits.shape[-2]))
+        ru = torch.rand((action_logits.shape[0]), device=action_logits.device)
+        try:
+            ru *= self.rpo_smoothing_param
+        except AttributeError:
+            # use 1 as a default
+            pass
+        ru = ru.unsqueeze(-1)
+        action_probs = (action_probs + ru) / (1 + ru * action_logits.shape[-2])
+        new_logits = probs_to_logits(action_probs).unsqueeze(-1)
+        return self.action_dist.proba_distribution(action_logits=new_logits)

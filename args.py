@@ -45,6 +45,9 @@ parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
 parser.add_argument("--lr", type=float, default=1e-3, help="Default Learning rate")
 parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
+parser.add_argument("--rpo", default=False, action="store_true", help="use RPO-style smoothing")
+parser.add_argument("--rpo_smoothing_param", type=float, default=1.0, help="RPO-style smoothing param")
+
 parser.add_argument(
     "--optimizer", type=str, default="adam", choices=["adam", "sgd", "adamw", "radam"], help="Which optimizer to use"
 )

@@ -19,6 +19,9 @@ from stable_baselines3.common.utils import obs_as_tensor
 
 
 class MaskablePPOCustom(MaskablePPO):
+    def set_rpo_smoothing_param(self, rsp):
+        self.policy.set_rpo_smoothing_param(rsp)
+
     def collect_rollouts(
         self,
         env: VecEnv,

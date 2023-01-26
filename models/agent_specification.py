@@ -44,6 +44,8 @@ class AgentSpecification:
         transformer_flavor,
         dropout,
         cache_lap_node_id,
+        rpo,
+        rpo_smoothing_param,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -85,6 +87,8 @@ class AgentSpecification:
         self.transformer_flavor = transformer_flavor
         self.dropout = dropout
         self.cache_lap_node_id = cache_lap_node_id
+        self.rpo = rpo
+        self.rpo_smoothing_param = rpo_smoothing_param
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -144,6 +148,8 @@ class AgentSpecification:
             f"Features extractor type:          {self.fe_type}\n"
             f"Layer Pooling:                    {self.layer_pooling}\n"
             f"Dropout:                          {self.dropout}\n"
+            f"RPO:                              {self.rpo}\n"
+            f"RPO smoothing:                    {self.rpo_smoothing_param}\n"
         )
         if self.fe_type == "tokengt":
             print(f"Net shapes:")

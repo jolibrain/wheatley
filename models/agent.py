@@ -13,7 +13,7 @@ import torch
 
 from env.env import Env
 from models.agent_callback import ValidationCallback
-from models.policy import Policy
+from models.policy import Policy, RPOPolicy
 from models.features_extractor import FeaturesExtractor
 from models.features_extractor_dgl import FeaturesExtractorDGL
 from models.features_extractor_tokengt import FeaturesExtractorTokenGT
@@ -165,8 +165,12 @@ class Agent:
                     "act_dropout": agent_specification.dropout,
                     "cache_lap_node_id": agent_specification.cache_lap_node_id,
                 }
+            if agent_specification.rpo:
+                policy = RPOPolicy
+            else:
+                policy = Policy
             self.model = MaskablePPOCustom(
-                Policy,
+                policy,
                 vec_env,
                 learning_rate=agent_specification.lr,
                 # learning_rate=partial(lr_schedule_linear, agent_specification.lr, 1e-9, 0.1),
@@ -193,6 +197,8 @@ class Agent:
                 verbose=2,
                 device=agent_specification.device,
             )
+            if agent_specification.rpo:
+                self.model.set_rpo_smoothing_param(agent_specification.rpo_smoothing_param)
 
         # Load the vectorized environments in the existing model
         else:
