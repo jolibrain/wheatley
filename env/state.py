@@ -602,6 +602,18 @@ class State:
         machine_id = self.affectations[job_id, task_id]
 
         if machine_id != -1:
+
+            if (
+                "job_completion_percentage" in self.features_offset
+                or "total_job_time" in self.features_offset
+                or "mopnr" in self.features_offset
+                or "mwkr" in self.features_offset
+            ):
+                node_same_job = self.node_same_job(job_id)
+
+            if "total_machine_time" in self.features_offset or "machine_completion_percentage" in self.features_offset:
+                on_machine = self.on_machine(machine_id)
+
             self.features[node_id, self.features_offset["is_affected"][0]] = 1
             self.affect(node_id)
 
@@ -623,17 +635,17 @@ class State:
 
             if "job_completion_percentage" in self.features_offset:
                 tjpof = self.features_offset["job_completion_percentage"]
-                for nid in self.node_same_job(job_id):
+                for nid in node_same_job:
                     self.features[nid, self.features_offset["job_completion_percentage"][0]] = (
                         self.job_completion_time[job_id][0] / self.total_job_time[job_id][0]
                     )
 
             if "total_job_time" in self.features_offset:
-                for nid in self.node_same_job(job_id):
+                for nid in node_same_job:
                     self.features[nid, self.features_offset["total_job_time"][0]] = self.total_job_time[job_id][0]
 
             if "total_machine_time" in self.features_offset or "machine_completion_percentage" in self.features_offset:
-                for nid in self.on_machine(machine_id):
+                for nid in on_machine:
                     jid, tid = node_to_job_and_task(nid, self.max_n_machines)
                     if self.total_machine_time_job_task[jid, tid][0] < 0:
                         self.total_machine_time_job_task[jid, tid][0] = self.get_durations(node_id)[0]
@@ -644,8 +656,9 @@ class State:
                     self.total_machine_time[machine_id][0] = self.get_durations(node_id)[0]
                 else:
                     self.total_machine_time[machine_id][0] += self.get_durations(node_id)[0]
+
             if "total_machine_time" in self.features_offset:
-                for nid in self.on_machine(machine_id):
+                for nid in on_machine:
                     self.features[nid, self.features_offset["total_machine_time"][0]] = self.total_machine_time[machine_id][
                         0
                     ]
@@ -659,19 +672,19 @@ class State:
                     self.job_completion_time[job_id][0] = -1
                     self.machine_completion_time[machine_id][0] = -1
                     self.machine_completion_time_job_task[job_id, task_id, 0] = -1
-                for nid in self.on_machine(machine_id):
+                for nid in on_machine:
                     mcpo = self.features_offset["machine_completion_percentage"]
                     self.features[nid, mcpo[0] : mcpo[1]] = (
                         self.machine_completion_time[machine_id] / self.total_machine_time[machine_id]
                     )
 
             if "mopnr" in self.features_offset:
-                for nid in self.node_same_job(job_id):
+                for nid in node_same_job:
                     self.features[nid, self.features_offset["mopnr"][0]] -= 1
 
             if "mwkr" in self.features_offset:
                 of = self.features_offset["mwkr"]
-                for nid in self.node_same_job(job_id):
+                for nid in node_same_job:
                     self.features[nid, of[0] : of[1]] = self.total_job_time[job_id] - self.job_completion_time[job_id]
 
             self.features[node_id, self.features_offset["selectable"][0]] = 0
