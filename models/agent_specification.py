@@ -44,6 +44,7 @@ class AgentSpecification:
         transformer_flavor,
         dropout,
         cache_lap_node_id,
+        lap_node_id_k,
         rpo,
         rpo_smoothing_param,
     ):
@@ -87,6 +88,7 @@ class AgentSpecification:
         self.transformer_flavor = transformer_flavor
         self.dropout = dropout
         self.cache_lap_node_id = cache_lap_node_id
+        self.lap_node_id_k = lap_node_id_k
         self.rpo = rpo
         self.rpo_smoothing_param = rpo_smoothing_param
 

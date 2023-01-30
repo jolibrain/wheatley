@@ -79,6 +79,7 @@ class AgentObservation:
         do_batch=True,
         compute_laplacian_pe=False,
         laplacian_pe_cache=None,
+        n_laplacian_eigv=50,
         bidir=True,
     ):
 
@@ -130,7 +131,7 @@ class AgentObservation:
                 if add_self_loops:
                     gnew = dgl.add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
                 if compute_laplacian_pe:
-                    gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(gnew, laplacian_pe_cache)
+                    gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(gnew, laplacian_pe_cache, n_laplacian_eigv)
                 gnew = gnew.to(device)
                 graphs.append(gnew)
                 if do_batch:

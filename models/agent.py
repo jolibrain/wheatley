@@ -155,7 +155,7 @@ class Agent:
                     "encoder_attention_heads": agent_specification.n_attention_heads,
                     "activation_fn": agent_specification.activation_fn_graph,
                     "lap_node_id": True,
-                    "lap_node_id_k": env_specification.max_n_nodes,
+                    "lap_node_id_k": agent_specification.lap_node_id_k,
                     "lap_node_id_sign_flip": True,
                     "type_id": True,
                     "transformer_flavor": agent_specification.transformer_flavor,

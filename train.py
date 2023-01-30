@@ -137,6 +137,9 @@ def main():
             transformer_flavor=args.transformer_flavor,
             dropout=args.dropout,
             cache_lap_node_id=args.cache_lap_node_id,
+            lap_node_id_k=args.lap_node_id_k,
+            rpo=args.rpo,
+            rpo_smoothing_param=args.rpo_smoothing_param,
         )
         agent_specification.print_self()
         agent = Agent(env_specification=env_specification, agent_specification=agent_specification)

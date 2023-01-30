@@ -48,6 +48,8 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
             self.laplacian_pe_cache = {}
         else:
             self.laplacian_pe_cache = None
+
+        self.lap_node_id_k = lap_node_id_k
         performer = False
         if transformer_flavor == "linear":
             linear_transformer = True
@@ -119,6 +121,7 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
             do_batch=False,
             compute_laplacian_pe=self.laplacian_pe,
             laplacian_pe_cache=self.laplacian_pe_cache,
+            n_laplacian_eigv=self.lap_node_id_k,
             bidir=True,
         ).to_graph()
 
