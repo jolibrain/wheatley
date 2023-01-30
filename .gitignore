@@ -3,6 +3,8 @@ __pycache__
 *.npy
 *.zip
 *.svg
+*~
+*#
 profile.data
 profile.pdf
 benchmark/*.csv
