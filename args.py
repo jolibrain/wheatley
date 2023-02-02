@@ -49,7 +49,11 @@ parser.add_argument("--rpo", default=False, action="store_true", help="use RPO-s
 parser.add_argument("--rpo_smoothing_param", type=float, default=1.0, help="RPO-style smoothing param")
 
 parser.add_argument(
-    "--optimizer", type=str, default="adam", choices=["adam", "sgd", "adamw", "radam"], help="Which optimizer to use"
+    "--optimizer",
+    type=str,
+    default="adam",
+    choices=["adam", "sgd", "adamw", "radam", "dadam"],
+    help="Which optimizer to use",
 )
 parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 parser.add_argument(

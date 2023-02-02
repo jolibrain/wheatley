@@ -1,4 +1,5 @@
 import torch
+from .dadapt_adam import DAdaptAdam
 
 
 class AgentSpecification:
@@ -127,6 +128,8 @@ class AgentSpecification:
             self.optimizer_class = torch.optim.AdamW
         elif optimizer.lower() == "radam":
             self.optimizer_class = torch.optim.RAdam
+        elif optimizer.lower() == "dadam":
+            self.optimizer_class = DAdaptAdam
         else:
             raise Exception("Optimizer not recognized")
 

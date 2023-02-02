@@ -5,6 +5,7 @@ from torch import nn
 import torch
 from torch.distributions.utils import probs_to_logits, logits_to_probs
 from .mlp import MLP
+from .dadapt_adam import DAdaptAdam
 
 
 class GraphExtractor(nn.Module):
@@ -70,12 +71,20 @@ class Policy(MaskableActorCriticPolicy):
             for module, gain in module_gains.items():
                 module.apply(partial(self.init_weights, gain=gain))
 
-        fe_lr = self.optimizer_kwargs["fe_lr"] if self.optimizer_kwargs["fe_lr"] is not None else self.optimizer_kwargs["lr"]
-        pgroup = [
-            {"params": self.features_extractor.parameters(), "lr": fe_lr},
-        ]
-
-        self.optimizer = self.optimizer_class(pgroup, lr=lr_schedule(1))
+        if self.optimizer_class == DAdaptAdam:
+            self.optimizer = self.optimizer_class(self.parameters())
+        else:
+            if self.optimizer_kwargs["fe_lr"] is not None:
+                fe_lr = self.optimizer_kwargs["fe_lr"]
+                lr = self.optimizer_kwargs["lr"]
+                pgroup = [
+                    {"params": self.features_extractor.parameters(), "lr": fe_lr},
+                    {"params": self.action_net.parameters(), "lr": lr},
+                    {"params": self.value_net.parameters(), "lr": lr},
+                ]
+                self.optimizer = self.optimizer_class(pgroup, lr=lr_schedule(1))
+            else:
+                self.optimizer = self.optimizer_class(self.parameters(), lr=lr_schedule(1))
         print("optimizer", self.optimizer)
 
 
