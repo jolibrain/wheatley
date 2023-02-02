@@ -33,6 +33,9 @@ def get_ortools_makespan(
         durs = durations[:, :, 1]
     elif ortools_strategy == "averagistic":
         durs = durations[:, :, 3]
+    else:
+        print("unknow ortools strategy ", ortools_strategy)
+        exit()
 
     solution = solve_jssp(affectations, durs, max_time_ortools, scaling_constant_ortools)
 

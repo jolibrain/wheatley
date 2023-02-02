@@ -41,27 +41,27 @@ def get_laplacian_pe_simple(g, cache=None, k=50):
 
     # classical computation
     # start = time.time()
-    # A = g.adj(scipy_fmt="csr")  # adjacency matrix
-    # N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
-    # L = sparse.eye(g.num_nodes()) - N @ A @ N
-    # EigVal, EigVec = np.linalg.eigh(L.toarray())
-    # kpartition_indices = np.argpartition(EigVal, k + 1)[: k + 1]
-    # topk_eigvals = EigVal[kpartition_indices]
-    # topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    # topk_EigVec = np.real(EigVec[:, topk_indices])
-    # ret = torch.from_numpy(topk_EigVec).float()
+    A = g.adj(scipy_fmt="csr")  # adjacency matrix
+    N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
+    L = sparse.eye(g.num_nodes()) - N @ A @ N
+    EigVal, EigVec = np.linalg.eigh(L.toarray())
+    kpartition_indices = np.argpartition(EigVal, k + 1)[: k + 1]
+    topk_eigvals = EigVal[kpartition_indices]
+    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+    topk_EigVec = np.real(EigVec[:, topk_indices])
+    ret = torch.from_numpy(topk_EigVec).float()
     # print("classicaltime", time.time() - start)
 
     # sparse + iterative + approximated
     # start = time.time()
-    g2 = dgl.add_self_loop(g)
-    A = g2.adj(scipy_fmt="csr")  # adjacency matrix
-    N = sparse.diags(F.asnumpy(g2.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
-    L = sparse.eye(g2.num_nodes()) - N @ A @ N
-    EigVal2, EigVec2 = scipy.sparse.linalg.eigs(L, k=k + 1, sigma=0, tol=1e-8)
-    topk_indices2 = np.arange(k + 1)[EigVal2.argsort()][1:]
-    topk_eigvec2 = np.real(EigVec2[:, topk_indices2])
-    ret = torch.from_numpy(topk_eigvec2).float()
+    # g2 = g
+    # A = g2.adj(scipy_fmt="csr")  # adjacency matrix
+    # N = sparse.diags(F.asnumpy(g2.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
+    # L = sparse.eye(g2.num_nodes()) - N @ A @ N
+    # EigVal2, EigVec2 = scipy.sparse.linalg.eigs(L, k=k + 1, sigma=0, tol=1e-8)
+    # topk_indices2 = np.arange(k + 1)[EigVal2.argsort()][1:]
+    # topk_eigvec2 = np.real(EigVec2[:, topk_indices2])
+    # ret = torch.from_numpy(topk_eigvec2).float()
     # print("sparse time", time.time() - start)
     # exit()
 

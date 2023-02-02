@@ -133,7 +133,7 @@ parser.add_argument(
     "--ortools_strategy",
     type=str,
     default="pessimistic",
-    choices=["realistic", "optimistic", "pessismistic", "averagistic"],
+    choices=["realistic", "optimistic", "pessimistic", "averagistic"],
     help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic realistic means omiscient, "
     "ie sees the future",
 )
@@ -148,7 +148,7 @@ parser.add_argument(
     choices=["vanilla", "linear", "performer"],
 )
 parser.add_argument("--cache_lap_node_id", action="store_true", help="enable laplacian cache for tokengt")
-parser.add_argument("--lap_node_id_k", type=int, default=100, help="laplacian id size for tokengt")
+parser.add_argument("--lap_node_id_k", type=int, default=10, help="laplacian id size for tokengt")
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )

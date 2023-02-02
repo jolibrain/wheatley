@@ -15,6 +15,7 @@ from args import args, exp_name, path
 
 def main():
 
+    torch.distributions.Distribution.set_default_validate_args(False)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 

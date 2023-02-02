@@ -122,7 +122,7 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
             compute_laplacian_pe=self.laplacian_pe,
             laplacian_pe_cache=self.laplacian_pe_cache,
             n_laplacian_eigv=self.lap_node_id_k,
-            bidir=True,
+            bidir=False,
         ).to_graph()
 
         max_node_num = max([gr.num_nodes() for gr in g_list])

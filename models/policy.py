@@ -92,16 +92,42 @@ class RPOPolicy(Policy):
     def set_rpo_smoothing_param(self, sp):
         self.rpo_smoothing_param = sp
 
-    def _get_action_dist_from_latent(self, latent_pi):
+    def _get_action_dist_from_latent(self, latent_pi, noise=False):
         action_logits = self.action_net(latent_pi)
-        action_probs = logits_to_probs(action_logits.view(-1, action_logits.shape[-2]))
-        ru = torch.rand((action_logits.shape[0]), device=action_logits.device)
-        try:
-            ru *= self.rpo_smoothing_param
-        except AttributeError:
-            # use 1 as a default
-            pass
-        ru = ru.unsqueeze(-1)
-        action_probs = (action_probs + ru) / (1 + ru * action_logits.shape[-2])
-        new_logits = probs_to_logits(action_probs).unsqueeze(-1)
-        return self.action_dist.proba_distribution(action_logits=new_logits)
+        if noise:
+            action_probs = logits_to_probs(action_logits.view(-1, action_logits.shape[-2]))
+            ru = torch.rand((action_logits.shape[0]), device=action_logits.device)
+            try:
+                ru *= self.rpo_smoothing_param
+            except AttributeError:
+                # use 1 as a default
+                pass
+            ru = ru.unsqueeze(-1)
+            action_probs = (action_probs + ru) / (1 + ru * action_logits.shape[-2])
+            new_logits = probs_to_logits(action_probs).unsqueeze(-1)
+            pd = self.action_dist.proba_distribution(action_logits=new_logits)
+            # type(pd)._validate_args = False
+            return pd
+        else:
+            pd = self.action_dist.proba_distribution(action_logits=action_logits)
+            # type(pd)._validate_args = False
+            return pd
+
+    def evaluate_actions(self, obs, actions, action_masks=None):
+        """
+        Evaluate actions according to the current policy,
+        given the observations.
+
+        :param obs:
+        :param actions:
+        :return: estimated value, log likelihood of taking those actions
+            and entropy of the action distribution.
+        """
+        features = self.extract_features(obs)
+        latent_pi, latent_vf = self.mlp_extractor(features)
+        distribution = self._get_action_dist_from_latent(latent_pi, noise=True)
+        if action_masks is not None:
+            distribution.apply_masking(action_masks)
+        log_prob = distribution.log_prob(actions)
+        values = self.value_net(latent_vf)
+        return values, log_prob, distribution.entropy()
