@@ -80,6 +80,10 @@ def main():
             observe_clique = True
         else:
             observe_clique = False
+        if args.observe_duration_when_affect:
+            observe_real_duration_when_affect = True
+        else:
+            observe_real_duration_when_affect = False
         env_specification = EnvSpecification(
             max_n_jobs=args.max_n_j,
             max_n_machines=args.max_n_m,
@@ -90,6 +94,7 @@ def main():
             sample_n_jobs=args.sample_n_jobs,
             chunk_n_jobs=args.chunk_n_jobs,
             observe_conflicts_as_cliques=observe_clique,
+            observe_real_duration_when_affect=observe_real_duration_when_affect,
         )
         env_specification.print_self()
         if args.batch_size == 1 and not args.dont_normalize_advantage:

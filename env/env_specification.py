@@ -13,6 +13,7 @@ class EnvSpecification:
         sample_n_jobs,
         chunk_n_jobs,
         observe_conflicts_as_cliques,
+        observe_real_duration_when_affect,
     ):
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
@@ -27,14 +28,16 @@ class EnvSpecification:
         self.add_boolean = (insertion_mode == "choose_forced_insertion") or (insertion_mode == "slot_locking")
         self.n_features = get_n_features(self.input_list, self.max_n_jobs, self.max_n_machines)
         self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
+        self.observe_real_duration_when_affect = observe_real_duration_when_affect
 
     def print_self(self):
         print_input_list = [el.lower().title().replace("_", " ") for el in self.input_list]
         print(
             f"==========Env Description     ==========\n"
-            f"Max size:                         {self.max_n_jobs} x {self.max_n_machines}\n"
-            f"Input normalization:              {'Yes' if self.normalize_input else 'No'}\n"
-            f"Insertion mode:                   {self.insertion_mode.lower().title().replace('_', ' ')}\n"
+            f"Max size:                           {self.max_n_jobs} x {self.max_n_machines}\n"
+            f"Input normalization:                {'Yes' if self.normalize_input else 'No'}\n"
+            f"Insertion mode:                     {self.insertion_mode.lower().title().replace('_', ' ')}\n"
+            f"Observe real duration when affect:  {self.observe_real_duration_when_affect}\n"
             f"List of features:\n - Task Completion Times\n - Machine Id"
         )
         print(" - " + "\n - ".join(print_input_list) + "\n")

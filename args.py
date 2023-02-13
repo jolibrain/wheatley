@@ -196,6 +196,13 @@ parser.add_argument(
     help="Which transition model to use",
 )
 parser.add_argument(
+    "--observe_duration_when_affect",
+    default=False,
+    action="store_true",
+    help="observe real duration at affectatio type, for more efficient replanning",
+)
+
+parser.add_argument(
     "--reward_model_config",
     type=str,
     default="L2D",

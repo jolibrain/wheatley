@@ -390,13 +390,18 @@ class State:
             return features, edge_index, self.conflicts_edges, self.conflicts_edges_machineid
         return features, edge_index
 
-    def observe_real_duration(self, node_id, do_update=True):
+    def observe_real_duration(self, node_id, do_update=True, update_duration_with_real=True):
         job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
         self.is_observed[job_id, task_id] = 1
         self.durations[job_id, task_id][:] = self.original_durations[job_id, task_id][0]
         if "duration" in self.features_offset:
             dof = self.features_offset["duration"]
-            self.features[node_id, dof[0] : dof[1]] = self.original_durations[job_id, task_id][0]
+            if update_duration_with_real:
+                # replace min max mode with real duration
+                self.features[node_id, dof[0] : dof[1]] = self.original_durations[job_id, task_id][0]
+            else:
+                # only put real duration, for computing makespan during propagation
+                self.features[node_id, dof[0] : dof[0] + 1] = self.original_durations[job_id, task_id][0]
 
         if do_update:
             self.update_completion_times(node_id)
@@ -807,11 +812,11 @@ class State:
 
     def display(self, fname="state.png"):
         print("affectation\n", self.affectations)
-        plt.clf()
-        pos = {}
-        for j in range(0, self.n_jobs):
-            for m in range(0, self.n_machines):
-                pos[j * self.n_machines + m] = (m, -j)
+        # plt.clf()
+        # pos = {}
+        # for j in range(0, self.n_jobs):
+        #     for m in range(0, self.n_machines):
+        #         pos[j * self.n_machines + m] = (m, -j)
 
         print("task_completion_times\n", self.features[:, 1:5])
 

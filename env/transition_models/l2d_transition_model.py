@@ -52,8 +52,9 @@ class L2DTransitionModel(TransitionModel):
         # If no task is affected on machine, just affect it wherever possible and returns
         if not machine_occupancy:
             # Observe duration (for the uncertainty case)
-            if self.observe_real_duration_when_affect:
-                state.observe_real_duration(node_id, do_update=False)
+            state.observe_real_duration(
+                node_id, do_update=False, update_duration_with_real=self.observe_real_duration_when_affect
+            )
             state.update_completion_times(node_id, rec=False)
             state.affect_node(node_id)
             return
@@ -61,8 +62,9 @@ class L2DTransitionModel(TransitionModel):
         # If forced insertion are not allowed
         if not force_insert:
             # Observe duration (for the uncertainty case)
-            if self.observe_real_duration_when_affect:
-                state.observe_real_duration(node_id, do_update=False)
+            state.observe_real_duration(
+                node_id, do_update=False, update_duration_with_real=self.observe_real_duration_when_affect
+            )
 
             job_duration = state.durations[job_id, task_id, self.metric_index]
             # Checks wheter task is inserted at the begining, in between or at the end
@@ -100,8 +102,9 @@ class L2DTransitionModel(TransitionModel):
 
         # If forced insertion is allowed and performed
         elif force_insert:
-            if self.observe_real_duration_when_affect:
-                state.observe_real_duration(node_id, do_update=False)
+            state.observe_real_duration(
+                node_id, do_update=False, update_duration_with_real=self.observe_real_duration_when_affect
+            )
             # Checks wheter task is inserted at the begining, in between or at the end
             if job_availability_time < machine_occupancy[0][0]:
                 # Insert task before all other tasks

@@ -233,6 +233,7 @@ class Env(gym.Env):
                 self.state.durations,
                 self.env_specification.max_n_jobs,
                 self.env_specification.max_n_machines,
+                self.env_specification.observe_real_duration_when_affect,
             )
         elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
             self.transition_model = L2DTransitionModel(
@@ -240,6 +241,7 @@ class Env(gym.Env):
                 self.state.durations,
                 self.env_specification.max_n_jobs,
                 self.env_specification.max_n_machines,
+                self.env_specification.observe_real_duration_when_affect,
             )
         elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode == "slot_locking":
             self.transition_model = SlotLockingTransitionModel(
@@ -247,6 +249,7 @@ class Env(gym.Env):
                 self.state.durations,
                 self.env_specification.max_n_jobs,
                 self.env_specification.max_n_machines,
+                self.env_specification.observe_real_duration_when_affect,
             )
         else:
             raise Exception("Transition model not recognized")
@@ -288,6 +291,12 @@ class Env(gym.Env):
                 self.env_specification.normalize_input,
                 self.env_specification.input_list,
             )
+            # remove real duration from obs (in state for computing makespan on the fly)
+            if not self.env_specification.observe_real_duration_when_affect:
+                if "duration" in self.state.features_offset:
+                    features = features.clone()
+                    dof = self.state.features_offset["duration"]
+                    features[:, dof[0] : dof[0] + 1] = -1
             return EnvObservation(
                 self.n_jobs,
                 self.n_machines,
@@ -305,6 +314,12 @@ class Env(gym.Env):
                 self.env_specification.normalize_input,
                 self.env_specification.input_list,
             )
+            # remove real duration from obs (in state for computing makespan on the fly)
+            if not self.env_specification.observe_real_duration_when_affect:
+                if "duration" in self.state.features_offset:
+                    features = features.clone()
+                    dof = self.state.features_offset["duration"]
+                    features[:, dof[0] : dof[0] + 1] = -1
             return EnvObservation(
                 self.n_jobs,
                 self.n_machines,

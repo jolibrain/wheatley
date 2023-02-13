@@ -49,8 +49,9 @@ class SimpleTransitionModel(TransitionModel):
         machine_occupancy = state.get_machine_occupancy(machine_id, self.metric)
 
         # Observe duration (for the uncertainty case)
-        if self.observe_real_duration_when_affect:
-            state.observe_real_duration(node_id, do_update=False)
+        state.observe_real_duration(
+            node_id, do_update=False, update_duration_with_real=self.observe_real_duration_when_affect
+        )
 
         if machine_occupancy:
             state.set_precedency(machine_occupancy[-1][2], node_id, do_update=False)
