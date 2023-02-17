@@ -1,138 +1,171 @@
-# Généralités
+# Introduction
 
-wheatly est lancé via la commande `python train.py` , il affiche son état courant en [local](http://localhost:8097). Il a besoin d'un grand nombres d'options, détaillées dans `args.py`, avec leurs valeurs par défaut. Les plus importantes sont:
+Lauching : 
+```
+python ./train.py
+```
 
-- `--n_j` : nombre de jobs
-- `--n_m` : nombre maximal de machines
-- `--total_timesteps` : nombre total d'actions à exécuter durant l'entrainement 
-- `--n_validation_env` : nombre d'environnements pour évaluer la politique (pour faire une moyenne, dans le cas de problème avec incertitudes)
-- `--n_steps_episode`: nombre d'actions par séquence (en général n_j $\times$ n_m)
-- `--batch_size 360` : nombre de séquences à traiter en parallèle lors de l'optimisation
-- `--gconv_type` : type de convolution dans le graph neural network
+Status is displayed  on [localhost](http://localhost:8097).
+
+
+Commmon options:
+
+- `--n_j` : number of jobs
+- `--n_m` : maximum number of  machines
+- `--total_timesteps` : total number of training timesteps
+- `--n_validation_env` : number of validation environment for averaging
+- `--n_steps_episode`: number of action per sequence (generally k *\times*  n_j $\times$ n_m)
+- `--batch_size 360` : batch size for optimisation
+- `--fe_type` :  feature extractor type dgl[default] ou pyg[deprecated] or tokengt
+- `--gconv_type` :  convolution type  (for dgl and pyg)
 - `-- lr` : learning rate
-- `--device` : device sur lequel faire les calculs parmi `cpu`, `cuda:0` ...
-- `--n_workers` : nombre d'environnements de génération des traces en parallèle (le nombre total de traces par itération sera de total_timesteps $\times$  n_workers)
-- `--max_edges_upper_bound_factor`: nombre maximal d'arcs : 2 pour deux fois plus d'arcs que de noeuds 
-- `--features` : features à incorporer dans l'état en plus du pur graphe de précédences 
+- `--device` : device id  `cpu`, `cuda:0` ...
+- `--n_workers` : number of data collecting threads (size of data buffer is n_steps_episode $\times$ n_workers)
+- `--max_edges_upper_bound_factor`: maximum number of edge : 2 means twice the number of nodes
+- `--features` : state features
 
 
 
-# Example de petit problème (au hasard) sans incertitude
+# Small fixed random problem without uncertainty
 
 ```
 python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --fixed_problem --lr 0.0002
 ```
-ici on utilise les options générales, et on utilise toujours le même problème généré en posant l'option `--fixed_problem`. De plus, d'un run à l'autre, on génère le même problème en fixant la graine de génération de nombre aléatoires `--seed 1`. 
+
+- `--fixed_problem` : force use of same problem along all training
+- `--seed 1` : force generation of same problem among several trainings
 
 
-# Exemple de problème 'taillard'
+#  'Taillard' problem 
 ```
 python3 train.py --n_j 100 --n_m 20 --n_steps_episode 2000 \
         --total_timesteps 10000000 --n_validation_env 1 \
-        --fixed_problem --load_problem instances/agilea/cas_modele_simulation.txt \
+        --fixed_problem --load_problem instances/taillart/ta72.txt \
         --lr 0.00002 \
-        --device cuda:0 --n_workers $(nproc) --batch_size 24 --max_edges_upper_bound_factor 2
+        --device cuda:0 --n_workers 2 --batch_size 24 --max_edges_upper_bound_factor 2
 ```
 
-Ici encore, on utilise toujours le même problème fixe, mais il est spécifié par l'option `--load_problem instances/agilea/cas_modele_simulation.txt`. (c'est si aucun problème n'est spécifié qu'un est généré comme dan l'exemple précédent. 
-
-# Exemple d'apprentissage sur plusieurs problèmes (générés au hasard), sans incertitudes
+-  `--load_problem ` forces ro read a problem definition instead of generating one.
+ 
+ 
+# Ramdom problems without uncertainty
 ```
 python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --lr 0.0002
 ```
 
-Si on enlève l'option `--fixed_problem`, des problèmes sont générés à chaque nouvel boucle de l'apprentissage. 
+Same as above, without `--fixed_problem` 
 
 
-# Exemple d'apprentissage sur un seul problème (généré au hasard), avec des incertiudes
+# Single random problem with uncertainty
 ```
-python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 -n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --lr 0.0002 --duration_type stochastic --fixed_problem --features duration --reward_model_config optimistic --ortools_strategy averagistic
+python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 -n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --lr 0.0002 --duration_type stochastic --fixed_problem --features duration --reward_model_config Sparse --ortools_strategy averagistic
 ```
 
-Ici, on ajoute les options:
 
-- `--duration_type stochastic` : pour dire que les durées ont des incertitudes
-- `--reward_model_config optimistic` : fixe les récompenses intermédiaires sur les valeurs au plus tôt de la fin des tâches
-- `--ortools_strategy averagistic` : donne les valeurs moyennes (de mode plus exactement) de durée à ortools comme valeur fixes. 
+- `--duration_type stochastic` : forces stochastic durations
+- `--reward_model_config Sparse` : reward model is based on true execution time, evaluated only on complete schedule
+- `--ortools_strategy averagistic` : ortools is given average (or mode) values
 
         
-# Example de problème réel avec génération d'incertitudes à plus ou moins 5% et sampling des problèmes parmi l'ensemble
+# Real problem with generted random duration and subsampling of jobs
 ```
-python3 train.py --n_j 64 --n_m 16 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1024 --batch_size 60 --duration_type stochastic --fixed_problem --lr 0.00001 --load_problem instances/agilea/3B-OF_en_cours_ou_dispo_16_colonnes.txt --exp_name_appendix from_0_max_64 --n_epochs 3 --reward_model_config optimistic --ortools_strategy averagistic --load_from_job 0 --load_max_jobs 64 --n_workers 4 --device cuda:0 --generate_duration_bounds 0.05 --max_edges_upper_bound_factor 2 --validation_batch_size 10
+python3 train.py --n_j 64 --n_m 16 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1024 --batch_size 60 --duration_type stochastic --fixed_problem --lr 0.00001 --load_problem instances/taillard/ta57.txt --exp_name_appendix from_0_max_40 --n_epochs 3 --reward_model_config optimistic --ortools_strategy averagistic --load_from_job 0 --load_max_jobs 40 --n_workers 4 --device cuda:0 --generate_duration_bounds 0.05 --max_edges_upper_bound_factor 2 --validation_batch_size 10
 ```
 
-les principale nouvelle options sont:
 
-- `--generate_duration_bounds 0.05`: génère des bornes à  plus ou moins 5% en chargeant un problème fixé. Dans le cas d'un problème avec incertitudes généré aléatoirement, ce sont les options duration_mode_bounds et  duration_delta qui servent à générer les durées.
-- `--load_from_job 0` : indice du premier job à utiliser
-- `--load_max_jobs 64` : nombre max de jobs à échantillonner
+- `--generate_duration_bounds 0.05`: genrate duration bounds at more or less 5% from fixed loaded problem. 
+- `--load_from_job 0` : index of first job to use
+- `--load_max_jobs 40` : max number of jobs to use
 
-# Autres options
 
-- `--max_duration` : durée max des tâches, pour générer un problème déterministe
-- `--max_n_j` : nombre max de jobs, en général égal à n_j
-- `--max_n_m` : nombre max de machines, en général égal à n_m
-- `--path` : endroit où sauver le réseau appris
-- `--exp_name_appendix` : suffixe d'ffichage dans visdom
-- `--vecenv_type` : type de parallélisation de la collecte des données
-- `--n_epochs` : nombre de passes d'optimisation sur un même ensemble de données
-- `--fe_lr` : learning rate du graph neural net, si différent du learning rate global
-- `--optimizer`: alogrithme d'optimisation à utliser
-- `--freeze_graph` : gel du graph neural net (pour debug)
-- `--custom_heuristic_name`: évaluation d'une heuristique simple en plus
-- `--retrain` : mettre pour repartir d'un ancien réseau
+In the case of randomly generated problem (eg w/o `--load_problem`), instead of `--generate_duration_bounds` one should use:
 
-## Options de test et validation 
+- `--duration_mode_bounds`
+- `--duration_delta` 
 
-- `--fixed_validation`: force l'utilisation des mêmes problèmes pour l'agent et OR-tools lors de l'évaluation
-- `--fixed_random_validation`: nombre de problèmes fixes à générer pour moyenner
-- `--validation_freq`: nombre d'étapes entre deux évaluations
-- `--max_time_ortools`: durée max données à ORtools pour résoudre le problème
-- `--validation_batch_size`: batch size lors de la validation
-- `--n_test_problems`: nombre de problèmes à générer lors des évalutions (cas où ils ne sont pas fixés uen fois pour toute au début)
-- `--test_print_every`: fréquence d'affichages des évaluations
 
-## Options de PPO
+# Large problem resolution by sub problem sampling:
 
-- `--gamma` : discount factor, laisser un pour un horizon fini
-- `--clip_range`: amplitude max des gradients
-- `--target_kl`: distance max entre les politiques
-- `--ent_coef`: coefficient à appliquer à la loss sur l'entropie
-- `--vf_coef`: coefficient à appliquer à la loss du critique
-- `--dont_normalize_advantage`: ne pas normaliser lors du calcul du gain espérés
+## DGL
+```
+python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 5 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --lr 0.0002 --gconv_type gatv2 --n_epochs 3 --n_layers_features_extractor 8 --device cuda:0 --batch_size 200 --exp_name_appendix taillard_10JOBS_DGL --max_edges_upper_bound_factor 2 --hidden_dim_features_extractor 64 --fe_type dgl --conflicts clique --hidden_dim_actor 64 --hidden_dim_critic 64 --n_mlp_layers_critic 1 --n_mlp_layers_actor 1 --n_attention_heads 4 --mlp_act_graph gelu --mlp_act tanh --optimizer radam  --sample_n_jobs 10 --validate_on_total_data --transition_model_config simple 
+```
 
-## Options du Graph neural net:
+## TOKENGT
+```
+python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --lr 0.0002  --n_epochs 3 --n_layers_features_extractor 2 --device cuda:0 --batch_size 200 --exp_name_appendix taillard_10JOBS_TOKENT --max_edges_upper_bound_factor 2 --hidden_dim_features_extractor 128 --fe_type tokengt --conflicts att --hidden_dim_actor 128 --hidden_dim_critic 128 --n_mlp_layers_critic 1 --n_mlp_layers_actor 1 --n_attention_heads 4 --mlp_act_graph gelu --mlp_act tanh --optimizer radam  --sample_n _jobs 10 --validate_on_total_data --transition_model_config simple --transformer_flavor linear
+```
 
-- `--graph_pooling`: type de pooling global du graphe
-- `--mlp_act`: activation dans les MLP
-- `--graph_has_relu`: ajout de relu dans le graphe
-- `--n_mlp_layers_features_extractor` : nombre de couches des MLP graph neural net
-- `--n_layers_features_extractor` : nombre de couches  graph neural net
-- `--hidden_dim_features_extractor`: largeur des données dans le graphe
-- `--n_attention_heads`: nombre de tête d'attention pour les convolutions basées attention
-- `--reverse_adj_in_gnn` : inverser le sens des adjacences dans le graphe (pour debug)
-- `--residual_gnn` : ajout de connections residuelles dans le GNN
-- `--normalize_gnn` : ajout de normalisation dans le GNN
-- `--conflicts_edges` : remplacer les attributs de conflits par des arcs
 
-## Paramètres de l'acteur and Critic network parameters
-- `--n_mlp_layers_shared` : nombre de couches partagées entre l'acteur et le critique
-- `--hidden_dim_shared`: largeur des couches partagées entre l'acteur et le critique
-- `--n_mlp_layers_actor`: nombre de couches de l'acteur
-- `--hidden_dim_actor`: largeur des couches de l'acteur
--  `--n_mlp_layers_critic`: nombre de couches du critique
-- `--hidden_dim_critic`: largeur des couches du critique
+- `--sample_n_jobs 10`: number of jobs to sample from total problem
+- `--validate_on_total_data` : force evaluation on global problem
+
+# Other options
+
+- `--max_duration` : max duration of tasks for deterministic problem generation
+- `--max_n_j` : max number of jobs default is  n_j [deprecated]
+- `--max_n_m` : max number of  machines, default is  n_m [deprecated]
+- `--path` : path for saving learned networks
+- `--exp_name_appendix` : print suffix for  visdom
+- `--vecenv_type` : type of threading for data collection
+- `--n_epochs` : number of time a given replay buffer is used during training
+- `--fe_lr` : learning rate of ther feature extreactor, if different from global learning rate
+- `--optimizer`: optimizer to use
+- `--freeze_graph` : freeze graph during learning (for debugging purposes)
+- `--custom_heuristic_name`: custom dispatch rule to compare to 
+- `--retrain` : restart training from former network
+
+## Test and validation options
+
+- `--fixed_validation`: use same problems for agent evaluation and or-tools
+- `--fixed_random_validation`: number of fixed problem to generate
+- `--validation_freq`: number of steps between evaluations
+- `--max_time_ortools`: or-tools timeout
+- `--validation_batch_size`: batch size during  validation
+- `--n_test_problems`: number of problems to generate for validation (in case they are not pre generated with fixed_validation and fixed_random_validation
+- `--test_print_every`: print frequency of evaluations
+
+##  PPO Options
+
+- `--gamma` : discount factor, default 1 for finite horizon
+- `--clip_range`: clip gradients
+- `--target_kl`: target kl for PPO
+- `--ent_coef`: entropy coefficient in PPO loss
+- `--vf_coef`: value function coefficient in PPO loss
+- `--dont_normalize_advantage`: do not normlize advantage function
+
+## GNN options:
+
+- `--graph_pooling`:  global pooling mode
+- `--mlp_act`: activation function in MLP in GNN (if any)
+- `--graph_has_relu`: add (r)elu in GNN
+- `--n_mlp_layers_features_extractor` : number of layers in MLP in GNN (if any)
+- `--n_layers_features_extractor` : number of layers in GNN
+- `--hidden_dim_features_extractor`: latent dimension in GNN
+- `--n_attention_heads`: number of attention heads in GNN (if any)
+- `--reverse_adj_in_gnn` : invert adj direction in pyg feature extractor (for debug, deprecated)
+- `--residual_gnn` : add residual connections in GNN
+- `--normalize_gnn` : add normalization layers in  GNN
+- `--conflicts` : conflict encoding in GNN
+
+## Actor and critic network parameters
+- `--n_mlp_layers_shared` : number of shared layers between actor and critic
+- `--hidden_dim_shared`: latent dim of shared layers 
+- `--n_mlp_layers_actor`: number of layers of actor
+- `--hidden_dim_actor`: latent dim of actor
+-  `--n_mlp_layers_critic`: number of layers of critic
+- `--hidden_dim_critic`: latent dim of actor
 
 ## Model Options
-- `--transition_model_config` : type de transition
-- `--insertion_mode` : type d'insertions possibles (sous type des transitions)
-- `--reward_model_config` : type de récompenses
-- `--dont_normalize_input`: normalise ou non les attributs des noeuds du graphe en entrée
+- `--transition_model_config` : transition type
+- `--insertion_mode` : allow insertion
+- `--reward_model_config` : reward model
+- `--dont_normalize_input`: do not normalize state data
 
-## Echantiollonage de sous problème pour l'apprentissage: : 
-- `--load_from_job` : indice de départ pour l'échantillonage de sous problème 
-- `--load_max_jobs` : nombre max de jobs à charger
-- `--sample_n_jobs` : nombre de jobs à échantillonner
-- `--chunk_n_jobs` : taille des fenêtre glissante pour l'échantillonage
+## Sub poblem sampling:
+- `--load_from_job` : start index for sub problem sampling
+- `--load_max_jobs` : max number of jobs for sampling
+- `--sample_n_jobs` : number of  jobs to sample
+- `--chunk_n_jobs` : sliding window size
 
 

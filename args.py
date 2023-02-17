@@ -138,7 +138,7 @@ parser.add_argument(
     "ie sees the future",
 )
 parser.add_argument(
-    "--fe_type", type=str, default="pyg", help="feature extractor type in [pyg|dgl]", choices=["pyg", "dgl", "tokengt"]
+    "--fe_type", type=str, default="dgl", help="feature extractor type in [pyg|dgl|tokengt]", choices=["pyg", "dgl", "tokengt"]
 )
 parser.add_argument(
     "--transformer_flavor",
