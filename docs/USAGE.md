@@ -2,6 +2,7 @@
 
 Lauching : 
 ```
+python -m visdom.server
 python ./train.py
 ```
 
@@ -17,40 +18,29 @@ Commmon options:
 - `--n_steps_episode`: number of action per sequence (generally k *\times*  n_j $\times$ n_m)
 - `--batch_size 360` : batch size for optimisation
 - `--fe_type` :  feature extractor type dgl[default] ou pyg[deprecated] or tokengt
-- `--gconv_type` :  convolution type  (for dgl and pyg)
-- `-- lr` : learning rate
+- `--gconv_type` :  convolution type  (for dgl and pyg default: gatv2)
+- `--lr` : learning rate
 - `--device` : device id  `cpu`, `cuda:0` ...
 - `--n_workers` : number of data collecting threads (size of data buffer is n_steps_episode $\times$ n_workers)
-- `--max_edges_upper_bound_factor`: maximum number of edge : 2 means twice the number of nodes
-- `--features` : state features
+- `--features` : state features (default is all)
+- `--exp_name_appendix` : print suffix for  visdom
 
 
 
 # Small fixed random problem without uncertainty
 
 ```
-python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --fixed_problem --lr 0.0002
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --n_workers 10 --batch_size 1600  --lr 0.0002 --exp_name_appendix EXAMPLE1 --fixed_problem --seed 1
 ```
 
 - `--fixed_problem` : force use of same problem along all training
 - `--seed 1` : force generation of same problem among several trainings
 
 
-#  'Taillard' problem 
-```
-python3 train.py --n_j 100 --n_m 20 --n_steps_episode 2000 \
-        --total_timesteps 10000000 --n_validation_env 1 \
-        --fixed_problem --load_problem instances/taillart/ta72.txt \
-        --lr 0.00002 \
-        --device cuda:0 --n_workers 2 --batch_size 24 --max_edges_upper_bound_factor 2
-```
-
--  `--load_problem ` forces ro read a problem definition instead of generating one.
- 
  
 # Ramdom problems without uncertainty
 ```
-python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --lr 0.0002
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1600 --n_workers 10  --batch_size 1600 --seed 1  --lr 0.0002  --exp_name_appendix EXAMPLE2 
 ```
 
 Same as above, without `--fixed_problem` 
@@ -58,7 +48,7 @@ Same as above, without `--fixed_problem`
 
 # Single random problem with uncertainty
 ```
-python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 -n_steps_episode 360 --batch_size 360 --seed 1 --gconv_type gatv2 --lr 0.0002 --duration_type stochastic --fixed_problem --features duration --reward_model_config Sparse --ortools_strategy averagistic
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --batch_size 1600 --n_workers 10 --seed 1  --lr 0.0002 --duration_type stochastic --fixed_problem  --reward_model_config Sparse --ortools_strategy averagistic --exp_name_appendix EXAMPLE3 
 ```
 
 
@@ -66,13 +56,15 @@ python3 train.py --n_j 6 --n_m 6 --total_timesteps 1000000 --n_validation_env 1 
 - `--reward_model_config Sparse` : reward model is based on true execution time, evaluated only on complete schedule
 - `--ortools_strategy averagistic` : ortools is given average (or mode) values
 
-        
-# Real problem with generted random duration and subsampling of jobs
+
+# Taillard problem with generated random durations and subsampling of jobs
+
 ```
-python3 train.py --n_j 64 --n_m 16 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1024 --batch_size 60 --duration_type stochastic --fixed_problem --lr 0.00001 --load_problem instances/taillard/ta57.txt --exp_name_appendix from_0_max_40 --n_epochs 3 --reward_model_config optimistic --ortools_strategy averagistic --load_from_job 0 --load_max_jobs 40 --n_workers 4 --device cuda:0 --generate_duration_bounds 0.05 --max_edges_upper_bound_factor 2 --validation_batch_size 10
+python3 train.py --n_j 50 --n_m 15 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1500 --n_workers 10 --batch_size 150 --duration_type stochastic --fixed_problem --lr 0.0002 --load_problem instances/taillard/ta57.txt --first_machine_id_is_one --exp_name_appendix EXAMPLE4 --n_epochs 3  --ortools_strategy averagistic   --device cuda:3 --generate_duration_bounds 0.05  --validation_batch_size 10 --load_max_jobs 40 --load_from_job 0
 ```
 
-
+- `--load_problem` :  forces to read a problem definition instead of generating one
+- `--first_machine_id_is_one` : in pure taillard format, machine numbering start at 1
 - `--generate_duration_bounds 0.05`: genrate duration bounds at more or less 5% from fixed loaded problem. 
 - `--load_from_job 0` : index of first job to use
 - `--load_max_jobs 40` : max number of jobs to use
@@ -84,16 +76,18 @@ In the case of randomly generated problem (eg w/o `--load_problem`), instead of 
 - `--duration_delta` 
 
 
+
+
 # Large problem resolution by sub problem sampling:
 
 ## DGL
 ```
-python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 5 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --lr 0.0002 --gconv_type gatv2 --n_epochs 3 --n_layers_features_extractor 8 --device cuda:0 --batch_size 200 --exp_name_appendix taillard_10JOBS_DGL --max_edges_upper_bound_factor 2 --hidden_dim_features_extractor 64 --fe_type dgl --conflicts clique --hidden_dim_actor 64 --hidden_dim_critic 64 --n_mlp_layers_critic 1 --n_mlp_layers_actor 1 --n_attention_heads 4 --mlp_act_graph gelu --mlp_act tanh --optimizer radam  --sample_n_jobs 10 --validate_on_total_data --transition_model_config simple 
+python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 5 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --first_machine_id_is_one --lr 0.0002  --n_epochs 3 --n_layers_features_extractor 8 --device cuda:0 --batch_size 200 --exp_name_appendix EXAMPLE5 --optimizer radam  --sample_n_jobs 10 --validate_on_total_data
 ```
 
 ## TOKENGT
 ```
-python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --lr 0.0002  --n_epochs 3 --n_layers_features_extractor 2 --device cuda:0 --batch_size 200 --exp_name_appendix taillard_10JOBS_TOKENT --max_edges_upper_bound_factor 2 --hidden_dim_features_extractor 128 --fe_type tokengt --conflicts att --hidden_dim_actor 128 --hidden_dim_critic 128 --n_mlp_layers_critic 1 --n_mlp_layers_actor 1 --n_attention_heads 4 --mlp_act_graph gelu --mlp_act tanh --optimizer radam  --sample_n _jobs 10 --validate_on_total_data --transition_model_config simple --transformer_flavor linear
+python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --first_machine_id_is_one --lr 0.0002 --n_epochs 3 --n_layers_features_extractor 2 --device cuda:0 --batch_size 200 --exp_name_appendix EXAMPLE6  --hidden_dim_features_extractor 128 --fe_type tokengt --conflicts att --hidden_dim_actor 128 --hidden_dim_critic 128 --optimizer radam  --sample_n _jobs 10 --validate_on_total_data  --transformer_flavor linear
 ```
 
 
@@ -106,7 +100,6 @@ python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total
 - `--max_n_j` : max number of jobs default is  n_j [deprecated]
 - `--max_n_m` : max number of  machines, default is  n_m [deprecated]
 - `--path` : path for saving learned networks
-- `--exp_name_appendix` : print suffix for  visdom
 - `--vecenv_type` : type of threading for data collection
 - `--n_epochs` : number of time a given replay buffer is used during training
 - `--fe_lr` : learning rate of ther feature extreactor, if different from global learning rate
@@ -118,11 +111,11 @@ python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total
 ## Test and validation options
 
 - `--fixed_validation`: use same problems for agent evaluation and or-tools
-- `--fixed_random_validation`: number of fixed problem to generate
+- `--fixed_random_validation`: number of fixed problem to generate for validation
 - `--validation_freq`: number of steps between evaluations
 - `--max_time_ortools`: or-tools timeout
 - `--validation_batch_size`: batch size during  validation
-- `--n_test_problems`: number of problems to generate for validation (in case they are not pre generated with fixed_validation and fixed_random_validation
+- `--n_test_problems`: number of problems to generate for validation (in case they are not pre-generated with fixed_validation and fixed_random_validation
 - `--test_print_every`: print frequency of evaluations
 
 ##  PPO Options
@@ -136,8 +129,8 @@ python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total
 
 ## GNN options:
 
-- `--graph_pooling`:  global pooling mode
-- `--mlp_act`: activation function in MLP in GNN (if any)
+- `--graph_pooling`:  global pooling mode default is learn (ie pool node)
+- `--mlp_act`: activation function in MLP in GNN (if any, default to gelu)
 - `--graph_has_relu`: add (r)elu in GNN
 - `--n_mlp_layers_features_extractor` : number of layers in MLP in GNN (if any)
 - `--n_layers_features_extractor` : number of layers in GNN
@@ -162,7 +155,7 @@ python3 train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total
 - `--reward_model_config` : reward model
 - `--dont_normalize_input`: do not normalize state data
 
-## Sub poblem sampling:
+## Sub problem sampling:
 - `--load_from_job` : start index for sub problem sampling
 - `--load_max_jobs` : max number of jobs for sampling
 - `--sample_n_jobs` : number of  jobs to sample

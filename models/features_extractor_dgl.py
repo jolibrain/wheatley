@@ -99,7 +99,7 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
 
         if self.gconv_type in ["gatv2", "gat"]:
             self.mlps = torch.nn.ModuleList()
-            self.mlps_edges = torch.nn.ModuleList()
+            # self.mlps_edges = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
 
@@ -134,17 +134,17 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                         device=self.device,
                     )
                 )
-                self.mlps_edges.append(
-                    MLP(
-                        n_layers=n_mlp_layers_features_extractor,
-                        input_dim=hidden_dim_features_extractor * n_attention_heads,
-                        hidden_dim=hidden_dim_features_extractor * n_attention_heads,
-                        output_dim=hidden_dim_features_extractor,
-                        batch_norm=self.normalize,
-                        activation=activation_features_extractor,
-                        device=self.device,
-                    )
-                )
+                # self.mlps_edges.append(
+                #     MLP(
+                #         n_layers=n_mlp_layers_features_extractor,
+                #         input_dim=hidden_dim_features_extractor * n_attention_heads,
+                #         hidden_dim=hidden_dim_features_extractor * n_attention_heads,
+                #         output_dim=hidden_dim_features_extractor,
+                #         batch_norm=self.normalize,
+                #         activation=activation_features_extractor,
+                #         device=self.device,
+                #     )
+                # )
             elif self.gconv_type == "pna":
                 self.features_extractors.append(
                     PNAConv(

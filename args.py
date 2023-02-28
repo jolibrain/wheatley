@@ -40,10 +40,10 @@ parser.add_argument(
 
 # =================================================TRAINING SPECIFICATION====================================================
 parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
-parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs for updating the agent's parameters")
+parser.add_argument("--n_epochs", type=int, default=10, help="Number of epochs for updating the agent's parameters")
 parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
 parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
-parser.add_argument("--lr", type=float, default=1e-3, help="Default Learning rate")
+parser.add_argument("--lr", type=float, default=2e-4, help="Default Learning rate")
 parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
 parser.add_argument("--rpo", default=False, action="store_true", help="use RPO-style smoothing")
 parser.add_argument("--rpo_smoothing_param", type=float, default=1.0, help="RPO-style smoothing param")
@@ -117,7 +117,7 @@ parser.add_argument(
 parser.add_argument(
     "--mlp_act_graph",
     type=str,
-    default="tanh",
+    default="gelu",
     choices=["relu", "tanh", "elu", "gelu", "selu"],
     help="agent mlp extractor activation type",
 )
@@ -138,7 +138,11 @@ parser.add_argument(
     "ie sees the future",
 )
 parser.add_argument(
-    "--fe_type", type=str, default="dgl", help="feature extractor type in [pyg|dgl|tokengt]", choices=["pyg", "dgl", "tokengt"]
+    "--fe_type",
+    type=str,
+    default="dgl",
+    help="feature extractor type in [pyg|dgl|tokengt]",
+    choices=["pyg", "dgl", "tokengt"],
 )
 parser.add_argument(
     "--transformer_flavor",
@@ -152,8 +156,8 @@ parser.add_argument("--lap_node_id_k", type=int, default=10, help="laplacian id 
 parser.add_argument(
     "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
 )
-parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=2, help="Number of MLP layers in each GNN")
-parser.add_argument("--n_layers_features_extractor", type=int, default=4, help="Number of layers of GNN")
+parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=3, help="Number of MLP layers in each GNN")
+parser.add_argument("--n_layers_features_extractor", type=int, default=6, help="Number of layers of GNN")
 parser.add_argument("--hidden_dim_features_extractor", type=int, default=64, help="Dimension of hidden and output for GNN")
 parser.add_argument("--n_attention_heads", type=int, default=4, help="Dimension of hidden and output for GNN")
 parser.add_argument("--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN")
@@ -163,7 +167,7 @@ parser.add_argument(
     "--conflicts",
     type=str,
     help="machine conflcit encoding in [att|clique|node]",
-    default="att",
+    default="clique",
     choices=["att", "clique", "node"],
 )
 parser.add_argument(
@@ -171,13 +175,13 @@ parser.add_argument(
 )
 parser.add_argument("--hidden_dim_shared", type=int, default=32, help="Hidden dim for shared")
 parser.add_argument(
-    "--n_mlp_layers_actor", type=int, default=2, help="Number of MLP layers in actor (excluding input and output"
+    "--n_mlp_layers_actor", type=int, default=1, help="Number of MLP layers in actor (excluding input and output"
 )
-parser.add_argument("--hidden_dim_actor", type=int, default=32, help="Hidden dim for actor")
+parser.add_argument("--hidden_dim_actor", type=int, default=64, help="Hidden dim for actor")
 parser.add_argument(
-    "--n_mlp_layers_critic", type=int, default=2, help="Number of MLP layers in critic (excluding input and output)"
+    "--n_mlp_layers_critic", type=int, default=1, help="Number of MLP layers in critic (excluding input and output)"
 )
-parser.add_argument("--hidden_dim_critic", type=int, default=32, help="Hidden dim for critic")
+parser.add_argument("--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic")
 
 # =================================================ENVIRONMENT SPECIFICATION================================================
 parser.add_argument(
@@ -191,7 +195,7 @@ parser.add_argument(
 parser.add_argument(
     "--transition_model_config",
     type=str,
-    default="L2D",
+    default="simple",
     choices=["simple", "L2D", "SlotLocking"],
     help="Which transition model to use",
 )
@@ -205,7 +209,7 @@ parser.add_argument(
 parser.add_argument(
     "--reward_model_config",
     type=str,
-    default="L2D",
+    default="Sparse",
     choices=[
         "L2D",
         "L2D_optimistic",
@@ -268,7 +272,7 @@ parser.add_argument("--fixed_problem", default=False, action="store_true", help=
 parser.add_argument(
     "--max_edges_upper_bound_factor",
     type=int,
-    default=-1,
+    default=2,
     help="Upper bound factor to max_n_edges, allows lowering the overall memory usage",
 )
 
@@ -278,6 +282,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--load_problem", type=str, default=None, help="Load problem in Taillard format (machine numbering starts at 0)"
+)
+parser.add_argument(
+    "--first_machine_id_is_one", default=False, action="store_true", help="in taillard format, first machine id is 1"
 )
 parser.add_argument("--load_from_job", type=int, default=0, help="Start load at job n from problem")
 parser.add_argument("--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem")

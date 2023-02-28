@@ -25,7 +25,7 @@ def main():
     if args.load_problem is not None:
         args.n_j, args.n_m, affectations, durations = load_problem(
             args.load_problem,
-            taillard_offset=False,
+            taillard_offset=args.first_machine_id_is_one,
             deterministic=(args.duration_type == "deterministic"),
             load_from_job=args.load_from_job,
             load_max_jobs=args.load_max_jobs,

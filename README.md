@@ -21,7 +21,7 @@ pip install -r requirements.txt
 
 ## Run Model:
 
-See docs/USAGE.md
+See [docs/USAGE.md](docs/USAGE.md)
 
 ## Contribute
 If you want to contribute to wheatley, make sure to install the pre-commit hooks:

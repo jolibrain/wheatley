@@ -6,9 +6,6 @@ import torch.nn.functional as F
 import dgl
 
 from .orf import gaussian_orthogonal_random_matrix_batched
-from .feedforward import FeedForward
-
-# from .utils import get_laplacian_pe
 
 
 def init_params(module, n_layers):

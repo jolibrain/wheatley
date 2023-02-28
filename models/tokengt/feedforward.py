@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from .utils import get_activation_fn
 from torch.nn import Dropout
 
 
