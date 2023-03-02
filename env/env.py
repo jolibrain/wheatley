@@ -149,6 +149,12 @@ class Env(gym.Env):
             next_obs,
         )
 
+        # if needed, remove tct from obs (reward is computed on tct on obs ... )
+        if self.env_specification.do_not_observe_updated_bounds:
+            next_obs.features = next_obs.features.clone()
+            tctof = self.state.features_offset["tct"]
+            next_obs.features[:, tctof[0] : tctof[1]] = -1
+
         # Getting final necessary information
         done = self.done()
         gym_observation = next_obs.to_gym_observation()
@@ -292,11 +298,10 @@ class Env(gym.Env):
                 self.env_specification.input_list,
             )
             # remove real duration from obs (in state for computing makespan on the fly)
-            if not self.env_specification.observe_real_duration_when_affect:
-                if "duration" in self.state.features_offset:
-                    features = features.clone()
-                    dof = self.state.features_offset["duration"]
-                    features[:, dof[0] : dof[0] + 1] = -1
+            if not self.env_specification.observe_real_duration_when_affect and "duration" in self.state.features_offset:
+                features = features.clone()
+                dof = self.state.features_offset["duration"]
+                features[:, dof[0] : dof[0] + 1] = -1
             return EnvObservation(
                 self.n_jobs,
                 self.n_machines,

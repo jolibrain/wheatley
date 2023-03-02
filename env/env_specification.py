@@ -14,6 +14,7 @@ class EnvSpecification:
         chunk_n_jobs,
         observe_conflicts_as_cliques,
         observe_real_duration_when_affect,
+        do_not_observe_updated_bounds,
     ):
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
@@ -29,6 +30,7 @@ class EnvSpecification:
         self.n_features = get_n_features(self.input_list, self.max_n_jobs, self.max_n_machines)
         self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
         self.observe_real_duration_when_affect = observe_real_duration_when_affect
+        self.do_not_observe_updated_bounds = do_not_observe_updated_bounds
 
     def print_self(self):
         print_input_list = [el.lower().title().replace("_", " ") for el in self.input_list]
@@ -38,6 +40,7 @@ class EnvSpecification:
             f"Input normalization:                {'Yes' if self.normalize_input else 'No'}\n"
             f"Insertion mode:                     {self.insertion_mode.lower().title().replace('_', ' ')}\n"
             f"Observe real duration when affect:  {self.observe_real_duration_when_affect}\n"
+            f"Do not observe tct:                 {self.do_not_observe_updated_bounds}\n"
             f"List of features:\n - Task Completion Times\n - Machine Id"
         )
         print(" - " + "\n - ".join(print_input_list) + "\n")

@@ -205,6 +205,10 @@ parser.add_argument(
     action="store_true",
     help="observe real duration at affectatio type, for more efficient replanning",
 )
+parser.add_argument(
+    "--do_not_observe_updated_bounds", default=False, action="store_true", help="do not observe task completion time"
+)
+
 
 parser.add_argument(
     "--reward_model_config",

@@ -154,6 +154,8 @@ python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_
 - `--insertion_mode` : allow insertion
 - `--reward_model_config` : reward model
 - `--dont_normalize_input`: do not normalize state data
+- `--observe_duration_when_affect` : with this option, real durations are observed at affectation time and used to tighten task completion time bounds. 
+- `--do_not_observe_updated_bounds`: task completion time (tct) bounds are computed on-the-fly during trial (necessary for L2D reward model), with this option updated tct bounds are not given to the agent (not observed)
 
 ## Sub problem sampling:
 - `--load_from_job` : start index for sub problem sampling
