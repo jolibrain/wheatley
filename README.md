@@ -1,6 +1,6 @@
 # Wheatley 
 
-A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems.
+A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems, and more.
 
 ## Features
 - Trains a scheduler for fixed or problems with uncertainty
