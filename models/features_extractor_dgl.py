@@ -6,7 +6,6 @@ import dgl
 from dgl.nn import GINEConv, EGATConv, PNAConv, MaxPooling, AvgPooling, DGNConv, GCN2Conv
 from dgl import LaplacianPE
 from utils.agent_observation import AgentObservation
-from utils.utils import put_back_one_hot_encoding_batched
 
 
 class FeaturesExtractorDGL(BaseFeaturesExtractor):
