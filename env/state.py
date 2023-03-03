@@ -694,10 +694,12 @@ class State:
 
             self.features[node_id, self.features_offset["selectable"][0]] = 0
             for successor in self.graph.successors(node_id):
-                parents = list(self.graph.predecessors(successor))
-                parents_affected = self.features[parents, self.features_offset["is_affected"][0]]
-                if torch.all(parents_affected.flatten() == 1):
-                    self.features[successor, self.features_offset["selectable"][0]] = 1
+                sjid, stid = node_to_job_and_task(successor, self.n_machines)
+                if self.affectations[sjid, stid] != -1:
+                    parents = list(self.graph.predecessors(successor))
+                    parents_affected = self.features[parents, self.features_offset["is_affected"][0]]
+                    if torch.all(parents_affected.flatten() == 1):
+                        self.features[successor, self.features_offset["selectable"][0]] = 1
 
     def get_machine_occupancy(self, machine_id, metric):
         """
