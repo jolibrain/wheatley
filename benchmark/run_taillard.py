@@ -1,3 +1,29 @@
+#
+# Wheatley
+# Copyright (c) 2023 Jolibrain
+# Authors:
+#    Guillaume Infantes <guillaume.infantes@jolibrain.com>
+#    Antoine Jacquet <antoine.jacquet@jolibrain.com>
+#    Michel Thomazo <thomazo.michel@gmail.com>
+#    Emmanuel Benazera <emmanuel.benazera@jolibrain.com>
+#
+#
+# This file is part of Wheatley.
+#
+# Wheatley is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Wheatley is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
+#
+
 # Running benchmark on Taillard's problems and storing the results in taillard_results.txt.
 # If you want to run the benchmark with default parameters on all available taillards problems (stored in
 # wheatley/instances/taillard/), just run: python3 run_taillard.py
