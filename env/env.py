@@ -32,7 +32,9 @@ import traceback
 
 from env.transition_models.l2d_transition_model import L2DTransitionModel
 from env.transition_models.simple_transition_model import SimpleTransitionModel
-from env.transition_models.slot_locking_transition_model import SlotLockingTransitionModel
+from env.transition_models.slot_locking_transition_model import (
+    SlotLockingTransitionModel,
+)
 from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
 from env.reward_models.l2d_reward_model import L2DRewardModel
 from env.reward_models.l2d_estim_reward_model import L2DEstimRewardModel
@@ -66,24 +68,35 @@ class Env(gym.Env):
         self.n_nodes = self.n_machines * self.n_jobs
         self.deterministic = problem_description.deterministic
 
-        self.observe_conflicts_as_cliques = env_specification.observe_conflicts_as_cliques
+        self.observe_conflicts_as_cliques = (
+            env_specification.observe_conflicts_as_cliques
+        )
 
         self.n_features = get_n_features(
-            self.env_specification.input_list, self.env_specification.max_n_jobs, self.env_specification.max_n_machines
+            self.env_specification.input_list,
+            self.env_specification.max_n_jobs,
+            self.env_specification.max_n_machines,
         )
-        self.action_space = Discrete(self.env_specification.max_n_nodes * (2 if self.env_specification.add_boolean else 1))
+        self.action_space = Discrete(
+            self.env_specification.max_n_nodes
+            * (2 if self.env_specification.add_boolean else 1)
+        )
 
         if self.observe_conflicts_as_cliques:
             n_conflict_edges = (
-                self.env_specification.max_n_jobs
-                * self.env_specification.max_n_jobs
-                * (self.env_specification.max_n_machines)
+                2
+                * sum(range(self.env_specification.max_n_jobs))
+                * self.env_specification.max_n_machines
             )
 
             shape_conflict_edges = (2, n_conflict_edges)
 
         if self.env_specification.max_edges_factor > 0:
-            shape = (2, self.env_specification.max_edges_factor * self.env_specification.max_n_nodes)
+            shape = (
+                2,
+                self.env_specification.max_edges_factor
+                * self.env_specification.max_n_nodes,
+            )
         else:
             shape = (2, self.env_specification.max_n_edges)
 
@@ -267,7 +280,10 @@ class Env(gym.Env):
                 self.env_specification.max_n_machines,
                 self.env_specification.observe_real_duration_when_affect,
             )
-        elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode != "slot_locking":
+        elif (
+            self.transition_model_config == "L2D"
+            and self.env_specification.insertion_mode != "slot_locking"
+        ):
             self.transition_model = L2DTransitionModel(
                 self.state.affectations,
                 self.state.durations,
@@ -275,7 +291,10 @@ class Env(gym.Env):
                 self.env_specification.max_n_machines,
                 self.env_specification.observe_real_duration_when_affect,
             )
-        elif self.transition_model_config == "L2D" and self.env_specification.insertion_mode == "slot_locking":
+        elif (
+            self.transition_model_config == "L2D"
+            and self.env_specification.insertion_mode == "slot_locking"
+        ):
             self.transition_model = SlotLockingTransitionModel(
                 self.state.affectations,
                 self.state.durations,
@@ -301,16 +320,25 @@ class Env(gym.Env):
                 self.reward_model = SparseRewardModel()
             elif self.reward_model_config == "Tassel":
                 self.reward_model = TasselRewardModel(
-                    self.affectations, self.durations, self.env_specification.normalize_input
+                    self.affectations,
+                    self.durations,
+                    self.env_specification.normalize_input,
                 )
             elif self.reward_model_config == "Intrinsic":
-                self.reward_model = IntrinsicRewardModel(self.n_features * self.n_nodes, self.n_nodes)
+                self.reward_model = IntrinsicRewardModel(
+                    self.n_features * self.n_nodes, self.n_nodes
+                )
             else:
                 raise Exception("Reward model not recognized")
 
         # If the problem_description is stochastic, only Sparse and Uncertain reward models are accepted
         else:
-            if self.reward_model_config in ["realistic", "optimistic", "pessimistic", "averagistic"]:
+            if self.reward_model_config in [
+                "realistic",
+                "optimistic",
+                "pessimistic",
+                "averagistic",
+            ]:
                 self.reward_model = UncertainRewardModel(self.reward_model_config)
             elif self.reward_model_config == "Sparse":
                 self.reward_model = SparseRewardModel()
@@ -319,12 +347,20 @@ class Env(gym.Env):
 
     def observe(self):
         if self.observe_conflicts_as_cliques:
-            features, edge_index, conflicts_edges, conflicts_edges_machineid = self.state.to_features_and_edge_index(
+            (
+                features,
+                edge_index,
+                conflicts_edges,
+                conflicts_edges_machineid,
+            ) = self.state.to_features_and_edge_index(
                 self.env_specification.normalize_input,
                 self.env_specification.input_list,
             )
             # remove real duration from obs (in state for computing makespan on the fly)
-            if not self.env_specification.observe_real_duration_when_affect and "duration" in self.state.features_offset:
+            if (
+                not self.env_specification.observe_real_duration_when_affect
+                and "duration" in self.state.features_offset
+            ):
                 features = features.clone()
                 dof = self.state.features_offset["duration"]
                 features[:, dof[0] : dof[0] + 1] = -1
@@ -370,6 +406,11 @@ class Env(gym.Env):
         return self.state.durations.shape[2] > 1
 
     def action_masks(self):
-        mask = self.transition_model.get_mask(self.state, self.env_specification.add_boolean)
-        mask += [False] * (self.env_specification.max_n_jobs * self.env_specification.max_n_machines - len(mask))
+        mask = self.transition_model.get_mask(
+            self.state, self.env_specification.add_boolean
+        )
+        mask += [False] * (
+            self.env_specification.max_n_jobs * self.env_specification.max_n_machines
+            - len(mask)
+        )
         return mask

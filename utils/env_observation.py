@@ -90,9 +90,13 @@ class EnvObservation:
         edge_index = torch.zeros((2, self.max_n_edges))
         edge_index[:, 0 : self.get_n_edges()] = self.edge_index
         if self.observe_conflicts_as_cliques:
-            conflicts_edges = torch.zeros((2, self.max_n_jobs * self.max_n_jobs * self.max_n_machines))
+            conflicts_edges = torch.zeros(
+                (2, 2 * sum(range(self.max_n_jobs)) * self.max_n_machines)
+            )
             conflicts_edges[:, 0 : self.conflicts_edges.shape[1]] = self.conflicts_edges
-            conflicts_edges_machineid = torch.zeros((2, self.max_n_jobs * self.max_n_jobs * self.max_n_machines))
+            conflicts_edges_machineid = torch.zeros(
+                (2, 2 * sum(range(self.max_n_jobs)) * self.max_n_machines)
+            )
             conflicts_edges_machineid[
                 :, : self.conflicts_edges_machineid.shape[0]
             ] = self.conflicts_edges_machineid.unsqueeze(0)
@@ -106,7 +110,9 @@ class EnvObservation:
                 "edge_index": edge_index.numpy().astype("int64"),
                 "n_conflict_edges": self.n_conflict_edges,
                 "conflicts_edges": conflicts_edges.numpy().astype("int64"),
-                "conflicts_edges_machineid": conflicts_edges_machineid.numpy().astype("int64"),
+                "conflicts_edges_machineid": conflicts_edges_machineid.numpy().astype(
+                    "int64"
+                ),
             }
         else:
             return {

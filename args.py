@@ -44,9 +44,17 @@ parser.add_argument("--seed", type=int, default=42, help="Random seed")
 parser.add_argument("--max_n_j", type=int, default=-1, help="Max number of jobs (if -1, max_n_j=n_j")
 parser.add_argument("--max_n_m", type=int, default=-1, help="Max number of machines (if -1, max_n_m=n_m")
 parser.add_argument(
-    "--path", type=str, default="saved_networks/default_net", help="Path to saved network (default is set to exp_name)"
+    "--path",
+    type=str,
+    default="saved_networks/default_net",
+    help="Path to saved network (default is set to exp_name)",
 )
-parser.add_argument("--n_workers", type=int, default=1, help="Number of CPU cores for simulating environment")
+parser.add_argument(
+    "--n_workers",
+    type=int,
+    default=1,
+    help="Number of CPU cores for simulating environment",
+)
 parser.add_argument(
     "--device",
     type=str,
@@ -55,7 +63,11 @@ parser.add_argument(
     help="Which device to use (cpu, cuda:0, cuda:1...)",
 )
 parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
-parser.add_argument("--stable_baselines3_localisation", type=str, help="If using custom SB3, specify here the path")
+parser.add_argument(
+    "--stable_baselines3_localisation",
+    type=str,
+    help="If using custom SB3, specify here the path",
+)
 parser.add_argument(
     "--vecenv_type",
     type=str,
@@ -65,10 +77,25 @@ parser.add_argument(
 )
 
 # =================================================TRAINING SPECIFICATION====================================================
-parser.add_argument("--total_timesteps", type=int, default=int(1e4), help="Number of training env timesteps")
-parser.add_argument("--n_epochs", type=int, default=10, help="Number of epochs for updating the agent's parameters")
+parser.add_argument(
+    "--total_timesteps",
+    type=int,
+    default=int(1e4),
+    help="Number of training env timesteps",
+)
+parser.add_argument(
+    "--n_epochs",
+    type=int,
+    default=10,
+    help="Number of epochs for updating the agent's parameters",
+)
 parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
-parser.add_argument("--batch_size", type=int, default=128, help="Batch size during training of the agent")
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    default=128,
+    help="Batch size during training of the agent",
+)
 parser.add_argument("--lr", type=float, default=2e-4, help="Default Learning rate")
 parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
 parser.add_argument("--rpo", default=False, action="store_true", help="use RPO-style smoothing")
@@ -81,9 +108,17 @@ parser.add_argument(
     choices=["adam", "sgd", "adamw", "radam", "dadam"],
     help="Which optimizer to use",
 )
-parser.add_argument("--freeze_graph", default=False, action="store_true", help="Freezes graph during training")
 parser.add_argument(
-    "--custom_heuristic_name", default="None", choices=["None", "mwkr", "mopnr"], help="Which custom heuristic to run"
+    "--freeze_graph",
+    default=False,
+    action="store_true",
+    help="Freezes graph during training",
+)
+parser.add_argument(
+    "--custom_heuristic_name",
+    default="None",
+    choices=["None", "mwkr", "mopnr"],
+    help="Which custom heuristic to run",
 )
 parser.add_argument(
     "--retrain",
@@ -93,9 +128,16 @@ parser.add_argument(
 )
 
 # =================================================VALIDATION SPECIFICATION=================================================
-parser.add_argument("--n_validation_env", type=int, default=20, help="Number of validation environments ")
 parser.add_argument(
-    "--fixed_validation", action="store_true", help="Use the same problems/durations sampling and OR-Tools solutions"
+    "--n_validation_env",
+    type=int,
+    default=20,
+    help="Number of validation environments ",
+)
+parser.add_argument(
+    "--fixed_validation",
+    action="store_true",
+    help="Use the same problems/durations sampling and OR-Tools solutions",
 )
 parser.add_argument(
     "--fixed_random_validation",
@@ -103,9 +145,24 @@ parser.add_argument(
     default=0,
     help="Average the random solutions over N random runs, requires --fixed_validation",
 )
-parser.add_argument("--validation_freq", type=int, default=-1, help="Number of steps between each evaluation")
-parser.add_argument("--max_time_ortools", type=int, default=3, help="Max compute time for ortools (in seconds)")
-parser.add_argument("--validation_batch_size", type=int, default=0, help="Batch size for predictions of actions")
+parser.add_argument(
+    "--validation_freq",
+    type=int,
+    default=-1,
+    help="Number of steps between each evaluation",
+)
+parser.add_argument(
+    "--max_time_ortools",
+    type=int,
+    default=3,
+    help="Max compute time for ortools (in seconds)",
+)
+parser.add_argument(
+    "--validation_batch_size",
+    type=int,
+    default=0,
+    help="Batch size for predictions of actions",
+)
 
 # =================================================TESTING SPECIFICATION====================================================
 parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
@@ -114,10 +171,19 @@ parser.add_argument("--test_print_every", type=int, default=50, help="Print freq
 # =================================================AGENT SPECIFICATION======================================================
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
 parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping parameter")
-parser.add_argument("--target_kl", type=float, default=0.2, help="Limit the KL divergence between updates")
+parser.add_argument(
+    "--target_kl",
+    type=float,
+    default=0.2,
+    help="Limit the KL divergence between updates",
+)
 parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
 parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
-parser.add_argument("--dont_normalize_advantage", action="store_true", help="Whether to not normalize PPO advantage")
+parser.add_argument(
+    "--dont_normalize_advantage",
+    action="store_true",
+    help="Whether to not normalize PPO advantage",
+)
 
 parser.add_argument(
     "--gconv_type",
@@ -177,35 +243,71 @@ parser.add_argument(
     help="transformer implementation for tokengt",
     choices=["vanilla", "linear", "performer"],
 )
-parser.add_argument("--cache_lap_node_id", action="store_true", help="enable laplacian cache for tokengt")
+parser.add_argument(
+    "--cache_lap_node_id",
+    action="store_true",
+    help="enable laplacian cache for tokengt",
+)
 parser.add_argument("--lap_node_id_k", type=int, default=10, help="laplacian id size for tokengt")
 parser.add_argument(
-    "--graph_has_relu", action="store_true", help="whether graph feature extractor has activations between layers"
+    "--graph_has_relu",
+    action="store_true",
+    help="whether graph feature extractor has activations between layers",
 )
-parser.add_argument("--n_mlp_layers_features_extractor", type=int, default=3, help="Number of MLP layers in each GNN")
+parser.add_argument(
+    "--n_mlp_layers_features_extractor",
+    type=int,
+    default=3,
+    help="Number of MLP layers in each GNN",
+)
 parser.add_argument("--n_layers_features_extractor", type=int, default=6, help="Number of layers of GNN")
-parser.add_argument("--hidden_dim_features_extractor", type=int, default=64, help="Dimension of hidden and output for GNN")
-parser.add_argument("--n_attention_heads", type=int, default=4, help="Dimension of hidden and output for GNN")
+parser.add_argument(
+    "--hidden_dim_features_extractor",
+    type=int,
+    default=64,
+    help="Dimension of hidden and output for GNN",
+)
+parser.add_argument(
+    "--n_attention_heads",
+    type=int,
+    default=4,
+    help="Dimension of hidden and output for GNN",
+)
 parser.add_argument("--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN")
 parser.add_argument("--residual_gnn", action="store_true", help="use residual connection in GNN")
 parser.add_argument("--normalize_gnn", action="store_true", help="normalize gnn everywhere")
 parser.add_argument(
     "--conflicts",
     type=str,
-    help="machine conflcit encoding in [att|clique|node]",
+    help="machine conflict encoding in [att|clique|node]",
     default="clique",
     choices=["att", "clique", "node"],
 )
 parser.add_argument(
-    "--n_mlp_layers_shared", type=int, default=0, help="Number of MLP layers in shared (excluding input and output"
+    "--precompute_cliques",
+    default=False,
+    action="store_true",
+    help="precompute cliques, trades mem with cpu time",
+)
+parser.add_argument(
+    "--n_mlp_layers_shared",
+    type=int,
+    default=0,
+    help="Number of MLP layers in shared (excluding input and output",
 )
 parser.add_argument("--hidden_dim_shared", type=int, default=32, help="Hidden dim for shared")
 parser.add_argument(
-    "--n_mlp_layers_actor", type=int, default=1, help="Number of MLP layers in actor (excluding input and output"
+    "--n_mlp_layers_actor",
+    type=int,
+    default=1,
+    help="Number of MLP layers in actor (excluding input and output",
 )
 parser.add_argument("--hidden_dim_actor", type=int, default=64, help="Hidden dim for actor")
 parser.add_argument(
-    "--n_mlp_layers_critic", type=int, default=1, help="Number of MLP layers in critic (excluding input and output)"
+    "--n_mlp_layers_critic",
+    type=int,
+    default=1,
+    help="Number of MLP layers in critic (excluding input and output)",
 )
 parser.add_argument("--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic")
 
@@ -232,7 +334,10 @@ parser.add_argument(
     help="observe real duration at affectatio type, for more efficient replanning",
 )
 parser.add_argument(
-    "--do_not_observe_updated_bounds", default=False, action="store_true", help="do not observe task completion time"
+    "--do_not_observe_updated_bounds",
+    default=False,
+    action="store_true",
+    help="do not observe task completion time",
 )
 
 
@@ -274,7 +379,12 @@ parser.add_argument(
     "--insertion_mode",
     type=str,
     default="no_forced_insertion",
-    choices=["no_forced_insertion", "full_forced_insertion", "choose_forced_insertion", "slot_locking"],
+    choices=[
+        "no_forced_insertion",
+        "full_forced_insertion",
+        "choose_forced_insertion",
+        "slot_locking",
+    ],
     help="This defines how the jobs are inserted in the schedule.",
 )
 parser.add_argument(
@@ -296,9 +406,17 @@ parser.add_argument(
     + "mopnr, mwkr",
 )
 parser.add_argument(
-    "--dont_normalize_input", default=False, action="store_true", help="Default is dividing input by constant"
+    "--dont_normalize_input",
+    default=False,
+    action="store_true",
+    help="Default is dividing input by constant",
 )
-parser.add_argument("--fixed_problem", default=False, action="store_true", help="Fix affectations and durations")
+parser.add_argument(
+    "--fixed_problem",
+    default=False,
+    action="store_true",
+    help="Fix affectations and durations",
+)
 parser.add_argument(
     "--max_edges_upper_bound_factor",
     type=int,
@@ -308,18 +426,36 @@ parser.add_argument(
 
 # =================================================OTHER====================================================================
 parser.add_argument(
-    "--taillard_pbs", help="taillard problem name (e.g ta01), default is empty for benchmarking all problems", default="*"
+    "--taillard_pbs",
+    help="taillard problem name (e.g ta01), default is empty for benchmarking all problems",
+    default="*",
 )
 parser.add_argument(
-    "--load_problem", type=str, default=None, help="Load problem in Taillard format (machine numbering starts at 0)"
+    "--load_problem",
+    type=str,
+    default=None,
+    help="Load problem in Taillard format (machine numbering starts at 0)",
 )
 parser.add_argument(
-    "--first_machine_id_is_one", default=False, action="store_true", help="in taillard format, first machine id is 1"
+    "--first_machine_id_is_one",
+    default=False,
+    action="store_true",
+    help="in taillard format, first machine id is 1",
 )
 parser.add_argument("--load_from_job", type=int, default=0, help="Start load at job n from problem")
 parser.add_argument("--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem")
-parser.add_argument("--sample_n_jobs", type=int, default=-1, help="Sample n jobs from problem during reset")
-parser.add_argument("--chunk_n_jobs", type=int, default=-1, help="Pick a chunk of n jobs from problem during reset")
+parser.add_argument(
+    "--sample_n_jobs",
+    type=int,
+    default=-1,
+    help="Sample n jobs from problem during reset",
+)
+parser.add_argument(
+    "--chunk_n_jobs",
+    type=int,
+    default=-1,
+    help="Pick a chunk of n jobs from problem during reset",
+)
 parser.add_argument(
     "--validate_on_total_data",
     default=False,
@@ -333,7 +469,10 @@ parser.add_argument(
     help="Generate duration bounds in %% of the true value, e.g. 0.05 for 5%% uncertainty",
 )
 parser.add_argument(
-    "--scaling_constant_ortools", type=int, default=1000, help="Factor for OR-Tools, since it only solves integer problems"
+    "--scaling_constant_ortools",
+    type=int,
+    default=1000,
+    help="Factor for OR-Tools, since it only solves integer problems",
 )
 
 # ================================================PARSING, IMPORTS, AND VERIFICATIONS=======================================

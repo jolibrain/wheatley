@@ -30,7 +30,7 @@ Commmon options:
 # Small fixed random problem without uncertainty
 
 ```
-python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --n_workers 10 --batch_size 1600  --lr 0.0002 --exp_name_appendix EXAMPLE1 --fixed_problem --seed 1
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --n_workers 10 --batch_size 160  --lr 0.0002 --exp_name_appendix EXAMPLE1 --fixed_problem --seed 1
 ```
 
 - `--fixed_problem` : force use of same problem along all training
