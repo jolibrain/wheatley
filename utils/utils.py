@@ -30,7 +30,6 @@ import numpy as np
 import torch
 from typing import List, Optional, Tuple, Union
 from collections import defaultdict
-import torch_geometric.data
 
 import sys
 

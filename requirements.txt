@@ -2,16 +2,14 @@ pre - commit
 pytest
 torch
 numpy
-torch_geometric
 stable_baselines3
 gym
 ortools
 visdom
 networkx
-torch_sparse
-torch_scatter
 plotly
 opencv-python
 sb3_contrib
 kaleido
 numba
+einops

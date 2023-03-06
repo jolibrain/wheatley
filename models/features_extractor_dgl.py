@@ -211,7 +211,7 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
     def forward(self, obs):
 
         observation = AgentObservation.from_gym_observation(
-            obs, use_dgl=True, conflicts=self.conflicts, max_n_machines=self.max_n_machines
+            obs, conflicts=self.conflicts, max_n_machines=self.max_n_machines
         )
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()
