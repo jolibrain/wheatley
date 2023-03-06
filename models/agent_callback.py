@@ -242,7 +242,9 @@ class ValidationCallback(BaseCallback):
         ortools_mean_makespan = 0
         random_mean_makespan = 0
         custom_mean_makespan = 0
+        eval_time = 0
         for i in range(self.n_validation_env):
+            start_eval = time.process_time()
             if not batch_size:
                 obs = self.validation_envs[i].reset(soft=self.fixed_validation)
                 done = False
@@ -251,6 +253,7 @@ class ValidationCallback(BaseCallback):
                     action, _ = self.model.predict(obs, deterministic=True, action_masks=action_masks)
                     obs, reward, done, info = self.validation_envs[i].step(action)
             solution = self.validation_envs[i].get_solution()
+            eval_time += (time.process_time() - start_eval) / self.n_validation_env
             schedule = solution.schedule
             makespan = solution.get_makespan()
 
@@ -302,6 +305,7 @@ class ValidationCallback(BaseCallback):
                     / self.n_validation_env
                 )
         print("--- mean_makespan=", mean_makespan, " ---")
+        print("--- eval time=", eval_time, "  ---")
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
