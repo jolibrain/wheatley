@@ -233,8 +233,8 @@ parser.add_argument(
     "--fe_type",
     type=str,
     default="dgl",
-    help="feature extractor type in [pyg|dgl|tokengt]",
-    choices=["pyg", "dgl", "tokengt"],
+    help="feature extractor type in [dgl|tokengt]",
+    choices=["dgl", "tokengt"],
 )
 parser.add_argument(
     "--transformer_flavor",

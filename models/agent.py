@@ -40,7 +40,6 @@ import torch
 from env.env import Env
 from models.agent_callback import ValidationCallback
 from models.policy import Policy, RPOPolicy
-from models.features_extractor import FeaturesExtractor
 from models.features_extractor_dgl import FeaturesExtractorDGL
 from models.features_extractor_tokengt import FeaturesExtractorTokenGT
 from problem.problem_description import ProblemDescription
@@ -141,14 +140,12 @@ class Agent:
             agent_specification = self.agent_specification
             if agent_specification.fe_type == "dgl":
                 fe_type = FeaturesExtractorDGL
-            elif agent_specification.fe_type == "pyg":
-                fe_type = FeaturesExtractor
             elif agent_specification.fe_type == "tokengt":
                 fe_type = FeaturesExtractorTokenGT
             else:
                 print("unknown fe_type: ", agent_specification.fe_type)
 
-            if agent_specification.fe_type in ["dgl", "pyg"]:
+            if agent_specification.fe_type == "dgl":
                 fe_kwargs = {
                     "input_dim_features_extractor": env_specification.n_features,
                     "gconv_type": agent_specification.gconv_type,

@@ -31,7 +31,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch_geometric
 
 import datetime
 import pandas as pd
@@ -424,7 +423,7 @@ class State:
 
     def to_features_and_edge_index(self, normalize_input, input_list):
         """
-        Returns self.graph under the form of a torch_geometric.data.Data object.
+        Returns self.graph under the form of a feature and edge_index tensors.
         The node_encoding arguments specifies what are the features (i.e. the x
         parameter of the Data object) that should be added to the graph.
         Note, input_set can contains the following str: 'one_hot_machine_id','one_hot_job_id',

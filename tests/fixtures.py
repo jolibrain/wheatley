@@ -28,7 +28,6 @@ from gym.spaces import Dict, Box, Discrete
 import numpy as np
 from pytest import fixture
 import torch
-from torch_geometric.data import Data
 
 from env.env import Env
 from env.env_specification import EnvSpecification
@@ -38,15 +37,6 @@ from models.features_extractor import FeaturesExtractor
 from problem.problem_description import ProblemDescription
 from utils.env_observation import EnvObservation
 from utils.agent_observation import AgentObservation
-
-
-@fixture
-def graph():
-    graph = Data(
-        x=torch.rand(4, 3),
-        edge_index=torch.tensor([[0, 1, 2, 3], [1, 2, 3, 0]], dtype=torch.int64),
-    )
-    return graph
 
 
 @fixture

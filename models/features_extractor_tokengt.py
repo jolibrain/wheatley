@@ -139,7 +139,6 @@ class FeaturesExtractorTokenGT(BaseFeaturesExtractor):
         # print("lap cache size", len(self.laplacian_pe_cache))
         g_list = AgentObservation.from_gym_observation(
             obs,
-            use_dgl=True,
             conflicts=self.conflicts,
             max_n_machines=self.max_n_machines,
             add_self_loops=False,

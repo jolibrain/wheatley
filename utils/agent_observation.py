@@ -25,7 +25,6 @@
 #
 
 import torch
-from torch_geometric.data import Data, Batch
 from models.tokengt.utils import get_laplacian_pe_simple
 from .utils import compute_conflicts_cliques, put_back_one_hot_encoding_unbatched
 import dgl
@@ -33,25 +32,20 @@ import time
 
 
 class AgentObservation:
-    def __init__(self, graphs, use_dgl, glist=False):
-        self.use_dgl = use_dgl
+    def __init__(self, graphs, glist=False):
         self.graphs = graphs
         self.glist = glist
 
     def get_batch_size(self):
-        if self.use_dgl:
-            if self.glist:
-                return len(self.graphs)
-            return self.graphs.batch_size
-        return self.graph.num_graphs
+        if self.glist:
+            return len(self.graphs)
+        return self.graphs.batch_size
 
     def get_n_nodes(self):
-        if self.use_dgl:
-            if self.glist:
-                return int(sum([g.num_nodes() for g in self.graphs]) / len(self.graphs))
-            else:
-                return int(self.graphs.num_nodes() / self.graphs.batch_size)
-        return int(self.graphs.num_nodes / self.graphs.num_graphs)
+        if self.glist:
+            return int(sum([g.num_nodes() for g in self.graphs]) / len(self.graphs))
+        else:
+            return int(self.graphs.num_nodes() / self.graphs.batch_size)
 
     @classmethod
     def build_graph(cls, n_edges, edges, nnodes, feats, bidir):
@@ -104,7 +98,6 @@ class AgentObservation:
     def from_gym_observation(
         cls,
         gym_observation,
-        use_dgl=False,
         conflicts="att",
         max_n_machines=-1,
         add_self_loops=True,
@@ -116,101 +109,86 @@ class AgentObservation:
         bidir=True,
     ):
 
-        if not use_dgl:
-            n_nodes = gym_observation["n_nodes"].long()
-            n_edges = gym_observation["n_edges"].long()
-            features = gym_observation["features"]
+        # batching on CPU for performance reasons...
+        n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
+        n_edges = gym_observation["n_edges"].long().to(torch.device("cpu"))
+        edge_index = gym_observation["edge_index"].long().to(torch.device("cpu"))
+        orig_feat = gym_observation["features"]  # .to(torch.device("cpu"))
 
-            edge_index = gym_observation["edge_index"].long()
-            # collating is much faster on cpu due to transfer of incs
-            orig_device = features.device
-            fcpu = features.to("cpu")
-            eicpu = edge_index.to("cpu")
-            graph = Batch.from_data_list(
-                [Data(fcpu[i, : n_nodes[i], :], eicpu[i, : n_edges[i], :]) for i in range(fcpu.shape[0])]
-            )
-            return cls(graph.to(orig_device), use_dgl)
+        if conflicts != "clique":
+            # orig_feat = put_back_one_hot_encoding_unbatched(orig_feat, max_n_machines)
+            orig_feat = orig_feat.to(torch.device("cpu"))
         else:
-            # here again, batching on CPU...
-            n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
-            n_edges = gym_observation["n_edges"].long().to(torch.device("cpu"))
-            edge_index = gym_observation["edge_index"].long().to(torch.device("cpu"))
-            orig_feat = gym_observation["features"]  # .to(torch.device("cpu"))
+            if "n_conflict_edges" in gym_observation:  # precomputed cliques
+                n_conflict_edges = gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
 
-            if conflicts != "clique":
+                conflicts_edges = gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
+                conflicts_edges_machineid = gym_observation["conflicts_edges_machineid"].long().to(torch.device("cpu"))
+                orig_feat = orig_feat.to(torch.device("cpu"))
+            else:  # compute cliques
+                conflicts_edges = []
+                conflicts_edges_machineid = []
+                all_nce = []
+                for i in range(orig_feat.shape[0]):
+                    ce, cemid = compute_conflicts_cliques(orig_feat[i, : n_nodes[i], 6].long().squeeze(0))
+                    cemid = cemid.unsqueeze_(0).expand(ce.shape)
+                    conflicts_edges.append(ce.long().to(torch.device("cpu")))
+                    conflicts_edges_machineid.append(cemid.long().to(torch.device("cpu")))
+                    nce = torch.LongTensor([ce.shape[1]])
+                    all_nce.append(nce)
+
+                # conflicts_edges = torch.stack(all_ce).to(torch.device("cpu"))
+
+                # Pas besoin de stack, garder la liste pour en dessous
+                # conflicts_edges_machineid = (
+                #     torch.stack(all_cemid).unsqueeze_(1).expand(conflicts_edges.shape).to(torch.device("cpu"))
+                # )
+
+                n_conflict_edges = torch.cat(all_nce)
                 # orig_feat = put_back_one_hot_encoding_unbatched(orig_feat, max_n_machines)
                 orig_feat = orig_feat.to(torch.device("cpu"))
-            else:
-                if "n_conflict_edges" in gym_observation:  # precomputed cliques
-                    n_conflict_edges = gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
 
-                    conflicts_edges = gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
-                    conflicts_edges_machineid = gym_observation["conflicts_edges_machineid"].long().to(torch.device("cpu"))
-                    orig_feat = orig_feat.to(torch.device("cpu"))
-                else:  # compute cliques
-                    conflicts_edges = []
-                    conflicts_edges_machineid = []
-                    all_nce = []
-                    for i in range(orig_feat.shape[0]):
-                        ce, cemid = compute_conflicts_cliques(orig_feat[i, : n_nodes[i], 6].long().squeeze(0))
-                        cemid = cemid.unsqueeze_(0).expand(ce.shape)
-                        conflicts_edges.append(ce.long().to(torch.device("cpu")))
-                        conflicts_edges_machineid.append(cemid.long().to(torch.device("cpu")))
-                        nce = torch.LongTensor([ce.shape[1]])
-                        all_nce.append(nce)
+        graphs = []
+        if do_batch:
+            batch_num_nodes = []
+            batch_num_edges = []
 
-                    # conflicts_edges = torch.stack(all_ce).to(torch.device("cpu"))
+        for i, nnodes in enumerate(n_nodes):
+            features = orig_feat[i, :nnodes, :]
+            gnew = cls.build_graph(
+                n_edges[i],
+                edge_index[i, :, : n_edges[i].item()],
+                nnodes.item(),
+                orig_feat[i, : nnodes.item(), :],
+                bidir,
+            )
 
-                    # Pas besoin de stack, garder la liste pour en dessous
-                    # conflicts_edges_machineid = (
-                    #     torch.stack(all_cemid).unsqueeze_(1).expand(conflicts_edges.shape).to(torch.device("cpu"))
-                    # )
-
-                    n_conflict_edges = torch.cat(all_nce)
-                    # orig_feat = put_back_one_hot_encoding_unbatched(orig_feat, max_n_machines)
-                    orig_feat = orig_feat.to(torch.device("cpu"))
-
-            graphs = []
-            if do_batch:
-                batch_num_nodes = []
-                batch_num_edges = []
-
-            for i, nnodes in enumerate(n_nodes):
-                features = orig_feat[i, :nnodes, :]
-                gnew = cls.build_graph(
-                    n_edges[i],
-                    edge_index[i, :, : n_edges[i].item()],
-                    nnodes.item(),
-                    orig_feat[i, : nnodes.item(), :],
-                    bidir,
+            if conflicts == "clique":
+                gnew = AgentObservation.add_conflicts_cliques2(
+                    gnew,
+                    conflicts_edges[i][:, : n_conflict_edges[i].item()],
+                    conflicts_edges_machineid[i][:, : n_conflict_edges[i].item()],
                 )
+                # gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
 
-                if conflicts == "clique":
-                    gnew = AgentObservation.add_conflicts_cliques2(
-                        gnew,
-                        conflicts_edges[i][:, : n_conflict_edges[i].item()],
-                        conflicts_edges_machineid[i][:, : n_conflict_edges[i].item()],
-                    )
-                    # gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
-
-                if add_self_loops:
-                    gnew = dgl.add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
-                if compute_laplacian_pe:
-                    gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(gnew, laplacian_pe_cache, n_laplacian_eigv)
-                gnew = gnew.to(device)
-                graphs.append(gnew)
-                if do_batch:
-                    batch_num_nodes.append(gnew.num_nodes())
-                    batch_num_edges.append(gnew.num_edges())
-
+            if add_self_loops:
+                gnew = dgl.add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
+            if compute_laplacian_pe:
+                gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(gnew, laplacian_pe_cache, n_laplacian_eigv)
+            gnew = gnew.to(device)
+            graphs.append(gnew)
             if do_batch:
-                graph = dgl.batch(graphs)
-                graph.set_batch_num_nodes(torch.tensor(batch_num_nodes))
-                graph.set_batch_num_edges(torch.tensor(batch_num_edges))
+                batch_num_nodes.append(gnew.num_nodes())
+                batch_num_edges.append(gnew.num_edges())
 
-                return cls(graph, use_dgl, glist=False)
-            else:
-                return cls(graphs, use_dgl, glist=True)
+        if do_batch:
+            graph = dgl.batch(graphs)
+            graph.set_batch_num_nodes(torch.tensor(batch_num_nodes))
+            graph.set_batch_num_edges(torch.tensor(batch_num_edges))
+
+            return cls(graph, glist=False)
+        else:
+            return cls(graphs, glist=True)
 
     def to_graph(self):
         """
