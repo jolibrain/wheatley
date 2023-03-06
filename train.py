@@ -34,7 +34,12 @@ from models.agent import Agent
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
-from utils.utils import get_n_features, generate_deterministic_problem, generate_problem_distrib, load_problem
+from utils.utils import (
+    get_n_features,
+    generate_deterministic_problem,
+    generate_problem_distrib,
+    load_problem,
+)
 
 from args import args, exp_name, path
 
@@ -83,7 +88,9 @@ def main():
         fixed_validation=args.fixed_validation,
         fixed_random_validation=args.fixed_random_validation,
         validation_batch_size=args.validation_batch_size,
-        validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
+        validation_freq=args.n_steps_episode * args.n_workers
+        if args.validation_freq == -1
+        else args.validation_freq,
         display_env=exp_name,
         path=path,
         custom_heuristic_name=args.custom_heuristic_name,
@@ -102,7 +109,7 @@ def main():
 
     # Else, we instantiate a new Agent
     else:
-        if args.conflicts == "clique":
+        if args.conflicts == "clique" and args.precompute_cliques:
             observe_clique = True
         else:
             observe_clique = False
@@ -175,7 +182,9 @@ def main():
             rpo_smoothing_param=args.rpo_smoothing_param,
         )
         agent_specification.print_self()
-        agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
+        agent = Agent(
+            env_specification=env_specification, agent_specification=agent_specification
+        )
 
     # And finally, we train the model on the specified training mode
     # Note: The saving of the best model is hanlded in the agent.train method.

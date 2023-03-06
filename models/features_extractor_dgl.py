@@ -94,17 +94,26 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         elif self.conflicts == "node":
             nmachineid = self.max_n_machines * 2
         if self.conflicts in ["clique", "node"]:
-            for layer in range(self.n_layers_features_extractor):
-                if self.gconv_type in ["gcn2"]:
-                    self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
-                else:
-                    self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, hidden_dim_features_extractor))
+            # for layer in range(self.n_layers_features_extractor):
+            #     if self.gconv_type in ["gcn2"]:
+            #         self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
+            #     else:
+            #         self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, hidden_dim_features_extractor))
+            if self.gconv_type in ["gcn2"]:
+                self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
+            else:
+                self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, hidden_dim_features_extractor))
+
         else:
-            for layer in range(self.n_layers_features_extractor):
-                if self.gconv_type in ["gcn2"]:
-                    self.edge_embedder.append(torch.nn.Embedding(5, 1))
-                else:
-                    self.edge_embedder.append(torch.nn.Embedding(5, hidden_dim_features_extractor))
+            # for layer in range(self.n_layers_features_extractor):
+            #     if self.gconv_type in ["gcn2"]:
+            #         self.edge_embedder.append(torch.nn.Embedding(5, 1))
+            #     else:
+            #         self.edge_embedder.append(torch.nn.Embedding(5, hidden_dim_features_extractor))
+            if self.gconv_type in ["gcn2"]:
+                self.edge_embedder.append(torch.nn.Embedding(5, 1))
+            else:
+                self.edge_embedder.append(torch.nn.Embedding(5, hidden_dim_features_extractor))
 
         self.embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,

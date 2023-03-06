@@ -27,6 +27,7 @@
 import torch
 from torch_geometric.data import Data, Batch
 from models.tokengt.utils import get_laplacian_pe_simple
+from .utils import compute_conflicts_cliques, put_back_one_hot_encoding_unbatched
 import dgl
 import time
 
@@ -60,7 +61,10 @@ class AgentObservation:
         if bidir:
             type1 = [2] * n_edges
 
-            gnew = dgl.graph((torch.cat([edges0, edges1]), torch.cat([edges1, edges0])), num_nodes=nnodes)
+            gnew = dgl.graph(
+                (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
+                num_nodes=nnodes,
+            )
         else:
             gnew = dgl.graph((edges0, edges1), num_nodes=nnodes)
 
@@ -87,7 +91,10 @@ class AgentObservation:
         m1 = machineid.unsqueeze(0).expand(nnodes, nnodes)
         # put m2 unaffected to -2 so that unaffected task are not considered in conflict
         m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(nnodes, nnodes)
-        cond = torch.logical_and(torch.eq(m1, m2), torch.logical_not(torch.diag(torch.BoolTensor([True] * nnodes))))
+        cond = torch.logical_and(
+            torch.eq(m1, m2),
+            torch.logical_not(torch.diag(torch.BoolTensor([True] * nnodes))),
+        )
         conflicts = torch.where(cond, 1, 0).nonzero(as_tuple=True)
         edgetype = machineid[conflicts[0]] + 5
         g.add_edges(conflicts[0], conflicts[1], data={"type": edgetype})
@@ -128,12 +135,40 @@ class AgentObservation:
             n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
             n_edges = gym_observation["n_edges"].long().to(torch.device("cpu"))
             edge_index = gym_observation["edge_index"].long().to(torch.device("cpu"))
-            orig_feat = gym_observation["features"].to(torch.device("cpu"))
+            orig_feat = gym_observation["features"]  # .to(torch.device("cpu"))
 
-            if conflicts == "clique":
-                n_conflict_edges = gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
-                conflicts_edges = gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
-                conflicts_edges_machineid = gym_observation["conflicts_edges_machineid"].long().to(torch.device("cpu"))
+            if conflicts != "clique":
+                # orig_feat = put_back_one_hot_encoding_unbatched(orig_feat, max_n_machines)
+                orig_feat = orig_feat.to(torch.device("cpu"))
+            else:
+                if "n_conflict_edges" in gym_observation:  # precomputed cliques
+                    n_conflict_edges = gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
+
+                    conflicts_edges = gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
+                    conflicts_edges_machineid = gym_observation["conflicts_edges_machineid"].long().to(torch.device("cpu"))
+                    orig_feat = orig_feat.to(torch.device("cpu"))
+                else:  # compute cliques
+                    conflicts_edges = []
+                    conflicts_edges_machineid = []
+                    all_nce = []
+                    for i in range(orig_feat.shape[0]):
+                        ce, cemid = compute_conflicts_cliques(orig_feat[i, : n_nodes[i], 6].long().squeeze(0))
+                        cemid = cemid.unsqueeze_(0).expand(ce.shape)
+                        conflicts_edges.append(ce.long().to(torch.device("cpu")))
+                        conflicts_edges_machineid.append(cemid.long().to(torch.device("cpu")))
+                        nce = torch.LongTensor([ce.shape[1]])
+                        all_nce.append(nce)
+
+                    # conflicts_edges = torch.stack(all_ce).to(torch.device("cpu"))
+
+                    # Pas besoin de stack, garder la liste pour en dessous
+                    # conflicts_edges_machineid = (
+                    #     torch.stack(all_cemid).unsqueeze_(1).expand(conflicts_edges.shape).to(torch.device("cpu"))
+                    # )
+
+                    n_conflict_edges = torch.cat(all_nce)
+                    # orig_feat = put_back_one_hot_encoding_unbatched(orig_feat, max_n_machines)
+                    orig_feat = orig_feat.to(torch.device("cpu"))
 
             graphs = []
             if do_batch:
@@ -143,14 +178,18 @@ class AgentObservation:
             for i, nnodes in enumerate(n_nodes):
                 features = orig_feat[i, :nnodes, :]
                 gnew = cls.build_graph(
-                    n_edges[i], edge_index[i, :, : n_edges[i].item()], nnodes.item(), orig_feat[i, : nnodes.item(), :], bidir
+                    n_edges[i],
+                    edge_index[i, :, : n_edges[i].item()],
+                    nnodes.item(),
+                    orig_feat[i, : nnodes.item(), :],
+                    bidir,
                 )
 
                 if conflicts == "clique":
                     gnew = AgentObservation.add_conflicts_cliques2(
                         gnew,
-                        conflicts_edges[i, :, : n_conflict_edges[i].item()],
-                        conflicts_edges_machineid[i, :, : n_conflict_edges[i].item()],
+                        conflicts_edges[i][:, : n_conflict_edges[i].item()],
+                        conflicts_edges_machineid[i][:, : n_conflict_edges[i].item()],
                     )
                     # gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
 

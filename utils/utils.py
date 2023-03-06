@@ -278,7 +278,12 @@ def check_sanity(affectations, durations):
 
 
 def load_problem(
-    problem_file, taillard_offset=False, deterministic=True, load_from_job=0, load_max_jobs=-1, generate_bounds=-1.0
+    problem_file,
+    taillard_offset=False,
+    deterministic=True,
+    load_from_job=0,
+    load_max_jobs=-1,
+    generate_bounds=-1.0,
 ):
     # Customized problem loader
     # - support for bounded duration uncertainty
@@ -336,7 +341,12 @@ def load_problem(
                 out=durations.copy(),
                 where=durations != -1,
             )
-            max_durations = np.add(durations, generate_bounds * durations, out=durations.copy(), where=durations != -1)
+            max_durations = np.add(
+                durations,
+                generate_bounds * durations,
+                out=durations.copy(),
+                where=durations != -1,
+            )
             real_durations = np.zeros((n_j, n_m)) - 1
             durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
             # sys.exit()
@@ -419,14 +429,30 @@ def put_back_one_hot_encoding_unbatched(
     features,
     max_n_machines,
 ):
-    machineid = features[:, :, 6].long()
-    idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)
-    features[idxaffected][:, 6 : 6 + max_n_machines] = torch.nn.functional.one_hot(
-        features[idxaffected][:, 6].long(), num_classes=max_n_machines
-    ).float()
 
-    idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)
-    features[idxnonaffected][:, 6 : 6 + max_n_machines] = torch.zeros(len(idxnonaffected[0]), max_n_machines) - 1
+    # TODO : parallel version
+    machineid = features[:, :, 6].long()
+    one_hot_machine_id = torch.diag(torch.Tensor([1] * max_n_machines).to(features.device))
+    for i in range(features.shape[0]):
+        for j in range(features.shape[1]):
+            if machineid[i, j] == -1:
+                features[i, j, 6 : 6 + max_n_machines] = 0
+            else:
+                features[i, j, 6 : 6 + max_n_machines] = one_hot_machine_id[machineid[i, j]]
+
+    # idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)
+    # idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)
+    # print("fidx.shape", features[idxaffected].shape)
+    # print("fidx", features[idxaffected][:, 6 : 6 + max_n_machines].shape)
+    # print(
+    #     "one_hot", torch.nn.functional.one_hot(features[idxaffected][:, 6].long(), num_classes=max_n_machines).float().shape
+    # )
+    # features[idxaffected][:, 6 : 6 + max_n_machines] = torch.nn.functional.one_hot(
+    #     features[idxaffected][:, 6].long(), num_classes=max_n_machines
+    # ).float()
+    # print("after", features[:, :, 6 : 6 + max_n_machines])
+
+    # features[idxnonaffected][:, 6 : 6 + max_n_machines] = torch.zeros(len(idxnonaffected[0]), max_n_machines)
     return features
 
 
@@ -456,3 +482,19 @@ def lr_schedule_linear(top, end, percent_warmup, x_orig):
         lr = top - (top - end) * ((x - percent_warmup) / (1 - percent_warmup))
 
     return lr
+
+
+def compute_conflicts_cliques(machineid):
+    n_nodes = machineid.shape[0]
+    m1 = machineid.unsqueeze(0).expand(n_nodes, n_nodes)
+    # put m2 unaffected to -2 so that unaffected task are not considered in conflict
+    # TODO : same job / same machine should not be in conclicts (already a repcedence)
+    m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(n_nodes, n_nodes)
+    cond = torch.logical_and(
+        torch.eq(m1, m2),
+        torch.logical_not(torch.diag(torch.BoolTensor([True] * n_nodes).to(machineid.device))),
+    )
+    conflicts_edges = torch.where(cond, 1, 0).nonzero(as_tuple=True)
+    conflicts_edges_machineid = machineid[conflicts_edges[0]]
+    conflicts_edges = torch.stack(conflicts_edges)
+    return conflicts_edges, conflicts_edges_machineid

@@ -39,7 +39,12 @@ import plotly.figure_factory as ff
 import cv2
 
 from problem.solution import Solution
-from utils.utils import node_to_job_and_task, job_and_task_to_node, get_n_features
+from utils.utils import (
+    node_to_job_and_task,
+    job_and_task_to_node,
+    get_n_features,
+    compute_conflicts_cliques,
+)
 
 
 class State:
@@ -86,7 +91,12 @@ class State:
         self.same_job = {}
 
         self.init_features_offset(feature_list)
-        self.features = torch.zeros((self.n_nodes, get_n_features(feature_list, self.max_n_jobs, self.max_n_machines)))
+        self.features = torch.zeros(
+            (
+                self.n_nodes,
+                get_n_features(feature_list, self.max_n_jobs, self.max_n_machines),
+            )
+        )
 
         self.affected = None
         self.is_observed = None
@@ -103,10 +113,10 @@ class State:
         self.job_completion_time = None
         self.machine_completion_time = None
 
+        self.set_not_one_hot_machine_id()
         if self.observe_conflicts_as_cliques:
-            self.set_not_one_hot_machine_id()
             self.compute_conflicts_cliques()
-        self.set_one_hot_machine_id()
+            self.set_one_hot_machine_id()
         self.n_jobs_per_machine = np.array([(self.affectations == m).sum() for m in range(self.n_machines)])
         self.n_machines_per_job = np.array(
             [self.n_machines - (self.affectations[j] == -1).sum() for j in range(self.n_jobs)]
@@ -149,13 +159,12 @@ class State:
 
     # no more one hot due to perf issues when adding conflcits as cliques
     def set_not_one_hot_machine_id(self):
+        self.features[:, 6 : 6 + self.max_n_machines] = torch.zeros(self.max_n_machines) - 1
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 machine_id = self.affectations[job_id, task_id]
                 node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
-                if machine_id == -1:
-                    self.features[node_id, 6 : 6 + self.max_n_machines] = torch.zeros(self.max_n_machines) - 1
-                else:
+                if machine_id != -1:
                     self.features[node_id, 6 : 6 + self.max_n_machines] = torch.as_tensor(
                         self.not_one_hot_machine_id[machine_id]
                     )
@@ -184,7 +193,10 @@ class State:
             dof = self.features_offset["duration"]
             durs = self.features[node_id, dof[0] : dof[1]]
             return durs.clone()
-        return torch.as_tensor(self.durations[node_to_job_and_task(node_id, self.max_n_machines)], dtype=torch.float)
+        return torch.as_tensor(
+            self.durations[node_to_job_and_task(node_id, self.max_n_machines)],
+            dtype=torch.float,
+        )
 
     def reset(self):
         self.graph = nx.DiGraph(
@@ -216,14 +228,10 @@ class State:
         self.compute_pre_features()
 
     def compute_conflicts_cliques(self):
-        machineid = self.features[:, 6].long()
-        m1 = machineid.unsqueeze(0).expand(self.n_nodes, self.n_nodes)
-        # put m2 unaffected to -2 so that unaffected task are not considered in conflict
-        m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(self.n_nodes, self.n_nodes)
-        cond = torch.logical_and(torch.eq(m1, m2), torch.logical_not(torch.diag(torch.BoolTensor([True] * self.n_nodes))))
-        self.conflicts_edges = torch.where(cond, 1, 0).nonzero(as_tuple=True)
-        self.conflicts_edges_machineid = machineid[self.conflicts_edges[0]]
-        self.conflicts_edges = torch.stack(self.conflicts_edges)
+        (
+            self.conflicts_edges,
+            self.conflicts_edges_machineid,
+        ) = compute_conflicts_cliques(self.features[:, 6].long())
 
     def compute_pre_features(self):
 
@@ -268,7 +276,8 @@ class State:
                 if "total_machine_time" in self.features_offset:
                     tmtof = self.features_offset["total_machine_time"]
                     self.features[
-                        job_and_task_to_node(job_id, task_id, self.max_n_machines), tmtof[0] : tmtof[1]
+                        job_and_task_to_node(job_id, task_id, self.max_n_machines),
+                        tmtof[0] : tmtof[1],
                     ] = self.total_machine_time[self.affectations[job_id, task_id]]
 
         self.job_completion_time = torch.zeros((self.n_jobs, 4))
@@ -299,9 +308,15 @@ class State:
                         / self.total_machine_time_job_task[job_id, task_id]
                     )
                     result[result != result] = 0
-                    self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0] : mcpof[1]] = result
+                    self.features[
+                        job_and_task_to_node(job_id, task_id, self.max_n_machines),
+                        mcpof[0] : mcpof[1],
+                    ] = result
                     if self.total_machine_time_job_task[job_id, task_id][0] < 0:
-                        self.features[job_and_task_to_node(job_id, task_id, self.max_n_machines), mcpof[0]] = -1
+                        self.features[
+                            job_and_task_to_node(job_id, task_id, self.max_n_machines),
+                            mcpof[0],
+                        ] = -1
 
         if "mopnr" in self.features_offset:
             mopnr = np.sum(self.affectations != -1, axis=1)
@@ -322,7 +337,10 @@ class State:
             ohji = np.zeros((self.max_n_jobs, self.max_n_jobs))  # vector of size max_
             for i in range(self.max_n_jobs):
                 ohji[i][i] = 1
-            ohji = np.broadcast_to(ohji[:, None, :], (self.max_n_jobs, self.max_n_machines, self.max_n_jobs))
+            ohji = np.broadcast_to(
+                ohji[:, None, :],
+                (self.max_n_jobs, self.max_n_machines, self.max_n_jobs),
+            )
             ohji = np.reshape(ohji, (self.max_n_jobs * self.max_n_machines, self.max_n_jobs))
             of = self.features_offset["one_hot_job_id"]
             self.features[:, of[0] : of[1]] = torch.as_tensor(ohji)
@@ -338,7 +356,12 @@ class State:
         self.features_offset["one_hot_machine_id"] = [6, 6 + self.max_n_machines]
         n = 6 + self.max_n_machines
         for input_name in input_list:
-            if input_name in ["is_affected", "completion_time", "one_hot_machine_id", "selectable"]:
+            if input_name in [
+                "is_affected",
+                "completion_time",
+                "one_hot_machine_id",
+                "selectable",
+            ]:
                 continue  # already appended above
             if input_name == "one_hot_job_id":
                 self.features_offset[input_name] = [n, n + self.max_n_jobs]
@@ -390,7 +413,9 @@ class State:
                 of = self.features_offset["mwkr"]
                 features[:, of[0] : of[1]] /= self.max_completion_time
                 features[:, of[0] : of[1]] = torch.where(
-                    features[:, of[0] : of[1]] < 0, torch.Tensor([-1]), features[:, of[0] : of[1]]
+                    features[:, of[0] : of[1]] < 0,
+                    torch.Tensor([-1]),
+                    features[:, of[0] : of[1]],
                 )
             except KeyError:
                 pass
@@ -413,7 +438,12 @@ class State:
         edge_index = torch.as_tensor(list(nx_graph.edges), dtype=torch.long).t().contiguous()
 
         if self.observe_conflicts_as_cliques:
-            return features, edge_index, self.conflicts_edges, self.conflicts_edges_machineid
+            return (
+                features,
+                edge_index,
+                self.conflicts_edges,
+                self.conflicts_edges_machineid,
+            )
         return features, edge_index
 
     def observe_real_duration(self, node_id, do_update=True, update_duration_with_real=True):
@@ -824,7 +854,13 @@ class State:
         fig = None
         if len(df) > 0:
             df = pd.DataFrame(df)
-            fig = ff.create_gantt(df, index_col="Resource", colors=self.colors, show_colorbar=True, group_tasks=True)
+            fig = ff.create_gantt(
+                df,
+                index_col="Resource",
+                colors=self.colors,
+                show_colorbar=True,
+                group_tasks=True,
+            )
             if fig is not None:
                 fig.update_yaxes(autorange="reversed")  # otherwise tasks are listed from the bottom
                 figimg = fig.to_image(format="png")
