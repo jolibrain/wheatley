@@ -61,8 +61,6 @@ class AgentSpecification:
         residual_gnn,
         normalize_gnn,
         conflicts,
-        n_mlp_layers_shared,
-        hidden_dim_shared,
         n_mlp_layers_actor,
         hidden_dim_actor,
         n_mlp_layers_critic,
@@ -100,8 +98,6 @@ class AgentSpecification:
         self.n_mlp_layers_features_extractor = n_mlp_layers_features_extractor
         self.n_layers_features_extractor = n_layers_features_extractor
         self.hidden_dim_features_extractor = hidden_dim_features_extractor
-        self.n_mlp_layers_shared = n_mlp_layers_shared
-        self.hidden_dim_shared = hidden_dim_shared
         self.n_attention_heads = n_attention_heads
         self.reverse_adj = reverse_adj
         self.residual_gnn = residual_gnn
@@ -159,10 +155,9 @@ class AgentSpecification:
         else:
             raise Exception("Optimizer not recognized")
 
-        shared = [hidden_dim_shared] * n_mlp_layers_shared
         pi = [hidden_dim_actor] * n_mlp_layers_actor
         vf = [hidden_dim_critic] * n_mlp_layers_critic
-        self.net_arch = shared + [dict(vf=vf, pi=pi)]
+        self.net_arch = dict(vf=vf, pi=pi)
 
     def print_self(self):
         print(
@@ -186,13 +181,11 @@ class AgentSpecification:
             print(f"Net shapes:")
             shape = f"{self.n_features} -> ( {self.hidden_dim_features_extractor} / {self.n_attention_heads} ) x {self.n_layers_features_extractor}"
 
-            shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
             actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
             critic_shape = (
                 f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
             )
             print(f" - Features extractor: TokenGT/{self.mlp_act_graph} {shape}")
-            print(f" - Shared: {shared_shape}")
             print(f" - Actor: {actor_shape}")
             print(f" - Critic: {critic_shape}\n")
         else:
@@ -210,7 +203,6 @@ class AgentSpecification:
 
             other_features_extractor_shape = f"{self.hidden_dim_features_extractor} -> {self.hidden_dim_features_extractor}"
 
-            shared_shape = f"" + "".join([f" -> {self.hidden_dim_shared}" for _ in range(self.n_mlp_layers_shared)])
             actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
             critic_shape = (
                 f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
@@ -219,6 +211,5 @@ class AgentSpecification:
                 f" - Features extractor: {self.gconv_type.upper()}({first_features_extractor_shape}) => "
                 + f"{self.gconv_type.upper()}({other_features_extractor_shape}) x {self.n_layers_features_extractor - 1}"
             )
-            print(f" - Shared: {shared_shape}")
             print(f" - Actor: {actor_shape}")
             print(f" - Critic: {critic_shape}\n")

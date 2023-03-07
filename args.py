@@ -290,13 +290,6 @@ parser.add_argument(
     help="precompute cliques, trades mem with cpu time",
 )
 parser.add_argument(
-    "--n_mlp_layers_shared",
-    type=int,
-    default=0,
-    help="Number of MLP layers in shared (excluding input and output",
-)
-parser.add_argument("--hidden_dim_shared", type=int, default=32, help="Hidden dim for shared")
-parser.add_argument(
     "--n_mlp_layers_actor",
     type=int,
     default=1,

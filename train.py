@@ -88,9 +88,7 @@ def main():
         fixed_validation=args.fixed_validation,
         fixed_random_validation=args.fixed_random_validation,
         validation_batch_size=args.validation_batch_size,
-        validation_freq=args.n_steps_episode * args.n_workers
-        if args.validation_freq == -1
-        else args.validation_freq,
+        validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,
         custom_heuristic_name=args.custom_heuristic_name,
@@ -167,8 +165,6 @@ def main():
             residual_gnn=args.residual_gnn,
             normalize_gnn=args.normalize_gnn,
             conflicts=args.conflicts,
-            n_mlp_layers_shared=args.n_mlp_layers_shared,
-            hidden_dim_shared=args.hidden_dim_shared,
             n_mlp_layers_actor=args.n_mlp_layers_actor,
             hidden_dim_actor=args.hidden_dim_actor,
             n_mlp_layers_critic=args.n_mlp_layers_critic,
@@ -182,9 +178,7 @@ def main():
             rpo_smoothing_param=args.rpo_smoothing_param,
         )
         agent_specification.print_self()
-        agent = Agent(
-            env_specification=env_specification, agent_specification=agent_specification
-        )
+        agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
 
     # And finally, we train the model on the specified training mode
     # Note: The saving of the best model is hanlded in the agent.train method.

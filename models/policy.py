@@ -50,9 +50,44 @@ class GraphExtractor(nn.Module):
 
 
 class Policy(MaskableActorCriticPolicy):
-    def extract_features(self, obs):
+    def extract_features(self, obs, features_extractor=None):
         # skip preprocessing
-        return self.features_extractor(obs)
+        if features_extractor is None:
+            return self.features_extractor(obs)
+        else:
+            return features_extractor(obs)
+
+    def get_distribution(self, obs, action_masks=None):
+        """
+        Get the current policy distribution given the observations.
+
+        :param obs: Observation
+        :param action_masks: Actions' mask
+        :return: the action distribution.
+        """
+        if hasattr(self, "pi_features_extractor"):  # SB3 >= 1.7
+            features = self.extract_features(obs, self.pi_features_extractor)
+        else:
+            features = self.extract_features(obs)
+        latent_pi = self.mlp_extractor.forward_actor(features)
+        distribution = self._get_action_dist_from_latent(latent_pi)
+        if action_masks is not None:
+            distribution.apply_masking(action_masks)
+        return distribution
+
+    def predict_values(self, obs):
+        """
+        Get the estimated values according to the current policy given the observations.
+
+        :param obs: Observation
+        :return: the estimated values.
+        """
+        if hasattr(self, "vf_features_extractor"):  # SB3 >= 1.7
+            features = self.extract_features(obs, self.vf_features_extractor)
+        else:
+            features = self.extract_features(obs)
+        latent_vf = self.mlp_extractor.forward_critic(features)
+        return self.value_net(latent_vf)
 
     def _build(self, lr_schedule):
         """
@@ -63,18 +98,18 @@ class Policy(MaskableActorCriticPolicy):
         self.mlp_extractor = GraphExtractor()
 
         self.action_net = MLP(
-            len(self.net_arch[0]["pi"]),
+            len(self.net_arch["pi"]),
             self.features_dim,
-            self.net_arch[0]["pi"][0],
+            self.net_arch["pi"][0],
             1,
             False,
             self.activation_fn,
             self.device,
         )
         self.value_net = MLP(
-            len(self.net_arch[0]["vf"]),
+            len(self.net_arch["vf"]),
             self.features_dim // 2,
-            self.net_arch[0]["vf"][0],
+            self.net_arch["vf"][0],
             1,
             False,
             self.activation_fn,
