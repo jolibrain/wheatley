@@ -85,16 +85,16 @@ class EnvObservation:
         if self.features.is_cuda:
             raise Exception("Please use this only on cpu observation")
 
-        features = torch.zeros((self.max_n_nodes, self.features.shape[1]))
+        features = torch.empty((self.max_n_nodes, self.features.shape[1]))
         features[0 : self.get_n_nodes(), :] = self.features
-        edge_index = torch.zeros((2, self.max_n_edges))
+        edge_index = torch.empty((2, self.max_n_edges))
         edge_index[:, 0 : self.get_n_edges()] = self.edge_index
         if self.observe_conflicts_as_cliques:
-            conflicts_edges = torch.zeros(
+            conflicts_edges = torch.empty(
                 (2, 2 * sum(range(self.max_n_jobs)) * self.max_n_machines)
             )
             conflicts_edges[:, 0 : self.conflicts_edges.shape[1]] = self.conflicts_edges
-            conflicts_edges_machineid = torch.zeros(
+            conflicts_edges_machineid = torch.empty(
                 (2, 2 * sum(range(self.max_n_jobs)) * self.max_n_machines)
             )
             conflicts_edges_machineid[

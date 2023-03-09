@@ -1,0 +1,11 @@
+pre - commit
+numpy
+gymnasium
+ortools
+visdom
+networkx
+plotly
+einops
+matplotlib
+opencv-python
+kaleido

@@ -37,14 +37,14 @@ import sys
 def get_exp_name(args):
 
     exp_name = (
-        f"{args.n_j}j{args.n_m}m_{args.duration_type}_{args.seed}seed_{args.transition_model_config}_"
-        + f"{args.reward_model_config}_{args.fe_type}"
+        f"{args.n_j}j{args.n_m}m_D{args.duration_type}_T{args.transition_model_config}_"
+        + f"R{args.reward_model_config}_GNN{args.fe_type}"
     )
     if args.fe_type != "tokengt":
-        exp_name += f"_{args.gconv_type}_{args.graph_pooling}"
+        exp_name += f"_CONV{args.gconv_type}_POOL{args.graph_pooling}"
     else:
         exp_name += f"_POOL{args.layer_pooling}_DROP{args.dropout}"
-    exp_name += f"_L{args.n_layers_features_extractor}_HD{args.hidden_dim_features_extractor}_{args.n_attention_heads}heads_{args.conflicts}_LR{args.lr}"
+    exp_name += f"_L{args.n_layers_features_extractor}_HD{args.hidden_dim_features_extractor}_H{args.n_attention_heads}_C{args.conflicts}"
     if args.dont_normalize_input:
         exp_name += "_DNI"
     if args.fixed_problem:
@@ -54,12 +54,12 @@ def get_exp_name(args):
     if args.freeze_graph:
         exp_name += "_FG"
     if args.insertion_mode == "no_forced_insertion":
-        exp_name += "_NFI"
-    if args.insertion_mode == "full_forced_insertion":
+        pass
+    elif args.insertion_mode == "full_forced_insertion":
         exp_name += "_FFI"
-    if args.insertion_mode == "choose_forced_insertion":
+    elif args.insertion_mode == "choose_forced_insertion":
         exp_name += "_CFI"
-    if args.insertion_mode == "slot_locking":
+    elif args.insertion_mode == "slot_locking":
         exp_name += "_SL"
     if args.exp_name_appendix is not None:
         exp_name += "_" + args.exp_name_appendix
@@ -86,7 +86,11 @@ def get_n_features(input_list, max_n_jobs, max_n_machines):
 
 
 def get_path(arg_path, exp_name):
-    path = "saved_networks/" + exp_name if arg_path == "saved_networks/default_net" else arg_path
+    path = (
+        "saved_networks/" + exp_name
+        if arg_path == "saved_networks/default_net"
+        else arg_path
+    )
     return path
 
 
@@ -121,7 +125,9 @@ def generate_problem_distrib(n_jobs, n_machines, duration_mode_bounds, duration_
     durations = np.empty((n_jobs, n_machines, 4), dtype=np.int32)
 
     # Sampling the modes, using duration_mode_bounds
-    durations[:, :, 3] = np.random.randint(duration_mode_bounds[0], duration_mode_bounds[1], size=(n_jobs, n_machines))
+    durations[:, :, 3] = np.random.randint(
+        duration_mode_bounds[0], duration_mode_bounds[1], size=(n_jobs, n_machines)
+    )
     for j in range(n_jobs):
         for m in range(n_machines):
             # Sampling the left
@@ -156,7 +162,9 @@ def generate_problem_durations(durations):
             else:
                 if durations[j, m][1] > durations[j, m][3]:
                     print(durations[j, m][1], durations[j, m][3])
-                ret_durations[j, m, 0] = np.random.triangular(durations[j, m][1], durations[j, m][3], durations[j, m][2])
+                ret_durations[j, m, 0] = np.random.triangular(
+                    durations[j, m][1], durations[j, m][3], durations[j, m][2]
+                )
     return ret_durations
 
 
@@ -171,7 +179,12 @@ def _permute_rows(x):
 
 def generate_data(n_j, n_m, max_duration, seed=200, n_problems=100):
     np.random.seed(seed)
-    data = np.array([generate_deterministic_problem(n_j, n_m, max_duration) for _ in range(n_problems)])
+    data = np.array(
+        [
+            generate_deterministic_problem(n_j, n_m, max_duration)
+            for _ in range(n_problems)
+        ]
+    )
     return data
 
 
@@ -241,7 +254,9 @@ def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True
 
             real_durations = np.zeros((n_j, n_m)) - 1
 
-            durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
+            durations = np.stack(
+                [real_durations, min_durations, max_durations, mode_durations], axis=2
+            )
 
         while line[0] == "#":
             line = next(f)
@@ -253,7 +268,9 @@ def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True
             toffset = 0
         np_lines = []
         for j in range(n_j):
-            aff_list = [int(i) - toffset for i in line.split()]  # Taillard spec has machines id start at 1
+            aff_list = [
+                int(i) - toffset for i in line.split()
+            ]  # Taillard spec has machines id start at 1
             np_lines.append(np.array(aff_list))
             line = next(f, "")
             if line == "":
@@ -268,11 +285,17 @@ def check_sanity(affectations, durations):
         for machine, (aff, dur) in enumerate(zip(affs, durs)):
             if aff == -1 and any(x != -1 for x in dur):
                 raise Exception(
-                    "affectations and durations should be only -1 for job " + str(job) + " machine " + str(machine)
+                    "affectations and durations should be only -1 for job "
+                    + str(job)
+                    + " machine "
+                    + str(machine)
                 )
             if aff != -1 and any(x == -1 for x in dur[1:]):
                 raise Exception(
-                    "affectations and durations should not be -1 for job " + str(job) + " machine " + str(machine)
+                    "affectations and durations should not be -1 for job "
+                    + str(job)
+                    + " machine "
+                    + str(machine)
                 )
 
 
@@ -347,7 +370,9 @@ def load_problem(
                 where=durations != -1,
             )
             real_durations = np.zeros((n_j, n_m)) - 1
-            durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
+            durations = np.stack(
+                [real_durations, min_durations, max_durations, mode_durations], axis=2
+            )
             # sys.exit()
         else:
             mode_durations = durations
@@ -392,7 +417,9 @@ def load_problem(
 
             real_durations = np.zeros((n_j, n_m)) - 1
 
-            durations = np.stack([real_durations, min_durations, max_durations, mode_durations], axis=2)
+            durations = np.stack(
+                [real_durations, min_durations, max_durations, mode_durations], axis=2
+            )
 
         while line[0] == "#":
             line = next(f)
@@ -404,7 +431,9 @@ def load_problem(
             toffset = 0
         np_lines = []
         for j in range(n_j):
-            aff_list = [int(i) - toffset for i in line.split()]  # Taillard spec has machines id start at 1
+            aff_list = [
+                int(i) - toffset for i in line.split()
+            ]  # Taillard spec has machines id start at 1
             while len(aff_list) < n_m:
                 aff_list.append(-1)
             np_lines.append(np.array(aff_list))
@@ -431,13 +460,17 @@ def put_back_one_hot_encoding_unbatched(
 
     # TODO : parallel version
     machineid = features[:, :, 6].long()
-    one_hot_machine_id = torch.diag(torch.Tensor([1] * max_n_machines).to(features.device))
+    one_hot_machine_id = torch.diag(
+        torch.Tensor([1] * max_n_machines).to(features.device)
+    )
     for i in range(features.shape[0]):
         for j in range(features.shape[1]):
             if machineid[i, j] == -1:
                 features[i, j, 6 : 6 + max_n_machines] = 0
             else:
-                features[i, j, 6 : 6 + max_n_machines] = one_hot_machine_id[machineid[i, j]]
+                features[i, j, 6 : 6 + max_n_machines] = one_hot_machine_id[
+                    machineid[i, j]
+                ]
 
     # idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)
     # idxnonaffected = torch.where(machineid == -1, 1, 0).nonzero(as_tuple=True)
@@ -488,12 +521,59 @@ def compute_conflicts_cliques(machineid):
     m1 = machineid.unsqueeze(0).expand(n_nodes, n_nodes)
     # put m2 unaffected to -2 so that unaffected task are not considered in conflict
     # TODO : same job / same machine should not be in conclicts (already a repcedence)
-    m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(n_nodes, n_nodes)
+    m2 = (
+        torch.where(machineid == -1, -2, machineid)
+        .unsqueeze(1)
+        .expand(n_nodes, n_nodes)
+    )
     cond = torch.logical_and(
         torch.eq(m1, m2),
-        torch.logical_not(torch.diag(torch.BoolTensor([True] * n_nodes).to(machineid.device))),
+        torch.logical_not(
+            torch.diag(torch.BoolTensor([True] * n_nodes).to(machineid.device))
+        ),
     )
     conflicts_edges = torch.where(cond, 1, 0).nonzero(as_tuple=True)
     conflicts_edges_machineid = machineid[conflicts_edges[0]]
     conflicts_edges = torch.stack(conflicts_edges)
     return conflicts_edges, conflicts_edges_machineid
+
+
+def obs_as_tensor(obs):
+    """
+    Moves the observation to the given device.
+    :param obs:
+    :param device: PyTorch device
+    :return: PyTorch tensor of the observation on a desired device.
+    """
+    if isinstance(obs, np.ndarray):
+        return torch.as_tensor(obs)
+    elif isinstance(obs, dict):
+        return {key: torch.as_tensor(_obs) for (key, _obs) in obs.items()}
+    else:
+        raise Exception(f"Unrecognized type of observation {type(obs)}")
+
+
+def obs_as_tensor_add_batch_dim(obs):
+    """
+    Moves the observation to the given device.
+    :param obs:
+    :param device: PyTorch device
+    :return: PyTorch tensor of the observation on a desired device.
+    """
+    if isinstance(obs, np.ndarray):
+        return torch.as_tensor(obs).unsqueeze_(0)
+    elif isinstance(obs, dict):
+        return {key: torch.as_tensor(_obs).unsqueeze_(0) for (key, _obs) in obs.items()}
+    else:
+        raise Exception(f"Unrecognized type of observation {type(obs)}")
+
+
+def safe_mean(arr):
+    """
+    Compute the mean of an array if there is at least one element.
+    For empty array, return NaN. It is used for logging only.
+
+    :param arr:
+    :return:
+    """
+    return np.nan if len(arr) == 0 else np.mean(arr)

@@ -84,7 +84,11 @@ class AgentObservation:
         machineid = features[:, 6].long()
         m1 = machineid.unsqueeze(0).expand(nnodes, nnodes)
         # put m2 unaffected to -2 so that unaffected task are not considered in conflict
-        m2 = torch.where(machineid == -1, -2, machineid).unsqueeze(1).expand(nnodes, nnodes)
+        m2 = (
+            torch.where(machineid == -1, -2, machineid)
+            .unsqueeze(1)
+            .expand(nnodes, nnodes)
+        )
         cond = torch.logical_and(
             torch.eq(m1, m2),
             torch.logical_not(torch.diag(torch.BoolTensor([True] * nnodes))),
@@ -120,20 +124,32 @@ class AgentObservation:
             orig_feat = orig_feat.to(torch.device("cpu"))
         else:
             if "n_conflict_edges" in gym_observation:  # precomputed cliques
-                n_conflict_edges = gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
+                n_conflict_edges = (
+                    gym_observation["n_conflict_edges"].long().to(torch.device("cpu"))
+                )
 
-                conflicts_edges = gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
-                conflicts_edges_machineid = gym_observation["conflicts_edges_machineid"].long().to(torch.device("cpu"))
+                conflicts_edges = (
+                    gym_observation["conflicts_edges"].long().to(torch.device("cpu"))
+                )
+                conflicts_edges_machineid = (
+                    gym_observation["conflicts_edges_machineid"]
+                    .long()
+                    .to(torch.device("cpu"))
+                )
                 orig_feat = orig_feat.to(torch.device("cpu"))
             else:  # compute cliques
                 conflicts_edges = []
                 conflicts_edges_machineid = []
                 all_nce = []
                 for i in range(orig_feat.shape[0]):
-                    ce, cemid = compute_conflicts_cliques(orig_feat[i, : n_nodes[i], 6].long().squeeze(0))
+                    ce, cemid = compute_conflicts_cliques(
+                        orig_feat[i, : n_nodes[i], 6].long().squeeze(0)
+                    )
                     cemid = cemid.unsqueeze_(0).expand(ce.shape)
                     conflicts_edges.append(ce.long().to(torch.device("cpu")))
-                    conflicts_edges_machineid.append(cemid.long().to(torch.device("cpu")))
+                    conflicts_edges_machineid.append(
+                        cemid.long().to(torch.device("cpu"))
+                    )
                     nce = torch.LongTensor([ce.shape[1]])
                     all_nce.append(nce)
 
@@ -174,7 +190,9 @@ class AgentObservation:
             if add_self_loops:
                 gnew = dgl.add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
             if compute_laplacian_pe:
-                gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(gnew, laplacian_pe_cache, n_laplacian_eigv)
+                gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(
+                    gnew, laplacian_pe_cache, n_laplacian_eigv
+                )
             gnew = gnew.to(device)
             graphs.append(gnew)
             if do_batch:

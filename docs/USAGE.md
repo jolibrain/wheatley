@@ -30,7 +30,7 @@ Commmon options:
 # Small fixed random problem without uncertainty
 
 ```
-python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --n_workers 10 --batch_size 160  --lr 0.0002 --exp_name_appendix EXAMPLE1 --fixed_problem --seed 1
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --batch_size 160 --exp_name_appendix EXAMPLE1 --fixed_problem --seed 1
 ```
 
 - `--fixed_problem` : force use of same problem along all training
@@ -40,7 +40,7 @@ python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 -
  
 # Ramdom problems without uncertainty
 ```
-python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1600 --n_workers 10  --batch_size 1600 --seed 1  --lr 0.0002  --exp_name_appendix EXAMPLE2 
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1600  --batch_size 1600 --seed 1   --exp_name_appendix EXAMPLE2 
 ```
 
 Same as above, without `--fixed_problem` 
@@ -48,7 +48,7 @@ Same as above, without `--fixed_problem`
 
 # Single random problem with uncertainty
 ```
-python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --batch_size 1600 --n_workers 10 --seed 1  --lr 0.0002 --duration_type stochastic --fixed_problem  --reward_model_config Sparse --ortools_strategy averagistic --exp_name_appendix EXAMPLE3 
+python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --batch_size 1600 --seed 1 --duration_type stochastic --fixed_problem  --reward_model_config Sparse --ortools_strategy averagistic --exp_name_appendix EXAMPLE3 
 ```
 
 
@@ -60,7 +60,7 @@ python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 -
 # Taillard problem with generated random durations and subsampling of jobs
 
 ```
-python3 train.py --n_j 50 --n_m 15 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1500 --n_workers 10 --batch_size 150 --duration_type stochastic --fixed_problem --lr 0.0002 --load_problem instances/taillard/ta57.txt --first_machine_id_is_one --exp_name_appendix EXAMPLE4 --n_epochs 3  --ortools_strategy averagistic   --device cuda:3 --generate_duration_bounds 0.05  --validation_batch_size 10 --load_max_jobs 40 --load_from_job 0
+python3 train.py --n_j 50 --n_m 15 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1500 --batch_size 150 --duration_type stochastic --fixed_problem  --load_problem instances/taillard/ta57.txt --first_machine_id_is_one --exp_name_appendix EXAMPLE4 --n_epochs 3  --ortools_strategy averagistic   --device cuda:3 --generate_duration_bounds 0.05   --load_max_jobs 40 --load_from_job 0
 ```
 
 - `--load_problem` :  forces to read a problem definition instead of generating one
@@ -82,12 +82,12 @@ In the case of randomly generated problem (eg w/o `--load_problem`), instead of 
 
 ## DGL
 ```
-python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 5 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --first_machine_id_is_one --lr 0.0002  --n_epochs 3 --n_layers_features_extractor 8 --device cuda:0 --batch_size 200 --exp_name_appendix EXAMPLE5 --optimizer radam  --sample_n_jobs 10 --validate_on_total_data
+python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 5 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --first_machine_id_is_one --n_epochs 3 --n_layers_features_extractor 8 --device cuda:0 --batch_size 200 --exp_name_appendix EXAMPLE5  --sample_n_jobs 10 --validate_on_total_data
 ```
 
 ## TOKENGT
 ```
-python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --first_machine_id_is_one --lr 0.0002 --n_epochs 3 --n_layers_features_extractor 2 --device cuda:0 --batch_size 200 --exp_name_appendix EXAMPLE6  --hidden_dim_features_extractor 128 --fe_type tokengt --conflicts att --hidden_dim_actor 128 --hidden_dim_critic 128 --optimizer radam  --sample_n _jobs 10 --validate_on_total_data  --transformer_flavor linear
+python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_timesteps 2000000 --n_validation_env 1 --fixed_validation --fixed_problem --load_problem instances/taillard/ta72.txt --first_machine_id_is_one --n_epochs 3 --n_layers_features_extractor 2 --device cuda:0 --batch_size 200 --exp_name_appendix EXAMPLE6  --hidden_dim_features_extractor 128 --fe_type tokengt --conflicts att --hidden_dim_actor 128 --hidden_dim_critic 128  --sample_n _jobs 10 --validate_on_total_data  
 ```
 
 
@@ -114,7 +114,6 @@ python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_
 - `--fixed_random_validation`: number of fixed problem to generate for validation
 - `--validation_freq`: number of steps between evaluations
 - `--max_time_ortools`: or-tools timeout
-- `--validation_batch_size`: batch size during  validation
 - `--n_test_problems`: number of problems to generate for validation (in case they are not pre-generated with fixed_validation and fixed_random_validation
 - `--test_print_every`: print frequency of evaluations
 
