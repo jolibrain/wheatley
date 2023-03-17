@@ -25,7 +25,7 @@
 #
 
 
-from models.mlp2 import MLP2
+from models.mlp import MLP
 import torch
 import dgl
 from dgl.nn import (
@@ -128,7 +128,7 @@ class GnnDGL(torch.nn.Module):
                     torch.nn.Embedding(5, hidden_dim_features_extractor)
                 )
 
-        self.embedder = MLP2(
+        self.embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
             input_dim=input_dim_features_extractor,
             hidden_dim=hidden_dim_features_extractor,
@@ -155,7 +155,7 @@ class GnnDGL(torch.nn.Module):
                     self.normsbis.append(torch.nn.BatchNorm1d(self.hidden_dim))
 
             if self.gconv_type == "gin":
-                mlp = MLP2(
+                mlp = MLP(
                     n_layers=n_mlp_layers_features_extractor,
                     input_dim=self.hidden_dim,
                     hidden_dim=self.hidden_dim,
@@ -175,7 +175,7 @@ class GnnDGL(torch.nn.Module):
                     )
                 )
                 self.mlps.append(
-                    MLP2(
+                    MLP(
                         n_layers=n_mlp_layers_features_extractor,
                         input_dim=hidden_dim_features_extractor * n_attention_heads,
                         hidden_dim=hidden_dim_features_extractor * n_attention_heads,
@@ -185,7 +185,7 @@ class GnnDGL(torch.nn.Module):
                     )
                 )
                 # self.mlps_edges.append(
-                #     MLP2(
+                #     MLP(
                 #         n_layers=n_mlp_layers_features_extractor,
                 #         input_dim=hidden_dim_features_extractor * n_attention_heads,
                 #         hidden_dim=hidden_dim_features_extractor * n_attention_heads,

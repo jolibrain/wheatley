@@ -3,9 +3,6 @@
 # Copyright (c) 2023 Jolibrain
 # Authors:
 #    Guillaume Infantes <guillaume.infantes@jolibrain.com>
-#    Antoine Jacquet <antoine.jacquet@jolibrain.com>
-#    Michel Thomazo <thomazo.michel@gmail.com>
-#    Emmanuel Benazera <emmanuel.benazera@jolibrain.com>
 #
 #
 # This file is part of Wheatley.
@@ -24,11 +21,9 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import gym
-from gym.spaces import Discrete, Dict, Box
+import gymnasium as gym
+from gymnasium.spaces import Discrete, Dict, Box
 import numpy as np
-import sys
-import traceback
 
 from env.transition_models.l2d_transition_model import L2DTransitionModel
 from env.transition_models.simple_transition_model import SimpleTransitionModel
@@ -55,6 +50,7 @@ class Env(gym.Env):
     ):
         self.problem_description = problem_description
         self.env_specification = env_specification
+        self.sum_reward = 0
 
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
@@ -188,6 +184,8 @@ class Env(gym.Env):
             next_obs,
         )
 
+        self.sum_reward += reward
+
         # if needed, remove tct from obs (reward is computed on tct on obs ... )
         if self.env_specification.do_not_observe_updated_bounds:
             next_obs.features = next_obs.features.clone()
@@ -197,10 +195,13 @@ class Env(gym.Env):
         # Getting final necessary information
         done = self.done()
         gym_observation = next_obs.to_gym_observation()
-        info = {"episode": {"r": reward, "l": 1 + self.n_steps * 2}}
+        info = {
+            "episode": {"r": self.sum_reward, "l": 1 + self.n_steps},
+            "mask": self.action_masks(),
+        }
         self.n_steps += 1
 
-        return gym_observation, reward, done, info
+        return gym_observation, reward, done, False, info
 
     def _convert_action_to_node_id(self, action):
         boolean = True
@@ -225,8 +226,13 @@ class Env(gym.Env):
         observation = self.observe()
 
         self.n_steps = 0
+        self.sum_reward = 0
+        info = {
+            "episode": {"r": 0, "l": 0},
+            "mask": self.action_masks(),
+        }
 
-        return observation.to_gym_observation()
+        return observation.to_gym_observation(), info
 
     def get_solution(self):
         return self.state.get_solution()

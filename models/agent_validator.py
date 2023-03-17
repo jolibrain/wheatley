@@ -32,9 +32,9 @@ import csv
 import copy
 import torch
 
-from env.env2 import Env2
-from models.custom_agent2 import CustomAgent2
-from models.random_agent2 import RandomAgent2
+from env.env import Env
+from models.custom_agent import CustomAgent
+from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
 from utils.utils import (
@@ -84,15 +84,15 @@ class AgentValidator:
         self.scaling_constant_ortools = training_specification.scaling_constant_ortools
 
         # Comparative agents
-        self.random_agent = RandomAgent2(self.max_n_jobs, self.max_n_machines)
+        self.random_agent = RandomAgent(self.max_n_jobs, self.max_n_machines)
         if self.custom_name != "None":
-            self.custom_agent = CustomAgent2(
+            self.custom_agent = CustomAgent(
                 self.max_n_jobs, self.max_n_machines, custom_name.lower()
             )
 
         # Inner variables
         self.validation_envs = [
-            Env2(self.problem_description, self.env_specification)
+            Env(self.problem_description, self.env_specification)
             for _ in range(self.n_validation_env)
         ]
         self.makespan_ratio = 1000

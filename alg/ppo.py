@@ -31,7 +31,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from .logger import Logger, configure_logger
-from env.env2 import Env2
+from env.env import Env
 from collections import deque
 from utils.utils import obs_as_tensor, safe_mean
 import tqdm
@@ -40,7 +40,7 @@ from tqdm.auto import trange
 
 def create_env(problem_description, env_specification):
     def _init():
-        env = Env2(problem_description, env_specification)
+        env = Env(problem_description, env_specification)
         return env
 
     return _init
@@ -99,14 +99,14 @@ class PPO:
     def collect_rollouts(self, agent, envs, env_specification, data_device):
         # ALGO Logic: Storage setup
         obs = []
-        actions = torch.zeros(
+        actions = torch.empty(
             (self.num_steps, self.num_envs) + envs.single_action_space.shape
         ).to(data_device)
-        logprobs = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        rewards = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        dones = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        values = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        action_masks = torch.zeros(
+        logprobs = torch.empty((self.num_steps, self.num_envs)).to(data_device)
+        rewards = torch.empty((self.num_steps, self.num_envs)).to(data_device)
+        dones = torch.empty((self.num_steps, self.num_envs)).to(data_device)
+        values = torch.empty((self.num_steps, self.num_envs)).to(data_device)
+        action_masks = torch.empty(
             (self.num_steps, self.num_envs, env_specification.max_n_nodes)
         ).to(data_device)
 
@@ -115,7 +115,7 @@ class PPO:
         # next obs is a list of dicts
         next_obs = obs_as_tensor(o)
         action_mask = decode_mask(info["mask"])
-        next_done = torch.zeros(self.num_envs).to(data_device)
+        next_done = torch.empty(self.num_envs).to(data_device)
 
         self.ep_info_buffer = deque(maxlen=100)
         self.global_step += self.num_envs * self.num_steps
@@ -148,7 +148,7 @@ class PPO:
         # compute returns and advantages
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1).to(data_device)
-            advantages = torch.zeros_like(rewards)
+            advantages = torch.empty_like(rewards)
             lastgaelam = 0
             for t in reversed(range(self.num_steps)):
                 if t == self.num_steps - 1:
