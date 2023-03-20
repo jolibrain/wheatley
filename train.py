@@ -3,9 +3,6 @@
 # Copyright (c) 2023 Jolibrain
 # Authors:
 #    Guillaume Infantes <guillaume.infantes@jolibrain.com>
-#    Antoine Jacquet <antoine.jacquet@jolibrain.com>
-#    Michel Thomazo <thomazo.michel@gmail.com>
-#    Emmanuel Benazera <emmanuel.benazera@jolibrain.com>
 #
 #
 # This file is part of Wheatley.
@@ -31,9 +28,11 @@ import torch
 
 from env.env_specification import EnvSpecification
 from models.agent import Agent
+from models.agent_validator import AgentValidator
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
+from alg.ppo import PPO
 from utils.utils import (
     get_n_features,
     generate_deterministic_problem,
@@ -88,7 +87,7 @@ def main():
         fixed_validation=args.fixed_validation,
         fixed_random_validation=args.fixed_random_validation,
         validation_batch_size=args.validation_batch_size,
-        validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
+        validation_freq=1 if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,
         custom_heuristic_name=args.custom_heuristic_name,
@@ -100,10 +99,19 @@ def main():
     )
     training_specification.print_self()
 
+    opt_state_dict = None
     # If we want to use a pretrained Agent, we only have to load it (if it exists)
-    if args.retrain and os.path.exists(path + ".zip"):
+    if args.retrain and os.path.exists(path + ".agent"):
         print("Retraining an already existing agent\n")
         agent = Agent.load(path)
+    if (
+        args.resume
+        and os.path.exists(path + ".agent")
+        and os.path.exists(path + ".opt")
+    ):
+        print("Resuming a training\n")
+        agent = Agent.load(path)
+        opt_state_dict = torch.load(path + ".opt")
 
     # Else, we instantiate a new Agent
     else:
@@ -178,12 +186,33 @@ def main():
             rpo_smoothing_param=args.rpo_smoothing_param,
         )
         agent_specification.print_self()
-        agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
+        agent = Agent(
+            env_specification=env_specification, agent_specification=agent_specification
+        )
 
     # And finally, we train the model on the specified training mode
     # Note: The saving of the best model is hanlded in the agent.train method.
     # We save every time we hit a min RL / OR-Tools ratio
-    agent.train(problem_description, training_specification)
+    # agent.train(problem_description, training_specification)
+
+    validator = AgentValidator(
+        problem_description, env_specification, args.device, training_specification
+    )
+    ppo = PPO(
+        agent_specification,
+        validator,
+    )
+    ppo.train(
+        agent,
+        problem_description,
+        env_specification,
+        training_specification,
+        lr=args.lr,
+        log_interval=1,
+        train_device=args.device,
+        rollout_agent_device=args.device,
+        opt_state_dict=None,
+    )
 
 
 if __name__ == "__main__":

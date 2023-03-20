@@ -29,13 +29,9 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.utils import safe_mean
 import visdom
 
-from env.env import Env
 from env.state import State
-from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.ortools_solver import solve_jssp
 from utils.utils import generate_data
@@ -63,7 +59,9 @@ def get_ortools_makespan(
         print("unknow ortools strategy ", ortools_strategy)
         exit()
 
-    solution = solve_jssp(affectations, durs, max_time_ortools, scaling_constant_ortools)
+    solution = solve_jssp(
+        affectations, durs, max_time_ortools, scaling_constant_ortools
+    )
 
     if durations.shape[2] == 1:
         return solution.get_makespan(), solution.schedule
@@ -76,7 +74,9 @@ def get_ortools_makespan(
     for i in range(n_j * n_m):
         state.affect_node(i)
     # we will use get_machine_occupancy_max_endtime which rely on task_completion_times
-    state.set_all_task_completion_times(np.expand_dims(solution.schedule, 2) + durations)
+    state.set_all_task_completion_times(
+        np.expand_dims(solution.schedule, 2) + durations
+    )
 
     occupancies = [state.get_machine_occupancy(m, ortools_strategy) for m in range(n_m)]
 
@@ -94,7 +94,12 @@ def get_ortools_makespan(
 
     state.update_completion_times_from_sinks()
 
-    tct = state.get_all_task_completion_times()[:, 0].reshape(n_j, n_m, 1).squeeze_(2).numpy()
+    tct = (
+        state.get_all_task_completion_times()[:, 0]
+        .reshape(n_j, n_m, 1)
+        .squeeze_(2)
+        .numpy()
+    )
 
     makespan = torch.max(state.get_all_task_completion_times()[:, 0].flatten())
 

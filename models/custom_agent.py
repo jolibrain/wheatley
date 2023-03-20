@@ -62,11 +62,11 @@ class CustomAgent:
                 "cr",
             ],
         )
-        observation = env.reset()
+        observation, _ = env.reset()
         done = False
         while not done:
             action = self.select_action(observation)
-            observation, _, done, _ = env.step(action)
+            observation, _, done, _, _ = env.step(action)
         solution = env.get_solution()
         return solution
 

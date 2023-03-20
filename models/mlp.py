@@ -3,9 +3,6 @@
 # Copyright (c) 2023 Jolibrain
 # Authors:
 #    Guillaume Infantes <guillaume.infantes@jolibrain.com>
-#    Antoine Jacquet <antoine.jacquet@jolibrain.com>
-#    Michel Thomazo <thomazo.michel@gmail.com>
-#    Emmanuel Benazera <emmanuel.benazera@jolibrain.com>
 #
 #
 # This file is part of Wheatley.
@@ -25,10 +22,9 @@
 #
 
 import torch
-import torch.nn as nn
 
 
-class MLP(nn.Module):
+class MLP(torch.nn.Module):
     def __init__(
         self,
         n_layers,
@@ -37,7 +33,6 @@ class MLP(nn.Module):
         output_dim,
         batch_norm,
         activation,
-        device,
     ):
         super(MLP, self).__init__()
         if n_layers < 1:
@@ -50,38 +45,39 @@ class MLP(nn.Module):
             self.batch_norms = torch.nn.ModuleList()
 
         if self.n_layers == 1:
-            self.layers.append(nn.Linear(input_dim, output_dim))
+            self.layers.append(torch.nn.Linear(input_dim, output_dim))
         else:
-            self.layers.append(nn.Linear(input_dim, hidden_dim))
+            self.layers.append(torch.nn.Linear(input_dim, hidden_dim))
             for i in range(self.n_layers - 2):
-                self.layers.append(nn.Linear(hidden_dim, hidden_dim))
+                self.layers.append(torch.nn.Linear(hidden_dim, hidden_dim))
                 if self.batch_norm:
-                    self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-            self.layers.append(nn.Linear(hidden_dim, output_dim))
+                    self.batch_norms.append(torch.nn.BatchNorm1d(hidden_dim))
+            self.layers.append(torch.nn.Linear(hidden_dim, output_dim))
             if self.batch_norm:
-                self.batch_norms.append(nn.BatchNorm1d(output_dim))
+                self.batch_norms.append(torch.nn.BatchNorm1d(output_dim))
 
         if type(activation) == str:
             if activation == "tanh":
-                self.activation_layer = nn.Tanh()
+                self.activation_layer = torch.nn.Tanh()
             elif activation == "relu":
-                self.activation_layer = nn.LeakyReLU()
+                self.activation_layer = torch.nn.LeakyReLU()
             elif activation == "elu":
-                self.activation_layer = nn.ELU()
+                self.activation_layer = torch.nn.ELU()
             elif activation == "gelu":
-                self.activation_layer = nn.GELU()
+                self.activation_layer = torch.nn.GELU()
             elif activation == "selu":
-                self.activation_layer = nn.SELU()
+                self.activation_layer = torch.nn.SELU()
             else:
                 raise Exception("Activation not recognized")
         else:
             self.activation_layer = activation()
-        self.to(device)
 
     def forward(self, x):
         for layer in range(self.n_layers - 1):
             if self.batch_norm:
-                x = self.batch_norms[layer](self.activation_layer(self.layers[layer](x)))
+                x = self.batch_norms[layer](
+                    self.activation_layer(self.layers[layer](x))
+                )
             else:
                 x = self.activation_layer(self.layers[layer](x))
         return self.layers[-1](x)

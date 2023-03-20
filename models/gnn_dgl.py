@@ -24,26 +24,32 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
 from models.mlp import MLP
 import torch
 import dgl
-from dgl.nn import GINEConv, EGATConv, PNAConv, MaxPooling, AvgPooling, DGNConv, GCN2Conv
+from dgl.nn import (
+    GINEConv,
+    EGATConv,
+    PNAConv,
+    MaxPooling,
+    AvgPooling,
+    DGNConv,
+    GCN2Conv,
+)
 from dgl import LaplacianPE
 from utils.agent_observation import AgentObservation
 
 
-class FeaturesExtractorDGL(BaseFeaturesExtractor):
+class GnnDGL(torch.nn.Module):
     def __init__(
         self,
-        observation_space,
         input_dim_features_extractor,
         gconv_type,
         graph_pooling,
         freeze_graph,
         graph_has_relu,
-        device,
+        # device,
         max_n_nodes,
         max_n_machines,
         n_mlp_layers_features_extractor,
@@ -57,19 +63,18 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         conflicts="att",
     ):
 
+        super().__init__()
         self.conflicts = conflicts
         self.residual = residual
         self.normalize = normalize
         self.max_n_nodes = max_n_nodes
-        features_dim = input_dim_features_extractor + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
-        features_dim *= 2
-        self.max_n_machines = max_n_machines
-        super(FeaturesExtractorDGL, self).__init__(
-            observation_space=observation_space,
-            features_dim=features_dim,
+        self.features_dim = (
+            input_dim_features_extractor
+            + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
         )
+        self.features_dim *= 2
+        self.max_n_machines = max_n_machines
         self.freeze_graph = freeze_graph
-        self.device = device
         self.reverse_adj = reverse_adj
 
         self.hidden_dim = hidden_dim_features_extractor
@@ -87,7 +92,9 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         # graph pooling rev 4
         # optional conflicts_edges   from 5 to self.max_n_machines+5 + reverse in case of node conflict
 
-        self.node_embedder = torch.nn.Embedding(1 + self.max_n_machines, input_dim_features_extractor)
+        self.node_embedder = torch.nn.Embedding(
+            1 + self.max_n_machines, input_dim_features_extractor
+        )
 
         if self.conflicts == "clique":
             nmachineid = self.max_n_machines
@@ -102,7 +109,11 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
             if self.gconv_type in ["gcn2"]:
                 self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
             else:
-                self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, hidden_dim_features_extractor))
+                self.edge_embedder.append(
+                    torch.nn.Embedding(
+                        5 + nmachineid + 1, hidden_dim_features_extractor
+                    )
+                )
 
         else:
             # for layer in range(self.n_layers_features_extractor):
@@ -113,7 +124,9 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
             if self.gconv_type in ["gcn2"]:
                 self.edge_embedder.append(torch.nn.Embedding(5, 1))
             else:
-                self.edge_embedder.append(torch.nn.Embedding(5, hidden_dim_features_extractor))
+                self.edge_embedder.append(
+                    torch.nn.Embedding(5, hidden_dim_features_extractor)
+                )
 
         self.embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
@@ -122,7 +135,6 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
             output_dim=hidden_dim_features_extractor,
             batch_norm=self.normalize,
             activation=activation_features_extractor,
-            device=self.device,
         )
 
         if self.normalize:
@@ -150,12 +162,17 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                     output_dim=self.hidden_dim,
                     batch_norm=self.normalize,
                     activation=activation_features_extractor,
-                    device=self.device,
                 )
                 self.features_extractors.append(GINEConv(mlp, learn_eps=True))
             elif self.gconv_type in ["gat", "gatv2"]:
                 self.features_extractors.append(
-                    EGATConv(self.hidden_dim, self.hidden_dim, self.hidden_dim, self.hidden_dim, num_heads=n_attention_heads)
+                    EGATConv(
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        num_heads=n_attention_heads,
+                    )
                 )
                 self.mlps.append(
                     MLP(
@@ -165,7 +182,6 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                         output_dim=hidden_dim_features_extractor,
                         batch_norm=self.normalize,
                         activation=activation_features_extractor,
-                        device=self.device,
                     )
                 )
                 # self.mlps_edges.append(
@@ -176,7 +192,6 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                 #         output_dim=hidden_dim_features_extractor,
                 #         batch_norm=self.normalize,
                 #         activation=activation_features_extractor,
-                #         device=self.device,
                 #     )
                 # )
             elif self.gconv_type == "pna":
@@ -184,7 +199,17 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                     PNAConv(
                         self.hidden_dim,
                         self.hidden_dim,
-                        ["mean", "max", "min", "std", "var", "sum", "moment3", "moment4", "moment5"],
+                        [
+                            "mean",
+                            "max",
+                            "min",
+                            "std",
+                            "var",
+                            "sum",
+                            "moment3",
+                            "moment4",
+                            "moment5",
+                        ],
                         ["identity", "amplification", "attenuation"],
                         2.5,
                     )
@@ -194,7 +219,19 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                     DGNConv(
                         self.hidden_dim,
                         self.hidden_dim,
-                        ["mean", "max", "min", "std", "var", "sum", "moment3", "moment4", "moment5", "dir1-av", "dir1-dx"],
+                        [
+                            "mean",
+                            "max",
+                            "min",
+                            "std",
+                            "var",
+                            "sum",
+                            "moment3",
+                            "moment4",
+                            "moment5",
+                            "dir1-av",
+                            "dir1-dx",
+                        ],
                         ["identity", "amplification", "attenuation"],
                         2.5,
                         num_towers=int(self.hidden_dim / 4),
@@ -226,7 +263,9 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         origbnn = g.batch_num_nodes()
         if self.graph_pooling == "learn":
             poolnodes = list(range(num_nodes, num_nodes + batch_size))
-            g.add_nodes(batch_size, data={"feat": torch.zeros((batch_size, features.shape[1]))})
+            g.add_nodes(
+                batch_size, data={"feat": torch.zeros((batch_size, features.shape[1]))}
+            )
             ei0 = []
             ei1 = []
             startnode = 0
@@ -256,9 +295,15 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
             batchid = torch.IntTensor(batchid)
             g.add_nodes(
                 self.max_n_machines * batch_size,
-                data={"feat": torch.zeros((batch_size * self.max_n_machines, features.shape[1]))},
+                data={
+                    "feat": torch.zeros(
+                        (batch_size * self.max_n_machines, features.shape[1])
+                    )
+                },
             )
-            machinenodeindex = list(range(node_offset, node_offset + self.max_n_machines * batch_size))
+            machinenodeindex = list(
+                range(node_offset, node_offset + self.max_n_machines * batch_size)
+            )
             idxaffected = torch.where(machineid != -1, 1, 0).nonzero(as_tuple=True)[0]
             machineid = machineid[idxaffected]
             bid = batchid[idxaffected]
@@ -269,7 +314,11 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                 data={"type": torch.LongTensor([0] * self.max_n_machines * batch_size)},
             )
             g.add_edges(idxaffected, targetmachinenode, data={"type": machineid + 5})
-            g.add_edges(targetmachinenode, idxaffected, data={"type": machineid + 5 + self.max_n_machines})
+            g.add_edges(
+                targetmachinenode,
+                idxaffected,
+                data={"type": machineid + 5 + self.max_n_machines},
+            )
             if self.graph_pooling == "learn":
                 # also pool machine nodes
                 machinepoolindex = []
@@ -278,18 +327,26 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                 g.add_edges(
                     machinenodeindex,
                     machinepoolindex,
-                    data={"type": torch.LongTensor([5 + 2 * self.max_n_machines] * len(machinepoolindex))},
+                    data={
+                        "type": torch.LongTensor(
+                            [5 + 2 * self.max_n_machines] * len(machinepoolindex)
+                        )
+                    },
                 )
 
-        g = g.to(self.device)
+        g = g.to(next(self.parameters()).device)
         features = g.ndata["feat"]
 
         if self.graph_pooling == "learn":
-            features[poolnodes] = self.node_embedder(torch.LongTensor([0] * len(poolnodes)).to(features.device))
+            features[poolnodes] = self.node_embedder(
+                torch.LongTensor([0] * len(poolnodes)).to(features.device)
+            )
 
         if self.conflicts == "node":
             features[machinenodeindex] = self.node_embedder(
-                (torch.LongTensor(list(range(self.max_n_machines)) * batch_size) + 1).to(features.device)
+                (
+                    torch.LongTensor(list(range(self.max_n_machines)) * batch_size) + 1
+                ).to(features.device)
             )
         features_list = []
         if self.normalize:
@@ -310,16 +367,22 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
             # do not update edge features below
             # g.edata["emb"] = self.edge_embedder[layer](g.edata["type"])
             if self.gconv_type == "gcn2":
-                g.edata["emb"] = g.edata["emb"] + torch.max(torch.abs(g.edata["emb"])) + 1.0
+                g.edata["emb"] = (
+                    g.edata["emb"] + torch.max(torch.abs(g.edata["emb"])) + 1.0
+                )
             if self.gconv_type in ["gat", "gatv2"]:
-                features, new_e_attr = self.features_extractors[layer](g, features, g.edata["emb"])
+                features, new_e_attr = self.features_extractors[layer](
+                    g, features, g.edata["emb"]
+                )
                 features = self.mlps[layer](features.flatten(start_dim=-2, end_dim=-1))
                 # update edge features below
                 # g.edata["emb"] = self.mlps_edges[layer](new_e_attr.flatten(start_dim=-2, end_dim=-1))
             elif self.gconv_type in ["gin", "pna"]:
                 features = self.features_extractors[layer](g, features, g.edata["emb"])
             elif self.gconv_type == "dgn":
-                features = self.features_extractors[layer](g, features, edge_feat=g.edata["emb"], eig_vec=g.ndata["eig"])
+                features = self.features_extractors[layer](
+                    g, features, edge_feat=g.edata["emb"], eig_vec=g.ndata["eig"]
+                )
             elif self.gconv_type == "gcn2":
                 features = self.features_extractors[layer](
                     g, features, features_list[1], edge_weight=g.edata["emb"].squeeze(1)
@@ -335,7 +398,9 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
                     features = self.normsbis[layer](features)
             features_list.append(features)
 
-        features = torch.cat(features_list, axis=1)  # The final embedding is concatenation of all layers embeddings
+        features = torch.cat(
+            features_list, axis=1
+        )  # The final embedding is concatenation of all layers embeddings
         node_features = features[:num_nodes, :]
         node_features = node_features.reshape(batch_size, n_nodes, -1)
 
@@ -348,10 +413,15 @@ class FeaturesExtractorDGL(BaseFeaturesExtractor):
         elif self.graph_pooling == "learn":
             graph_embedding = features[num_nodes : num_nodes + batch_size, :]
         else:
-            raise Exception(f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg")
+            raise Exception(
+                f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg"
+            )
 
         node_features = torch.nn.functional.pad(
-            node_features, (0, 0, 0, self.max_n_nodes - node_features.shape[1]), mode="constant", value=0.0
+            node_features,
+            (0, 0, 0, self.max_n_nodes - node_features.shape[1]),
+            mode="constant",
+            value=0.0,
         )
 
         graph_embedding = graph_embedding.reshape(batch_size, 1, -1)

@@ -37,12 +37,18 @@ parser = argparse.ArgumentParser(
 # =================================================PROBLEM DESCRIPTION======================================================
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
-parser.add_argument("--max_duration", type=int, default=99, help="Max duration for problems")
+parser.add_argument(
+    "--max_duration", type=int, default=99, help="Max duration for problems"
+)
 
 # =================================================COMPUTER SPECIFICATION===================================================
 parser.add_argument("--seed", type=int, default=42, help="Random seed")
-parser.add_argument("--max_n_j", type=int, default=-1, help="Max number of jobs (if -1, max_n_j=n_j")
-parser.add_argument("--max_n_m", type=int, default=-1, help="Max number of machines (if -1, max_n_m=n_m")
+parser.add_argument(
+    "--max_n_j", type=int, default=-1, help="Max number of jobs (if -1, max_n_j=n_j"
+)
+parser.add_argument(
+    "--max_n_m", type=int, default=-1, help="Max number of machines (if -1, max_n_m=n_m"
+)
 parser.add_argument(
     "--path",
     type=str,
@@ -52,7 +58,7 @@ parser.add_argument(
 parser.add_argument(
     "--n_workers",
     type=int,
-    default=1,
+    default=10,
     help="Number of CPU cores for simulating environment",
 )
 parser.add_argument(
@@ -62,7 +68,9 @@ parser.add_argument(
     choices=["cpu", "cuda", "cuda:0", "cuda:1", "cuda:2", "cuda:3"],
     help="Which device to use (cpu, cuda:0, cuda:1...)",
 )
-parser.add_argument("--exp_name_appendix", type=str, help="Appendix for the name of the experience")
+parser.add_argument(
+    "--exp_name_appendix", type=str, help="Appendix for the name of the experience"
+)
 parser.add_argument(
     "--stable_baselines3_localisation",
     type=str,
@@ -80,7 +88,7 @@ parser.add_argument(
 parser.add_argument(
     "--total_timesteps",
     type=int,
-    default=int(1e4),
+    default=int(1e6),
     help="Number of training env timesteps",
 )
 parser.add_argument(
@@ -89,7 +97,9 @@ parser.add_argument(
     default=10,
     help="Number of epochs for updating the agent's parameters",
 )
-parser.add_argument("--n_steps_episode", type=int, default=1024, help="Number of steps per episode.")
+parser.add_argument(
+    "--n_steps_episode", type=int, default=1024, help="Number of steps per episode."
+)
 parser.add_argument(
     "--batch_size",
     type=int,
@@ -97,9 +107,15 @@ parser.add_argument(
     help="Batch size during training of the agent",
 )
 parser.add_argument("--lr", type=float, default=2e-4, help="Default Learning rate")
-parser.add_argument("--fe_lr", type=float, default=None, help="Learning rate for feature extractor")
-parser.add_argument("--rpo", default=False, action="store_true", help="use RPO-style smoothing")
-parser.add_argument("--rpo_smoothing_param", type=float, default=1.0, help="RPO-style smoothing param")
+parser.add_argument(
+    "--fe_lr", type=float, default=None, help="Learning rate for feature extractor"
+)
+parser.add_argument(
+    "--rpo", default=False, action="store_true", help="use RPO-style smoothing"
+)
+parser.add_argument(
+    "--rpo_smoothing_param", type=float, default=1.0, help="RPO-style smoothing param"
+)
 
 parser.add_argument(
     "--optimizer",
@@ -125,6 +141,12 @@ parser.add_argument(
     default=False,
     action="store_true",
     help="Use this flag if you want to retrain a pretrained model. The script will look for existing model at path loc.",
+)
+parser.add_argument(
+    "--resume",
+    default=False,
+    action="store_true",
+    help="Resume a previous training",
 )
 
 # =================================================VALIDATION SPECIFICATION=================================================
@@ -165,20 +187,26 @@ parser.add_argument(
 )
 
 # =================================================TESTING SPECIFICATION====================================================
-parser.add_argument("--n_test_problems", type=int, default=100, help="Number of problems for testing")
-parser.add_argument("--test_print_every", type=int, default=50, help="Print frequency for testing")
+parser.add_argument(
+    "--n_test_problems", type=int, default=100, help="Number of problems for testing"
+)
+parser.add_argument(
+    "--test_print_every", type=int, default=50, help="Print frequency for testing"
+)
 
 # =================================================AGENT SPECIFICATION======================================================
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
-parser.add_argument("--clip_range", type=float, default=0.2, help="Clipping parameter")
+parser.add_argument("--clip_range", type=float, default=0.25, help="Clipping parameter")
 parser.add_argument(
     "--target_kl",
     type=float,
-    default=0.2,
+    default=0.04,
     help="Limit the KL divergence between updates",
 )
 parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
-parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function coefficient")
+parser.add_argument(
+    "--vf_coef", type=float, default=0.5, help="Value function coefficient"
+)
 parser.add_argument(
     "--dont_normalize_advantage",
     action="store_true",
@@ -224,7 +252,7 @@ parser.add_argument("--dropout", type=float, default=0.0, help="dropout ratio")
 parser.add_argument(
     "--ortools_strategy",
     type=str,
-    default="pessimistic",
+    default="averagistic",
     choices=["realistic", "optimistic", "pessimistic", "averagistic"],
     help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic realistic means omiscient, "
     "ie sees the future",
@@ -239,7 +267,7 @@ parser.add_argument(
 parser.add_argument(
     "--transformer_flavor",
     type=str,
-    default="vanilla",
+    default="linear",
     help="transformer implementation for tokengt",
     choices=["vanilla", "linear", "performer"],
 )
@@ -248,7 +276,9 @@ parser.add_argument(
     action="store_true",
     help="enable laplacian cache for tokengt",
 )
-parser.add_argument("--lap_node_id_k", type=int, default=10, help="laplacian id size for tokengt")
+parser.add_argument(
+    "--lap_node_id_k", type=int, default=10, help="laplacian id size for tokengt"
+)
 parser.add_argument(
     "--graph_has_relu",
     action="store_true",
@@ -260,7 +290,9 @@ parser.add_argument(
     default=3,
     help="Number of MLP layers in each GNN",
 )
-parser.add_argument("--n_layers_features_extractor", type=int, default=6, help="Number of layers of GNN")
+parser.add_argument(
+    "--n_layers_features_extractor", type=int, default=6, help="Number of layers of GNN"
+)
 parser.add_argument(
     "--hidden_dim_features_extractor",
     type=int,
@@ -273,9 +305,15 @@ parser.add_argument(
     default=4,
     help="Dimension of hidden and output for GNN",
 )
-parser.add_argument("--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN")
-parser.add_argument("--residual_gnn", action="store_true", help="use residual connection in GNN")
-parser.add_argument("--normalize_gnn", action="store_true", help="normalize gnn everywhere")
+parser.add_argument(
+    "--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN"
+)
+parser.add_argument(
+    "--residual_gnn", action="store_true", help="use residual connection in GNN"
+)
+parser.add_argument(
+    "--normalize_gnn", action="store_true", help="normalize gnn everywhere"
+)
 parser.add_argument(
     "--conflicts",
     type=str,
@@ -295,14 +333,18 @@ parser.add_argument(
     default=1,
     help="Number of MLP layers in actor (excluding input and output",
 )
-parser.add_argument("--hidden_dim_actor", type=int, default=64, help="Hidden dim for actor")
+parser.add_argument(
+    "--hidden_dim_actor", type=int, default=64, help="Hidden dim for actor"
+)
 parser.add_argument(
     "--n_mlp_layers_critic",
     type=int,
     default=1,
     help="Number of MLP layers in critic (excluding input and output)",
 )
-parser.add_argument("--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic")
+parser.add_argument(
+    "--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic"
+)
 
 # =================================================ENVIRONMENT SPECIFICATION================================================
 parser.add_argument(
@@ -358,14 +400,14 @@ parser.add_argument(
     "--duration_mode_bounds",
     type=int,
     nargs=2,
-    default=(10, 49),
+    default=(10, 50),
     help="The define the range of sampling for the mode of the triangular distributions for durations",
 )
 parser.add_argument(
     "--duration_delta",
     type=int,
     nargs=2,
-    default=(2, 50),
+    default=(10, 200),
     help="This defines the delta between low_value/high_value and the mode for the triangular distributions for durations",
 )
 parser.add_argument(
@@ -435,8 +477,12 @@ parser.add_argument(
     action="store_true",
     help="in taillard format, first machine id is 1",
 )
-parser.add_argument("--load_from_job", type=int, default=0, help="Start load at job n from problem")
-parser.add_argument("--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem")
+parser.add_argument(
+    "--load_from_job", type=int, default=0, help="Start load at job n from problem"
+)
+parser.add_argument(
+    "--load_max_jobs", type=int, default=-1, help="Load at most n jobs from problem"
+)
 parser.add_argument(
     "--sample_n_jobs",
     type=int,
@@ -495,7 +541,9 @@ elif args.max_n_j < args.n_j:
 if args.max_n_m == -1:
     args.max_n_m = args.n_m
 elif args.max_n_m < args.n_m:
-    raise Exception("Max number of machines should be higher than current number of machines")
+    raise Exception(
+        "Max number of machines should be higher than current number of machines"
+    )
 
 # Incompatible options
 if args.fixed_random_validation and not args.fixed_validation:

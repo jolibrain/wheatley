@@ -1,14 +1,11 @@
 pre - commit
-pytest
 numpy
-stable_baselines3
-gym
+gymnasium
 ortools
 visdom
 networkx
 plotly
-opencv-python
-sb3_contrib
-kaleido
-numba
 einops
+matplotlib
+opencv-python
+kaleido

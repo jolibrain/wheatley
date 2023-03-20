@@ -24,86 +24,77 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import pickle
 import time
 import sys
 import numpy as np
-from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.utils import safe_mean
 import visdom
 import csv
 import copy
+import torch
 
 from env.env import Env
 from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
 from utils.utils_testing import get_ortools_makespan
-from utils.utils import generate_problem_durations
-from sb3_contrib.common.maskable.utils import get_action_masks
+from utils.utils import (
+    generate_problem_durations,
+    obs_as_tensor_add_batch_dim,
+    safe_mean,
+)
 
 
-class ValidationCallback(BaseCallback):
+class AgentValidator:
     def __init__(
         self,
         problem_description,
         env_specification,
-        n_workers,
         device,
-        n_validation_env,
-        fixed_validation,
-        fixed_random_validation,
-        validation_batch_size,
-        display_env,
-        path,
-        custom_name,
-        max_n_jobs,
-        max_n_machines,
-        max_time_ortools,
-        scaling_constant_ortools,
-        ortools_strategy="pessimistic",
-        validate_on_total_data=False,
+        training_specification,
         verbose=2,
     ):
-        super(ValidationCallback, self).__init__(verbose=verbose)
+        super().__init__()
 
         # Parameters
         self.problem_description = problem_description
-        if validate_on_total_data:
+        if training_specification.validate_on_total_data:
             self.env_specification = copy.deepcopy(env_specification)
             self.env_specification.sample_n_jobs = -1
         else:
             self.env_specification = env_specification
-        self.n_workers = n_workers
         self.device = device
 
-        self.n_validation_env = n_validation_env
-        self.fixed_validation = fixed_validation
-        self.fixed_random_validation = fixed_random_validation
-        self.validation_batch_size = validation_batch_size
-        self.vis = visdom.Visdom(env=display_env)
-        self.path = path
-        self.ortools_strategy = ortools_strategy
+        self.n_validation_env = training_specification.n_validation_env
+        self.fixed_validation = training_specification.fixed_validation
+        self.fixed_random_validation = training_specification.fixed_random_validation
+        self.vis = visdom.Visdom(env=training_specification.display_env)
+        self.path = training_specification.path
+        self.ortools_strategy = training_specification.ortools_strategy
 
         self.n_jobs = problem_description.n_jobs
         self.n_machines = problem_description.n_machines
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
-        self.custom_name = custom_name
+        self.custom_name = training_specification.custom_heuristic_name
 
-        self.max_n_jobs = max_n_jobs
-        self.max_n_machines = max_n_machines
-        self.max_time_ortools = max_time_ortools
-        self.scaling_constant_ortools = scaling_constant_ortools
+        self.max_n_jobs = env_specification.max_n_jobs
+        self.max_n_machines = env_specification.max_n_machines
+        self.max_time_ortools = training_specification.max_time_ortools
+        self.scaling_constant_ortools = training_specification.scaling_constant_ortools
 
         # Comparative agents
         self.random_agent = RandomAgent(self.max_n_jobs, self.max_n_machines)
-        if custom_name != "None":
-            self.custom_agent = CustomAgent(self.max_n_jobs, self.max_n_machines, custom_name.lower())
+        if self.custom_name != "None":
+            self.custom_agent = CustomAgent(
+                self.max_n_jobs, self.max_n_machines, custom_name.lower()
+            )
 
         # Inner variables
-        self.validation_envs = [Env(self.problem_description, self.env_specification) for _ in range(self.n_validation_env)]
+        self.validation_envs = [
+            Env(self.problem_description, self.env_specification)
+            for _ in range(self.n_validation_env)
+        ]
         self.makespan_ratio = 1000
         self.makespans = []
         self.ortools_makespans = []
@@ -120,6 +111,7 @@ class ValidationCallback(BaseCallback):
         self.ep_len_means = []
         self.ep_rew_means = []
         self.fpss = []
+        self.dpss = []
         self.total_timestepss = []
         self.first_callback = True
         self.gantt_rl_img = None
@@ -131,7 +123,7 @@ class ValidationCallback(BaseCallback):
         self.best_makespan_ortools = float("inf")
 
         # Compute OR-Tools solutions once if validations are fixed
-        if fixed_validation:
+        if self.fixed_validation:
             print("Computing fixed OR-Tools solutions", end="", flush=True)
             self.fixed_ortools = []
             for i in range(self.n_validation_env):
@@ -140,40 +132,35 @@ class ValidationCallback(BaseCallback):
             print()
 
         # Compute random solutions once if validations are fixed
-        if fixed_random_validation:
+        if self.fixed_random_validation:
             print("Computing fixed random solutions", end="", flush=True)
             self.fixed_random = []
             for i in range(self.n_validation_env):
-                makespans = [self._get_random_makespan(i) for n in range(fixed_validation)]
+                makespans = [
+                    self._get_random_makespan(i)
+                    for n in range(self.fixed_random_validation)
+                ]
                 self.fixed_random.append(sum(makespans) / len(makespans))
                 print(".", end="", flush=True)
             print()
 
-    def _on_step(self):
-        self._evaluate_agent()
-        self._save_if_best_model()
-        self._visdom_metrics()
-        print(self.path)
+    def validate(self, agent, alg):
+        self._evaluate_agent(agent)
+        self._save_if_best_model(agent, alg)
+        self._visdom_metrics(agent, alg)
         return True
 
-    def _save_if_best_model(self):
+    def _save_if_best_model(self, agent, alg):
         cur_ratio = np.mean(
             np.array(self.makespans[-4 : len(self.makespans)])
             / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
         )
         if cur_ratio <= self.makespan_ratio:
-            self.model.save(self.path)
-
-            # EVIL QUICK FIX OF DEATH
-            # The best thing to do would be to specify a AgentTrainer, responsible of training the agent and printing
-            # callbacks. This way, we could just do agent.save(path). This needs to rebuild the structure of the training.
-            with open(self.path + ".pickle", "wb") as f:
-                pickle.dump(
-                    {"env_specification": self.env_specification, "n_workers": self.n_workers, "device": self.device}, f
-                )
+            print("Saving agent", self.path + ".agent")
+            agent.save(self.path + ".agent")
+            torch.save(alg.optimizer.state_dict(), self.path + ".opt")
 
             self.makespan_ratio = cur_ratio
-            print("Saving model")
             print(f"Current ratio : {cur_ratio:.3f}")
 
     def _get_ortools_makespan(self, i):
@@ -212,32 +199,7 @@ class ValidationCallback(BaseCallback):
             writer.writerow(line)
         f.close()
 
-    def _evaluate_agent(self):
-        # compute the solutions in parallel if we use batch_size
-        batch_size = self.validation_batch_size
-        if batch_size:
-            envs = self.validation_envs
-            all_obs = [env.reset(soft=self.fixed_validation) for env in envs]
-            while envs:
-                all_masks = [get_action_masks(env) for env in envs]
-                all_actions = []
-                for i in range(0, len(envs), batch_size):
-                    actions, _ = self.model.predict(
-                        self._list_to_dict(all_obs[i : i + batch_size]),
-                        action_masks=all_masks[i : i + batch_size],
-                        deterministic=True,
-                    )
-                    all_actions += list(actions)
-                all_obs = []
-                todo_envs = []
-                for env, action in zip(envs, all_actions):
-                    obs, reward, done, info = env.step(action)
-                    if done:
-                        continue
-                    all_obs.append(obs)
-                    todo_envs.append(env)
-                envs = todo_envs
-
+    def _evaluate_agent(self, agent):
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
@@ -245,13 +207,17 @@ class ValidationCallback(BaseCallback):
         eval_time = 0
         for i in range(self.n_validation_env):
             start_eval = time.process_time()
-            if not batch_size:
-                obs = self.validation_envs[i].reset(soft=self.fixed_validation)
-                done = False
-                while not done:
-                    action_masks = get_action_masks(self.validation_envs[i])
-                    action, _ = self.model.predict(obs, deterministic=True, action_masks=action_masks)
-                    obs, reward, done, info = self.validation_envs[i].step(action)
+            obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
+            done = False
+            while not done:
+                action_masks = info["mask"]
+                obs = obs_as_tensor_add_batch_dim(obs)
+                action = agent.predict(
+                    obs, deterministic=True, action_masks=action_masks
+                )
+                obs, reward, done, _, info = self.validation_envs[i].step(
+                    action.long().item()
+                )
             solution = self.validation_envs[i].get_solution()
             eval_time += (time.process_time() - start_eval) / self.n_validation_env
             schedule = solution.schedule
@@ -262,7 +228,9 @@ class ValidationCallback(BaseCallback):
 
             if makespan < self.best_makespan_wheatley:
                 self.best_makespan_wheatley = makespan
-                self.save_csv("wheatley", makespan, schedule, self.validation_envs[i].sampled_jobs)
+                self.save_csv(
+                    "wheatley", makespan, schedule, self.validation_envs[i].sampled_jobs
+                )
 
             mean_makespan += makespan / self.n_validation_env
 
@@ -272,11 +240,18 @@ class ValidationCallback(BaseCallback):
                 or_tools_makespan, or_tools_schedule = self._get_ortools_makespan(i)
 
             if i == 0:
-                self.gantt_or_img = self.validation_envs[i].render_solution(or_tools_schedule, scaling=1.0)
+                self.gantt_or_img = self.validation_envs[i].render_solution(
+                    or_tools_schedule, scaling=1.0
+                )
 
             if or_tools_makespan < self.best_makespan_ortools:
                 self.best_makespan_ortools = or_tools_makespan
-                self.save_csv("ortools", or_tools_makespan.item(), or_tools_schedule, self.validation_envs[i].sampled_jobs)
+                self.save_csv(
+                    "ortools",
+                    or_tools_makespan.item(),
+                    or_tools_schedule,
+                    self.validation_envs[i].sampled_jobs,
+                )
 
             ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 
@@ -291,10 +266,18 @@ class ValidationCallback(BaseCallback):
                     np.max(
                         self.custom_agent.predict(
                             ProblemDescription(
-                                transition_model_config=self.validation_envs[i].transition_model_config,
-                                reward_model_config=self.validation_envs[i].reward_model_config,
-                                affectations=self.validation_envs[i].transition_model.affectations,
-                                durations=self.validation_envs[i].transition_model.durations,
+                                transition_model_config=self.validation_envs[
+                                    i
+                                ].transition_model_config,
+                                reward_model_config=self.validation_envs[
+                                    i
+                                ].reward_model_config,
+                                affectations=self.validation_envs[
+                                    i
+                                ].transition_model.affectations,
+                                durations=self.validation_envs[
+                                    i
+                                ].transition_model.durations,
                                 n_jobs=self.validation_envs[i].n_jobs,
                                 n_machines=self.validation_envs[i].n_machines,
                             ),
@@ -311,11 +294,11 @@ class ValidationCallback(BaseCallback):
         self.random_makespans.append(random_mean_makespan)
         self.custom_makespans.append(custom_mean_makespan)
 
-    def _visdom_metrics(self):
+    def _visdom_metrics(self, agent, alg):
         commandline = " ".join(sys.argv)
         html = f"""
             <div style="padding: 5px">
-                <h4>Total actions: {self.model.num_timesteps}</h4>
+                <h4>Total actions: {alg.global_step}</h4>
                 <code>{commandline}</code>
             </div>
         """
@@ -339,7 +322,9 @@ class ValidationCallback(BaseCallback):
             Y_list.append(self.custom_makespans)
             Y2_list.append(self.custom_makespans / np.array(self.ortools_makespans))
             opts["legend"].append(self.custom_name)
-            opts["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]])
+            opts["linecolor"] = np.array(
+                [[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]]
+            )
             opts2["legend"].append(self.custom_name + " / OR-tools")
             opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
@@ -366,28 +351,55 @@ class ValidationCallback(BaseCallback):
         pct = 100 * wins / count
         self.time_to_ortools.append(pct)
         opts = {"title": "Time to OR-tools %"}
-        self.vis.line(X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts)
+        self.vis.line(
+            X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts
+        )
 
         if self.first_callback:
             self.first_callback = False
             return
 
-        self.entropy_losses.append(self.model.ent_coef * self.model.logger.name_to_value["train/entropy_loss"])
-        self.policy_gradient_losses.append(self.model.logger.name_to_value["train/policy_gradient_loss"])
-        self.value_losses.append(self.model.vf_coef * self.model.logger.name_to_value["train/value_loss"])
-        self.losses.append(self.model.logger.name_to_value["train/loss"])
-        self.approx_kls.append(self.model.logger.name_to_value["train/approx_kl"])
-        self.clip_fractions.append(self.model.logger.name_to_value["train/clip_fraction"])
-        self.explained_variances.append(self.model.logger.name_to_value["train/explained_variance"])
-        self.clip_ranges.append(self.model.logger.name_to_value["train/clip_range"])
+        self.entropy_losses.append(
+            alg.ent_coef * alg.logger.name_to_value["train/entropy_loss"]
+        )
+        self.policy_gradient_losses.append(
+            alg.logger.name_to_value["train/policy_gradient_loss"]
+        )
+        self.value_losses.append(
+            alg.vf_coef * alg.logger.name_to_value["train/value_loss"]
+        )
+        self.losses.append(alg.logger.name_to_value["train/loss"])
+        self.approx_kls.append(alg.logger.name_to_value["train/approx_kl"])
+        self.clip_fractions.append(alg.logger.name_to_value["train/clip_fraction"])
+        self.explained_variances.append(
+            alg.logger.name_to_value["train/explained_variance"]
+        )
+        self.clip_ranges.append(alg.logger.name_to_value["train/clip_range"])
         # Recreate last features by hand, since they are erased
-        self.ep_rew_means.append(safe_mean([ep_info["r"] for ep_info in self.model.ep_info_buffer]))
-        self.ep_len_means.append(safe_mean([ep_info["l"] for ep_info in self.model.ep_info_buffer]))
-        self.fpss.append(int(self.model.num_timesteps / (time.time() - self.model.start_time)))
-        self.total_timestepss.append(self.model.num_timesteps)
+        self.ep_rew_means.append(
+            safe_mean([ep_info["r"] for ep_info in alg.ep_info_buffer])
+        )
+        self.ep_len_means.append(
+            safe_mean([ep_info["l"] for ep_info in alg.ep_info_buffer])
+        )
+        self.fpss.append(int(alg.global_step / (time.time() - alg.start_time)))
+        self.dpss.append(
+            int(
+                alg.n_epochs
+                * alg.num_envs
+                * alg.num_steps
+                / (time.time() - alg.start_time)
+            )
+        )
+        self.total_timestepss.append(alg.global_step)
 
         X = list(range(1, len(self.losses) + 1))
-        Y_list = [self.losses, self.value_losses, self.policy_gradient_losses, self.entropy_losses]
+        Y_list = [
+            self.losses,
+            self.value_losses,
+            self.policy_gradient_losses,
+            self.entropy_losses,
+        ]
         opts = {
             "legend": ["loss", "value_loss", "policy_gradient_loss", "entropy_loss"],
         }
@@ -405,12 +417,21 @@ class ValidationCallback(BaseCallback):
             "ep_len_mean": self.ep_len_means,
             "ep_rew_mean": self.ep_rew_means,
             "actions_per_second": self.fpss,
+            "updates_per_second": self.dpss,
             "total_timesteps": self.total_timestepss,
         }
         for title, data in charts.items():
             self.vis.line(X=X, Y=data, win=title, opts={"title": title})
 
         if self.gantt_rl_img is not None:
-            self.vis.image(self.gantt_rl_img, opts={"caption": "Gantt RL schedule"}, win="rl_schedule")
+            self.vis.image(
+                self.gantt_rl_img,
+                opts={"caption": "Gantt RL schedule"},
+                win="rl_schedule",
+            )
         if self.gantt_or_img is not None:
-            self.vis.image(self.gantt_or_img, opts={"caption": "Gantt OR-Tools schedule"}, win="or_schedule")
+            self.vis.image(
+                self.gantt_or_img,
+                opts={"caption": "Gantt OR-Tools schedule"},
+                win="or_schedule",
+            )

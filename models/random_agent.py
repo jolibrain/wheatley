@@ -26,8 +26,9 @@
 
 import numpy as np
 
-from env.env import Env
-from sb3_contrib.common.maskable.utils import get_action_masks
+
+def decode_mask(info_mask):
+    return np.stack([np.array(i) for i in info_mask])
 
 
 class RandomAgent:
@@ -38,16 +39,17 @@ class RandomAgent:
 
     def predict(self, env):
         # soft reset to evaluate the same sampled problem as PPO
-        observation = env.reset(soft=True)
+        observation, info = env.reset(soft=True)
+        action_mask = decode_mask(info["mask"])
         done = False
         while not done:
-            action = self.select_action(env)
-            observation, _, done, _ = env.step(action)
+            action = self.select_action(env, action_mask)
+            observation, _, done, _, info = env.step(action)
+            action_mask = decode_mask(info["mask"])
         solution = env.get_solution()
         return solution
 
-    def select_action(self, env):
-        action_masks = get_action_masks(env)
+    def select_action(self, env, action_masks):
         possible_actions = np.nonzero(action_masks)[0]
         action = np.random.choice(possible_actions)
         return action
