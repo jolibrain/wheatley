@@ -24,8 +24,6 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from copy import deepcopy
-
 import numpy as np
 import torch
 from typing import List, Optional, Tuple, Union
