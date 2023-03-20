@@ -30,7 +30,6 @@ import numpy as np
 import torch
 from typing import List, Optional, Tuple, Union
 from collections import defaultdict
-
 import sys
 
 
@@ -539,31 +538,51 @@ def compute_conflicts_cliques(machineid):
 
 
 def obs_as_tensor(obs):
-    """
-    Moves the observation to the given device.
-    :param obs:
-    :param device: PyTorch device
-    :return: PyTorch tensor of the observation on a desired device.
-    """
     if isinstance(obs, np.ndarray):
-        return torch.as_tensor(obs)
+        return torch.tensor(obs)
     elif isinstance(obs, dict):
-        return {key: torch.as_tensor(_obs) for (key, _obs) in obs.items()}
+        max_nnodes = max(obs["n_nodes"])
+        max_nedges = max(obs["n_edges"])
+        if "n_conflict_edges" in obs:
+            max_nconflicts_edgs = max(obs["n_conflict_edges"])
+        newobs = {}
+        for (key, _obs) in obs.items():
+            if key == "features":
+                newobs[key] = torch.tensor(_obs[:, :max_nnodes, :])
+            elif key == "edge_index":
+                newobs[key] = torch.tensor(_obs[:, :, :max_nedges])
+            elif key == "conflicts_edges":
+                newobs[key] = torch.tensor(_obs[:, :, :max_nconflicts_edges])
+            elif key == "conflicts_edges_machineid":
+                newobs[key] = torch.tensor(_obs[:, :, :max_nconflicts_edges])
+            else:
+                newobs[key] = torch.tensor(_obs)
+        return newobs
     else:
         raise Exception(f"Unrecognized type of observation {type(obs)}")
 
 
 def obs_as_tensor_add_batch_dim(obs):
-    """
-    Moves the observation to the given device.
-    :param obs:
-    :param device: PyTorch device
-    :return: PyTorch tensor of the observation on a desired device.
-    """
     if isinstance(obs, np.ndarray):
-        return torch.as_tensor(obs).unsqueeze_(0)
+        return torch.tensor(obs).unsqueeze_(0)
     elif isinstance(obs, dict):
-        return {key: torch.as_tensor(_obs).unsqueeze_(0) for (key, _obs) in obs.items()}
+        max_nnodes = obs["n_nodes"]
+        max_nedges = obs["n_edges"]
+        if "n_conflict_edges" in obs:
+            max_nconflicts_edges = obs["n_conflict_edges"]
+        newobs = {}
+        for (key, _obs) in obs.items():
+            if key == "features":
+                newobs[key] = torch.tensor(_obs[:max_nnodes, :]).unsqueeze(0)
+            elif key == "edge_index":
+                newobs[key] = torch.tensor(_obs[:, :max_nedges]).unsqueeze(0)
+            elif key == "conflicts_edges":
+                newobs[key] = torch.tensor(_obs[:, :max_nconflicts_edges]).unsqueeze(0)
+            elif key == "conflicts_edges_machineid":
+                newobs[key] = torch.tensor(_obs[:, :max_nconflicts_edges]).unsqueeze(0)
+            else:
+                newobs[key] = torch.tensor([_obs])
+        return newobs
     else:
         raise Exception(f"Unrecognized type of observation {type(obs)}")
 
