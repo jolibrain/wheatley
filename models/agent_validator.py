@@ -31,6 +31,7 @@ import visdom
 import csv
 import copy
 import torch
+import tqdm
 
 from env.env import Env
 from models.custom_agent import CustomAgent
@@ -205,7 +206,7 @@ class AgentValidator:
         random_mean_makespan = 0
         custom_mean_makespan = 0
         eval_time = 0
-        for i in range(self.n_validation_env):
+        for i in tqdm.tqdm(range(self.n_validation_env), desc="   evaluating         "):
             start_eval = time.process_time()
             obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
             done = False

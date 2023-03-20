@@ -29,6 +29,7 @@ import torch
 from typing import List, Optional, Tuple, Union
 from collections import defaultdict
 import sys
+from copy import deepcopy
 
 
 def get_exp_name(args):

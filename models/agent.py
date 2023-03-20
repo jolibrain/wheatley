@@ -69,7 +69,6 @@ class Agent(torch.nn.Module):
                 input_dim_features_extractor=env_specification.n_features,
                 gconv_type=agent_specification.gconv_type,
                 graph_pooling=agent_specification.graph_pooling,
-                freeze_graph=agent_specification.freeze_graph,
                 graph_has_relu=agent_specification.graph_has_relu,
                 max_n_nodes=env_specification.max_n_nodes,
                 max_n_machines=env_specification.max_n_machines,
