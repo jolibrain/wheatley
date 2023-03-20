@@ -141,11 +141,9 @@ python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_
 - `--conflicts` : conflict encoding in GNN
 
 ## Actor and critic network parameters
-- `--n_mlp_layers_shared` : number of shared layers between actor and critic
-- `--hidden_dim_shared`: latent dim of shared layers 
 - `--n_mlp_layers_actor`: number of layers of actor
 - `--hidden_dim_actor`: latent dim of actor
--  `--n_mlp_layers_critic`: number of layers of critic
+- `--n_mlp_layers_critic`: number of layers of critic
 - `--hidden_dim_critic`: latent dim of actor
 
 ## Model Options
