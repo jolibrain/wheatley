@@ -32,8 +32,6 @@ from dgl.nn import (
     GINEConv,
     EGATConv,
     PNAConv,
-    MaxPooling,
-    AvgPooling,
     DGNConv,
     GCN2Conv,
 )
@@ -47,9 +45,7 @@ class GnnDGL(torch.nn.Module):
         input_dim_features_extractor,
         gconv_type,
         graph_pooling,
-        freeze_graph,
         graph_has_relu,
-        # device,
         max_n_nodes,
         max_n_machines,
         n_mlp_layers_features_extractor,
@@ -74,7 +70,6 @@ class GnnDGL(torch.nn.Module):
         )
         self.features_dim *= 2
         self.max_n_machines = max_n_machines
-        self.freeze_graph = freeze_graph
         self.reverse_adj = reverse_adj
 
         self.hidden_dim = hidden_dim_features_extractor

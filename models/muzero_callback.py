@@ -2,10 +2,7 @@
 # Wheatley
 # Copyright (c) 2023 Jolibrain
 # Authors:
-#    Guillaume Infantes <guillaume.infantes@jolibrain.com>
 #    Antoine Jacquet <antoine.jacquet@jolibrain.com>
-#    Michel Thomazo <thomazo.michel@gmail.com>
-#    Emmanuel Benazera <emmanuel.benazera@jolibrain.com>
 #
 #
 # This file is part of Wheatley.
@@ -34,10 +31,11 @@ import sys
 
 # hide Visdom deprecation warnings
 import warnings
+
 warnings.simplefilter("ignore", DeprecationWarning)
 
 
-class MuZeroCallback():
+class MuZeroCallback:
     def __init__(
         self,
         problem_description,
@@ -70,7 +68,7 @@ class MuZeroCallback():
     def __getstate__(self):
         state = self.__dict__.copy()
         # prevent MuZero from serializing Visdom during checkpoint
-        state.pop('vis', None)
+        state.pop("vis", None)
         return state
 
     def get_ortools_schedule(self, env):
@@ -102,7 +100,7 @@ class MuZeroCallback():
 
         # for each valid action, check if it is the minimum node time for this machine
         mask = env.action_masks()
-        valid_actions = [ node for node, masked in enumerate(mask) if masked == True ]
+        valid_actions = [node for node, masked in enumerate(mask) if masked == True]
         ortools_actions = []
         for action in valid_actions:
             machine_id = nodes_machine[action]
@@ -121,7 +119,9 @@ class MuZeroCallback():
             action = np.random.choice(actions)
             env.step(action)
             trajectory.append(action)
-        env.reset(soft=True) # we want MuZero to apply the trajectory to the same problem
+        env.reset(
+            soft=True
+        )  # we want MuZero to apply the trajectory to the same problem
         return trajectory
 
     def visdom(self, envs, metrics, config):
@@ -129,16 +129,16 @@ class MuZeroCallback():
             return
 
         # first connection to Visdom
-        if not hasattr(self, 'vis'):
+        if not hasattr(self, "vis"):
             self.vis = visdom.Visdom(env=self.training_specification.display_env)
 
         # html
-        types = ['int', 'bool', 'float', 'list', 'NoneType']
-        table = ''
+        types = ["int", "bool", "float", "list", "NoneType"]
+        table = ""
         for k, v in config.__dict__.items():
-            if not type(v).__name__ in types or k == 'action_space':
+            if not type(v).__name__ in types or k == "action_space":
                 continue
-            table += '<tr><td>' + k + '</td><td>' + str(v) + '</td></tr>'
+            table += "<tr><td>" + k + "</td><td>" + str(v) + "</td></tr>"
         html = f"""
             <div style="padding: 5px">
                 <code>{self.commandline}</code>
@@ -193,14 +193,14 @@ class MuZeroCallback():
             "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
         }
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
-        
+
         # ratio to OR-tools
-        opts = { "title": "MuZero / OR-tools" }
+        opts = {"title": "MuZero / OR-tools"}
         ratio_to_ortools = np.array(self.makespans) / np.array(self.ortools_makespans)
         self.vis.line(X=X, Y=ratio_to_ortools, win="ratio_to_ortools", opts=opts)
 
         # distance to OR-tools
-        opts = { "title": "Distance to OR-tools" }
+        opts = {"title": "Distance to OR-tools"}
         dist_to_ortools = np.array(self.makespans) - np.array(self.ortools_makespans)
         self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
 
@@ -212,8 +212,10 @@ class MuZeroCallback():
                 wins += 1
         pct = 100 * wins / count
         self.time_to_ortools.append(pct)
-        opts = { "title": "Time to OR-tools %" }
-        self.vis.line(X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts)
+        opts = {"title": "Time to OR-tools %"}
+        self.vis.line(
+            X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts
+        )
 
         # draw other metrics
         for key, value in metrics.items():
@@ -230,5 +232,9 @@ class MuZeroCallback():
             self.vis.line(X=X, Y=Y, win=key, opts={"title": key})
 
         # gantts
-        self.vis.image(gantt_rl_img, opts={"caption": "Gantt RL schedule"}, win="rl_schedule")
-        self.vis.image(gantt_or_img, opts={"caption": "Gantt OR-Tools schedule"}, win="or_schedule")
+        self.vis.image(
+            gantt_rl_img, opts={"caption": "Gantt RL schedule"}, win="rl_schedule"
+        )
+        self.vis.image(
+            gantt_or_img, opts={"caption": "Gantt OR-Tools schedule"}, win="or_schedule"
+        )

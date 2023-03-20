@@ -131,7 +131,6 @@ class GnnTokenGT(torch.nn.Module):
 
     def forward(self, obs):
 
-        # print("lap cache size", len(self.laplacian_pe_cache))
         g_list = AgentObservation.from_gym_observation(
             obs,
             conflicts=self.conflicts,
@@ -175,5 +174,4 @@ class GnnTokenGT(torch.nn.Module):
         )
         graph_rep = graph_rep.unsqueeze(1).expand(-1, node_rep.shape[1], -1)
         ret = torch.cat([node_rep, graph_rep], dim=2)
-        # ret  =torch.nn.functional.pad(ret, (0, 0, 0, self.max_n_nodes - ret.shape[1]), mode="constant", value=0.0)
         return ret

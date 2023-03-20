@@ -2,10 +2,7 @@
 # Wheatley
 # Copyright (c) 2023 Jolibrain
 # Authors:
-#    Guillaume Infantes <guillaume.infantes@jolibrain.com>
 #    Antoine Jacquet <antoine.jacquet@jolibrain.com>
-#    Michel Thomazo <thomazo.michel@gmail.com>
-#    Emmanuel Benazera <emmanuel.benazera@jolibrain.com>
 #
 #
 # This file is part of Wheatley.
@@ -35,15 +32,19 @@ from models.agent import Agent
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
-from utils.utils import get_n_features, generate_deterministic_problem, generate_problem_distrib, load_problem
+from utils.utils import (
+    get_n_features,
+    generate_deterministic_problem,
+    generate_problem_distrib,
+    load_problem,
+)
 
 from args import args, exp_name, path
 
 from muzero_general.muzero import MuZero
 from env.env import Env
-from models.features_extractor import FeaturesExtractor
-from models.features_extractor_dgl import FeaturesExtractorDGL
-from models.features_extractor_tokengt import FeaturesExtractorTokenGT
+from models.gnn_dgl import GnnDGL
+from models.gnn_tokengt import GNNTokenGT
 from models.muzero_callback import MuZeroCallback
 
 
@@ -80,7 +81,7 @@ def main():
         duration_mode_bounds=args.duration_mode_bounds,
         duration_delta=args.duration_delta,
     )
-    #problem_description.print_self()
+    # problem_description.print_self()
 
     # Then specify the variables used for the training
     training_specification = TrainingSpecification(
@@ -89,8 +90,10 @@ def main():
         fixed_validation=args.fixed_validation,
         fixed_random_validation=args.fixed_random_validation,
         validation_batch_size=args.validation_batch_size,
-        validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
-        display_env=exp_name + '_muzero',
+        validation_freq=args.n_steps_episode * args.n_workers
+        if args.validation_freq == -1
+        else args.validation_freq,
+        display_env=exp_name + "_muzero",
         path=path,
         custom_heuristic_name=args.custom_heuristic_name,
         ortools_strategy=args.ortools_strategy,
@@ -98,7 +101,7 @@ def main():
         scaling_constant_ortools=args.scaling_constant_ortools,
         vecenv_type=args.vecenv_type,
     )
-    #training_specification.print_self()
+    # training_specification.print_self()
 
     # If we want to use a pretrained Agent, we only have to load it (if it exists)
     if args.retrain and os.path.exists(path + ".zip"):
@@ -117,7 +120,7 @@ def main():
             sample_n_jobs=args.sample_n_jobs,
             chunk_n_jobs=args.chunk_n_jobs,
         )
-        #env_specification.print_self()
+        # env_specification.print_self()
         agent_specification = AgentSpecification(
             lr=args.lr,
             fe_lr=args.fe_lr,
@@ -160,16 +163,17 @@ def main():
             dropout=args.dropout,
             cache_lap_node_id=args.cache_lap_node_id,
         )
-        #agent_specification.print_self()
-        #agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
+        # agent_specification.print_self()
+        # agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
 
     # And finally, we train the model on the specified training mode
     # Note: The saving of the best model is hanlded in the agent.train method.
     # We save every time we hit a min RL / OR-Tools ratio
-    #agent.train(problem_description, training_specification)
+    # agent.train(problem_description, training_specification)
 
     # load configuration from template
     from games.wheatley import MuZeroConfig
+
     config = MuZeroConfig()
 
     # add Env constructor parameters to MuZero configuration so MuZero can create new Envs
@@ -182,13 +186,11 @@ def main():
     config.observation_space = env.observation_space
 
     # create a specific FeaturesExtractor for our observation_space
-    if agent_specification.fe_type in ["dgl", "pyg"]:
+    if agent_specification.fe_type in ["dgl"]:
         fe_kwargs = {
-            "observation_space": env.observation_space,
             "input_dim_features_extractor": env_specification.n_features,
             "gconv_type": agent_specification.gconv_type,
             "graph_pooling": agent_specification.graph_pooling,
-            "freeze_graph": agent_specification.freeze_graph,
             "graph_has_relu": agent_specification.graph_has_relu,
             "device": agent_specification.device,
             "max_n_nodes": env_specification.max_n_nodes,
@@ -205,9 +207,7 @@ def main():
         }
     elif agent_specification.fe_type == "tokengt":
         fe_kwargs = {
-            "observation_space": env.observation_space,
             "input_dim_features_extractor": env_specification.n_features,
-            "device": agent_specification.device,
             "max_n_nodes": env_specification.max_n_nodes,
             "max_n_machines": env_specification.max_n_machines,
             "conflicts": agent_specification.conflicts,
@@ -217,7 +217,7 @@ def main():
             "encoder_attention_heads": agent_specification.n_attention_heads,
             "activation_fn": agent_specification.activation_fn_graph,
             "lap_node_id": True,
-            "lap_node_id_k": env_specification.max_n_nodes,
+            "lap_node_id_k": agent_specification.lap_node_id_k,
             "lap_node_id_sign_flip": True,
             "type_id": True,
             "transformer_flavor": agent_specification.transformer_flavor,
@@ -228,70 +228,75 @@ def main():
             "cache_lap_node_id": agent_specification.cache_lap_node_id,
         }
     if agent_specification.fe_type == "dgl":
-        fe_type = FeaturesExtractorDGL
-    elif agent_specification.fe_type == "pyg":
-        fe_type = FeaturesExtractor
+        fe_type = GnnDGL
     elif agent_specification.fe_type == "tokengt":
-        fe_type = FeaturesExtractorTokenGT
+        fe_type = GnnTokenGT
     else:
         print("unknown fe_type: ", agent_specification.fe_type)
     features_extractor = fe_type(**fe_kwargs)
 
     # add the features extractor to MuZero configuration so MuZero can use it for representation
     config.features_extractor = features_extractor
-    config.observation_shape = (1, 1, env_specification.max_n_nodes * features_extractor.features_dim)
+    config.observation_shape = (
+        1,
+        1,
+        env_specification.max_n_nodes * features_extractor.features_dim,
+    )
 
     # set config values that depend on problem size
     config.action_space = list(range(env.action_space.n))
     # unless the user set it manually
-    for attribute in ['max_moves', 'num_unroll_steps', 'td_steps']:
+    for attribute in ["max_moves", "num_unroll_steps", "td_steps"]:
         if getattr(config, attribute) is None:
             setattr(config, attribute, env_specification.max_n_nodes)
 
     # add our Visdom callback
     config.wheatley_callback = MuZeroCallback(
-            problem_description=problem_description,
-            env_specification=env_specification,
-            training_specification=training_specification,
+        problem_description=problem_description,
+        env_specification=env_specification,
+        training_specification=training_specification,
     )
 
     # check incompatible args
     incompatibles = [
-            '--path',
-            '--n_workers',
-            '--device',
-            '--vecenv_type',
-            '--total_timesteps',
-            '--n_epochs',
-            '--n_steps_episode',
-            '--batch_size',
-            '--lr',
-            '--fe_lr',
-            '--optimizer',
-            '--retrain',
-            '--fixed_random_validation',
-            '--validation_freq',
-            '--validation_batch_size',
-            '--gamma',
-            '--clip_range',
-            '--target_kl',
-            '--ent_coef',
-            '--vf_coef',
-            '--dont_normalize_advantage',
-            '--mlp_act',
-            '--n_mlp_layers_shared',
-            '--hidden_dim_shared',
-            '--n_mlp_layers_actor',
-            '--hidden_dim_actor',
-            '--n_mlp_layers_critic',
-            '--hidden_dim_critic',
-            ]
+        "--path",
+        "--n_workers",
+        "--device",
+        "--vecenv_type",
+        "--total_timesteps",
+        "--n_epochs",
+        "--n_steps_episode",
+        "--batch_size",
+        "--lr",
+        "--fe_lr",
+        "--optimizer",
+        "--retrain",
+        "--fixed_random_validation",
+        "--validation_freq",
+        "--validation_batch_size",
+        "--gamma",
+        "--clip_range",
+        "--target_kl",
+        "--ent_coef",
+        "--vf_coef",
+        "--dont_normalize_advantage",
+        "--mlp_act",
+        "--n_mlp_layers_shared",
+        "--hidden_dim_shared",
+        "--n_mlp_layers_actor",
+        "--hidden_dim_actor",
+        "--n_mlp_layers_critic",
+        "--hidden_dim_critic",
+    ]
     for incompatible in incompatibles:
         if incompatible in sys.argv:
-            raise Exception(incompatible + ' is not comptabile with MuZero, please check games/wheatley.py')
+            raise Exception(
+                incompatible
+                + " is not comptabile with MuZero, please check games/wheatley.py"
+            )
 
     # create a MuZero agent with our custom Config/Game
-    muzero = MuZero('wheatley', config)
+    muzero = MuZero("wheatley", config)
     muzero.train()
 
 
