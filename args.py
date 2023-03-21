@@ -461,6 +461,13 @@ parser.add_argument(
 
 # =================================================OTHER====================================================================
 parser.add_argument(
+    "--skip_initial_eval",
+    default=False,
+    action="store_true",
+    help="Do not perform initial eval",
+)
+
+parser.add_argument(
     "--taillard_pbs",
     help="taillard problem name (e.g ta01), default is empty for benchmarking all problems",
     default="*",
