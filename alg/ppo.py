@@ -250,6 +250,7 @@ class PPO:
         rollout_agent_device=torch.device("cpu"),
         train_device=torch.device("cpu"),
         opt_state_dict=None,
+        skip_initial_eval=False,
     ):
         # env setup
         batch_size = self.num_envs * self.num_steps
@@ -289,10 +290,11 @@ class PPO:
         print("learning on", train_device)
 
         self.global_step = 0
-        print("initial validation")
-        agent.to(rollout_agent_device)
-        self.validator.validate(agent, self)
-        print("... done initial validation")
+        if not skip_initial_eval:
+            print("initial validation")
+            agent.to(rollout_agent_device)
+            self.validator.validate(agent, self)
+            print("... done initial validation")
         start_time = time.time()
         num_updates = training_specification.total_timesteps // batch_size
 

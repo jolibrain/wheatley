@@ -212,6 +212,7 @@ def main():
         train_device=args.device,
         rollout_agent_device=args.device,
         opt_state_dict=None,
+        skip_initial_eval=args.skip_initial_eval,
     )
 
 
