@@ -562,6 +562,31 @@ def obs_as_tensor(obs):
         raise Exception(f"Unrecognized type of observation {type(obs)}")
 
 
+def single_obs_as_tensor(obs):
+    if isinstance(obs, np.ndarray):
+        return torch.tensor(obs)
+    elif isinstance(obs, dict):
+        max_nnodes = obs["n_nodes"]
+        max_nedges = obs["n_edges"]
+        if "n_conflict_edges" in obs:
+            max_nconflicts_edges = obs["n_conflict_edges"]
+        newobs = {}
+        for (key, _obs) in obs.items():
+            if key == "features":
+                newobs[key] = torch.tensor(_obs[:max_nnodes, :]).unsqueeze(0)
+            elif key == "edge_index":
+                newobs[key] = torch.tensor(_obs[:, :max_nedges]).unsqueeze(0)
+            elif key == "conflicts_edges":
+                newobs[key] = torch.tensor(_obs[:, :max_nconflicts_edges]).unsqueeze(0)
+            elif key == "conflicts_edges_machineid":
+                newobs[key] = torch.tensor(_obs[:, :max_nconflicts_edges]).unsqueeze(0)
+            else:
+                newobs[key] = torch.tensor(_obs).unsqueeze(0)
+        return newobs
+    else:
+        raise Exception(f"Unrecognized type of observation {type(obs)}")
+
+
 def obs_as_tensor_add_batch_dim(obs):
     if isinstance(obs, np.ndarray):
         return torch.tensor(obs).unsqueeze_(0)
@@ -608,7 +633,6 @@ def rebatch_obs(obs):
     max_nedges = 0
     max_nconflicts_edges = 0
     num_steps = len(obs)
-    print("num_steps", num_steps)
     for _obs in obs:
         mnn = _obs["n_nodes"].max().item()
         if mnn > max_nnodes:
