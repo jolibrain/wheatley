@@ -29,6 +29,7 @@ import torch
 from typing import List, Optional, Tuple, Union
 from collections import defaultdict
 import sys
+import os
 from copy import deepcopy
 
 
@@ -84,11 +85,11 @@ def get_n_features(input_list, max_n_jobs, max_n_machines):
 
 
 def get_path(arg_path, exp_name):
-    path = (
-        "saved_networks/" + exp_name
-        if arg_path == "saved_networks/default_net"
-        else arg_path
-    )
+    path = arg_path + "/" + exp_name + "/"
+    try:
+        os.mkdir(path)
+    except OSError as error:
+        print("save directory", path, " already exists")
     return path
 
 

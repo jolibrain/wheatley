@@ -52,7 +52,7 @@ parser.add_argument(
 parser.add_argument(
     "--path",
     type=str,
-    default="saved_networks/default_net",
+    default="saved_networks/",
     help="Path to saved network (default is set to exp_name)",
 )
 parser.add_argument(

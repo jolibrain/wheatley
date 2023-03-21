@@ -157,9 +157,9 @@ class AgentValidator:
             / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
         )
         if cur_ratio <= self.makespan_ratio:
-            print("Saving agent", self.path + ".agent")
-            agent.save(self.path + ".agent")
-            torch.save(alg.optimizer.state_dict(), self.path + ".opt")
+            print("Saving agent", self.path + "agent.pkl")
+            agent.save(self.path + "agent.pkl")
+            torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
 
             self.makespan_ratio = cur_ratio
             print(f"Current ratio : {cur_ratio:.3f}")
@@ -185,7 +185,7 @@ class AgentValidator:
         return batch_dict
 
     def save_csv(self, name, makespan, schedule, sampled_jobs):
-        f = open(self.path + "." + name + ".csv", "w")
+        f = open(self.path + name + ".csv", "w")
         writer = csv.writer(f)
         if sampled_jobs is not None:
             writer.writerow(["sampled jobs", sampled_jobs])
