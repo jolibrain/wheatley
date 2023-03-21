@@ -64,7 +64,7 @@ parser.add_argument(
 parser.add_argument(
     "--device",
     type=str,
-    default="cpu",
+    default="cuda",
     choices=["cpu", "cuda", "cuda:0", "cuda:1", "cuda:2", "cuda:3"],
     help="Which device to use (cpu, cuda:0, cuda:1...)",
 )
