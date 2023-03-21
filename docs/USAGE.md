@@ -38,7 +38,7 @@ python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 -
 
 
  
-# Ramdom problems without uncertainty
+# Random problems without uncertainty
 ```
 python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1600  --batch_size 1600 --seed 1   --exp_name_appendix EXAMPLE2 
 ```
