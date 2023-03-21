@@ -18,10 +18,7 @@ A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, tar
 
 - Install dgl for your hardware [(instructions here)](https://www.dgl.ai/pages/start.html)
 
-- Install other dependencies: 
-```
-pip install -r requirements.txt
-```
+- Install other dependencies: `pip install -r requirements.txt`
 
 ## Run Model:
 
