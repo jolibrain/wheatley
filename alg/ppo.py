@@ -91,7 +91,7 @@ class PPO:
             mne = _obs["n_edges"].max().item()
             if mne > max_nedges:
                 max_nedges = mne
-            if "n_conflict_edges" in obs:
+            if "n_conflict_edges" in _obs:
                 mce = _obs["n_conflict_edges"].max().item()
                 if mce > max_nconflicts_edges:
                     max_nconflicts_edges = mce

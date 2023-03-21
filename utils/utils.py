@@ -543,7 +543,7 @@ def obs_as_tensor(obs):
         max_nnodes = max(obs["n_nodes"])
         max_nedges = max(obs["n_edges"])
         if "n_conflict_edges" in obs:
-            max_nconflicts_edgs = max(obs["n_conflict_edges"])
+            max_nconflicts_edges = max(obs["n_conflict_edges"])
         newobs = {}
         for (key, _obs) in obs.items():
             if key == "features":
