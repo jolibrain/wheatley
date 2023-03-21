@@ -13,9 +13,12 @@ A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, tar
 - Relies on state-of-the art Deep Learning libraries: written with [Pytorch](), uses [stables-baselines3]() for RL, and [pytorch-geometric]() for graph neural networks
 
 ## Installation
-Install [pytorch](https://pytorch.org/get-started/locally/)
-Install [dgl](https://www.dgl.ai/pages/start.html)
-Install other dependencies: 
+
+- Install pytorch for your hardware [(instructions here)](https://pytorch.org/get-started/locally/)
+
+- Install dgl for your hardware [(instructions here)](https://www.dgl.ai/pages/start.html)
+
+- Install other dependencies: 
 ```
 pip install -r requirements.txt
 ```
