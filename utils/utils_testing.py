@@ -59,7 +59,7 @@ def get_ortools_makespan(
         print("unknow ortools strategy ", ortools_strategy)
         exit()
 
-    solution = solve_jssp(
+    solution, optimal = solve_jssp(
         affectations, durs, max_time_ortools, scaling_constant_ortools
     )
 
@@ -103,4 +103,4 @@ def get_ortools_makespan(
 
     makespan = torch.max(state.get_all_task_completion_times()[:, 0].flatten())
 
-    return makespan, tct - durations[:, :, 0]
+    return makespan, tct - durations[:, :, 0], optimal

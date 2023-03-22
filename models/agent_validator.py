@@ -122,19 +122,23 @@ class AgentValidator:
         self.time_to_ortools = []
         self.best_makespan_wheatley = float("inf")
         self.best_makespan_ortools = float("inf")
+        self.ortools_env_zero_is_optimal = False
 
         # Compute OR-Tools solutions once if validations are fixed
         if self.fixed_validation:
-            print("Computing fixed OR-Tools solutions", end="", flush=True)
+            print("Computing fixed OR-Tools solutions ", end="", flush=True)
             self.fixed_ortools = []
             for i in range(self.n_validation_env):
                 self.fixed_ortools.append(self._get_ortools_makespan(i))
-                print(".", end="", flush=True)
+                if self.fixed_ortools[-1][2]:
+                    print("o", end="", flush=True)
+                else:
+                    print(".", end="", flush=True)
             print()
 
         # Compute random solutions once if validations are fixed
         if self.fixed_random_validation:
-            print("Computing fixed random solutions", end="", flush=True)
+            print("Computing fixed random solutions ", end="", flush=True)
             self.fixed_random = []
             for i in range(self.n_validation_env):
                 makespans = [
@@ -184,12 +188,13 @@ class AgentValidator:
                 batch_dict.setdefault(key, []).append(value)
         return batch_dict
 
-    def save_csv(self, name, makespan, schedule, sampled_jobs):
+    def save_csv(self, name, makespan, optimal, schedule, sampled_jobs):
         f = open(self.path + name + ".csv", "w")
         writer = csv.writer(f)
         if sampled_jobs is not None:
             writer.writerow(["sampled jobs", sampled_jobs])
         writer.writerow(["makespan", makespan])
+        writer.writerow(["optimal", optimal])
         writer.writerow([])
         header = [""]
         for i in range(self.max_n_machines):
@@ -230,26 +235,36 @@ class AgentValidator:
             if makespan < self.best_makespan_wheatley:
                 self.best_makespan_wheatley = makespan
                 self.save_csv(
-                    "wheatley", makespan, schedule, self.validation_envs[i].sampled_jobs
+                    "wheatley",
+                    makespan,
+                    "unknown",
+                    schedule,
+                    self.validation_envs[i].sampled_jobs,
                 )
 
             mean_makespan += makespan / self.n_validation_env
 
             if self.fixed_validation:
-                or_tools_makespan, or_tools_schedule = self.fixed_ortools[i]
+                or_tools_makespan, or_tools_schedule, optimal = self.fixed_ortools[i]
             else:
-                or_tools_makespan, or_tools_schedule = self._get_ortools_makespan(i)
+                (
+                    or_tools_makespan,
+                    or_tools_schedule,
+                    optimal,
+                ) = self._get_ortools_makespan(i)
 
             if i == 0:
                 self.gantt_or_img = self.validation_envs[i].render_solution(
                     or_tools_schedule, scaling=1.0
                 )
+                self.ortools_env_zero_is_optimal = optimal
 
             if or_tools_makespan < self.best_makespan_ortools:
                 self.best_makespan_ortools = or_tools_makespan
                 self.save_csv(
                     "ortools",
                     or_tools_makespan.item(),
+                    optimal,
                     or_tools_schedule,
                     self.validation_envs[i].sampled_jobs,
                 )
@@ -431,8 +446,12 @@ class AgentValidator:
                 win="rl_schedule",
             )
         if self.gantt_or_img is not None:
+            if self.ortools_env_zero_is_optimal:
+                opts = {"caption": "Gantt OR-Tools schedule (OPTIMAL)"}
+            else:
+                opts = {"caption": "Gantt OR-Tools schedule (not optimal)"}
             self.vis.image(
                 self.gantt_or_img,
-                opts={"caption": "Gantt OR-Tools schedule"},
+                opts=opts,
                 win="or_schedule",
             )

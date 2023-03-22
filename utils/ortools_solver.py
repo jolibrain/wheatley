@@ -44,7 +44,12 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
         jobs_data.append([])
         for j in range(affectations.shape[1]):
             if affectations[i, j] != -1:
-                jobs_data[-1].append((int(affectations[i, j]), int(float(durations[i, j]) * scaling_constant_ortools)))
+                jobs_data[-1].append(
+                    (
+                        int(affectations[i, j]),
+                        int(float(durations[i, j]) * scaling_constant_ortools),
+                    )
+                )
 
     machines_count = 1 + max(task[0] for job in jobs_data for task in job)
     all_machines = range(machines_count)
@@ -66,8 +71,12 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
             suffix = "_%i_%i" % (job_id, task_id)
             start_var = model.NewIntVar(0, horizon, "start" + suffix)
             end_var = model.NewIntVar(0, horizon, "end" + suffix)
-            interval_var = model.NewIntervalVar(start_var, duration, end_var, "interval" + suffix)
-            all_tasks[job_id, task_id] = task_type(start=start_var, end=end_var, interval=interval_var)
+            interval_var = model.NewIntervalVar(
+                start_var, duration, end_var, "interval" + suffix
+            )
+            all_tasks[job_id, task_id] = task_type(
+                start=start_var, end=end_var, interval=interval_var
+            )
             machine_to_intervals[machine].append(interval_var)
 
     # Create and add disjunctive constraints.
@@ -77,7 +86,9 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
     # Precedences inside a job.
     for job_id, job in enumerate(jobs_data):
         for task_id in range(len(job) - 1):
-            model.Add(all_tasks[job_id, task_id + 1].start >= all_tasks[job_id, task_id].end)
+            model.Add(
+                all_tasks[job_id, task_id + 1].start >= all_tasks[job_id, task_id].end
+            )
 
     # Makespan objective.
     obj_var = model.NewIntVar(0, horizon, "makespan")
@@ -90,7 +101,7 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
     # Solve model.
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = max_time_ortools
-    solver.Solve(model)
+    status = solver.Solve(model)
 
     schedule = np.zeros_like(affectations)
 
@@ -99,4 +110,9 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
         for task_id, task in enumerate(job):
             machine = task[0]
             schedule[job_id, task_id] = solver.Value(all_tasks[job_id, task_id].start)
-    return Solution(schedule=schedule / scaling_constant_ortools, real_durations=durations)
+    return (
+        Solution(
+            schedule=schedule / scaling_constant_ortools, real_durations=durations
+        ),
+        status == cp_model.OPTIMAL,
+    )
