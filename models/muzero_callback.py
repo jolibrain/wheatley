@@ -24,7 +24,7 @@
 import numpy as np
 import visdom
 from models.random_agent import RandomAgent
-from utils.utils_testing import get_ortools_makespan
+from utils.ortools import get_ortools_makespan
 from utils.utils import job_and_task_to_node, node_to_job_and_task
 import sys
 

@@ -44,8 +44,13 @@ from models.agent import Agent  # noqa E402
 from models.agent_specification import AgentSpecification  # noqa E402
 from models.training_specification import TrainingSpecification  # noqa E402
 from problem.problem_description import ProblemDescription  # noqa E402
-from utils.ortools_solver import solve_jssp  # noqa E402
-from utils.utils import get_exp_name, get_n_features, get_path, load_taillard_problem  # noqa E402
+from utils.ortools import solve_jssp  # noqa E402
+from utils.utils import (
+    get_exp_name,
+    get_n_features,
+    get_path,
+    load_taillard_problem,
+)  # noqa E402
 
 
 def main():
@@ -134,7 +139,9 @@ def main():
             hidden_dim_critic=args.hidden_dim_critic,
         )
         agent_specification.print_self()
-        agent = Agent(env_specification=env_specification, agent_specification=agent_specification)
+        agent = Agent(
+            env_specification=env_specification, agent_specification=agent_specification
+        )
 
         # Launch training
         agent.train(problem_description, training_specification)
@@ -145,14 +152,19 @@ def main():
         agent = Agent.load(path)
         rl_makespan = agent.predict(problem_description).get_makespan()
         ortools_makespan = solve_jssp(
-            affectations, durations, args.max_time_ortools, args.scaling_constant_ortools
+            affectations,
+            durations,
+            args.max_time_ortools,
+            args.scaling_constant_ortools,
         ).get_makespan()
 
         # Store the best metric
         print("Taillard ", taillard_problem, " / best makespace=", rl_makespan)
         taillards[taillard_problem] = rl_makespan
         with open("taillard_results.txt", "a") as result_file:
-            result_file.write(f"{taillard_problem}. RL Score={rl_makespan}. OR-Tools Score={ortools_makespan}")
+            result_file.write(
+                f"{taillard_problem}. RL Score={rl_makespan}. OR-Tools Score={ortools_makespan}"
+            )
 
     # Print the results
     print("Taillard benchmark results")

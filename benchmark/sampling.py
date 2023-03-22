@@ -25,6 +25,7 @@
 #
 
 import sys
+
 sys.path.append("..")
 
 import os
@@ -42,12 +43,17 @@ from models.agent import Agent
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
-from utils.utils import get_n_features, generate_deterministic_problem, generate_problem_distrib, load_problem
+from utils.utils import (
+    get_n_features,
+    generate_deterministic_problem,
+    generate_problem_distrib,
+    load_problem,
+)
 from args import args, exp_name, path
 from env.env import Env
-from utils.utils_testing import get_ortools_makespan
+from utils.ortools import get_ortools_makespan
 
-EPSILON = 1e-3 # because of OR-tools int/float conversion, ignore small overlaps
+EPSILON = 1e-3  # because of OR-tools int/float conversion, ignore small overlaps
 
 
 # count how many tasks overlap if there all start as soon as possible
@@ -73,8 +79,9 @@ def metric_overlap(state):
                 if min(stop1, stop2) - max(start1, start2) <= 0:
                     continue
                 total += 1
-                #print("conflict: [{:.2f} {:.2f}] and [{:.2f} {:.2f}] on machine {} {}".format(start1, stop1, start2, stop2, state.affectations[j1][m1], state.affectations[j2][m2]))
+                # print("conflict: [{:.2f} {:.2f}] and [{:.2f} {:.2f}] on machine {} {}".format(start1, stop1, start2, stop2, state.affectations[j1][m1], state.affectations[j2][m2]))
     return total / state.n_jobs
+
 
 # maximum of tasks scheduled in //
 def metric_parallel(state, schedule):
@@ -87,7 +94,7 @@ def metric_parallel(state, schedule):
                 continue
             start = schedule[j][m]
             finish = all_finish[j][m]
-            assert(start < finish)
+            assert start < finish
             intervals.append([start, finish])
             times.append(start)
     maxi = 0
@@ -95,10 +102,11 @@ def metric_parallel(state, schedule):
         current = 0
         for (start, finish) in intervals:
             if start <= time < finish - EPSILON:
-                #print(time, 'in interval [', start, '-', finish - EPSILON, ']')
+                # print(time, 'in interval [', start, '-', finish - EPSILON, ']')
                 current += 1
         maxi = max(maxi, current)
     return maxi
+
 
 # % of waiting time per job (except at the end)
 def metric_gap(state, makespan, schedule):
@@ -111,15 +119,15 @@ def metric_gap(state, makespan, schedule):
                 continue
             start = schedule[j][m]
             finish = all_finish[j][m]
-            assert(start < finish)
+            assert start < finish
             intervals.append([start, finish])
         intervals.sort()
-        total += intervals[0][0] # waiting time at the beginning
+        total += intervals[0][0]  # waiting time at the beginning
         for i in range(len(intervals) - 1):
             stop = intervals[i][1]
-            start = intervals[i+1][0]
+            start = intervals[i + 1][0]
             gap = start - stop
-            assert(gap >= -EPSILON) # accept small errors
+            assert gap >= -EPSILON  # accept small errors
             gap = abs(gap)
             if gap < EPSILON:
                 gap = 0
@@ -135,8 +143,11 @@ def sampling(sample_n_jobs, writer=None):
     affectations, durations = None, None
     if args.load_problem is not None:
         args.n_j, args.n_m, affectations, durations = load_problem(
-            args.load_problem, taillard_offset=False, deterministic=(args.duration_type == "deterministic"),
-            load_max_jobs=args.load_max_jobs, generate_bounds=args.generate_duration_bounds
+            args.load_problem,
+            taillard_offset=False,
+            deterministic=(args.duration_type == "deterministic"),
+            load_max_jobs=args.load_max_jobs,
+            generate_bounds=args.generate_duration_bounds,
         )
         args.fixed_problem = True
 
@@ -159,7 +170,9 @@ def sampling(sample_n_jobs, writer=None):
     training_specification = TrainingSpecification(
         total_timesteps=args.total_timesteps,
         n_validation_env=args.n_validation_env,
-        validation_freq=args.n_steps_episode * args.n_workers if args.validation_freq == -1 else args.validation_freq,
+        validation_freq=args.n_steps_episode * args.n_workers
+        if args.validation_freq == -1
+        else args.validation_freq,
         display_env=exp_name,
         path=path,
         custom_heuristic_name=args.custom_heuristic_name,
@@ -187,22 +200,24 @@ def sampling(sample_n_jobs, writer=None):
     for i in range(100):
         env.reset()
         or_tools_makespan, or_tools_schedule = get_ortools_makespan(
-                env.state.affectations,
-                env.state.original_durations,
-                training_specification.max_time_ortools,
-                training_specification.scaling_constant_ortools,
-                training_specification.ortools_strategy,
-                )
+            env.state.affectations,
+            env.state.original_durations,
+            training_specification.max_time_ortools,
+            training_specification.scaling_constant_ortools,
+            training_specification.ortools_strategy,
+        )
         overlaps.append(metric_overlap(env.state))
         parallels.append(metric_parallel(env.state, or_tools_schedule))
         gaps.append(metric_gap(env.state, or_tools_makespan.item(), or_tools_schedule))
-    assert(max(parallels) <= sample_n_jobs)
-    writer.writerow([
-        sample_n_jobs,
-        sum(overlaps) / len(overlaps),
-        sum(parallels) / len(parallels),
-        sum(gaps) / len(gaps),
-        ])
+    assert max(parallels) <= sample_n_jobs
+    writer.writerow(
+        [
+            sample_n_jobs,
+            sum(overlaps) / len(overlaps),
+            sum(parallels) / len(parallels),
+            sum(gaps) / len(gaps),
+        ]
+    )
 
 
 def main():
@@ -212,8 +227,16 @@ def main():
 
     f = open("sampling.csv", "w")
     writer = csv.writer(f)
-    writer.writerow(["sample_n_jobs", "overlaps", "parallels", "gaps",
-        socket.gethostname(), " ".join(sys.argv) ])
+    writer.writerow(
+        [
+            "sample_n_jobs",
+            "overlaps",
+            "parallels",
+            "gaps",
+            socket.gethostname(),
+            " ".join(sys.argv),
+        ]
+    )
 
     benchs = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 

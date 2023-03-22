@@ -596,3 +596,81 @@ def safe_mean(arr):
     :return:
     """
     return np.nan if len(arr) == 0 else np.mean(arr)
+
+
+def decode_mask(info_mask):
+    return np.stack([np.array(i) for i in info_mask])
+
+
+def rebatch_obs(obs):
+    rebatched_obs = {}
+    max_nnodes = 0
+    max_nedges = 0
+    max_nconflicts_edges = 0
+    num_steps = len(obs)
+    print("num_steps", num_steps)
+    for _obs in obs:
+        mnn = _obs["n_nodes"].max().item()
+        if mnn > max_nnodes:
+            max_nnodes = mnn
+        mne = _obs["n_edges"].max().item()
+        if mne > max_nedges:
+            max_nedges = mne
+        if "n_conflict_edges" in _obs:
+            mce = _obs["n_conflict_edges"].max().item()
+            if mce > max_nconflicts_edges:
+                max_nconflicts_edges = mce
+    max_nnodes = int(max_nnodes)
+    max_nedges = int(max_nedges)
+    max_nconflicts_edges = int(max_nconflicts_edges)
+
+    for key in obs[0]:
+        if key == "features":
+            s = (max_nnodes, obs[0][key].shape[-1])
+            rebatched_obs[key] = torch.stack(
+                [
+                    torch.nn.functional.pad(
+                        obs[j][key],
+                        (0, 0, 0, max_nnodes - obs[j][key].shape[-2]),
+                    )
+                    for j in range(num_steps)
+                ]
+            ).reshape(torch.Size((-1,)) + s)
+        elif key == "edge_index":
+            s = (obs[0][key].shape[-2], max_nedges)
+            rebatched_obs[key] = torch.stack(
+                [
+                    torch.nn.functional.pad(
+                        obs[j][key],
+                        (0, max_nedges - obs[j][key].shape[-1]),
+                    )
+                    for j in range(num_steps)
+                ]
+            ).reshape(torch.Size((-1,)) + s)
+        elif key in ["conflicts_edges", "conflicts_edges_machineid"]:
+            s = (obs[0][key].shape[-2], max_nconflicts_edges)
+            rebatched_obs[key] = torch.stack(
+                [
+                    torch.nn.functional.pad(
+                        obs[j][key],
+                        (
+                            0,
+                            max_nconflicts_edges - obs[j][key].shape[-1],
+                        ),
+                    )
+                    for j in range(num_steps)
+                ]
+            ).reshape(torch.Size((-1,)) + s)
+        else:
+            s = obs[0][key].shape
+            rebatched_obs[key] = torch.stack(
+                [obs[j][key] for j in range(num_steps)]
+            ).reshape(torch.Size((-1,)) + s[1:])
+    return rebatched_obs
+
+
+def get_obs(b_obs, mb_ind):
+    minibatched_obs = {}
+    for key in b_obs:
+        minibatched_obs[key] = b_obs[key][mb_ind]
+    return minibatched_obs

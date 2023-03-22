@@ -37,7 +37,7 @@ from env.env import Env
 from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.problem_description import ProblemDescription
-from utils.utils_testing import get_ortools_makespan
+from utils.ortools import get_ortools_makespan
 from utils.utils import (
     generate_problem_durations,
     obs_as_tensor_add_batch_dim,
