@@ -33,7 +33,7 @@ import torch.optim as optim
 from .logger import Logger, configure_logger
 from env.env import Env
 from collections import deque
-from utils.utils import obs_as_tensor, safe_mean, rebatch_obs
+from utils.utils import obs_as_tensor, safe_mean, rebatch_obs, get_obs, decode_mask
 import tqdm
 
 
@@ -43,10 +43,6 @@ def create_env(problem_description, env_specification):
         return env
 
     return _init
-
-
-def decode_mask(info_mask):
-    return np.stack([np.array(i) for i in info_mask])
 
 
 class PPO:
@@ -78,12 +74,6 @@ class PPO:
         # in case of resume
         self._num_timesteps_at_start = 0
         self.ep_info_buffer = deque(maxlen=100)
-
-    def get_obs(self, b_obs, mb_ind):
-        minibatched_obs = {}
-        for key in b_obs:
-            minibatched_obs[key] = b_obs[key][mb_ind]
-        return minibatched_obs
 
     def collect_rollouts(self, agent, envs, env_specification, data_device):
         # ALGO Logic: Storage setup
@@ -282,7 +272,7 @@ class PPO:
                     mb_inds = b_inds[start:end]
 
                     _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                        self.get_obs(b_obs, mb_inds),
+                        get_obs(b_obs, mb_inds),
                         action=b_actions.long()[mb_inds].to(train_device),
                         action_masks=b_action_masks[mb_inds],
                     )
