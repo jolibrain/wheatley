@@ -205,7 +205,7 @@ def get_ortools_schedule(
         scaling_constant_ortools,
         ortools_strategy,
     )
-    return ortools_schedule
+    return ortools_schedule, optimal
 
 
 def get_ortools_actions(env, ortools_schedule):
