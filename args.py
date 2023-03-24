@@ -429,12 +429,12 @@ parser.add_argument(
     default=[
         "selectable",
         "duration",
-        "total_job_time",
-        "total_machine_time",
-        "job_completion_percentage",
-        "machine_completion_percentage",
-        "mopnr",
-        "mwkr",
+        # "total_job_time",
+        # "total_machine_time",
+        # "job_completion_percentage",
+        # "machine_completion_percentage",
+        # "mopnr",
+        # "mwkr",
     ],
     help="The features we want to have as input of features_extractor. Should be in {duration, one_hot_job_id, "
     + "one_hot_machine_id, total_job_time, total_machine_time, job_completion_percentage, machine_completion_percentage, "
