@@ -183,7 +183,7 @@ parser.add_argument(
     "--validation_batch_size",
     type=int,
     default=0,
-    help="Batch size for predictions of actions",
+    help="Batch size for predictions of actions during validation",
 )
 
 # =================================================TESTING SPECIFICATION====================================================

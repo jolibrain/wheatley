@@ -42,6 +42,7 @@ from utils.utils import (
     generate_problem_durations,
     obs_as_tensor_add_batch_dim,
     safe_mean,
+    get_obs,
 )
 
 
@@ -124,30 +125,35 @@ class AgentValidator:
         self.best_makespan_ortools = float("inf")
         self.ortools_env_zero_is_optimal = False
 
+        self.batch_size = training_specification.validation_batch_size
+
         # Compute OR-Tools solutions once if validations are fixed
         if self.fixed_validation:
-            print("Computing fixed OR-Tools solutions ", end="", flush=True)
             self.fixed_ortools = []
-            for i in range(self.n_validation_env):
+            for i in tqdm.tqdm(
+                range(self.n_validation_env), desc="Computing fixed OR-Tools solutions"
+            ):
                 self.fixed_ortools.append(self._get_ortools_makespan(i))
-                if self.fixed_ortools[-1][2]:
-                    print("o", end="", flush=True)
-                else:
-                    print(".", end="", flush=True)
-            print()
+            print(
+                "    optimal solutions:",
+                sum([res[2] for res in self.fixed_ortools]),
+                " / ",
+                self.n_validation_env,
+            )
 
         # Compute random solutions once if validations are fixed
         if self.fixed_random_validation:
-            print("Computing fixed random solutions ", end="", flush=True)
+            print("Computing fixed random solutions ")
             self.fixed_random = []
-            for i in range(self.n_validation_env):
-                makespans = [
-                    self._get_random_makespan(i)
-                    for n in range(self.fixed_random_validation)
-                ]
+            for i in tqdm.tqdm(range(self.n_validation_env), desc="   environment"):
+                makespans = []
+                for j in tqdm.tqdm(
+                    range(self.fixed_random_validation),
+                    desc="   instance",
+                    leave=False,
+                ):
+                    makespans.append(self._get_random_makespan(i))
                 self.fixed_random.append(sum(makespans) / len(makespans))
-                print(".", end="", flush=True)
-            print()
 
     def validate(self, agent, alg):
         self._evaluate_agent(agent)
@@ -205,27 +211,65 @@ class AgentValidator:
             writer.writerow(line)
         f.close()
 
+    def rebatch_obs(self, obs_list):
+        obs = {}
+        for key in obs_list[0]:
+            obs[key] = torch.cat([_obs[key] for _obs in obs_list])
+        return obs
+
     def _evaluate_agent(self, agent):
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
         custom_mean_makespan = 0
-        eval_time = 0
+        start_eval = time.time()
+
+        if self.batch_size != 0:
+            print("batched predicts...")
+            # batch inference
+            envs = self.validation_envs
+            all_rdata = [env.reset(soft=self.fixed_validation) for env in envs]
+            all_obs = [obs_as_tensor_add_batch_dim(rdata[0]) for rdata in all_rdata]
+            all_masks = [rdata[1]["mask"] for rdata in all_rdata]
+            while envs:
+                all_obs = self.rebatch_obs(all_obs)
+                all_actions = []
+                for i in range(0, len(envs), self.batch_size):
+                    bs = min(self.batch_size, len(envs) - i)
+                    actions = agent.predict(
+                        get_obs(all_obs, list(range(i, i + bs))),
+                        action_masks=all_masks[i : i + bs],
+                        deterministic=True,
+                    )
+                    all_actions += list(actions)
+                all_obs = []
+                all_masks = []
+                todo_envs = []
+                for env, action in zip(envs, all_actions):
+                    obs, _, done, _, info = env.step(action.long().item())
+                    if done:
+                        continue
+                    all_obs.append(obs_as_tensor_add_batch_dim(obs))
+                    todo_envs.append(env)
+                    all_masks.append(info["mask"])
+                envs = todo_envs
+            print("...done")
+
         for i in tqdm.tqdm(range(self.n_validation_env), desc="   evaluating         "):
-            start_eval = time.process_time()
-            obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
-            done = False
-            while not done:
-                action_masks = info["mask"]
-                obs = obs_as_tensor_add_batch_dim(obs)
-                action = agent.predict(
-                    obs, deterministic=True, action_masks=action_masks
-                )
-                obs, reward, done, _, info = self.validation_envs[i].step(
-                    action.long().item()
-                )
+
+            if self.batch_size == 0:
+                obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
+                done = False
+                while not done:
+                    action_masks = info["mask"]
+                    obs = obs_as_tensor_add_batch_dim(obs)
+                    action = agent.predict(
+                        obs, deterministic=True, action_masks=action_masks
+                    )
+                    obs, reward, done, _, info = self.validation_envs[i].step(
+                        action.long().item()
+                    )
             solution = self.validation_envs[i].get_solution()
-            eval_time += (time.process_time() - start_eval) / self.n_validation_env
             schedule = solution.schedule
             makespan = solution.get_makespan()
 
@@ -304,7 +348,7 @@ class AgentValidator:
                     / self.n_validation_env
                 )
         print("--- mean_makespan=", mean_makespan, " ---")
-        print("--- eval time=", eval_time, "  ---")
+        print("--- eval time=", time.time() - start_eval, "  ---")
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
