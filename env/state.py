@@ -134,6 +134,9 @@ class State:
             job_and_task_to_node(job_id, task_id, self.max_n_machines), 0
         ].item()
 
+    def is_affected_by_node(self, node_id):
+        return self.features[node_id, 0].item()
+
     def affect(self, node_id):
         self.features[node_id, 0] = 1
         self.affected[node_to_job_and_task(node_id, self.max_n_machines)] = 1
@@ -205,8 +208,9 @@ class State:
     def get_durations(self, node_id):
         if "duration" in self.features_offset:
             dof = self.features_offset["duration"]
-            durs = self.features[node_id, dof[0] : dof[1]]
-            return durs.clone()
+            # durs = self.features[node_id, dof[0] : dof[1]]
+            # return durs.clone()
+            return self.features[node_id, dof[0] : dof[1]]
         return torch.as_tensor(
             self.durations[node_to_job_and_task(node_id, self.max_n_machines)],
             dtype=torch.float,
@@ -851,7 +855,7 @@ class State:
 
         for node_id in node_ids:
             job_id, task_id = node_to_job_and_task(node_id, self.n_machines)
-            is_affected = self.is_affected(job_id, task_id)
+            is_affected = self.is_affected_by_node(node_id)
             if is_affected == 1:
                 duration = self.get_durations(node_id)
                 tct = self.get_task_completion_times(node_id)[index].item()
