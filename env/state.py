@@ -125,6 +125,9 @@ class State:
 
         self.reset()
 
+    def cache_last_task_on_machine(self, machine_id, task):
+        self.last_task_on_machine[machine_id] = task
+
     def reset_is_affected(self):
         self.affected = np.zeros_like(self.affectations)
         self.features[:, 0] = 0
@@ -217,6 +220,8 @@ class State:
         )
 
     def reset(self):
+        self.last_task_on_machine = {}
+
         self.edges = [
             (
                 job_index * self.n_machines + i,
@@ -469,11 +474,7 @@ class State:
 
         features = self.normalize_features(normalize_input)
 
-        # nx_graph = self.graph
-        # edge_index = (
-        #     torch.as_tensor(list(nx_graph.edges), dtype=torch.long).t().contiguous()
-        # )
-        edge_index = torch.tensor(self.edges, dtype=torch.long).t()
+        edge_index = np.transpose(np.array(self.edges))
 
         if self.observe_conflicts_as_cliques:
             return (
@@ -839,6 +840,11 @@ class State:
         Returns a list of occupancy period on the wanted machine, under the form
         (occupancy_start_time, occupancy_duration, node_id)
         """
+
+        if machine_id in self.last_task_on_machine:
+            return self.last_task_on_machine[machine_id]
+        return None
+
         if metric == "realistic":
             index = 0
         elif metric == "optimistic":

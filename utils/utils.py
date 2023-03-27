@@ -599,7 +599,7 @@ def safe_mean(arr):
 
 
 def decode_mask(info_mask):
-    return np.stack([np.array(i) for i in info_mask])
+    return np.stack(info_mask)
 
 
 def rebatch_obs(obs):

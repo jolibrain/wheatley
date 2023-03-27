@@ -43,6 +43,7 @@ from utils.utils import (
     obs_as_tensor_add_batch_dim,
     safe_mean,
     get_obs,
+    decode_mask,
 )
 
 
@@ -135,7 +136,7 @@ class AgentValidator:
             ):
                 self.fixed_ortools.append(self._get_ortools_makespan(i))
             print(
-                "    optimal solutions:",
+                "   optimal solutions:",
                 sum([res[2] for res in self.fixed_ortools]),
                 " / ",
                 self.n_validation_env,
@@ -149,7 +150,7 @@ class AgentValidator:
                 makespans = []
                 for j in tqdm.tqdm(
                     range(self.fixed_random_validation),
-                    desc="   instance",
+                    desc="   instance   ",
                     leave=False,
                 ):
                     makespans.append(self._get_random_makespan(i))
@@ -230,7 +231,8 @@ class AgentValidator:
             envs = self.validation_envs
             all_rdata = [env.reset(soft=self.fixed_validation) for env in envs]
             all_obs = [obs_as_tensor_add_batch_dim(rdata[0]) for rdata in all_rdata]
-            all_masks = [rdata[1]["mask"] for rdata in all_rdata]
+            all_masks = decode_mask([rdata[1]["mask"] for rdata in all_rdata])
+            print(all_masks.shape)
             while envs:
                 all_obs = self.rebatch_obs(all_obs)
                 all_actions = []
@@ -251,7 +253,7 @@ class AgentValidator:
                         continue
                     all_obs.append(obs_as_tensor_add_batch_dim(obs))
                     todo_envs.append(env)
-                    all_masks.append(info["mask"])
+                    all_masks.append(decode_mask(info["mask"]))
                 envs = todo_envs
             print("...done")
 
@@ -261,7 +263,7 @@ class AgentValidator:
                 obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
                 done = False
                 while not done:
-                    action_masks = info["mask"]
+                    action_masks = decode_mask(info["mask"])
                     obs = obs_as_tensor_add_batch_dim(obs)
                     action = agent.predict(
                         obs, deterministic=True, action_masks=action_masks
