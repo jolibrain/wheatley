@@ -163,10 +163,11 @@ class AgentValidator:
         return True
 
     def _save_if_best_model(self, agent, alg):
-        cur_ratio = np.mean(
-            np.array(self.makespans[-4 : len(self.makespans)])
-            / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
-        )
+        # cur_ratio = np.mean(
+        #     np.array(self.makespans[-4 : len(self.makespans)])
+        #     / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
+        # )
+        cur_ratio = self.makespans[-1] / self.ortools_makespans[-1]
         if cur_ratio <= self.makespan_ratio:
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")

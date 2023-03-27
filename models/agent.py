@@ -77,7 +77,6 @@ class Agent(torch.nn.Module):
                 n_layers_features_extractor=agent_specification.n_layers_features_extractor,
                 hidden_dim_features_extractor=agent_specification.hidden_dim_features_extractor,
                 n_attention_heads=agent_specification.n_attention_heads,
-                reverse_adj=agent_specification.reverse_adj,
                 residual=agent_specification.residual_gnn,
                 normalize=agent_specification.normalize_gnn,
                 conflicts=agent_specification.conflicts,

@@ -53,7 +53,6 @@ class GnnDGL(torch.nn.Module):
         hidden_dim_features_extractor,
         activation_features_extractor,
         n_attention_heads,
-        reverse_adj,
         residual=True,
         normalize=False,
         conflicts="att",
@@ -70,7 +69,6 @@ class GnnDGL(torch.nn.Module):
         )
         self.features_dim *= 2
         self.max_n_machines = max_n_machines
-        self.reverse_adj = reverse_adj
 
         self.hidden_dim = hidden_dim_features_extractor
         self.gconv_type = gconv_type
