@@ -33,6 +33,7 @@ from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
 from alg.ppo import PPO
+from alg.pretrain import Pretrainer
 from utils.utils import (
     get_n_features,
     generate_deterministic_problem,
@@ -188,6 +189,23 @@ def main():
         agent_specification.print_self()
         agent = Agent(
             env_specification=env_specification, agent_specification=agent_specification
+        )
+
+    if args.pretrain:
+        agent.to(args.device)
+        pretrainer = Pretrainer(
+            problem_description,
+            env_specification,
+            agent_specification,
+            num_envs=args.pretrain_num_envs,
+            prob=args.pretrain_prob,
+        )
+        pretrainer.pretrain(
+            agent,
+            args.pretrain_epochs,
+            args.pretrain_batch_size,
+            args.pretrain_n_steps_episode,
+            lr=args.pretrain_lr,
         )
 
     # And finally, we train the model on the specified training mode

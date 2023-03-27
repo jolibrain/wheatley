@@ -238,25 +238,26 @@ def get_ortools_actions(env, ortools_schedule):
     return ortools_actions
 
 
-def get_ortools_trajectory(env):
+def get_ortools_trajectory_and_past_actions(env):
     schedule, optimal = get_ortools_schedule(env)
-    if optimal:
-        print("using optimal solution from or-tools")
+    # if optimal:
+    #     print("using optimal solution from or-tools")
     trajectory = []
+    past_actions = []
     obs = []
     masks = []
-    o, info = env.reset(soft=True)
+    o, info = env.reset()
     next_obs = obs_as_tensor_add_batch_dim(o)
-    obs.append(next_obs)
     action_mask = decode_mask(info["mask"])
     while not env.done():
         obs.append(next_obs)
         masks.append(action_mask)
         actions = get_ortools_actions(env, schedule)
         action = np.random.choice(actions)
+        # action = actions[0]
         next_obs, reward, done, _, info = env.step(action)
         action_mask = decode_mask(info["mask"])
         next_obs = obs_as_tensor_add_batch_dim(next_obs)
+        past_actions.append(trajectory.copy())
         trajectory.append(action)
-    env.reset(soft=True)  # we want MuZero to apply the trajectory to the same problem
-    return obs, masks, trajectory
+    return obs, masks, trajectory, past_actions

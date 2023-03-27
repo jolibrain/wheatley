@@ -459,6 +459,49 @@ parser.add_argument(
     help="Upper bound factor to max_n_edges, allows lowering the overall memory usage",
 )
 
+# ============================= PRETRAIN ======================================
+parser.add_argument(
+    "--pretrain",
+    default=False,
+    action="store_true",
+    help="pretrain with ortools",
+)
+parser.add_argument(
+    "--pretrain_prob", type=float, default=0.9, help="target prob for or tools action"
+)
+
+parser.add_argument(
+    "--pretrain_num_envs",
+    type=int,
+    default=1,
+    help="number of pretrain envs (1 is enough for determinisitic case)",
+)
+parser.add_argument(
+    "--pretrain_epochs",
+    type=int,
+    default=10,
+    help="number of pretrain epochs",
+)
+parser.add_argument(
+    "--pretrain_batch_size",
+    type=int,
+    default=128,
+    help="size of batch_size for pretrain",
+)
+parser.add_argument(
+    "--pretrain_n_steps_episode",
+    type=int,
+    default=1024,
+    help="pretrain: number of steps per env",
+)
+parser.add_argument(
+    "--pretrain_lr",
+    type=float,
+    default=2e-4,
+    help="learning rate for pretrain",
+)
+
+
 # =================================================OTHER====================================================================
 parser.add_argument(
     "--skip_initial_eval",
