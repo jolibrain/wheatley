@@ -25,6 +25,7 @@
 #
 
 import torch
+import numpy as np
 
 
 class EnvObservation:
@@ -62,6 +63,7 @@ class EnvObservation:
             self.max_n_edges = self.max_n_nodes**2
         self.n_nodes = n_jobs * n_machines
         self.n_edges = edge_index.shape[1]
+
         self.features = features
         self.edge_index = edge_index
 
@@ -87,8 +89,9 @@ class EnvObservation:
 
         features = torch.empty((self.max_n_nodes, self.features.shape[1]))
         features[0 : self.get_n_nodes(), :] = self.features
-        edge_index = torch.empty((2, self.max_n_edges))
+        edge_index = np.empty((2, self.max_n_edges))
         edge_index[:, 0 : self.get_n_edges()] = self.edge_index
+
         if self.observe_conflicts_as_cliques:
             conflicts_edges = torch.empty(
                 (2, 2 * sum(range(self.max_n_jobs)) * self.max_n_machines)
@@ -107,7 +110,7 @@ class EnvObservation:
                 "n_nodes": self.n_nodes,
                 "n_edges": self.n_edges,
                 "features": features.numpy(),
-                "edge_index": edge_index.numpy().astype("int64"),
+                "edge_index": edge_index.astype("int64"),
                 "n_conflict_edges": self.n_conflict_edges,
                 "conflicts_edges": conflicts_edges.numpy().astype("int64"),
                 "conflicts_edges_machineid": conflicts_edges_machineid.numpy().astype(
@@ -121,5 +124,5 @@ class EnvObservation:
                 "n_nodes": self.n_nodes,
                 "n_edges": self.n_edges,
                 "features": features.numpy(),
-                "edge_index": edge_index.numpy().astype("int64"),
+                "edge_index": edge_index.astype("int64"),
             }

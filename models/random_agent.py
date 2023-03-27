@@ -27,10 +27,6 @@
 import numpy as np
 
 
-def decode_mask(info_mask):
-    return np.stack([np.array(i) for i in info_mask])
-
-
 class RandomAgent:
     def __init__(self, max_n_jobs, max_n_machines):
         self.max_n_jobs = max_n_jobs
@@ -40,12 +36,12 @@ class RandomAgent:
     def predict(self, env):
         # soft reset to evaluate the same sampled problem as PPO
         observation, info = env.reset(soft=True)
-        action_mask = decode_mask(info["mask"])
+        action_mask = info["mask"]
         done = False
         while not done:
             action = self.select_action(env, action_mask)
             observation, _, done, _, info = env.step(action)
-            action_mask = decode_mask(info["mask"])
+            action_mask = info["mask"]
         solution = env.get_solution()
         return solution
 

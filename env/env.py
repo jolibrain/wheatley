@@ -415,8 +415,13 @@ class Env(gym.Env):
         mask = self.transition_model.get_mask(
             self.state, self.env_specification.add_boolean
         )
-        mask += [False] * (
-            self.env_specification.max_n_jobs * self.env_specification.max_n_machines
-            - len(mask)
+        pad = np.full(
+            (
+                self.env_specification.max_n_jobs
+                * self.env_specification.max_n_machines
+                - len(mask),
+            ),
+            False,
+            dtype=bool,
         )
-        return mask
+        return np.concatenate([mask, pad])

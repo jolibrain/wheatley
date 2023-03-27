@@ -25,6 +25,7 @@
 #
 
 import torch
+import numpy as np
 
 from env.transition_model import TransitionModel
 from utils.utils import job_and_task_to_node, node_to_job_and_task
@@ -40,7 +41,9 @@ class SimpleTransitionModel(TransitionModel):
         observe_real_duration_when_affect=True,
         stochastic_metric="pessimistic",
     ):
-        super(SimpleTransitionModel, self).__init__(affectations, durations, max_n_jobs, max_n_machines)
+        super(SimpleTransitionModel, self).__init__(
+            affectations, durations, max_n_jobs, max_n_machines
+        )
         self.useless_timesteps = 0
         self.observe_real_duration_when_affect = observe_real_duration_when_affect
         self.metric = stochastic_metric
@@ -72,25 +75,29 @@ class SimpleTransitionModel(TransitionModel):
             self.useless_timesteps += 1
             return
 
-        machine_occupancy = state.get_machine_occupancy(machine_id, self.metric)
+        # machine_occupancy = state.get_machine_occupancy(machine_id, self.metric)
+        last_task_on_machine = state.get_last_task_on_machine(machine_id, self.metric)
 
         # Observe duration (for the uncertainty case)
         state.observe_real_duration(
-            node_id, do_update=False, update_duration_with_real=self.observe_real_duration_when_affect
+            node_id,
+            do_update=False,
+            update_duration_with_real=self.observe_real_duration_when_affect,
         )
 
-        if machine_occupancy:
-            state.set_precedency(machine_occupancy[-1][2], node_id, do_update=False)
+        if last_task_on_machine is not None:
+            state.set_precedency(last_task_on_machine, node_id, do_update=False)
+        state.cache_last_task_on_machine(machine_id, node_id)
         state.update_completion_times(node_id)
         state.affect_node(node_id)
 
     def get_mask(self, state, add_boolean=False):
-        available_node_ids = []
+        mask = np.full((state.n_nodes,), False, dtype=bool)
         for job_id in range(state.n_jobs):
             task_id = state.get_first_unaffected_task(job_id)
             if task_id != -1 and state.affectations[job_id, task_id] != -1:
-                available_node_ids.append(job_and_task_to_node(job_id, task_id, state.n_machines))
-        mask = [False] * state.n_nodes
-        for node_id in available_node_ids:
-            mask[node_id] = True
-        return mask * (2 if add_boolean else 1)
+                mask[job_and_task_to_node(job_id, task_id, state.n_machines)] = True
+        if add_boolean:
+            return np.concatenate([mask, mask])
+        else:
+            return mask
