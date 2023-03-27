@@ -9,3 +9,4 @@ einops
 matplotlib
 opencv-python
 kaleido
+pandas
