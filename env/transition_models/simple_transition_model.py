@@ -92,12 +92,10 @@ class SimpleTransitionModel(TransitionModel):
         state.affect_node(node_id)
 
     def get_mask(self, state, add_boolean=False):
-        mask = np.full((state.n_nodes,), False, dtype=bool)
-        for job_id in range(state.n_jobs):
-            task_id = state.get_first_unaffected_task(job_id)
-            if task_id != -1 and state.affectations[job_id, task_id] != -1:
-                mask[job_and_task_to_node(job_id, task_id, state.n_machines)] = True
-        if add_boolean:
-            return np.concatenate([mask, mask])
-        else:
-            return mask
+        # mask = np.full((state.n_nodes,), False, dtype=bool)
+        # for job_id in range(state.n_jobs):
+        #     task_id = state.get_first_unaffected_task(job_id)
+        #     if task_id != -1 and state.affectations[job_id, task_id] != -1:
+        #         mask[job_and_task_to_node(job_id, task_id, state.n_machines)] = True
+        # return mask
+        return state.get_selectable() == 1

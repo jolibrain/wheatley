@@ -232,6 +232,8 @@ class State:
         ]
 
         self.graph = nx.DiGraph(self.edges)
+        self.numpy_edges = np.array(self.edges)
+        self.edges = []
 
         self.reset_durations()
         self.reset_task_completion_times()
@@ -474,7 +476,12 @@ class State:
 
         features = self.normalize_features(normalize_input)
 
-        edge_index = np.transpose(np.array(self.edges))
+        if not self.edges:
+            edge_index = np.transpose(self.numpy_edges)
+        else:
+            edge_index = np.transpose(
+                np.concatenate([self.numpy_edges, np.array(self.edges)])
+            )
 
         if self.observe_conflicts_as_cliques:
             return (
@@ -835,6 +842,9 @@ class State:
                             successor, self.features_offset["selectable"][0]
                         ] = 1
 
+    def get_selectable(self):
+        return self.features[:, self.features_offset["selectable"][0]]
+
     def get_last_task_on_machine(self, machine_id, metric):
         """
         Returns a list of occupancy period on the wanted machine, under the form
@@ -931,9 +941,13 @@ class State:
         Returns the id of the first task that wasn't affected. If all tasks are
         affected, returns -1
         """
+        # unaff = np.where(
+        #     np.logical_and(self.affected[job_id] == 0, self.affectations[job_id] != -1)
+        # )[0]
         unaff = np.where(self.affected[job_id] == 0)[0]
+
         if unaff.size == 0:
-            return -1
+            return None
         return unaff[0]
 
     def get_job_availability(self, job_id, task_id, metric):
