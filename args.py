@@ -427,8 +427,9 @@ parser.add_argument(
     type=str,
     nargs="+",
     default=[
-        "selectable",
         "duration",
+        # "selectable", is mandatory , no need to put it here
+        # "one_hot_machineid", is also mandatory, no need to put it here
         # "total_job_time",
         # "total_machine_time",
         # "job_completion_percentage",
