@@ -7,18 +7,21 @@ A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, tar
 - Support for training over random problems and generalize
 - Support for training over problems with bounded but uncertain durations
 - Reads JSSP in Taillard format, extended for uncertain durations
-- Web live training metrics reported with [Visdom]()
+- Web live training metrics reported with [Visdom](https://ai.facebook.com/tools/visdom/)
 - Includes schedule visualization as Gantt charts
 - Compares to OR-Tools
-- Relies on state-of-the art Deep Learning libraries: written with [Pytorch](), uses [stables-baselines3]() for RL, and [pytorch-geometric]() for graph neural networks
+- Relies on state-of-the art Deep Learning libraries: written with [Pytorch](https://pytorch.org/),  and [DGL](https://www.dgl.ai/) for graph neural networks
 
 ## Installation
+
 
 - Install pytorch for your hardware [(instructions here)](https://pytorch.org/get-started/locally/)
 
 - Install dgl for your hardware [(instructions here)](https://www.dgl.ai/pages/start.html)
 
 - Install other dependencies: `pip install -r requirements.txt`
+
+Note: for windows users, we strongly recommend to use [anaconda](https://www.anaconda.com/)
 
 ## Run Model:
 
