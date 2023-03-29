@@ -65,25 +65,6 @@ def get_exp_name(args):
     return exp_name
 
 
-def get_n_features(input_list, max_n_jobs, max_n_machines):
-    if "one_hot_machine_id" in input_list:
-        input_list.remove("one_hot_machine_id")
-    if "selectable" in input_list:
-        input_list.remove("selectable")
-    # 4 for task completion times, 1 for is_affected, max_n_machines for mandatory one_hot_machine_id
-    # 1 for mandatory selectable
-    n_features = 6 + max_n_machines
-    # most features make 4 values
-    n_features += 4 * len(input_list)
-    # except one_hot_job_id
-    if "one_hot_job_id" in input_list:
-        n_features += max_n_jobs - 4
-    # except for mopnr
-    if "mopnr" in input_list:
-        n_features -= 3
-    return n_features
-
-
 def get_path(arg_path, exp_name):
     path = arg_path + "/" + exp_name + "/"
     try:
@@ -457,7 +438,6 @@ def put_back_one_hot_encoding_unbatched(
     max_n_machines,
 ):
 
-    # TODO : parallel version
     machineid = features[:, :, 6].long()
     one_hot_machine_id = torch.diag(
         torch.Tensor([1] * max_n_machines).to(features.device)
@@ -515,11 +495,49 @@ def lr_schedule_linear(top, end, percent_warmup, x_orig):
     return lr
 
 
+def compute_resources_graph_np(r_info):
+    n_modes = r_info.shape[0]
+    # r_info is n_modes x n_resources, contains values between 0 and 1
+    conflicts = np.where(
+        np.logical_and(
+            np.expand_dims(r_info, 0) != 0,
+            np.expand_dims(r_info, 1) != 0,
+            out=np.zeros(
+                (r_info.shape[0], r_info.shape[0], r_info.shape[1]), dtype=bool
+            ),
+            where=np.expand_dims(np.logical_not(np.diag([True] * n_modes)), 2),
+        )
+    )
+    # conflicts[0] is source of edge
+    # conflicts[1] is dest of edge
+    # conflicts[2] is ressource id
+    # both directions are created at once
+    conflicts_val = r_info[conflicts[0], conflicts[2]]
+    return np.stack([conflicts[0], conflicts[1]]), conflicts[2], conflicts_val
+
+
+def compute_resources_graph_torch(r_info):
+    n_modes = r_info.shape[0]
+    # r_info is n_modes x n_resources, contains values between 0 and 1
+    notdiag = torch.logical_not(
+        torch.diag(torch.BoolTensor([True] * n_modes)).unsqueeze_(-1)
+    )
+    c2 = torch.logical_and(
+        torch.logical_and(r_info.unsqueeze(0) != 0, r_info.unsqueeze(1) != 0), notdiag
+    )
+    conflicts = torch.where(c2)
+    # conflicts[0] is source of edge
+    # conflicts[1] is dest of edge
+    # conflicts[2] is ressource id
+    # both directions are created at once
+    conflicts_val = r_info[conflicts[0], conflicts[2]]
+    return np.stack([conflicts[0], conflicts[1]]), conflicts[2], conflicts_val
+
+
 def compute_conflicts_cliques(machineid):
     n_nodes = machineid.shape[0]
     m1 = machineid.unsqueeze(0).expand(n_nodes, n_nodes)
     # put m2 unaffected to -2 so that unaffected task are not considered in conflict
-    # TODO : same job / same machine should not be in conclicts (already a repcedence)
     m2 = (
         torch.where(machineid == -1, -2, machineid)
         .unsqueeze(1)

@@ -33,11 +33,13 @@ import copy
 import torch
 import tqdm
 
-from env.env import Env
 from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
-from problem.problem_description import ProblemDescription
-from utils.ortools import get_ortools_makespan
+from problem.jssp_description import JSSPDescription
+from env.psp_env import PSPEnv
+from env.jssp_env import JSSPEnv
+from utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
+from utils.ortools import get_ortools_makespan_psp
 from utils.utils import (
     generate_problem_durations,
     obs_as_tensor_add_batch_dim,
@@ -60,6 +62,15 @@ class AgentValidator:
 
         # Parameters
         self.problem_description = problem_description
+        if isinstance(problem_description, JSSPDescription):
+            self.psp = False
+        else:
+            self.psp = True
+
+        if self.psp:
+            self.env_cls = PSPEnv
+        else:
+            self.env_cls = JSSPEnv
         if training_specification.validate_on_total_data:
             self.env_specification = copy.deepcopy(env_specification)
             self.env_specification.sample_n_jobs = -1
@@ -92,9 +103,18 @@ class AgentValidator:
             )
 
         # Inner variables
+        if hasattr(self.problem_description, "test_psps"):
+            mod = len(self.problem_description.test_psps)
+        else:
+            mod = 1
         self.validation_envs = [
-            Env(self.problem_description, self.env_specification)
-            for _ in range(self.n_validation_env)
+            self.env_cls(
+                self.problem_description,
+                self.env_specification,
+                i % mod,
+                validate=True,
+            )
+            for i in range(self.n_validation_env)
         ]
         self.makespan_ratio = 1000
         self.makespans = []
@@ -175,13 +195,22 @@ class AgentValidator:
             print(f"Current ratio : {cur_ratio:.3f}")
 
     def _get_ortools_makespan(self, i):
-        return get_ortools_makespan(
-            self.validation_envs[i].state.affectations,
-            self.validation_envs[i].state.original_durations,
-            self.max_time_ortools,
-            self.scaling_constant_ortools,
-            self.ortools_strategy,
-        )
+        if self.psp:
+            return get_ortools_makespan_psp(
+                self.validation_envs[i],
+                self.max_time_ortools,
+                self.scaling_constant_ortools,
+                self.ortools_strategy,
+            )
+        else:
+            return get_ortools_makespan_jssp(
+                self.validation_envs[i].state.affectations,
+                self.validation_envs[i].state.original_durations,
+                self.env_specification.n_features,
+                self.max_time_ortools,
+                self.scaling_constant_ortools,
+                self.ortools_strategy,
+            )
 
     def _get_random_makespan(self, i):
         return self.random_agent.predict(self.validation_envs[i]).get_makespan()
@@ -202,13 +231,31 @@ class AgentValidator:
         writer.writerow(["makespan", makespan])
         writer.writerow(["optimal", optimal])
         writer.writerow([])
-        header = [""]
-        for i in range(self.env_specification.max_n_machines):
-            header.append("task " + str(i) + " start time")
-        writer.writerow(header)
-        for i in range(schedule.shape[0]):
-            line = ["job " + str(i)] + schedule[i].tolist()
-            writer.writerow(line)
+        if hasattr(self.env_specification, "max_n_machines"):
+            header = [""]
+            for i in range(self.env_specification.max_n_machines):
+                header.append("task " + str(i) + " start time")
+            writer.writerow(header)
+            for i in range(schedule.shape[0]):
+                line = ["job " + str(i)] + schedule[i].tolist()
+                writer.writerow(line)
+        else:  # PSP case
+            # schedule is (job_schedule, mode)
+            header = []
+            for i in range(len(schedule[0])):
+                header.append("job " + str(i) + " start")
+            writer.writerow(header)
+            for i in range(len(schedule[0])):
+                line = schedule[0]
+                writer.writerow(line)
+            writer.writerow([])
+            header2 = []
+            for i in range(len(schedule[0])):
+                header.append("job " + str(i) + " mode")
+            writer.writerow(header)
+            for i in range(len(schedule[0])):
+                line = schedule[1]
+                writer.writerow(line)
         f.close()
 
     def rebatch_obs(self, obs_list):
@@ -229,7 +276,9 @@ class AgentValidator:
             # batch inference
             envs = self.validation_envs
             all_rdata = [env.reset(soft=self.fixed_validation) for env in envs]
-            all_obs = [obs_as_tensor_add_batch_dim(rdata[0]) for rdata in all_rdata]
+            all_obs = [
+                agent.obs_as_tensor_add_batch_dim(rdata[0]) for rdata in all_rdata
+            ]
             all_masks = decode_mask([rdata[1]["mask"] for rdata in all_rdata])
             print(all_masks.shape)
             while envs:
@@ -250,7 +299,7 @@ class AgentValidator:
                     obs, _, done, _, info = env.step(action.long().item())
                     if done:
                         continue
-                    all_obs.append(obs_as_tensor_add_batch_dim(obs))
+                    all_obs.append(agent.obs_as_tensor_add_batch_dim(obs))
                     todo_envs.append(env)
                     all_masks.append(decode_mask(info["mask"]))
                 envs = todo_envs
@@ -263,7 +312,7 @@ class AgentValidator:
                 done = False
                 while not done:
                     action_masks = decode_mask(info["mask"])
-                    obs = obs_as_tensor_add_batch_dim(obs)
+                    obs = agent.obs_as_tensor_add_batch_dim(obs)
                     action = agent.predict(
                         obs, deterministic=True, action_masks=action_masks
                     )
@@ -308,7 +357,7 @@ class AgentValidator:
                 self.best_makespan_ortools = or_tools_makespan
                 self.save_csv(
                     "ortools",
-                    or_tools_makespan.item(),
+                    or_tools_makespan,
                     optimal,
                     or_tools_schedule,
                     self.validation_envs[i].sampled_jobs,

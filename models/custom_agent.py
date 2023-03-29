@@ -26,11 +26,9 @@
 
 import numpy as np
 
-from env.env import Env
-
 
 class CustomAgent:
-    def __init__(self, max_n_jobs, max_n_machines, rule="mopnr"):
+    def __init__(self, env_cls, max_n_jobs, max_n_machines, rule="mopnr"):
         self.index = None
         if rule == "mopnr":
             self.index = 0
@@ -44,7 +42,7 @@ class CustomAgent:
         self.max_n_machines = max_n_machines
 
     def predict(self, problem_description, normalize_input, full_force_insert):
-        env = Env(
+        env = env_cls(
             problem_description,
             self.max_n_jobs,
             self.max_n_machines,

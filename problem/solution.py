@@ -25,6 +25,7 @@
 #
 
 import numpy as np
+from itertools import accumulate
 
 
 class Solution:
@@ -34,3 +35,38 @@ class Solution:
 
     def get_makespan(self):
         return np.max(self.schedule + self.real_durations)
+
+
+class PSPSolution:
+    @classmethod
+    def from_mode_schedule(
+        cls, mode_schedule, problem, affected, jobids, real_durations
+    ):
+        nmodes_per_job = [nj[0] for nj in problem["job_info"]]
+        nmodes_per_job_cum = [0] + list(accumulate(nmodes_per_job))
+        job_schedule = np.empty((problem["n_jobs"]), dtype=np.float32)
+        modes = np.empty((problem["n_jobs"]), dtype=int)
+        mode_offset = 0
+        for m in range(mode_schedule.shape[0]):
+            if affected[m]:
+                job_schedule[jobids[m]] = mode_schedule[m]
+                modes[jobids[m]] = m - nmodes_per_job_cum[jobids[m]]
+
+        return cls(
+            job_schedule=job_schedule,
+            modes=modes,
+            mode_schedule=mode_schedule,
+            real_durations=real_durations,
+        )
+
+    def __init__(
+        self, job_schedule=None, modes=None, mode_schedule=None, real_durations=None
+    ):
+        self.job_schedule = job_schedule
+        self.modes = modes
+        self.mode_schedule = mode_schedule
+        self.real_durations = real_durations
+        self.schedule = (self.job_schedule, self.modes)
+
+    def get_makespan(self):  # return start of sink
+        return self.job_schedule[-1]
