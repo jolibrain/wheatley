@@ -41,7 +41,6 @@ from problem.solution import Solution
 from utils.utils import (
     node_to_job_and_task,
     job_and_task_to_node,
-    get_n_features,
     compute_conflicts_cliques,
 )
 
@@ -53,6 +52,7 @@ class JSSPState:
         durations,
         max_n_jobs,
         max_n_machines,
+        n_features,
         deterministic=True,
         feature_list=[],
         observe_conflicts_as_cliques=False,
@@ -85,12 +85,7 @@ class JSSPState:
         self.same_job = {}
 
         self.init_features_offset(feature_list)
-        self.features = torch.zeros(
-            (
-                self.n_nodes,
-                get_n_features(feature_list, self.max_n_jobs, self.max_n_machines),
-            )
-        )
+        self.features = torch.zeros((self.n_nodes, n_features))
 
         self.affected = None
         self.is_observed = None

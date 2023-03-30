@@ -37,8 +37,7 @@ from env.reward_models.meta_reward_model import MetaRewardModel
 from env.reward_models.sparse_reward_model import SparseRewardModel
 from env.reward_models.tassel_reward_model import TasselRewardModel
 from env.reward_models.uncertain_reward_model import UncertainRewardModel
-from utils.env_observation import EnvObservation
-from utils.utils import get_n_features
+from utils.jssp_env_observation import JSSPEnvObservation as EnvObservation
 from env.jssp_state import JSSPState as State
 
 
@@ -64,11 +63,7 @@ class JSSPEnv(gym.Env):
             env_specification.observe_conflicts_as_cliques
         )
 
-        self.n_features = get_n_features(
-            self.env_specification.input_list,
-            self.env_specification.max_n_jobs,
-            self.env_specification.max_n_machines,
-        )
+        self.n_features = self.env_specification.n_features
         self.action_space = Discrete(
             self.env_specification.max_n_nodes
             * (2 if self.env_specification.add_boolean else 1)
@@ -268,6 +263,7 @@ class JSSPEnv(gym.Env):
             durations,
             self.env_specification.max_n_jobs,
             self.env_specification.max_n_machines,
+            self.env_specification.n_features,
             self.deterministic,
             feature_list=self.env_specification.input_list,
             observe_conflicts_as_cliques=self.observe_conflicts_as_cliques,

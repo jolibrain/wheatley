@@ -26,13 +26,7 @@ from gymnasium.spaces import Discrete, Dict, Box
 import numpy as np
 
 from env.transition_models.psp_transition_model import PSPTransitionModel
-from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
-from env.reward_models.l2d_reward_model import L2DRewardModel
-from env.reward_models.l2d_estim_reward_model import L2DEstimRewardModel
-from env.reward_models.meta_reward_model import MetaRewardModel
 from env.reward_models.sparse_reward_model import SparseRewardModel
-from env.reward_models.tassel_reward_model import TasselRewardModel
-from env.reward_models.uncertain_reward_model import UncertainRewardModel
 from utils.psp_env_observation import PSPEnvObservation as EnvObservation
 from utils.utils import get_n_features
 from env.psp_state import PSPState as State
@@ -144,15 +138,8 @@ class PSPEnv(gym.Env):
         obs = self.observe()
 
         # Running the transition model on the current action
-        node_id, boolean = self._convert_action_to_node_id(action)
-        if self.env_specification.insertion_mode == "no_forced_insertion":
-            self.transition_model.run(self.state, node_id, force_insert=False)
-        elif self.env_specification.insertion_mode == "full_forced_insertion":
-            self.transition_model.run(self.state, node_id, force_insert=True)
-        elif self.env_specification.insertion_mode == "choose_forced_insertion":
-            self.transition_model.run(self.state, node_id, force_insert=boolean)
-        elif self.env_specification.insertion_mode == "slot_locking":
-            self.transition_model.run(self.state, node_id, lock_slot=boolean)
+        node_id = action
+        self.transition_model.run(self.state, node_id)
 
         # Getting next observation
         next_obs = self.observe()
@@ -169,8 +156,7 @@ class PSPEnv(gym.Env):
         # if needed, remove tct from obs (reward is computed on tct on obs ... )
         if self.env_specification.do_not_observe_updated_bounds:
             next_obs.features = next_obs.features.clone()
-            tctof = self.state.features_offset["tct"]
-            next_obs.features[:, tctof[0] : tctof[1]] = -1
+            next_obs.features[:, 2:6] = -1
 
         # Getting final necessary information
         done = self.done()
@@ -182,13 +168,6 @@ class PSPEnv(gym.Env):
         self.n_steps += 1
 
         return gym_observation, reward, done, False, info
-
-    def _convert_action_to_node_id(self, action):
-        boolean = True
-        if self.env_specification.add_boolean:
-            boolean = True if action >= self.env_specification.max_n_nodes else False
-        node_id = action % self.env_specification.max_n_nodes
-        return node_id, boolean
 
     def reset(self, soft=False):
         # Reset the internal state, but do not sample a new problem
@@ -241,44 +220,7 @@ class PSPEnv(gym.Env):
         self.transition_model = PSPTransitionModel(self.env_specification)
 
     def _create_reward_model(self):
-        # For deterministic problems, there are a few rewards available
-        if self.deterministic:
-            if self.reward_model_config == "L2D":
-                self.reward_model = L2DRewardModel()
-            elif self.reward_model_config == "L2D_optimistic":
-                self.reward_model = L2DEstimRewardModel(estim="optimistic")
-            elif self.reward_model_config == "L2D_pessimistic":
-                self.reward_model = L2DEstimRewardModel(estim="pessimistic")
-            elif self.reward_model_config == "L2D_averagistic":
-                self.reward_model = L2DEstimRewardModel(estim="averagistic")
-            elif self.reward_model_config == "Sparse":
-                self.reward_model = SparseRewardModel()
-            elif self.reward_model_config == "Tassel":
-                self.reward_model = TasselRewardModel(
-                    self.affectations,
-                    self.durations,
-                    self.env_specification.normalize_input,
-                )
-            elif self.reward_model_config == "Intrinsic":
-                self.reward_model = IntrinsicRewardModel(
-                    self.n_features * self.n_nodes, self.n_nodes
-                )
-            else:
-                raise Exception("Reward model not recognized")
-
-        # If the problem_description is stochastic, only Sparse and Uncertain reward models are accepted
-        else:
-            if self.reward_model_config in [
-                "realistic",
-                "optimistic",
-                "pessimistic",
-                "averagistic",
-            ]:
-                self.reward_model = UncertainRewardModel(self.reward_model_config)
-            elif self.reward_model_config == "Sparse":
-                self.reward_model = SparseRewardModel()
-            else:
-                raise Exception("Reward model not recognized")
+        self.reward_model = TerminalRewardModel()
 
     def observe(self):
         if self.observe_conflicts_as_cliques:
@@ -331,13 +273,9 @@ class PSPEnv(gym.Env):
     def done(self):
         return self.state.done()
 
-    def is_uncertain(self):
-        return self.state.durations.shape[2] > 1
-
     def action_masks(self):
-        mask = self.transition_model.get_mask(
-            self.state, self.env_specification.add_boolean
-        )
+        mask = self.transition_model.get_mask(self.state)
+
         pad = np.full(
             (self.env_specification.max_n_modes - len(mask),),
             False,

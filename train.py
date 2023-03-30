@@ -36,7 +36,6 @@ from env.jssp_env import JSSPEnv
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
 from utils.utils import (
-    get_n_features,
     generate_deterministic_problem,
     generate_problem_distrib,
     load_problem,
@@ -158,7 +157,7 @@ def main():
             normalize_advantage=not args.dont_normalize_advantage,
             optimizer=args.optimizer,
             freeze_graph=args.freeze_graph,
-            n_features=get_n_features(args.features, args.max_n_j, args.max_n_m),
+            n_features=env_specification.n_features,
             gconv_type=args.gconv_type,
             graph_has_relu=args.graph_has_relu,
             graph_pooling=args.graph_pooling,

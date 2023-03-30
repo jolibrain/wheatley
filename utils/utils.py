@@ -65,25 +65,6 @@ def get_exp_name(args):
     return exp_name
 
 
-def get_n_features(input_list, max_n_jobs, max_n_machines):
-    if "one_hot_machine_id" in input_list:
-        input_list.remove("one_hot_machine_id")
-    if "selectable" in input_list:
-        input_list.remove("selectable")
-    # 4 for task completion times, 1 for is_affected, max_n_machines for mandatory one_hot_machine_id
-    # 1 for mandatory selectable
-    n_features = 6 + max_n_machines
-    # most features make 4 values
-    n_features += 4 * len(input_list)
-    # except one_hot_job_id
-    if "one_hot_job_id" in input_list:
-        n_features += max_n_jobs - 4
-    # except for mopnr
-    if "mopnr" in input_list:
-        n_features -= 3
-    return n_features
-
-
 def get_path(arg_path, exp_name):
     path = arg_path + "/" + exp_name + "/"
     try:

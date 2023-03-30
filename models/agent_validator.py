@@ -191,6 +191,7 @@ class AgentValidator:
         return get_ortools_makespan(
             self.validation_envs[i].state.affectations,
             self.validation_envs[i].state.original_durations,
+            self.env_specification.n_features,
             self.max_time_ortools,
             self.scaling_constant_ortools,
             self.ortools_strategy,

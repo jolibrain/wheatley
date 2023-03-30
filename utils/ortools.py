@@ -40,7 +40,9 @@ from problem.solution import Solution
 import torch
 
 
-def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortools):
+def solve_jssp(
+    affectations, durations, n_features, max_time_ortools, scaling_constant_ortools
+):
     """Minimal jobshop problem."""
     # Create the model.
     model = cp_model.CpModel()
@@ -127,6 +129,7 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
 def get_ortools_makespan(
     affectations,
     durations,
+    n_features,
     max_time_ortools,
     scaling_constant_ortools,
     ortools_strategy="pessimistic",
@@ -146,13 +149,19 @@ def get_ortools_makespan(
         exit()
 
     solution, optimal = solve_jssp(
-        affectations, durs, max_time_ortools, scaling_constant_ortools
+        affectations, durs, n_features, max_time_ortools, scaling_constant_ortools
     )
 
     if durations.shape[2] == 1:
         return solution.get_makespan(), solution.schedule
 
-    state = State(affectations, durations, affectations.shape[0], affectations.shape[1])
+    state = State(
+        affectations,
+        durations,
+        affectations.shape[0],
+        affectations.shape[1],
+        n_features,
+    )
     state.reset()
 
     # use the same durations to compute machines occupancies
@@ -201,6 +210,7 @@ def get_ortools_schedule(
     _, ortools_schedule, optimal = get_ortools_makespan(
         env.state.affectations,
         env.state.original_durations,
+        env.env_specification.n_features,
         max_time_ortools,
         scaling_constant_ortools,
         ortools_strategy,
