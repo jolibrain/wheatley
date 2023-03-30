@@ -74,23 +74,22 @@ class AgentValidator:
         self.path = training_specification.path
         self.ortools_strategy = training_specification.ortools_strategy
 
-        self.n_jobs = problem_description.n_jobs
-        self.n_machines = problem_description.n_machines
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
         self.custom_name = training_specification.custom_heuristic_name
 
-        self.max_n_jobs = env_specification.max_n_jobs
-        self.max_n_machines = env_specification.max_n_machines
+        self.env_specification = env_specification
         self.max_time_ortools = training_specification.max_time_ortools
         self.scaling_constant_ortools = training_specification.scaling_constant_ortools
 
         # Comparative agents
-        self.random_agent = RandomAgent(self.max_n_jobs, self.max_n_machines)
+        self.random_agent = RandomAgent()
         if self.custom_name != "None":
             self.custom_agent = CustomAgent(
-                self.max_n_jobs, self.max_n_machines, custom_name.lower()
+                self.env_specification.max_n_jobs,
+                self.env_specification.max_n_machines,
+                custom_name.lower(),
             )
 
         # Inner variables
@@ -205,7 +204,7 @@ class AgentValidator:
         writer.writerow(["optimal", optimal])
         writer.writerow([])
         header = [""]
-        for i in range(self.max_n_machines):
+        for i in range(self.env_specification.max_n_machines):
             header.append("task " + str(i) + " start time")
         writer.writerow(header)
         for i in range(schedule.shape[0]):
