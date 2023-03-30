@@ -26,8 +26,9 @@ import os
 import numpy as np
 import torch
 
-# from env.psp_env_specification import PspEnvSpecification
-from models.agent import Agent
+from env.psp_env_specification import PSPEnvSpecification
+from env.psp_env import PSPEnv
+from models.psp_agent import PSPAgent as Agent
 from models.agent_validator import AgentValidator
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
@@ -111,8 +112,8 @@ def main():
             observe_real_duration_when_affect = True
         else:
             observe_real_duration_when_affect = False
-        env_specification = PspEnvSpecification(
-            problems = problem_description
+        env_specification = PSPEnvSpecification(
+            problems=problem_description,
             normalize_input=not args.dont_normalize_input,
             input_list=args.features,
             max_edges_factor=args.max_edges_upper_bound_factor,
@@ -199,10 +200,15 @@ def main():
     # agent.train(problem_description, training_specification)
 
     validator = AgentValidator(
-        problem_description, env_specification, args.device, training_specification
+        problem_description,
+        env_specification,
+        PSPEnv,
+        args.device,
+        training_specification,
     )
     ppo = PPO(
         agent_specification,
+        PSPEnv,
         validator,
     )
     ppo.train(

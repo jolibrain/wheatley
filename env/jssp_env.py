@@ -42,12 +42,8 @@ from utils.utils import get_n_features
 from env.state import State
 
 
-class Env(gym.Env):
-    def __init__(
-        self,
-        problem_description,
-        env_specification,
-    ):
+class JSSPEnv(gym.Env):
+    def __init__(self, problem_description, env_specification, i, validate=False):
         self.problem_description = problem_description
         self.env_specification = env_specification
         self.sum_reward = 0

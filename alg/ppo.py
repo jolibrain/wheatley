@@ -31,15 +31,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from .logger import Logger, configure_logger
-from env.env import Env
 from collections import deque
 from utils.utils import obs_as_tensor, safe_mean, rebatch_obs, get_obs, decode_mask
 import tqdm
 
 
-def create_env(problem_description, env_specification):
+def create_env(env_cls, problem_description, env_specification, i):
     def _init():
-        env = Env(problem_description, env_specification)
+        env = env_cls(problem_description, env_specification, i, validate=False)
         return env
 
     return _init
@@ -49,11 +48,13 @@ class PPO:
     def __init__(
         self,
         agent_specification,
+        env_cls,
         validator=None,
     ):
 
         self.optimizer_class = agent_specification.optimizer_class
         self.logger = configure_logger()
+        self.env_cls = env_cls
 
         self.num_envs = agent_specification.n_workers
         self.gamma = agent_specification.gamma
@@ -185,15 +186,15 @@ class PPO:
         if training_specification.vecenv_type == "dummy":
             envs = gym.vector.SyncVectorEnv(
                 [
-                    create_env(problem_description, env_specification)
-                    for _ in range(self.num_envs)
+                    create_env(self.env_cls, problem_description, env_specification, i)
+                    for i in range(self.num_envs)
                 ],
             )
         else:
             envs = gym.vector.AsyncVectorEnv(
                 [
-                    create_env(problem_description, env_specification)
-                    for _ in range(self.num_envs)
+                    create_env(self.env_cls, problem_description, env_specification, i)
+                    for i in range(self.num_envs)
                 ],
                 # spwan helps when observation space is huge
                 # context="spawn",

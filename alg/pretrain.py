@@ -27,7 +27,6 @@ from models.agent_specification import AgentSpecification
 from models.jssp_agent import JSSPAgent as Agent
 from utils.utils import rebatch_obs, get_obs
 from utils.ortools import *
-from env.env import Env
 import numpy as np
 import torch
 from torch.distributions.categorical import Categorical
@@ -39,6 +38,7 @@ class Pretrainer:
         problem_description,
         env_specification,
         agent_specification,
+        env_cls,
         num_envs=1,
         prob=0.9,
     ):
@@ -81,7 +81,7 @@ class Pretrainer:
         all_actions = []
         all_past_actions = []
         for e in range(self.num_envs):
-            env = Env(self.problem_description, self.env_specification)
+            env = self.env_cls(self.problem_description, self.env_specification)
             for i in range(n_traj):
                 (
                     obs,

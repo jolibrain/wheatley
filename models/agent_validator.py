@@ -33,7 +33,6 @@ import copy
 import torch
 import tqdm
 
-from env.env import Env
 from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.jssp_description import (
@@ -54,6 +53,7 @@ class AgentValidator:
         self,
         problem_description,
         env_specification,
+        env_cls,
         device,
         training_specification,
         verbose=2,
@@ -68,6 +68,7 @@ class AgentValidator:
         else:
             self.env_specification = env_specification
         self.device = device
+        self.env_cls = env_cls
 
         self.n_validation_env = training_specification.n_validation_env
         self.fixed_validation = training_specification.fixed_validation
@@ -96,8 +97,10 @@ class AgentValidator:
 
         # Inner variables
         self.validation_envs = [
-            Env(self.problem_description, self.env_specification)
-            for _ in range(self.n_validation_env)
+            self.env_cls(
+                self.problem_description, self.env_specification, i, validate=True
+            )
+            for i in range(self.n_validation_env)
         ]
         self.makespan_ratio = 1000
         self.makespans = []

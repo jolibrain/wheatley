@@ -295,7 +295,7 @@ class PSPLoader:
         job_info = []
         durations = []
         resources = []
-        n_tasks = 0
+        n_modes = 0
 
         self.firstchar("*")
         self.firstword("file")
@@ -309,13 +309,13 @@ class PSPLoader:
         self.firstword("horizon")
         self.firstword("RESOURCES")
         self.word(1, "renewable", True)
-        n_renewable_resources = self.sline[3]
+        n_renewable_resources = int(self.sline[3])
         self.nextline()
         self.word(1, "nonrenewable", True)
-        n_nonrenewable_resources = self.sline[3]
+        n_nonrenewable_resources = int(self.sline[3])
         self.nextline()
         self.word(1, "doubly", True)
-        n_doubly_constrained_resources = self.sline[4]
+        n_doubly_constrained_resources = int(self.sline[4])
         n_resources = (
             n_renewable_resources
             + n_nonrenewable_resources
@@ -334,7 +334,7 @@ class PSPLoader:
         self.firstword("PRECEDENCE")
         self.firstword("jobnr.")
         for j in range(1, n_jobs + 1):
-            n_tasks += int(self.sline[1])
+            n_modes += int(self.sline[1])
             job_info.append((int(self.sline[1]), [int(s) for s in self.sline[3:]]))
             self.nextline()
         self.firstchar("*")
@@ -360,15 +360,15 @@ class PSPLoader:
 
         self.cleanup()
 
-        return (
-            "n_jobs":n_jobs,
-            "n_tasks":n_tasks,
-            "n_resources":n_resources,
-            "n_renewable_resources":n_renewable_resources,
-            "n_nonrenewable_resources":n_nonrenewable_resources,
-            "n_doubly_constrained_resources",n_doubly_constrained_resources,
-            "job_info":job_info,
-            "durations":durations,
-            "resources":resources,
-            "resource_availabilities":resource_availabilities,
-        )
+        return {
+            "n_jobs": n_jobs,
+            "n_modes": n_modes,
+            "n_resources": n_resources,
+            "n_renewable_resources": n_renewable_resources,
+            "n_nonrenewable_resources": n_nonrenewable_resources,
+            "n_doubly_constrained_resources": n_doubly_constrained_resources,
+            "job_info": job_info,
+            "durations": durations,
+            "resources": resources,
+            "resource_availabilities": resource_availabilities,
+        }

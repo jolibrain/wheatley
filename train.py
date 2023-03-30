@@ -32,6 +32,7 @@ from models.agent_validator import AgentValidator
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.jssp_description import JSSPDescription as ProblemDescription
+from env.jssp_env import JSSPEnv
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
 from utils.utils import (
@@ -214,10 +215,15 @@ def main():
     # agent.train(problem_description, training_specification)
 
     validator = AgentValidator(
-        problem_description, env_specification, args.device, training_specification
+        problem_description,
+        env_specification,
+        JSSPEnv,
+        args.device,
+        training_specification,
     )
     ppo = PPO(
         agent_specification,
+        JSSPEnv,
         validator,
     )
     ppo.train(
