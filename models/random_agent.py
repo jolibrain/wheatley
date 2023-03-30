@@ -28,11 +28,6 @@ import numpy as np
 
 
 class RandomAgent:
-    def __init__(self, max_n_jobs, max_n_machines):
-        self.max_n_jobs = max_n_jobs
-        self.max_n_machines = max_n_machines
-        self.max_n_nodes = self.max_n_jobs * self.max_n_machines
-
     def predict(self, env):
         # soft reset to evaluate the same sampled problem as PPO
         observation, info = env.reset(soft=True)
