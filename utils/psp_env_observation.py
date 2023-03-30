@@ -108,7 +108,7 @@ class PSPEnvObservation:
                 "edge_index": edge_index.astype("int64"),
                 "n_conflict_edges": self.n_conflict_edges,
                 "conflicts_edges": conflicts_edges.numpy().astype("int64"),
-                "conflicts_edges_machineid": conflicts_edges_machineid.numpy().astype(
+                "conflicts_edges_resourceinfo": conflicts_edges_resourceinfo.astype(
                     "int64"
                 ),
             }

@@ -72,15 +72,6 @@ class PSPEnv(gym.Env):
             * (2 if self.env_specification.add_boolean else 1)
         )
 
-        if self.observe_conflicts_as_cliques:
-            n_conflict_edges = (
-                2
-                * sum(range(self.env_specification.max_n_jobs))
-                * self.env_specification.max_n_machines
-            )
-
-            shape_conflict_edges = (2, n_conflict_edges)
-
         if self.env_specification.max_edges_factor > 0:
             shape = (
                 2,
@@ -111,6 +102,14 @@ class PSPEnv(gym.Env):
         )
 
         if self.observe_conflicts_as_cliques:
+            n_conflict_edges = (
+                2
+                * sum(range(self.env_specification.max_n_modes))
+                * self.env_specification.max_n_resources
+            )
+
+            shape_conflict_edges = (2, n_conflict_edges)
+
             self.observation_space["n_conflict_edges"] = Discrete(n_conflict_edges)
             self.observation_space["conflicts_edges"] = Box(
                 low=0,
@@ -119,9 +118,15 @@ class PSPEnv(gym.Env):
                 dtype=np.int64,
             )
             self.observation_space["conflicts_edges_resourceinfo"] = Box(
-                low=0,
-                high=self.env_specification.max_n_machines,
-                shape=(2, n_conflict_edges),
+                low=np.array([0, 0, 0]),
+                high=np.array(
+                    [
+                        self.env_specification.max_n_resources,
+                        self.env_specification.max_resource_request,
+                        self.env_specification.max_resource_availability,
+                    ]
+                ),
+                shape=(2, n_conflict_edges, 3),
                 dtype=np.int64,
             )
 

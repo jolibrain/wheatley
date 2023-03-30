@@ -296,6 +296,8 @@ class PSPLoader:
         durations = []
         resources = []
         n_modes = 0
+        max_resource_availability = 0
+        max_resource_request = 0
 
         self.firstchar("*")
         self.firstword("file")
@@ -345,7 +347,10 @@ class PSPLoader:
             job_durations = []
             job_resources = []
             job_durations.append(int(self.sline[2]))
-            job_resources.append([int(d) for d in self.sline[3:]])
+            req = [int(d) for d in self.sline[3:]]
+            if max(req) > max_resource_request:
+                max_resource_request = max(req)
+            job_resources.append(req)
             self.nextline()
             for m in range(1, job_info[j - 1][0]):
                 job_durations.append(int(self.sline[1]))
@@ -357,6 +362,8 @@ class PSPLoader:
         self.firstword("RESOURCEAVAILABILITIES:")
         self.nextline()
         resource_availabilities = [int(rl) for rl in self.sline]
+        if max(resource_availabilities) > max_resource_availability:
+            max_resource_availability = max(resource_availabilities)
 
         self.cleanup()
 
@@ -370,5 +377,7 @@ class PSPLoader:
             "job_info": job_info,
             "durations": durations,
             "resources": resources,
-            "resource_availabilities": resource_availabilities,
+            "resource_availability": resource_availabilities,
+            "max_resource_availability": max_resource_availability,
+            "max_resource_request": max_resource_request,
         }

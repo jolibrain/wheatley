@@ -43,6 +43,8 @@ class PSPEnvSpecification:
         self.max_n_nodes = self.max_n_modes
         self.max_n_edges = self.max_n_nodes**2
         self.max_n_resources = self.problems.max_n_resources
+        self.max_resource_request = self.problems.max_resource_request
+        self.max_resource_availability = self.problems.max_resource_availability
         self.normalize_input = normalize_input
         self.input_list = input_list
         if "selectable" in input_list:

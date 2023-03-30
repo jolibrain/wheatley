@@ -55,6 +55,12 @@ class PSPDescription:
         self.max_n_resources = max(
             [psp["n_resources"] for psp in train_psps + test_psps]
         )
+        self.max_resource_request = max(
+            [psp["max_resource_request"] for psp in train_psps + test_psps]
+        )
+        self.max_resource_availability = max(
+            [psp["max_resource_availability"] for psp in train_psps + test_psps]
+        )
 
     def print_self(self):
         print(
