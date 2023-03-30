@@ -50,15 +50,17 @@ class PSPDescription:
         self.train_psps = train_psps
         self.test_psps = test_psps
 
-        self.max_n_jobs = max([psp[0] for psp in train_psps + test_psps])
-        self.max_n_tasks = max([psp[1] for psp in train_psps + test_psps])
-        self.max_n_resources = max([psp[2] for psp in train_psps + test_psps])
+        self.max_n_jobs = max([psp["n_jobs"] for psp in train_psps + test_psps])
+        self.max_n_modes = max([psp["n_modes"] for psp in train_psps + test_psps])
+        self.max_n_resources = max(
+            [psp["n_resources"] for psp in train_psps + test_psps]
+        )
 
     def print_self(self):
         print(
             f"==========Problem Description ==========\n"
             f"Number of jobs:                   {self.max_n_jobs}\n"
-            f"number of tasks:                  {self.max_n_tasks}\n"
+            f"number of modes:                  {self.max_n_modes}\n"
             f"Number of resources:              {self.max_n_resources}\n"
             f"Transition model:                 {self.transition_model_config}\n"
             f"Reward model:                     {self.reward_model_config}\n"

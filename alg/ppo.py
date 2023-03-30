@@ -183,17 +183,25 @@ class PPO:
         batch_size = self.num_envs * self.num_steps
         classVecEnv = gym.vector.AsyncVectorEnv
         print("creating environments")
+        if hasattr(problem_description, "train_psps"):
+            mod = len(problem_description.train_psps)
+        else:
+            mod = 1
         if training_specification.vecenv_type == "dummy":
             envs = gym.vector.SyncVectorEnv(
                 [
-                    create_env(self.env_cls, problem_description, env_specification, i)
+                    create_env(
+                        self.env_cls, problem_description, env_specification, i % mod
+                    )
                     for i in range(self.num_envs)
                 ],
             )
         else:
             envs = gym.vector.AsyncVectorEnv(
                 [
-                    create_env(self.env_cls, problem_description, env_specification, i)
+                    create_env(
+                        self.env_cls, problem_description, env_specification, i % mod
+                    )
                     for i in range(self.num_envs)
                 ],
                 # spwan helps when observation space is huge

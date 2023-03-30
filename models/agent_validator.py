@@ -96,9 +96,16 @@ class AgentValidator:
             )
 
         # Inner variables
+        if hasattr(self.problem_description, "test_psps"):
+            mod = len(self.problem_description.test_psps)
+        else:
+            mod = 1
         self.validation_envs = [
             self.env_cls(
-                self.problem_description, self.env_specification, i, validate=True
+                self.problem_description,
+                self.env_specification,
+                i % mod,
+                validate=True,
             )
             for i in range(self.n_validation_env)
         ]

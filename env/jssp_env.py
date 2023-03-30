@@ -39,7 +39,7 @@ from env.reward_models.tassel_reward_model import TasselRewardModel
 from env.reward_models.uncertain_reward_model import UncertainRewardModel
 from utils.env_observation import EnvObservation
 from utils.utils import get_n_features
-from env.state import State
+from env.jssp_state import JSSPState as State
 
 
 class JSSPEnv(gym.Env):

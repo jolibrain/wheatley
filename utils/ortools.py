@@ -31,7 +31,7 @@ import numpy as np
 import visdom
 import collections
 
-from env.state import State
+from env.jssp_state import JSSPState as State
 from problem.jssp_description import JSSPDescription as ProblemDescription
 from utils.utils import obs_as_tensor_add_batch_dim, decode_mask
 from ortools.sat.python import cp_model

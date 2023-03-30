@@ -25,11 +25,7 @@ import gymnasium as gym
 from gymnasium.spaces import Discrete, Dict, Box
 import numpy as np
 
-from env.transition_models.l2d_transition_model import L2DTransitionModel
-from env.transition_models.simple_transition_model import SimpleTransitionModel
-from env.transition_models.slot_locking_transition_model import (
-    SlotLockingTransitionModel,
-)
+from env.transition_models.psp_transition_model import PSPTransitionModel
 from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
 from env.reward_models.l2d_reward_model import L2DRewardModel
 from env.reward_models.l2d_estim_reward_model import L2DEstimRewardModel
@@ -37,9 +33,9 @@ from env.reward_models.meta_reward_model import MetaRewardModel
 from env.reward_models.sparse_reward_model import SparseRewardModel
 from env.reward_models.tassel_reward_model import TasselRewardModel
 from env.reward_models.uncertain_reward_model import UncertainRewardModel
-from utils.env_observation import EnvObservation
+from utils.psp_env_observation import PSPEnvObservation as EnvObservation
 from utils.utils import get_n_features
-from env.state import State
+from env.psp_state import PSPState as State
 
 
 class PSPEnv(gym.Env):
@@ -55,12 +51,15 @@ class PSPEnv(gym.Env):
 
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
-        self.n_jobs = problem_description.max_n_jobs
+        self.n_jobs = self.problem["n_jobs"]
+        self.n_modes = self.problem["n_modes"]
         # adjust n_jobs if we are going to sample or chunk
         if env_specification.sample_n_jobs != -1:
             self.n_jobs = env_specification.sample_n_jobs
+            self.problem, self.n_modes = self.sample_problem(self.problem, self.n_jobs)
         if env_specification.chunk_n_jobs != -1:
             self.n_jobs = env_specification.chunk_n_jobs
+            self.problem, self.n_modes = self.chunk_problem(self.problem, self.n_jobs)
         self.deterministic = problem_description.deterministic
 
         self.observe_conflicts_as_cliques = (
@@ -216,76 +215,25 @@ class PSPEnv(gym.Env):
     def render_solution(self, schedule, scaling=1.0):
         return self.state.render_solution(schedule, scaling)
 
-    def chunk_jobs(self, input_affectations, input_durations):
-        chunk = self.env_specification.chunk_n_jobs
-        if chunk == -1:
-            return input_affectations, input_durations
-        assert chunk <= self.problem_description.n_jobs
-        start = np.random.randint(self.problem_description.n_jobs - chunk + 1)
-        affectations = input_affectations[start : start + chunk]
-        durations = input_durations[start : start + chunk]
-        return affectations, durations
+    def chunk_problem(self, problem, n_jobs):
+        # TODO
+        return problem, problem["n_modes"]
 
-    def sample_jobs(self, input_affectations, input_durations):
-        sample = self.env_specification.sample_n_jobs
-        self.sampled_jobs = None
-        if sample == -1:
-            return input_affectations, input_durations
-        assert sample <= self.problem_description.n_jobs
-        ids = list(range(len(input_durations)))
-        samples = np.random.choice(ids, sample, replace=False)
-        self.sampled_jobs = samples
-        affectations = np.array([input_affectations[i] for i in samples])
-        durations = np.array([input_durations[i] for i in samples])
-        return affectations, durations
+    def sample_jobs(self, problem, n_jobs):
+        # TODO
+        return problem, problem["n_modes"]
 
     def _create_state(self):
-        affectations, durations = self.problem_description.sample_problem()
-        affectations, durations = self.sample_jobs(affectations, durations)
-        affectations, durations = self.chunk_jobs(affectations, durations)
         self.state = State(
-            affectations,
-            durations,
-            self.env_specification.max_n_jobs,
-            self.env_specification.max_n_machines,
+            self.env_specification,
+            self.problem_description,
+            self.problem,
             self.deterministic,
-            feature_list=self.env_specification.input_list,
             observe_conflicts_as_cliques=self.observe_conflicts_as_cliques,
         )
 
     def _create_transition_model(self):
-        if self.transition_model_config == "simple":
-            self.transition_model = SimpleTransitionModel(
-                self.state.affectations,
-                self.state.durations,
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
-                self.env_specification.observe_real_duration_when_affect,
-            )
-        elif (
-            self.transition_model_config == "L2D"
-            and self.env_specification.insertion_mode != "slot_locking"
-        ):
-            self.transition_model = L2DTransitionModel(
-                self.state.affectations,
-                self.state.durations,
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
-                self.env_specification.observe_real_duration_when_affect,
-            )
-        elif (
-            self.transition_model_config == "L2D"
-            and self.env_specification.insertion_mode == "slot_locking"
-        ):
-            self.transition_model = SlotLockingTransitionModel(
-                self.state.affectations,
-                self.state.durations,
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
-                self.env_specification.observe_real_duration_when_affect,
-            )
-        else:
-            raise Exception("Transition model not recognized")
+        self.transition_model = PSPTransitionModel(self.env_specification)
 
     def _create_reward_model(self):
         # For deterministic problems, there are a few rewards available
@@ -339,22 +287,18 @@ class PSPEnv(gym.Env):
                 self.env_specification.input_list,
             )
             # remove real duration from obs (in state for computing makespan on the fly)
-            if (
-                not self.env_specification.observe_real_duration_when_affect
-                and "duration" in self.state.features_offset
-            ):
-                features = features.clone()
-                dof = self.state.features_offset["duration"]
-                features[:, dof[0] : dof[0] + 1] = -1
+            if not self.env_specification.observe_real_duration_when_affect:
+
+                features = self.state.get_features_wo_real_dur()
             return EnvObservation(
                 self.n_jobs,
-                self.n_machines,
+                self.n_modes,
                 features,
                 edge_index,
                 conflicts_edges,
                 conflicts_edges_machineid,
                 self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
+                self.env_specification.max_n_resources,
                 self.env_specification.max_edges_factor,
             )
 
@@ -365,19 +309,17 @@ class PSPEnv(gym.Env):
             )
             # remove real duration from obs (in state for computing makespan on the fly)
             if not self.env_specification.observe_real_duration_when_affect:
-                if "duration" in self.state.features_offset:
-                    features = features.clone()
-                    dof = self.state.features_offset["duration"]
-                    features[:, dof[0] : dof[0] + 1] = -1
+                features = self.state.get_features_wo_real_dur()
             return EnvObservation(
                 self.n_jobs,
-                self.n_machines,
+                self.n_modes,
                 features,
                 edge_index,
                 None,
                 None,
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
+                self.problem_description.max_n_jobs,
+                self.problem_description.max_n_modes,
+                self.problem_description.max_n_resources,
                 self.env_specification.max_edges_factor,
             )
 
@@ -392,11 +334,7 @@ class PSPEnv(gym.Env):
             self.state, self.env_specification.add_boolean
         )
         pad = np.full(
-            (
-                self.env_specification.max_n_jobs
-                * self.env_specification.max_n_machines
-                - len(mask),
-            ),
+            (self.env_specification.max_n_modes - len(mask),),
             False,
             dtype=bool,
         )

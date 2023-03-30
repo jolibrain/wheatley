@@ -46,7 +46,7 @@ from utils.utils import (
 )
 
 
-class State:
+class JSSPState:
     def __init__(
         self,
         affectations,
