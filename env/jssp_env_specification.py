@@ -27,7 +27,7 @@
 from utils.utils import get_n_features
 
 
-class EnvSpecification:
+class JSSPEnvSpecification:
     def __init__(
         self,
         max_n_jobs,
@@ -52,14 +52,20 @@ class EnvSpecification:
         self.max_edges_factor = max_edges_factor
         self.sample_n_jobs = sample_n_jobs
         self.chunk_n_jobs = chunk_n_jobs
-        self.add_boolean = (insertion_mode == "choose_forced_insertion") or (insertion_mode == "slot_locking")
-        self.n_features = get_n_features(self.input_list, self.max_n_jobs, self.max_n_machines)
+        self.add_boolean = (insertion_mode == "choose_forced_insertion") or (
+            insertion_mode == "slot_locking"
+        )
+        self.n_features = get_n_features(
+            self.input_list, self.max_n_jobs, self.max_n_machines
+        )
         self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
         self.observe_real_duration_when_affect = observe_real_duration_when_affect
         self.do_not_observe_updated_bounds = do_not_observe_updated_bounds
 
     def print_self(self):
-        print_input_list = [el.lower().title().replace("_", " ") for el in self.input_list]
+        print_input_list = [
+            el.lower().title().replace("_", " ") for el in self.input_list
+        ]
         print(
             f"==========Env Description     ==========\n"
             f"Max size:                           {self.max_n_jobs} x {self.max_n_machines}\n"

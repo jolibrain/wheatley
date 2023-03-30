@@ -26,14 +26,13 @@ import torch
 
 from models.gnn_dgl import GnnDGL
 from models.gnn_tokengt import GnnTokenGT
-from problem.problem_description import ProblemDescription
 from models.mlp import MLP
 from torch.distributions.categorical import Categorical
 from functools import partial
 import numpy as np
 
 
-class Agent(torch.nn.Module):
+class JSSPAgent(torch.nn.Module):
     def __init__(
         self,
         env_specification,

@@ -21,10 +21,10 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from problem.problem_description import ProblemDescription
-from env.env_specification import EnvSpecification
+from problem.jssp_description import JSSPDescription as ProblemDescription
+from env.jssp_env_specification import JSSPEnvSpecification
 from models.agent_specification import AgentSpecification
-from models.agent import Agent
+from models.jssp_agent import JSSPAgent as Agent
 from utils.utils import rebatch_obs, get_obs
 from utils.ortools import *
 from env.env import Env

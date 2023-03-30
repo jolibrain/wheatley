@@ -32,7 +32,7 @@ import visdom
 import collections
 
 from env.state import State
-from problem.problem_description import ProblemDescription
+from problem.jssp_description import JSSPDescription as ProblemDescription
 from utils.utils import obs_as_tensor_add_batch_dim, decode_mask
 from ortools.sat.python import cp_model
 from problem.solution import Solution

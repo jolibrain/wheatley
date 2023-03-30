@@ -36,7 +36,9 @@ import tqdm
 from env.env import Env
 from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
-from problem.problem_description import ProblemDescription
+from problem.jssp_description import (
+    JSSPDescription as ProblemDescription,
+)
 from utils.ortools import get_ortools_makespan
 from utils.utils import (
     generate_problem_durations,

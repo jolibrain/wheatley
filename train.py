@@ -26,12 +26,12 @@ import os
 import numpy as np
 import torch
 
-from env.env_specification import EnvSpecification
-from models.agent import Agent
+from env.jssp_env_specification import JSSPEnvSpecification
+from models.jssp_agent import JSSPAgent as Agent
 from models.agent_validator import AgentValidator
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
-from problem.problem_description import ProblemDescription
+from problem.jssp_description import JSSPDescription as ProblemDescription
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
 from utils.utils import (
@@ -124,7 +124,7 @@ def main():
             observe_real_duration_when_affect = True
         else:
             observe_real_duration_when_affect = False
-        env_specification = EnvSpecification(
+        env_specification = JSSPEnvSpecification(
             max_n_jobs=args.max_n_j,
             max_n_machines=args.max_n_m,
             normalize_input=not args.dont_normalize_input,

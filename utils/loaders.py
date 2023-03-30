@@ -361,14 +361,14 @@ class PSPLoader:
         self.cleanup()
 
         return (
-            n_jobs,
-            n_tasks,
-            n_resources,
-            n_renewable_resources,
-            n_nonrenewable_resources,
-            n_doubly_constrained_resources,
-            job_info,
-            durations,
-            resources,
-            resource_availabilities,
+            "n_jobs":n_jobs,
+            "n_tasks":n_tasks,
+            "n_resources":n_resources,
+            "n_renewable_resources":n_renewable_resources,
+            "n_nonrenewable_resources":n_nonrenewable_resources,
+            "n_doubly_constrained_resources",n_doubly_constrained_resources,
+            "job_info":job_info,
+            "durations":durations,
+            "resources":resources,
+            "resource_availabilities":resource_availabilities,
         )
