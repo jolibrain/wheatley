@@ -79,7 +79,6 @@ class AgentValidator:
 
         self.custom_name = training_specification.custom_heuristic_name
 
-        self.env_specification = env_specification
         self.max_time_ortools = training_specification.max_time_ortools
         self.scaling_constant_ortools = training_specification.scaling_constant_ortools
 
