@@ -46,12 +46,10 @@ pre-commit install
 - Uses some intuitions and ideas from [A Reinforcement Learning Environment For Job-Shop Scheduling](https://arxiv.org/abs/2104.03760)
 
 ## Differences with L2D and other JSSP-RL implementations:
- - Rewards are normalized, simply divided by a scalar. This also means that the 
- original implementeation value loss is different than ours
- - L2D updates the PPO model every n environment runs, Wheatley does every n steps, which is more practical
- - Wheatley uses batching
- - Wheatley uses advanced GNN, such as gatv2 thanks to pytorch-geometric
- - Wheatley embeds more information into every node of the schedule graph, yielding more informed policies
+ - Rewards are normalized
+ - Wheatley uses proper batching and parallel environments
+ - Wheatley uses advanced GNN, such as gatv2  (with edge info) thanks to DGL.
+ - Wheatley embeds more information into every node of the schedule graph (like propagated time bounds), yielding more informed policies
  - Wheatley has support for bounded uncertain durations, including at node and reward levels.
 
 
