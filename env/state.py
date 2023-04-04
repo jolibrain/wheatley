@@ -28,6 +28,8 @@ from copy import deepcopy
 from queue import PriorityQueue
 
 import networkx as nx
+import networkit as nk
+import dgl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -56,6 +58,7 @@ class State:
         deterministic=True,
         feature_list=[],
         observe_conflicts_as_cliques=False,
+        graph_type="dgl",
     ):
         self.affectations = affectations
         self.original_durations = durations.copy()
@@ -66,6 +69,14 @@ class State:
 
         self.max_n_jobs = max_n_jobs
         self.max_n_machines = max_n_machines
+
+        self.graph_type = graph_type
+        if self.graph_type == "nk":
+            import networkit as nk
+        elif self.graph_type == "dgl":
+            import dgl
+        elif self.graph_type == "nx":
+            import networkx as nx
 
         # no more one hot due to perf issues when adding conflcits as cliques
         self.not_one_hot_machine_id = np.zeros((max_n_machines, max_n_machines))
@@ -231,7 +242,14 @@ class State:
             for job_index in range(self.n_jobs)
         ]
 
-        self.graph = nx.DiGraph(self.edges)
+        if self.graph_type == "nk":
+            self.graph = nk.graph.Graph(n=self.n_machines * self.n_jobs, directed=True)
+            for e in self.edges:
+                self.graph.addEdge(e[0], e[1])
+        elif self.graph_type == "dgl":
+            self.graph = dgl.graph(self.edges, idtype=torch.int32)
+        else:
+            self.graph = nx.DiGraph(self.edges)
         self.numpy_edges = np.array(self.edges)
         self.edges = []
 
@@ -521,7 +539,12 @@ class State:
             return completion_times
 
         # recursively solve the predecessors
-        predecessors = list(self.graph.predecessors(node_id))
+        if self.graph_type == "nk":
+            predecessors = self.graph.iterInNeighbors(node_id)
+        elif self.graph_type == "dgl":
+            predecessors = self.graph.predecessors(node_id)
+        else:
+            predecessors = self.graph.predecessors(node_id)
         task_comp_time_pred = torch.stack(
             [self.update_completion_times_from(p) for p in predecessors]
         )
@@ -552,37 +575,61 @@ class State:
 
     def update_completion_times_from_sinks(self):
         sinks = []
-        nodes = list(self.graph.nodes)
+        if self.graph_type == "nk":
+            nodes = self.graph.iterNodes()
+        elif self.graph_type == "dgl":
+            nodes = self.graph.nodes()
+        else:
+            nodes = self.graph.nodes
         for n in nodes:
-            successors = list(self.graph.successors(n))
-            if len(successors) == 0:
-                sinks.append(n)
+            if self.graph_type == "nk":
+                if self.graph.degree(n) == 0:
+                    sinks.append(n)
+            elif self.graph_type == "dgl":
+                if self.graph.out_degrees(n) == 0:
+                    sinks.append(n)
+            else:
+                if self.graph.out_degree(n) == 0:
+                    # successors = list(self.graph.successors(n))
+                    # if len(successors) == 0:
+                    sinks.append(n)
             # reset all completion times for memoization
             completion_times = torch.ones(4) * -1
             # set completion times for source nodes
-            predecessors = list(self.graph.predecessors(n))
-            if len(predecessors) == 0:
-                completion_times = self.get_durations(n)
+            if self.graph_type == "nk":
+                if self.graph.degreeIn(n) == 0:
+                    completion_times = self.get_durations(n)
+            elif self.graph_type == "dgl":
+                if self.graph.in_degrees(n) == 0:
+                    completion_times = self.get_durations(n)
+            else:
+                if self.graph.in_degree(n) == 0:
+                    # predecessors = list(self.graph.predecessors(n))
+                    # if len(predecessors) == 0:
+                    completion_times = self.get_durations(n)
             self.set_task_completion_times(n, completion_times)
         for sink in sinks:
             self.update_completion_times_from(sink)
 
     def update_completion_times_in_order(self):
         priority_queue = PriorityQueue()
-        nodes = list(self.graph.nodes)
-        for n in nodes:
-            predecessors = list(self.graph.predecessors(n))
-            if not predecessors:
+        for n in self.graph.nodes:
+            if self.graph.in_degree(n) == 0:
+                # predecessors = list(self.graph.predecessors(n))
+                # if not predecessors:
                 priority_queue.put((0, n))
         while not priority_queue.empty():
             (distance, cur_node_id) = priority_queue.get()
-            predecessors = list(self.graph.predecessors(cur_node_id))
+            # predecessors = list(self.graph.predecessors(cur_node_id))
 
-            if len(predecessors) == 0:
+            if self.graph.in_degree(cur_node_id) == 0:
                 max_completion_time_predecessors = torch.zeros(4)
             else:
                 task_comp_time_pred = torch.stack(
-                    [self.get_task_completion_times(p) for p in predecessors]
+                    [
+                        self.get_task_completion_times(p)
+                        for p in self.graph.predecessors(cur_node_id)
+                    ]
                 )
                 # The max completion time of predecessors is given by max for each features (real, min, max, and mode)
                 max_completion_time_predecessors = torch.max(task_comp_time_pred, 0)[0]
@@ -618,11 +665,27 @@ class State:
 
         while not priority_queue.empty():
             (distance, cur_node_id) = priority_queue.get()
-            predecessors = list(self.graph.predecessors(cur_node_id))
 
-            if len(predecessors) == 0:
+            if self.graph_type == "nk":
+                n_prec = self.graph.degreeIn(cur_node_id)
+            elif self.graph_type == "dgl":
+                if not cur_node_id in self.graph.edges()[1]:
+                    n_prec = 0
+                else:
+                    n_prec = 1
+            else:
+                n_prec = self.graph.in_degree(cur_node_id)
+
+            if n_prec == 0:
                 max_completion_time_predecessors = torch.zeros(4)
             else:
+                if self.graph_type == "nk":
+                    predecessors = self.graph.iterInNeighbors(cur_node_id)
+                elif self.graph_type == "dgl":
+                    edges = self.graph.edges()
+                    predecessors = edges[0][torch.where(edges[1] == cur_node_id)]
+                else:
+                    predecessors = self.graph.predecessors(cur_node_id)
                 task_comp_time_pred = torch.stack(
                     [self.get_task_completion_times(p) for p in predecessors]
                 )
@@ -655,8 +718,19 @@ class State:
 
             # Only add the nodes in the queue if update is necessary
             if rec and not torch.equal(old_completion_time, new_completion_time):
-                for successor in self.graph.successors(cur_node_id):
-                    priority_queue.put((distance + 1, successor))
+                if self.graph_type == "nk":
+                    for successor in self.graph.iterNeighbors(cur_node_id):
+                        priority_queue.put((distance + 1, successor))
+                elif self.graph_type == "dgl":
+                    edges = self.graph.edges()
+                    w = torch.where(edges[0] == cur_node_id)
+                    successors = edges[1][w]
+                    # print(self.graph.successors(cur_node_id))
+                    for successor in successors:
+                        priority_queue.put((distance + 1, successor))
+                else:
+                    for successor in self.graph.successors(cur_node_id):
+                        priority_queue.put((distance + 1, successor))
 
     def set_precedency(self, first_node_id, second_node_id, do_update=True):
         """
@@ -664,14 +738,19 @@ class State:
         and updates all other attributes of the State related to the graph.
         """
         # First check that second_node is not scheduled before first node
-        nodes_after_second_node = nx.algorithms.descendants(self.graph, second_node_id)
-        if first_node_id in nodes_after_second_node:
-            return False
-        # Also check that first and second node ids are not the same
-        if first_node_id == second_node_id:
-            return False
+        # nodes_after_second_node = nx.algorithms.descendants(self.graph, second_node_id)
+        # if first_node_id in nodes_after_second_node:
+        #     return False
+        # # Also check that first and second node ids are not the same
+        # if first_node_id == second_node_id:
+        #     return False
         # Then add the node into the graph
-        self.graph.add_edge(first_node_id, second_node_id)
+        if self.graph_type == "nk":
+            self.graph.addEdge(first_node_id, second_node_id)
+        elif self.graph_type == "dgl":
+            self.graph.add_edges(first_node_id, second_node_id)
+        else:
+            self.graph.add_edge(first_node_id, second_node_id)
         self.edges.append((first_node_id, second_node_id))
 
         # Finally update the task starting times
@@ -830,17 +909,47 @@ class State:
                     )
 
             self.features[node_id, self.features_offset["selectable"][0]] = 0
-            for successor in self.graph.successors(node_id):
-                sjid, stid = node_to_job_and_task(successor, self.n_machines)
-                if self.affectations[sjid, stid] != -1:
-                    parents = list(self.graph.predecessors(successor))
-                    parents_affected = self.features[
-                        parents, self.features_offset["is_affected"][0]
-                    ]
-                    if torch.all(parents_affected.flatten() == 1):
-                        self.features[
-                            successor, self.features_offset["selectable"][0]
-                        ] = 1
+            if self.graph_type == "nk":
+                for successor in self.graph.iterNeighbors(node_id):
+                    sjid, stid = node_to_job_and_task(successor, self.n_machines)
+                    if self.affectations[sjid, stid] != -1:
+
+                        parents = list(self.graph.iterInNeighbors(successor))
+                        parents_affected = self.features[
+                            parents, self.features_offset["is_affected"][0]
+                        ]
+                        if torch.all(parents_affected.flatten() == 1):
+                            self.features[
+                                successor, self.features_offset["selectable"][0]
+                            ] = 1
+            elif self.graph_type == "dgl":
+                edges = self.graph.edges()
+                succ = edges[1][torch.where(edges[0] == node_id)]
+                for successor in succ:
+                    sjid, stid = node_to_job_and_task(successor, self.n_machines)
+                    if self.affectations[sjid, stid] != -1:
+                        parents = edges[0][torch.where(edges[1] == node_id)]
+                        # parents = list(self.graph.predecessors(successor))
+                        parents_affected = self.features[
+                            parents, self.features_offset["is_affected"][0]
+                        ]
+                        if torch.all(parents_affected.flatten() == 1):
+                            self.features[
+                                successor, self.features_offset["selectable"][0]
+                            ] = 1
+
+            else:
+                for successor in self.graph.successors(node_id):
+                    sjid, stid = node_to_job_and_task(successor, self.n_machines)
+                    if self.affectations[sjid, stid] != -1:
+                        parents = list(self.graph.predecessors(successor))
+                        parents_affected = self.features[
+                            parents, self.features_offset["is_affected"][0]
+                        ]
+                        if torch.all(parents_affected.flatten() == 1):
+                            self.features[
+                                successor, self.features_offset["selectable"][0]
+                            ] = 1
 
     def get_selectable(self):
         return self.features[:, self.features_offset["selectable"][0]]
