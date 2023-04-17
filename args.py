@@ -25,9 +25,9 @@
 #
 
 import argparse
+import os
 
 from utils.utils import get_exp_name, get_path
-
 
 parser = argparse.ArgumentParser(
     description="These args can be used with train.py, test.py and benchmark/run_taillard.py. They specify how the training"
@@ -566,6 +566,17 @@ parser.add_argument(
     default=1000,
     help="Factor for OR-Tools, since it only solves integer problems",
 )
+parser.add_argument(
+    "--log_file",
+    type=str,
+    default="/dev/null",
+    help="File to log to, note that visdom produce `jsonl` files, the file is logged in the experiment folder unless it is the `/dev/null` file",
+)
+parser.add_argument(
+    "--disable_visdom",
+    action="store_true",
+    help="Disable visdom logging",
+)
 
 # ================================================PARSING, IMPORTS, AND VERIFICATIONS=======================================
 # Parsing
@@ -596,3 +607,8 @@ if args.sample_n_jobs != -1 and args.chunk_n_jobs != -1:
 
 # Sorting the features
 args.features = sorted(args.features)
+
+# Full log path
+args.log_file = (
+    os.path.join(path, args.log_file) if args.log_file != "/dev/null" else args.log_file
+)
