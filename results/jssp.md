@@ -6,11 +6,24 @@
 # Benchmark launch line
 (problems are generated with same parameters as taillard, ie uniform duration in [1,99]):
 ```
-python train.py --n_j 15 --n_m 15 --n_steps_episode 5625 --n_workers 10 --total_timesteps 2000000 --n_validation_env 100 --fixed_validation  --lr 0.0002  --n_epochs 3 --n_layers_features_extractor 8  --batch_size 100 --exp_name_appendix 15x15_L2D --optimizer radam  --device cuda:2 --hidden_dim_features_extractor 64  --precompute_cliques --max_time_ortools 3600
+python train.py --n_j 15 --n_m 15 --n_steps_episode 5625 --n_workers 10 --total_timesteps 2000000 --n_validation_env 100 --fixed_validation  --lr 0.0002  --n_epochs 3 --n_layers_features_extractor 8  --batch_size 100 --exp_name_appendix 15x15_L2D  --hidden_dim_features_extractor 64  --max_time_ortools 3600
 ```
 
 # Results on taillard problems, compared to [L2D](https://github.com/zcaicaros/L2D).
 
+## Methodology
+
+- Problems are generated randomly using taillard parameters (ie duration is uniformly sampled in [1,99]).
+
+- 100 problems are generated first and then used for every evaluation. 
+
+- At every iteration, new problems are generated randomly and used to train wheatley. 
+
+- This shows geenralization abilities, as train problems are extremely unlikely to be the same as evaluation problems. 
+
+- This is the same setup as L2D. 
+
+## Results 
 
 - Obj. is average makespan
 
