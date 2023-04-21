@@ -72,11 +72,6 @@ parser.add_argument(
     "--exp_name_appendix", type=str, help="Appendix for the name of the experience"
 )
 parser.add_argument(
-    "--stable_baselines3_localisation",
-    type=str,
-    help="If using custom SB3, specify here the path",
-)
-parser.add_argument(
     "--vecenv_type",
     type=str,
     default="subproc",
@@ -571,16 +566,6 @@ args = parser.parse_args()
 exp_name = get_exp_name(args)
 path = get_path(args.path, exp_name)
 
-# Modify path if there is a custom SB3 library path specified
-if args.stable_baselines3_localisation is not None:
-    import sys
-
-    sys.path.insert(0, args.stable_baselines3_localisation + "/stable-baselines3/")
-    sys.path.insert(0, args.stable_baselines3_localisation + "stable-baselines3/")
-    sys.path.insert(0, args.stable_baselines3_localisation)
-    import stable_baselines3
-
-    print(f"Stable Baselines 3 imported from : {stable_baselines3.__file__}")
 
 # Max n_jobs must be under n_jobs
 if args.max_n_j == -1:

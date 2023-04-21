@@ -31,15 +31,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from .logger import Logger, configure_logger
-from env.env import Env
 from collections import deque
-from utils.utils import obs_as_tensor, safe_mean, rebatch_obs, get_obs, decode_mask
+from utils.utils import safe_mean, get_obs, decode_mask
 import tqdm
 
 
-def create_env(problem_description, env_specification):
+def create_env(env_cls, problem_description, env_specification, i):
     def _init():
-        env = Env(problem_description, env_specification)
+        env = env_cls(problem_description, env_specification, i, validate=False)
         return env
 
     return _init
@@ -49,11 +48,13 @@ class PPO:
     def __init__(
         self,
         agent_specification,
+        env_cls,
         validator=None,
     ):
 
         self.optimizer_class = agent_specification.optimizer_class
         self.logger = configure_logger()
+        self.env_cls = env_cls
 
         self.num_envs = agent_specification.n_workers
         self.gamma = agent_specification.gamma
@@ -92,7 +93,7 @@ class PPO:
         # buffer filling
         o, info = envs.reset()
         # next obs is a list of dicts
-        next_obs = obs_as_tensor(o)
+        next_obs = agent.obs_as_tensor(o)
         action_mask = decode_mask(info["mask"])
         next_done = torch.empty(self.num_envs).to(data_device)
 
@@ -120,7 +121,7 @@ class PPO:
                     [ep_info["episode"] for ep_info in info["final_info"]]
                 )
 
-            next_obs = obs_as_tensor(next_obs)
+            next_obs = agent.obs_as_tensor(next_obs)
             rewards[step] = torch.tensor(reward).view(-1).to(data_device)
             next_done = torch.Tensor(done).to(data_device)
 
@@ -146,7 +147,7 @@ class PPO:
             returns = advantages + values
 
         # flatten the batch
-        b_obs = rebatch_obs(obs)
+        b_obs = agent.rebatch_obs(obs)
         b_logprobs = logprobs.reshape(-1)
         b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
         b_advantages = advantages.reshape(-1)
@@ -182,18 +183,26 @@ class PPO:
         batch_size = self.num_envs * self.num_steps
         classVecEnv = gym.vector.AsyncVectorEnv
         print("creating environments")
+        if hasattr(problem_description, "train_psps"):
+            mod = len(problem_description.train_psps)
+        else:
+            mod = 1
         if training_specification.vecenv_type == "dummy":
             envs = gym.vector.SyncVectorEnv(
                 [
-                    create_env(problem_description, env_specification)
-                    for _ in range(self.num_envs)
+                    create_env(
+                        self.env_cls, problem_description, env_specification, i % mod
+                    )
+                    for i in range(self.num_envs)
                 ],
             )
         else:
             envs = gym.vector.AsyncVectorEnv(
                 [
-                    create_env(problem_description, env_specification)
-                    for _ in range(self.num_envs)
+                    create_env(
+                        self.env_cls, problem_description, env_specification, i % mod
+                    )
+                    for i in range(self.num_envs)
                 ],
                 # spwan helps when observation space is huge
                 # context="spawn",

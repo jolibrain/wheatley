@@ -30,14 +30,66 @@ import matplotlib.pyplot as plt
 import numpy as np
 import visdom
 import collections
+from operator import itemgetter
 
-from env.state import State
-from problem.problem_description import ProblemDescription
+from copy import deepcopy
+from env.jssp_state import JSSPState as State
+from problem.jssp_description import JSSPDescription as ProblemDescription
 from utils.utils import obs_as_tensor_add_batch_dim, decode_mask
 from ortools.sat.python import cp_model
-from problem.solution import Solution
+from problem.solution import Solution, PSPSolution
+from utils.ortools_psp import (
+    AnalyseDependencyGraph,
+    ComputeDelaysBetweenNodes,
+    SolveRcpsp,
+)
 
 import torch
+
+
+def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
+
+    durations = (durations * scaling_constant_ortools).astype(int)
+
+    # update problem durations with real_durations
+    problem = deepcopy(problem)
+    i = 0
+    for j in range(len(problem["durations"])):
+        for m in range(len(problem["durations"][j])):
+            problem["durations"][j][m] = durations[i]
+            i += 1
+
+    # return solution, is_Optimal
+    intervals_of_tasks, after = AnalyseDependencyGraph(problem)
+    delays, initial_solution, optimal_found = ComputeDelaysBetweenNodes(
+        problem, intervals_of_tasks
+    )
+    last_task = problem["n_modes"]
+    key = (0, last_task)
+    lower_bound = delays[key][0] if key in delays else 0
+
+    bound, value, assignment, optimal = SolveRcpsp(
+        problem=problem,
+        proto_file="",
+        params="",
+        active_tasks=set(range(1, last_task)),
+        source=0,
+        sink=last_task,
+        intervals_of_tasks=intervals_of_tasks,
+        delays=delays,
+        in_main_solve=True,
+        initial_solution=initial_solution,
+        lower_bound=lower_bound,
+    )
+
+    return (
+        PSPSolution(
+            [e / scaling_constant_ortools for e in assignment[0]],
+            assignment[1],
+            [d / scaling_constant_ortools for d in durations],
+        ),
+        optimal,
+    )
 
 
 def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortools):
@@ -124,9 +176,62 @@ def solve_jssp(affectations, durations, max_time_ortools, scaling_constant_ortoo
     )
 
 
+def node_from_job_mode(problem, jobid, modeid):
+    nid = 0
+    for i in range(jobid):
+        nid += problem["job_info"][i][0]
+    return nid + modeid
+
+
+def compute_ortools_makespan_on_real_duration(solution, state):
+    state.reset()  # reset do not redraw real durations
+
+    aff = solution.job_schedule
+    mid = solution.modes
+    while True:
+        index, element = min(enumerate(aff), key=itemgetter(1))
+        if element == float("inf"):
+            break
+        modeid = mid[index]
+        aff[index] = np.float("inf")
+        nid = node_from_job_mode(state.problem, index, modeid)
+        state.affect_job(node_from_job_mode(state.problem, index, modeid))
+
+    return state.tct(-1)[0], state.all_tct_real - state.real_durations
+
+
+def get_ortools_makespan_psp(
+    env,
+    max_time_ortools,
+    scaling_constant_ortools,
+    ortools_strategy="pessimistic",
+):
+    if ortools_strategy == "realistic":
+        durations = env.state.all_duration_real()
+    elif ortools_strategy == "pessimistic":
+        durations = env.state.all_durations()[:, 1]
+    elif ortools_strategy == "optimistic":
+        durations = env.state.all_durations()[:, 0]
+    elif ortools_strategy == "averagistic":
+        durations = env.state.all_durations()[:, 2]
+    else:
+        print("unknow ortools strategy ", ortools_strategy)
+        exit()
+
+    solution, optimal = solve_psp(
+        env.problem, durations, max_time_ortools, scaling_constant_ortools
+    )
+    if env.state.deterministic:
+        return solution.get_makespan(), solution.schedule, optimal
+
+    real_makespan, starts = compute_ortools_makespan_on_real_duration(solution, state)
+    return real_makespan, starts, solution[1], optimal
+
+
 def get_ortools_makespan(
     affectations,
     durations,
+    n_features,
     max_time_ortools,
     scaling_constant_ortools,
     ortools_strategy="pessimistic",
@@ -152,7 +257,13 @@ def get_ortools_makespan(
     if durations.shape[2] == 1:
         return solution.get_makespan(), solution.schedule
 
-    state = State(affectations, durations, affectations.shape[0], affectations.shape[1])
+    state = State(
+        affectations,
+        durations,
+        affectations.shape[0],
+        affectations.shape[1],
+        n_features,
+    )
     state.reset()
 
     # use the same durations to compute machines occupancies
@@ -201,6 +312,7 @@ def get_ortools_schedule(
     _, ortools_schedule, optimal = get_ortools_makespan(
         env.state.affectations,
         env.state.original_durations,
+        env.env_specification.n_features,
         max_time_ortools,
         scaling_constant_ortools,
         ortools_strategy,
