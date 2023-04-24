@@ -77,6 +77,7 @@ class PSPAgentObservation:
         else:
             nn_edges = n_edges
         gnew.edata["type"] = torch.LongTensor(type0)
+        gnew.edata["rid"] = torch.zeros((nn_edges), dtype=torch.int)
         gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
         gnew.edata["att_rc"] = torch.zeros((nn_edges, 1), dtype=torch.float32)
         return gnew

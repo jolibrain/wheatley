@@ -139,10 +139,12 @@ class PSPGnnDGL(torch.nn.Module):
             )
 
     def embed_edges(self, g):
-        type_embeded = self.edge_type_embedder(g.edata["type"])
-        rid_embeded = self.resource_id_embedder(g.edata["rid"])
-        rc_att_embeded = self.rc_att_embedder(g.edata["att_rc"])
-        ret = type_embeded + rid_embeded + rc_att_embeded
+        ret = self.edge_type_embedder(g.edata["type"])
+        ret += self.resource_id_embedder(g.edata["rid"])
+        try:
+            ret += self.rc_att_embedder(g.edata["att_rc"])
+        except KeyError:
+            pass
         try:  # if no ressource priory info in graph (ie at start state), key is absent
             ret += self.rp_att_embedder(g.edata["att_rp"].float())
         except KeyError:

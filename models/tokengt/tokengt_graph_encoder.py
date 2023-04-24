@@ -69,7 +69,8 @@ class TokenGTGraphEncoder(nn.Module):
     def __init__(
         self,
         input_dim_features_extractor: int,
-        num_edges_type: int,
+        num_edges_type: int = -1,
+        max_n_resources: int = -1,
         orf_node_id: bool = False,
         orf_node_id_dim: int = 64,
         lap_node_id: bool = False,
@@ -112,6 +113,7 @@ class TokenGTGraphEncoder(nn.Module):
         self.graph_feature = GraphFeatureTokenizer(
             input_dim_features_extractor=input_dim_features_extractor,
             num_edges_type=num_edges_type,
+            max_n_resources=max_n_resources,
             orf_node_id=orf_node_id,
             orf_node_id_dim=orf_node_id_dim,
             lap_node_id=lap_node_id,
@@ -144,7 +146,9 @@ class TokenGTGraphEncoder(nn.Module):
                     dropout=self.dropout_module.p,
                     attention_dropout=attention_dropout,
                     activation_dropout=activation_dropout,
-                    drop_path=(0.1 * (layer_idx + 1) / num_encoder_layers) if stochastic_depth else 0,
+                    drop_path=(0.1 * (layer_idx + 1) / num_encoder_layers)
+                    if stochastic_depth
+                    else 0,
                     linear_transformer=linear_transformer,
                     performer=performer,
                     performer_nb_features=performer_nb_features,
@@ -164,7 +168,9 @@ class TokenGTGraphEncoder(nn.Module):
         if performer:
             # keeping track of when to redraw projections for all attention layers
             self.performer_auto_check_redraw = performer_auto_check_redraw
-            self.performer_proj_updater = ProjectionUpdater(self.layers, performer_feature_redraw_interval)
+            self.performer_proj_updater = ProjectionUpdater(
+                self.layers, performer_feature_redraw_interval
+            )
 
     def build_tokengt_graph_encoder_layer(
         self,
@@ -250,7 +256,12 @@ class TokenGTGraphEncoder(nn.Module):
         attn_dict = {"maps": {}, "padded_index": padded_index}
         for i in range(len(self.layers)):
             layer = self.layers[i]
-            x, attn = layer(x, self_attn_padding_mask=padding_mask, self_attn_mask=None, self_attn_bias=None)
+            x, attn = layer(
+                x,
+                self_attn_padding_mask=padding_mask,
+                self_attn_mask=None,
+                self_attn_bias=None,
+            )
             if not last_state_only:
                 y = x.transpose(0, 1)
                 if self.permute:

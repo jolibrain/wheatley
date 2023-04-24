@@ -32,7 +32,8 @@ class PSPGnnTokenGT(torch.nn.Module):
         self,
         input_dim_features_extractor,
         max_n_nodes,
-        max_n_machines,
+        max_n_machines=-1,
+        max_n_resources=-1,
         conflicts="att",
         orf_node_id=False,
         orf_node_id_dim=64,
@@ -84,13 +85,20 @@ class PSPGnnTokenGT(torch.nn.Module):
         else:
             features_dim = encoder_embed_dim * 2
         self.max_n_machines = max_n_machines
+        self.max_n_resources = max_n_resources
         self.max_n_nodes = max_n_nodes
         self.conflicts = conflicts
         self.laplacian_pe = lap_node_id
+        if max_n_machines != -1:
+            num_edges_type = 5 + max_n_machines + 1
+        else:
+            num_edges_type = -1
+
         self.graph_encoder = TokenGTGraphEncoder(
             # <
             input_dim_features_extractor=input_dim_features_extractor,  # to be embedded
-            num_edges_type=5 + max_n_machines + 1,  # num (edge type) !
+            num_edges_type=num_edges_type,  # num (edge type) !
+            max_n_resources=self.max_n_resources,
             # >
             # < for tokenization
             orf_node_id=orf_node_id,
