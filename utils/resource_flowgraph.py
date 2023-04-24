@@ -1,4 +1,27 @@
-# This class allows to model cumulative resources. For a resource with a capacity capa_r, it ensures that at any time t,
+#
+# Wheatley
+# Copyright (c) 2023 Jolibrain
+# Authors:
+#    Stephanie Roussel <stephanie.roussel@onera.fr>
+#
+#
+# This file is part of Wheatley.
+#
+# Wheatley is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Wheatley is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
+#
+# This class allows to model cumulative resources. For a resource with a capacity
+# capa_r, it ensures that at any time t,
 # the sum of consumptions of r is lower than or equal to capa_r.
 # Careful, such a resource type is not always suitable for representing a set of disjunctive resources.
 
