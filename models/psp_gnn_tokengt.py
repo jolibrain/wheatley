@@ -134,7 +134,6 @@ class PSPGnnTokenGT(torch.nn.Module):
         g_list = AgentObservation.from_gym_observation(
             obs,
             conflicts=self.conflicts,
-            max_n_machines=self.max_n_machines,
             add_self_loops=False,
             device=next(self.parameters()).device,
             do_batch=False,

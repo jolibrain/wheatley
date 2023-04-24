@@ -86,8 +86,6 @@ class PSPState:
                 self.resource_conf_id,
                 self.resource_conf_val,
             ) = compute_resources_graph_np(self.features[:, 9:])
-            # normalize resource_conf_val
-            # self.resource_conf_val /= self.resource_levels[self.resource_conf_id]
 
         else:
             self.resource_conf_edges = None
@@ -131,8 +129,6 @@ class PSPState:
                 self.resource_conf_id,
                 self.resource_conf_val,
             ) = compute_resources_graph_np(self.features[:, 9:])
-            # normalize resource_conf_val
-            # self.resource_conf_val /= self.resource_levels[self.resource_conf_id]
 
         else:
             self.resource_conf_edges = None
