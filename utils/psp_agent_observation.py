@@ -73,9 +73,12 @@ class PSPAgentObservation:
         gnew.ndata["feat"] = feats
         if bidir:
             type0.extend(type1)
+            nn_edges = n_edges * 2
+        else:
+            nn_edges = n_edges
         gnew.edata["type"] = torch.LongTensor(type0)
-        gnew.edata["att_rp"] = torch.zeros((n_edges * 2, 3), dtype=torch.float32)
-        gnew.edata["att_rc"] = torch.zeros((n_edges * 2, 1), dtype=torch.float32)
+        gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
+        gnew.edata["att_rc"] = torch.zeros((nn_edges, 1), dtype=torch.float32)
         return gnew
 
     @classmethod
@@ -83,12 +86,6 @@ class PSPAgentObservation:
         # print("machine_one_hot", machine_one_hot)
 
         return torch.max(machine_one_hot, dim=1)
-
-    # @classmethod
-    # def add_conflicts_cliques(cls, g, rc_edges, rc_att):
-    #     rc_type = torch.LongTensor(self.edgeType["rc"] * rc_edges.shape[1])
-    #     g.add_edges(rc_edges[0], rc_edges[1], data={"type": rc_type, "att": rc_att})
-    #     return g
 
     @classmethod
     def add_edges(cls, g, t, edges, rid, att):

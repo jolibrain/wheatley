@@ -50,6 +50,7 @@ class PPO:
         agent_specification,
         env_cls,
         validator=None,
+        discard_incomplete_trials=True,
     ):
 
         self.optimizer_class = agent_specification.optimizer_class
@@ -72,9 +73,17 @@ class PPO:
         self.minibatch_size = agent_specification.batch_size
         self.validator = validator
 
+        self.discard_incomplete_trials = discard_incomplete_trials
+
         # in case of resume
         self._num_timesteps_at_start = 0
         self.ep_info_buffer = deque(maxlen=100)
+
+    def keep_only(self, obs, to_keep):
+        kobs = {}
+        for key in obs:
+            kobs[key] = obs[key][to_keep]
+        return kobs
 
     def collect_rollouts(self, agent, envs, env_specification, data_device):
         # ALGO Logic: Storage setup
@@ -90,12 +99,16 @@ class PPO:
             (self.num_steps, self.num_envs, env_specification.max_n_nodes)
         ).to(data_device)
 
+        if self.discard_incomplete_trials:
+            to_keep = [[] for i in range(self.num_envs)]
+            to_keep_candidate = [[] for i in range(self.num_envs)]
+
         # buffer filling
         o, info = envs.reset()
         # next obs is a list of dicts
         next_obs = agent.obs_as_tensor(o)
         action_mask = decode_mask(info["mask"])
-        next_done = torch.empty(self.num_envs).to(data_device)
+        next_done = torch.zeros(self.num_envs).to(data_device)
 
         self.ep_info_buffer = deque(maxlen=100)
         self.global_step += self.num_envs * self.num_steps
@@ -104,6 +117,13 @@ class PPO:
             obs.append(next_obs)
             action_masks[step] = torch.tensor(action_mask)
             dones[step] = next_done
+
+            if self.discard_incomplete_trials:
+                for i in range(self.num_envs):
+                    if dones[step][i] == 1:
+                        to_keep[i].extend(to_keep_candidate[i])
+                        to_keep_candidate[i].clear()
+                    to_keep_candidate[i].append(step)
 
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(
@@ -125,6 +145,10 @@ class PPO:
             rewards[step] = torch.tensor(reward).view(-1).to(data_device)
             next_done = torch.Tensor(done).to(data_device)
 
+        if self.discard_incomplete_trials:
+            for i in range(self.num_envs):
+                if next_done[i] == 1:
+                    to_keep[i].extend(to_keep_candidate[i])
         # compute returns and advantages
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1).to(data_device)
@@ -155,6 +179,20 @@ class PPO:
         b_values = values.reshape(-1)
         b_action_masks = action_masks.reshape(-1, env_specification.max_n_nodes)
 
+        to_keep_b = [
+            j + i * self.num_steps for i in range(self.num_envs) for j in to_keep[i]
+        ]
+
+        if self.discard_incomplete_trials:
+            return (
+                self.keep_only(b_obs, to_keep_b),
+                b_logprobs[to_keep_b],
+                b_actions[to_keep_b],
+                b_advantages[to_keep_b],
+                b_returns[to_keep_b],
+                b_values[to_keep_b],
+                b_action_masks[to_keep_b],
+            )
         return (
             b_obs,
             b_logprobs,
@@ -256,6 +294,7 @@ class PPO:
                 rollout_data_device,
             )
 
+            batch_size = b_logprobs.shape[0]
             # Optimizing the policy and value network
             b_inds = np.arange(batch_size)
             clipfracs = []
