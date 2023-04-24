@@ -78,7 +78,7 @@ class PSPAgent(Agent):
             self.gnn = GnnTokenGT(
                 input_dim_features_extractor=env_specification.n_features,
                 max_n_nodes=env_specification.max_n_nodes,
-                max_n_machines=env_specification.max_n_resources,
+                max_n_resources=env_specification.max_n_resources,
                 conflicts=agent_specification.conflicts,
                 encoder_layers=agent_specification.n_layers_features_extractor,
                 encoder_embed_dim=agent_specification.hidden_dim_features_extractor,
@@ -151,7 +151,7 @@ class PSPAgent(Agent):
                 input_dim_features_extractor=env_specification.n_features,
                 device=agent_specification.device,
                 max_n_nodes=env_specification.max_n_nodes,
-                max_n_machines=env_specification.max_n_machines,
+                max_n_resources=env_specification.max_n_resources,
                 conflicts=agent_specification.conflicts,
                 encoder_layers=agent_specification.n_layers_features_extractor,
                 encoder_embed_dim=agent_specification.hidden_dim_features_extractor,
