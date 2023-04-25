@@ -65,7 +65,6 @@ class PSPEnvSpecification:
         self.do_not_observe_updated_bounds = do_not_observe_updated_bounds
         self.action_space = Discrete(self.max_n_nodes)
 
-        print("self.max_edges_factor", self.max_edges_factor)
         if self.max_edges_factor > 0:
             self.shape_pr = (
                 2,
@@ -75,7 +74,6 @@ class PSPEnvSpecification:
                 2,
                 self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
             )
-            print("shape_rc", self.shape_rc)
             self.shape_rc_att = (
                 self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
                 2,

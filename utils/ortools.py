@@ -54,9 +54,9 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
     # update problem durations with real_durations
     problem = deepcopy(problem)
     i = 0
-    for j in range(len(problem["durations"])):
-        for m in range(len(problem["durations"][j])):
-            problem["durations"][j][m] = durations[i]
+    for j in range(len(problem["durations"][0])):
+        for m in range(len(problem["durations"][0][j])):
+            problem["durations"][0][j][m] = durations[i]
             i += 1
 
     # return solution, is_Optimal
@@ -193,11 +193,11 @@ def compute_ortools_makespan_on_real_duration(solution, state):
         if element == float("inf"):
             break
         modeid = mid[index]
-        aff[index] = np.float("inf")
+        aff[index] = float("inf")
         nid = node_from_job_mode(state.problem, index, modeid)
         state.affect_job(node_from_job_mode(state.problem, index, modeid))
 
-    return state.tct(-1)[0], state.all_tct_real - state.real_durations
+    return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
 
 
 def get_ortools_makespan_psp(
@@ -211,9 +211,9 @@ def get_ortools_makespan_psp(
     elif ortools_strategy == "pessimistic":
         durations = env.state.all_durations()[:, 1]
     elif ortools_strategy == "optimistic":
-        durations = env.state.all_durations()[:, 0]
-    elif ortools_strategy == "averagistic":
         durations = env.state.all_durations()[:, 2]
+    elif ortools_strategy == "averagistic":
+        durations = env.state.all_durations()[:, 0]
     else:
         print("unknow ortools strategy ", ortools_strategy)
         exit()
@@ -224,8 +224,18 @@ def get_ortools_makespan_psp(
     if env.state.deterministic:
         return solution.get_makespan(), solution.schedule, optimal
 
-    real_makespan, starts = compute_ortools_makespan_on_real_duration(solution, state)
-    return real_makespan, starts, solution[1], optimal
+    real_makespan, starts = compute_ortools_makespan_on_real_duration(
+        solution, env.state
+    )
+    solution2 = PSPSolution.from_mode_schedule(
+        starts,
+        env.state.problem,
+        env.state.all_affected(),
+        env.state.all_jobid(),
+        real_durations=env.state.real_durations,
+    )
+    print("real_makespan", real_makespan)
+    return real_makespan, solution2.schedule, optimal
 
 
 def get_ortools_makespan(

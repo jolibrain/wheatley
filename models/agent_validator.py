@@ -280,7 +280,6 @@ class AgentValidator:
                 agent.obs_as_tensor_add_batch_dim(rdata[0]) for rdata in all_rdata
             ]
             all_masks = decode_mask([rdata[1]["mask"] for rdata in all_rdata])
-            print(all_masks.shape)
             while envs:
                 all_obs = self.rebatch_obs(all_obs)
                 all_actions = []

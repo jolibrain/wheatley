@@ -60,12 +60,12 @@ python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 -
 # Taillard problem with generated random durations and subsampling of jobs
 
 ```
-python3 train.py --n_j 50 --n_m 15 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1500 --batch_size 150 --duration_type stochastic --fixed_problem  --load_problem instances/taillard/ta57.txt --first_machine_id_is_one --exp_name_appendix EXAMPLE4 --n_epochs 10  --ortools_strategy averagistic   --device cuda:3 --generate_duration_bounds 0.05   --load_max_jobs 40 --load_from_job 0
+python3 train.py --n_j 50 --n_m 15 --total_timesteps 1000000 --n_validation_env 10 --n_steps_episode 1500 --batch_size 150 --duration_type stochastic --fixed_problem  --load_problem instances/taillard/ta57.txt --first_machine_id_is_one --exp_name_appendix EXAMPLE4 --n_epochs 10  --ortools_strategy averagistic   --device cuda:3 --generate_duration_bounds 0.05 0.1  --load_max_jobs 40 --load_from_job 0
 ```
 
 - `--load_problem` :  forces to read a problem definition instead of generating one
 - `--first_machine_id_is_one` : in pure taillard format, machine numbering start at 1
-- `--generate_duration_bounds 0.05`: genrate duration bounds at more or less 5% from fixed loaded problem. 
+- `--generate_duration_bounds 0.05 0.1`: generate duration bounds in [v\*0.95, v\*1.1] where v is duration of  fixed loaded problem. 
 - `--load_from_job 0` : index of first job to use
 - `--load_max_jobs 40` : max number of jobs to use
 

@@ -240,10 +240,9 @@ def load_taillard_problem(problem_file, taillard_offset=True, deterministic=True
 
 
 class PSPLoader:
-    def __init__(self, deterministic=True, generate_bounds=-1):
+    def __init__(self, generate_bounds=None):
         self.cleanup()
-        self.deterministic = deterministic
-        self.generate_bounds = -1
+        self.generate_bounds = generate_bounds
 
     def cleanup(self):
         self.f = None
@@ -281,19 +280,26 @@ class PSPLoader:
         psps = [self.load_single(directory + "/" + f) for f in files]
         return psps
 
+    def do_generate_bounds(self, mode):
+        if self.generate_bounds is None:
+            return mode, mode
+        return int(mode * (1 - self.generate_bounds[0])), int(
+            mode * (1 + self.generate_bounds[1])
+        )
+
     def load_single(self, problem_file):
 
         self.f = open(problem_file, "r")
         self.nextline()
 
-        if not self.deterministic:
-            print("Loading problem with uncertainties, using customized format")
-            if self.generate_bounds > 0:
-                print(
-                    "Generating random duration bounds of ", self.generate_bounds, " %"
-                )
+        if self.generate_bounds is not None:
+            print(
+                "If not present, generating random duration bounds of ",
+                self.generate_bounds,
+                " %",
+            )
         job_info = []
-        durations = []
+        durations = [[], [], []]
         resources = []
         n_modes = 0
         max_resource_availability = 0
@@ -344,19 +350,38 @@ class PSPLoader:
         self.firstword("jobnr.")
         self.firstchar("-")
         for j in range(1, n_jobs + 1):
-            job_durations = []
+            job_durations = [[], [], []]
             job_resources = []
-            job_durations.append(int(self.sline[2]))
-            req = [int(d) for d in self.sline[3:]]
+            job_durations[0].append(int(self.sline[2]))
+            if len(self.sline) == (n_resources + 5):
+                job_durations[1].append(int(self.sline[3]))
+                job_durations[2].append(int(self.sline[4]))
+                startr = 5
+            else:
+                dmin, dmax = self.do_generate_bounds(job_durations[0][-1])
+                job_durations[1].append(dmin)
+                job_durations[2].append(dmax)
+                startr = 3
+            req = [int(d) for d in self.sline[startr:]]
             if max(req) > max_resource_request:
                 max_resource_request = max(req)
             job_resources.append(req)
             self.nextline()
             for m in range(1, job_info[j - 1][0]):
-                job_durations.append(int(self.sline[1]))
-                job_resources.append([int(d) for d in self.sline[2:]])
+                job_durations[0].append(int(self.sline[1]))
+                if len(self.sline) == (n_resources + 4):
+                    job_durations[1].append(int(self.sline[3]))
+                    job_durations[2].append(int(self.sline[4]))
+                    startr = 4
+                else:
+                    dmin, dmax = self.do_generate_bounds(job_durations[0][-1])
+                    job_durations[1].append(dmin)
+                    job_durations[2].append(dmax)
+                    startr = 2
+                job_resources.append([int(d) for d in self.sline[startr:]])
                 self.nextline()
-            durations.append(job_durations)
+            for i in range(3):
+                durations[i].append(job_durations[i])
             resources.append(job_resources)
         self.firstchar("*")
         self.firstword("RESOURCEAVAILABILITIES:")

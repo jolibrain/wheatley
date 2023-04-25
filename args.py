@@ -550,8 +550,9 @@ parser.add_argument(
 parser.add_argument(
     "--generate_duration_bounds",
     type=float,
-    default=-1.0,
-    help="Generate duration bounds in %% of the true value, e.g. 0.05 for 5%% uncertainty",
+    nargs=2,
+    default=None,
+    help="Generate duration bounds in %% of the true value, e.g. 0.05 0.1 for lower bounds 5%% below loaded value and for upper bounds  10%% above loaded value",
 )
 parser.add_argument(
     "--scaling_constant_ortools",

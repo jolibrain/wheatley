@@ -31,6 +31,7 @@ def test_gnn_dgl(env_specification_small, agent_specification, state_small):
     ) = s.to_features_and_edge_index(False)
 
     eog = EnvObservation(
+        s.env_specification,
         s.problem["n_jobs"],
         s.n_nodes,
         s.problem["n_resources"],
