@@ -103,12 +103,20 @@ class PSPState:
         if self.deterministic:
             return durs[:, 0]
         else:
-            raise RuntimeError("stochastic durs not yet implemented")
+            d = np.zeros((durs.shape[0]))
+            r = np.random.triangular(
+                durs[1:-1, 1], durs[1:-1, 0], durs[1:-1, 2]
+            ).astype(int)
+            d[1:-1] = r
+            return d
 
     def reset_durations(self, redraw_real=True):
         # at init, draw real durations from distrib if not deterministic
-        flat_dur = [item for sublist in self.problem["durations"] for item in sublist]
-        self.features[:, 3:6] = np.expand_dims(np.array(flat_dur), 1)
+        for i in range(3):
+            flat_dur = [
+                item for sublist in self.problem["durations"][i] for item in sublist
+            ]
+            self.features[:, 3 + i] = np.array(flat_dur)
         if redraw_real:
             self.real_durations = self.draw_real_durations(self.features[:, 3:6])
         self.max_duration = max(flat_dur)
@@ -294,8 +302,11 @@ class PSPState:
         modes = schedule[1]
         nres = self.problem["n_resources"]
         maxres = self.problem["resource_availability"]
+        # print("job_modes", self.job_modes)
         ends = [
-            starts[j] + self.problem["durations"][j][modes[j]] for j in range(n_jobs)
+            # starts[j] + self.problem["durations"][0][j][modes[j]] for j in range(n_jobs)
+            starts[j] + int(self.duration_real(self.job_modes[j][modes[j]]))
+            for j in range(n_jobs)
         ]
 
         rusage = [self.problem["resources"][j][modes[j]] for j in range(n_jobs)]

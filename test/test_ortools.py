@@ -5,8 +5,8 @@ import numpy as np
 
 def test_ortools_small():
     psp = PSPLoader().load_single("instances/psp/small/small.sm")
-    durations = [item for sublist in psp["durations"] for item in sublist]
-    sol, optimal = solve_psp(psp, durations, 3, 1)
+    durations = [item for sublist in psp["durations"][0] for item in sublist]
+    sol, optimal = solve_psp(psp, np.array(durations), 3, 1)
     assert sol.job_schedule == [0, 0, 0, 4, 4, 10, 11, 15]
     assert sol.modes == [0] * 8
     assert sol.get_makespan() == 15
@@ -15,12 +15,16 @@ def test_ortools_small():
 
 def test_ortools_uncertainty(state_small):
     psp = PSPLoader().load_single("instances/psp/small/small.sm")
-    durations = [item for sublist in psp["durations"] for item in sublist]
-    sol, optimal = solve_psp(psp, durations, 3, 1)
+    durations = [item for sublist in psp["durations"][0] for item in sublist]
+    sol, optimal = solve_psp(psp, np.array(durations), 3, 1)
     assert sol.job_schedule == [0, 0, 0, 4, 4, 10, 11, 15]
 
     state = state_small
-    state.problem["durations"] = [[0], [5], [4], [6], [2], [1], [4], [0]]
+    state.problem["durations"] = [
+        [[0], [5], [4], [6], [2], [1], [4], [0]],
+        [[0], [5], [4], [6], [2], [1], [4], [0]],
+        [[0], [5], [4], [6], [2], [1], [4], [0]],
+    ]
     state.reset_durations(redraw_real=True)
 
     assert np.all(

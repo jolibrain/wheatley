@@ -73,7 +73,9 @@ def test_env(problem_description_small, env_specification_small):
 
     obs, reward, done, _, info = env.step(7)
     assert done
-    assert reward == -15
+    # assert reward == -15 unnormalized
+    # assert reward == -1.25 normalized final value
+    assert reward == -15 / env.state.max_duration / env.state.n_resources
     assert np.all(
         np.equal(
             info["mask"],

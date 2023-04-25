@@ -8,7 +8,6 @@ from env.psp_state import PSPState
 from problem.psp_description import PSPDescription
 
 from env.psp_env_specification import PSPEnvSpecification
-from utils.loaders import PSPLoader
 from utils.psp_env_observation import PSPEnvObservation as EnvObservation
 from utils.psp_agent_observation import PSPAgentObservation as AgentObservation
 
@@ -75,6 +74,7 @@ def test_rcatt(state_small_preclique):
     ) = sp.to_features_and_edge_index(False)
 
     eogp = EnvObservation(
+        sp.env_specification,
         sp.problem["n_jobs"],
         sp.n_nodes,
         sp.problem["n_resources"],
@@ -113,6 +113,7 @@ def test_rcatt(state_small_preclique):
     ) = sp.to_features_and_edge_index(False)
 
     eogp = EnvObservation(
+        sp.env_specification,
         sp.problem["n_jobs"],
         sp.n_nodes,
         sp.problem["n_resources"],
@@ -147,6 +148,7 @@ def test_obs(state_small, state_small_preclique):
     ) = sp.to_features_and_edge_index(False)
 
     eogp = EnvObservation(
+        sp.env_specification,
         sp.problem["n_jobs"],
         sp.n_nodes,
         sp.problem["n_resources"],
@@ -179,6 +181,7 @@ def test_obs(state_small, state_small_preclique):
     ) = s.to_features_and_edge_index(False)
 
     eog = EnvObservation(
+        s.env_specification,
         s.problem["n_jobs"],
         s.n_nodes,
         s.problem["n_resources"],
@@ -228,6 +231,7 @@ def test_obs(state_small, state_small_preclique):
     ) = sp.to_features_and_edge_index(False)
 
     eogp = EnvObservation(
+        sp.env_specification,
         sp.problem["n_jobs"],
         sp.n_nodes,
         sp.problem["n_resources"],
@@ -260,6 +264,7 @@ def test_obs(state_small, state_small_preclique):
     ) = s.to_features_and_edge_index(False)
 
     eog = EnvObservation(
+        s.env_specification,
         s.problem["n_jobs"],
         s.n_nodes,
         s.problem["n_resources"],
@@ -300,6 +305,7 @@ def test_graph(state_small):
     ) = s.to_features_and_edge_index(False)
 
     eog = EnvObservation(
+        s.env_specification,
         s.problem["n_jobs"],
         s.n_nodes,
         s.problem["n_resources"],

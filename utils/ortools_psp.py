@@ -150,7 +150,7 @@ def SolveRcpsp(
         horizon = delays[(source, sink)][1]
     elif horizon == -1:  # Naive computation.
         # horizon = sum(max(r.duration for r in t.recipes) for t in problem.tasks)
-        horizon = sum([max(t) for t in problem["durations"]])
+        horizon = sum([max(t) for t in problem["durations"][0]])
     # if in_main_solve:
     # print(f"Horizon = {horizon}", flush=True)
 
@@ -173,7 +173,7 @@ def SolveRcpsp(
     for t in all_active_tasks:
         # task = problem.tasks[t]
         # num_recipes = len(task.recipes)
-        num_recipes = len(problem["durations"][t])
+        num_recipes = len(problem["durations"][0][t])
         all_recipes = range(num_recipes)
 
         start_var = model.NewIntVar(0, horizon, f"start_of_task_{t}")
@@ -198,8 +198,8 @@ def SolveRcpsp(
         #     task_to_recipe_durations[t].append(recipe.duration)
         #     for demand, resource in zip(recipe.demands, recipe.resources):
         #         demand_matrix[(resource, recipe_index)] = demand
-        for m in range(len(problem["durations"][t - 1])):
-            task_to_recipe_durations[t].append(problem["durations"][t - 1][m])
+        for m in range(len(problem["durations"][0][t - 1])):
+            task_to_recipe_durations[t].append(problem["durations"][0][t - 1][m])
             for r in range(problem["n_resources"]):
                 if problem["resources"][t - 1][m][r] != 0:
                     demand_matrix[(r, m)] = problem["resources"][t - 1][m][r]

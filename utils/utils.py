@@ -285,7 +285,7 @@ def load_problem(
     deterministic=True,
     load_from_job=0,
     load_max_jobs=-1,
-    generate_bounds=-1.0,
+    generate_bounds=None,
 ):
     # Customized problem loader
     # - support for bounded duration uncertainty
@@ -296,7 +296,7 @@ def load_problem(
 
     if not deterministic:
         print("Loading problem with uncertainties, using customized format")
-        if generate_bounds > 0:
+        if generate_bounds is not None:
             print("Generating random duration bounds of ", generate_bounds, " %")
 
     with open(problem_file, "r") as f:
@@ -335,17 +335,17 @@ def load_problem(
         if deterministic:
             durations = np.expand_dims(durations, axis=2)
             durations = np.repeat(durations, 4, axis=2)
-        elif generate_bounds > 0.0:
+        elif generate_bounds is not None:
             mode_durations = durations
             min_durations = np.subtract(
                 durations,
-                generate_bounds * durations,
+                generate_bounds[0] * durations,
                 out=durations.copy(),
                 where=durations != -1,
             )
             max_durations = np.add(
                 durations,
-                generate_bounds * durations,
+                generate_bounds[1] * durations,
                 out=durations.copy(),
                 where=durations != -1,
             )

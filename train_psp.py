@@ -54,7 +54,7 @@ def main():
 
     # If we want to load a specific problem, under the taillard (extended) format, and train on it, we first do it.
     # Note that this problem can be stochastic or deterministic
-    loader = PSPLoader()
+    loader = PSPLoader(generate_bounds=args.generate_duration_bounds)
     psp = loader.load_single(args.load_problem)
     train_psps = None
     test_psps = None
