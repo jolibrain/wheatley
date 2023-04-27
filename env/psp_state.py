@@ -335,14 +335,15 @@ class PSPState:
                     facecolor=color[i],
                     fill=True,
                     alpha=0.2,
-                    lw=2,
+                    lw=1,
                     label=f"J{i}/m{modes[i]}",
                 )
                 ax[r].add_patch(rect)
                 if rusage[i][r] != 0:
+                    max_level = max(levels[r][starts[i] : ends[i]])
                     ax[r].text(
                         starts[i] + (ends[i] - starts[i]) / 2,
-                        levels[r][starts[i]] + rusage[i][r] / 2 - 0.2,
+                        max_level + rusage[i][r] / 2 - 0.2,
                         str(i),
                         color=color[i],
                     )
@@ -356,7 +357,7 @@ class PSPState:
         fig.legend(handles=patches)
 
         figimg = io.BytesIO()
-        fig.savefig(figimg, format="png")
+        fig.savefig(figimg, format="png", dpi=300)
         figimg.seek(0)
         npimg = np.fromstring(figimg.read(), dtype="uint8")
         cvimg = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
