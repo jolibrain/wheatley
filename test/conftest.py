@@ -22,6 +22,12 @@ def small_pb():
 
 
 @pytest.fixture
+def large_pb():
+    loader = PSPLoader()
+    return loader.load_single("instances/psp/sm/j3010_1.sm")
+
+
+@pytest.fixture
 def problem_description_small(small_pb):
     return PSPDescription(
         transition_model_config="simple",
@@ -33,9 +39,35 @@ def problem_description_small(small_pb):
 
 
 @pytest.fixture
+def problem_description_large(large_pb):
+    return PSPDescription(
+        transition_model_config="simple",
+        reward_model_config="Sparse",
+        deterministic=True,
+        train_psps=[large_pb],
+        test_psps=[large_pb],
+    )
+
+
+@pytest.fixture
 def env_specification_small(problem_description_small):
     return PSPEnvSpecification(
         problems=problem_description_small,
+        normalize_input=True,
+        input_list=["duration"],
+        max_edges_factor=2,
+        sample_n_jobs=-1,
+        chunk_n_jobs=-1,
+        observe_conflicts_as_cliques=True,
+        observe_real_duration_when_affect=False,
+        do_not_observe_updated_bounds=False,
+    )
+
+
+@pytest.fixture
+def env_specification_large(problem_description_large):
+    return PSPEnvSpecification(
+        problems=problem_description_large,
         normalize_input=True,
         input_list=["duration"],
         max_edges_factor=2,
@@ -100,6 +132,17 @@ def state_small(problem_description_small, env_specification_small):
         env_specification_small,
         problem_description_small,
         problem_description_small.train_psps[0],
+        deterministic=True,
+        observe_conflicts_as_cliques=False,
+    )
+
+
+@pytest.fixture
+def state_large(problem_description_large, env_specification_large):
+    return PSPState(
+        env_specification_large,
+        problem_description_large,
+        problem_description_large.train_psps[0],
         deterministic=True,
         observe_conflicts_as_cliques=False,
     )

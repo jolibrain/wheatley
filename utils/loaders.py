@@ -1,4 +1,5 @@
 import numpy as np
+import pathlib
 
 
 def load_problem(
@@ -252,8 +253,11 @@ class PSPLoader:
         self.fw = None
 
     def nextline(self):
-        self.line = self.f.readline()
-        self.sline = self.line.split()
+        while True:
+            self.line = self.f.readline()
+            self.sline = self.line.split()
+            if len(self.sline) != 0:
+                break
         self.fc = self.line[0]
         self.fw = self.sline[0]
 
@@ -288,6 +292,68 @@ class PSPLoader:
         )
 
     def load_single(self, problem_file):
+        suffix = pathlib.Path(problem_file).suffix
+        if suffix in [".sm", ".mm"]:
+            return self.load_sm(problem_file)
+        elif suffix == ".rcp":
+            return self.load_rcp(problem_file)
+        else:
+            raise ValueError("unkown file format" + problem_file)
+
+    def load_rcp(self, problem_file):
+        self.f = open(problem_file, "r")
+        self.nextline()
+        job_info = []
+        n_jobs = n_modes = int(self.sline[0])
+        n_resources = n_renewable_resources = int(self.sline[1])
+        n_nonrenewable_resources = 0
+        n_doubly_constrained_resources = 0
+        self.nextline()
+        resource_availabilities = [int(rl) for rl in self.sline]
+        max_resource_availability = max(resource_availabilities)
+        max_resource_request = 0
+        durations = [[], [], []]
+        resources = []
+        for j in range(n_jobs):
+            self.nextline()
+            job_info.append((1, [int(s) for s in self.sline[5:]]))
+
+            job_durations = [[], [], []]
+            job_resources = []
+            job_durations[0].append(int(self.sline[0]))
+            if len(self.sline) == (n_resources + 7):
+                job_durations[1].append(int(self.sline[1]))
+                job_durations[2].append(int(self.sline[2]))
+                startr = 3
+            else:
+                dmin, dmax = self.do_generate_bounds(job_durations[0][-1])
+                job_durations[1].append(dmin)
+                job_durations[2].append(dmax)
+                startr = 1
+            req = [int(d) for d in self.sline[startr : startr + n_resources]]
+            if max(req) > max_resource_request:
+                max_resource_request = max(req)
+            job_resources.append(req)
+            for i in range(3):
+                durations[i].append(job_durations[i])
+            resources.append(job_resources)
+        self.cleanup()
+        return {
+            "n_jobs": n_jobs,
+            "n_modes": n_modes,
+            "n_resources": n_resources,
+            "n_renewable_resources": n_renewable_resources,
+            "n_nonrenewable_resources": n_nonrenewable_resources,
+            "n_doubly_constrained_resources": n_doubly_constrained_resources,
+            "job_info": job_info,
+            "durations": durations,
+            "resources": resources,
+            "resource_availability": resource_availabilities,
+            "max_resource_availability": max_resource_availability,
+            "max_resource_request": max_resource_request,
+        }
+
+    def load_sm(self, problem_file):
 
         self.f = open(problem_file, "r")
         self.nextline()
