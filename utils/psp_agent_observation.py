@@ -385,6 +385,8 @@ class PSPAgentObservation:
                     rc_att[i][: n_rc_edges[i].item(), 1:],
                 )
 
+            # TODO : add job_id edges, ie link modes that are for same job
+
             if add_self_loops:
                 gnew = dgl.add_self_loop(
                     gnew, edge_feat_names=["type"], fill_data=cls.edgeType["self"]

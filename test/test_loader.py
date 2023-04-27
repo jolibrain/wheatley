@@ -5,7 +5,28 @@ sys.path.append(".")
 from utils.loaders import PSPLoader
 
 
-def test_psp_loader():
+def test_psp_loader_rcp():
+    loader = PSPLoader()
+    rcp = loader.load_single("instances/psp/patterson/pat103.rcp")
+    assert len(rcp["durations"]) == 3
+    assert rcp["durations"][0] == rcp["durations"][1]
+    assert rcp["durations"][0] == rcp["durations"][2]
+    assert rcp["n_jobs"] == 51
+    assert rcp["n_modes"] == 51
+    assert rcp["n_resources"] == 3
+    assert rcp["n_renewable_resources"] == 3
+    assert rcp["n_nonrenewable_resources"] == 0
+    assert rcp["n_doubly_constrained_resources"] == 0
+    assert len(rcp["job_info"]) == 51
+    assert rcp["job_info"][0][1] == [2, 3, 4]
+    # "durations": durations,
+    # "resources": resources,
+    assert rcp["resource_availability"] == [14, 14, 12]
+    assert rcp["max_resource_availability"] == 14
+    assert rcp["max_resource_request"] == 6
+
+
+def test_psp_loader_sm():
     loader = PSPLoader()
     det = loader.load_single("instances/psp/272/272.sm")
     assert len(det["durations"]) == 3
