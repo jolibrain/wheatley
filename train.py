@@ -148,6 +148,7 @@ def main():
             fe_lr=args.fe_lr,
             n_steps_episode=args.n_steps_episode,
             batch_size=args.batch_size,
+            iter_size=args.iter_size,
             n_epochs=args.n_epochs,
             gamma=args.gamma,
             clip_range=args.clip_range,

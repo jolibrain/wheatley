@@ -35,6 +35,7 @@ class AgentSpecification:
         fe_lr,
         n_steps_episode,
         batch_size,
+        iter_size,
         n_epochs,
         gamma,
         clip_range,
@@ -77,6 +78,7 @@ class AgentSpecification:
         self.fe_lr = fe_lr
         self.n_steps_episode = n_steps_episode
         self.batch_size = batch_size
+        self.iter_size = iter_size
         self.n_epochs = n_epochs
         self.gamma = gamma
         self.clip_range = clip_range
@@ -181,9 +183,25 @@ class AgentSpecification:
             print(f"Net shapes:")
             shape = f"{self.n_features} -> ( {self.hidden_dim_features_extractor} / {self.n_attention_heads} ) x {self.n_layers_features_extractor}"
 
-            actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
+            actor_shape = (
+                f""
+                + "".join(
+                    [
+                        f" -> {self.hidden_dim_actor}"
+                        for _ in range(self.n_mlp_layers_actor)
+                    ]
+                )
+                + " -> 1"
+            )
             critic_shape = (
-                f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
+                f""
+                + "".join(
+                    [
+                        f" -> {self.hidden_dim_critic}"
+                        for _ in range(self.n_mlp_layers_critic)
+                    ]
+                )
+                + " -> 1"
             )
             print(f" - Features extractor: TokenGT/{self.mlp_act_graph} {shape}")
             print(f" - Actor: {actor_shape}")
@@ -199,13 +217,31 @@ class AgentSpecification:
                 f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
                 f"Net shapes:"
             )
-            first_features_extractor_shape = f"{self.n_features} -> {self.hidden_dim_features_extractor}"
+            first_features_extractor_shape = (
+                f"{self.n_features} -> {self.hidden_dim_features_extractor}"
+            )
 
             other_features_extractor_shape = f"{self.hidden_dim_features_extractor} -> {self.hidden_dim_features_extractor}"
 
-            actor_shape = f"" + "".join([f" -> {self.hidden_dim_actor}" for _ in range(self.n_mlp_layers_actor)]) + " -> 1"
+            actor_shape = (
+                f""
+                + "".join(
+                    [
+                        f" -> {self.hidden_dim_actor}"
+                        for _ in range(self.n_mlp_layers_actor)
+                    ]
+                )
+                + " -> 1"
+            )
             critic_shape = (
-                f"" + "".join([f" -> {self.hidden_dim_critic}" for _ in range(self.n_mlp_layers_critic)]) + " -> 1"
+                f""
+                + "".join(
+                    [
+                        f" -> {self.hidden_dim_critic}"
+                        for _ in range(self.n_mlp_layers_critic)
+                    ]
+                )
+                + " -> 1"
             )
             print(
                 f" - Features extractor: {self.gconv_type.upper()}({first_features_extractor_shape}) => "
