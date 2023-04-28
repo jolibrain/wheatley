@@ -71,6 +71,7 @@ class PPO:
         self.target_kl = agent_specification.target_kl
         self.max_grad_norm = 0.5  # SB3 default
         self.minibatch_size = agent_specification.batch_size
+        self.iter_size = agent_specification.iter_size
         self.validator = validator
 
         self.discard_incomplete_trials = discard_incomplete_trials
@@ -311,12 +312,16 @@ class PPO:
             ):
                 self.n_epochs += 1
                 np.random.shuffle(b_inds)
+                self.optimizer.zero_grad()
+                iter_it = 0
+
                 approx_kl_divs_on_epoch = []
                 for start in tqdm.tqdm(
                     range(0, batch_size, self.minibatch_size),
                     desc="   minibatches        ",
                     leave=False,
                 ):
+
                     end = start + self.minibatch_size
                     mb_inds = b_inds[start:end]
 
@@ -378,10 +383,13 @@ class PPO:
                     pg_losses.append(pg_loss.item())
                     entropy_losses.append(entropy_loss.item())
 
-                    self.optimizer.zero_grad()
                     loss.backward()
                     nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
-                    self.optimizer.step()
+                    iter_it += 1
+                    if iter_it == self.iter_size:
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
+                        iter_it = 0
 
                 if self.target_kl is not None:
                     if np.mean(approx_kl_divs_on_epoch) > self.target_kl:

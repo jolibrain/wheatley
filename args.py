@@ -101,6 +101,12 @@ parser.add_argument(
     default=128,
     help="Batch size during training of the agent",
 )
+parser.add_argument(
+    "--iter_size",
+    type=int,
+    default=1,
+    help="iter size during training of the agent",
+)
 parser.add_argument("--lr", type=float, default=2e-4, help="Default Learning rate")
 parser.add_argument(
     "--fe_lr", type=float, default=None, help="Learning rate for feature extractor"
