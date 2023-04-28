@@ -23,7 +23,7 @@
 
 from problem.jssp_description import JSSPDescription as ProblemDescription
 from env.jssp_env_specification import JSSPEnvSpecification
-from models.agent_specification import AgentSpecification
+from models.training_specification import TrainingSpecification
 from models.jssp_agent import JSSPAgent as Agent
 from utils.utils import rebatch_obs, get_obs
 from utils.ortools import *
@@ -37,14 +37,14 @@ class Pretrainer:
         self,
         problem_description,
         env_specification,
-        agent_specification,
+        training_specification,
         env_cls,
         num_envs=1,
         prob=0.9,
     ):
         self.problem_description = problem_description
         self.env_specification = env_specification
-        self.agent_specification = agent_specification
+        self.training_specification = training_specification
         self.num_envs = num_envs
         self.prob = prob
 
@@ -106,7 +106,9 @@ class Pretrainer:
 
         b_inds = np.arange(len(actions))
 
-        optimizer = self.agent_specification.optimizer_class(agent.parameters(), lr=lr)
+        optimizer = self.training_specification.optimizer_class(
+            agent.parameters(), lr=lr
+        )
         for epoch in range(num_epochs):
             # np.random.shuffle(b_inds)
             eloss = 0

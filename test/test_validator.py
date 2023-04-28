@@ -10,7 +10,6 @@ def test_validator_psp(
     env_specification_small,
     training_specification,
     psp_agent,
-    agent_specification,
 ):
     validator = AgentValidator(
         problem_description_small,
@@ -19,7 +18,7 @@ def test_validator_psp(
         training_specification,
     )
 
-    alg = PPO(agent_specification, PSPEnv, validator)
+    alg = PPO(training_specification, PSPEnv, validator)
     # normally initialzed in train
     alg.optimizer = alg.optimizer_class(psp_agent.parameters(), lr=0.1)
     alg.global_step = 0
