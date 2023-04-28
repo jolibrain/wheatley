@@ -303,6 +303,7 @@ class PPO:
             pg_losses = []
             value_losses = []
             approx_kl_divs = []
+            losses = []
 
             agent.to(train_device)
             for epoch in tqdm.tqdm(
@@ -372,6 +373,7 @@ class PPO:
                         pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef
                     )
 
+                    losses.append(loss.item())
                     value_losses.append(v_loss.item())
                     pg_losses.append(pg_loss.item())
                     entropy_losses.append(entropy_loss.item())
@@ -405,7 +407,7 @@ class PPO:
                 self.logger.record("train/value_loss", np.mean(value_losses))
                 self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
                 self.logger.record("train/clip_fraction", np.mean(clipfracs))
-                self.logger.record("train/loss", loss.item())
+                self.logger.record("train/loss", np.mean(losses))
                 self.logger.record("train/explained_variance", explained_var)
                 self.logger.record(
                     "train/n_epochs",
