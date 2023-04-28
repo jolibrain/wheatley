@@ -82,19 +82,6 @@ def env_specification_large(problem_description_large):
 @pytest.fixture
 def agent_specification(env_specification_small):
     return AgentSpecification(
-        lr=2e-4,
-        fe_lr=None,
-        n_steps_episode=1024,
-        batch_size=128,
-        n_epochs=10,
-        gamma=1,
-        clip_range=0.25,
-        target_kl=0.04,
-        ent_coef=0.005,
-        vf_coef=0.5,
-        normalize_advantage=True,
-        optimizer="adam",
-        freeze_graph=False,
         n_features=env_specification_small.n_features,
         gconv_type="gatv2",
         graph_has_relu=False,
@@ -102,7 +89,6 @@ def agent_specification(env_specification_small):
         layer_pooling="all",
         mlp_act="tanh",
         mlp_act_graph="gelu",
-        n_workers=10,
         device="cuda",
         n_mlp_layers_features_extractor=3,
         n_layers_features_extractor=6,
@@ -121,8 +107,6 @@ def agent_specification(env_specification_small):
         dropout=0.0,
         cache_lap_node_id=False,
         lap_node_id_k=10,
-        rpo=False,
-        rpo_smoothing_param=1.0,
     )
 
 
@@ -170,6 +154,21 @@ def psp_agent(env_specification_small, agent_specification):
 @pytest.fixture
 def training_specification():
     return TrainingSpecification(
+        n_workers=10,
+        iter_size=1,
+        lr=2e-4,
+        fe_lr=None,
+        n_steps_episode=1024,
+        batch_size=128,
+        n_epochs=10,
+        gamma=1,
+        clip_range=0.25,
+        target_kl=0.04,
+        ent_coef=0.005,
+        vf_coef=0.5,
+        normalize_advantage=True,
+        optimizer="adam",
+        freeze_graph=False,
         total_timesteps=10,
         n_validation_env=2,
         fixed_validation=True,
@@ -184,4 +183,6 @@ def training_specification():
         scaling_constant_ortools=1,
         vecenv_type="subproc",
         validate_on_total_data=False,
+        rpo=False,
+        rpo_smoothing_param=1.0,
     )

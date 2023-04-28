@@ -86,6 +86,23 @@ def main():
         scaling_constant_ortools=args.scaling_constant_ortools,
         vecenv_type=args.vecenv_type,
         validate_on_total_data=args.validate_on_total_data,
+        optimizer=args.optimizer,
+        n_workers=args.n_workers,
+        gamma=args.gamma,
+        n_epochs=args.n_epochs,
+        normalize_advantage=not args.dont_normalize_advantage,
+        ent_coef=args.ent_coef,
+        vf_coef=args.vf_coef,
+        n_steps_episode=args.n_steps_episode,
+        batch_size=args.batch_size,
+        iter_size=args.iter_size,
+        clip_range=args.clip_range,
+        target_kl=args.target_kl,
+        freeze_graph=args.freeze_graph,
+        lr=args.lr,
+        fe_lr=args.fe_lr,
+        rpo=args.rpo,
+        rpo_smoothing_param=args.rpo_smoothing_param,
     )
     training_specification.print_self()
 
@@ -131,20 +148,6 @@ def main():
             )
             exit()
         agent_specification = AgentSpecification(
-            lr=args.lr,
-            fe_lr=args.fe_lr,
-            n_steps_episode=args.n_steps_episode,
-            batch_size=args.batch_size,
-            iter_size=args.iter_size,
-            n_epochs=args.n_epochs,
-            gamma=args.gamma,
-            clip_range=args.clip_range,
-            target_kl=args.target_kl,
-            ent_coef=args.ent_coef,
-            vf_coef=args.vf_coef,
-            normalize_advantage=not args.dont_normalize_advantage,
-            optimizer=args.optimizer,
-            freeze_graph=args.freeze_graph,
             n_features=env_specification.n_features,
             gconv_type=args.gconv_type,
             graph_has_relu=args.graph_has_relu,
@@ -152,7 +155,6 @@ def main():
             layer_pooling=args.layer_pooling,
             mlp_act=args.mlp_act,
             mlp_act_graph=args.mlp_act_graph,
-            n_workers=args.n_workers,
             device=torch.device(args.device),
             n_mlp_layers_features_extractor=args.n_mlp_layers_features_extractor,
             n_layers_features_extractor=args.n_layers_features_extractor,
@@ -171,8 +173,6 @@ def main():
             dropout=args.dropout,
             cache_lap_node_id=args.cache_lap_node_id,
             lap_node_id_k=args.lap_node_id_k,
-            rpo=args.rpo,
-            rpo_smoothing_param=args.rpo_smoothing_param,
         )
         agent_specification.print_self()
         agent = Agent(
@@ -184,7 +184,7 @@ def main():
         pretrainer = Pretrainer(
             problem_description,
             env_specification,
-            agent_specification,
+            training_specification,
             num_envs=args.pretrain_num_envs,
             prob=args.pretrain_prob,
         )
@@ -208,7 +208,7 @@ def main():
         training_specification,
     )
     ppo = PPO(
-        agent_specification,
+        training_specification,
         PSPEnv,
         validator,
     )
@@ -216,7 +216,6 @@ def main():
         agent,
         problem_description,
         env_specification,
-        training_specification,
         lr=args.lr,
         log_interval=1,
         train_device=args.device,

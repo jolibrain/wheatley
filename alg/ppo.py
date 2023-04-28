@@ -47,32 +47,35 @@ def create_env(env_cls, problem_description, env_specification, i):
 class PPO:
     def __init__(
         self,
-        agent_specification,
+        training_specification,
         env_cls,
         validator=None,
         discard_incomplete_trials=True,
     ):
 
-        self.optimizer_class = agent_specification.optimizer_class
+        self.optimizer_class = training_specification.optimizer_class
         self.logger = configure_logger()
         self.env_cls = env_cls
 
-        self.num_envs = agent_specification.n_workers
-        self.gamma = agent_specification.gamma
-        self.update_epochs = agent_specification.n_epochs
-        self.norm_adv = agent_specification.normalize_advantage
-        self.ent_coef = agent_specification.ent_coef
-        self.num_steps = agent_specification.n_steps_episode
+        self.num_envs = training_specification.n_workers
+        self.gamma = training_specification.gamma
+        self.update_epochs = training_specification.n_epochs
+        self.norm_adv = training_specification.normalize_advantage
+        self.ent_coef = training_specification.ent_coef
+        self.num_steps = training_specification.n_steps_episode
         self.gae_lambda = 1.0
         self.clip_vloss = False
-        self.clip_coef = agent_specification.clip_range
-        self.ent_coef = agent_specification.ent_coef
-        self.vf_coef = agent_specification.vf_coef
-        self.target_kl = agent_specification.target_kl
+        self.clip_coef = training_specification.clip_range
+        self.ent_coef = training_specification.ent_coef
+        self.vf_coef = training_specification.vf_coef
+        self.target_kl = training_specification.target_kl
         self.max_grad_norm = 0.5  # SB3 default
-        self.minibatch_size = agent_specification.batch_size
-        self.iter_size = agent_specification.iter_size
+        self.minibatch_size = training_specification.batch_size
+        self.iter_size = training_specification.iter_size
         self.validator = validator
+        self.vecenv_type = training_specification.vecenv_type
+        self.total_timesteps = training_specification.total_timesteps
+        self.validation_freq = training_specification.validation_freq
 
         self.discard_incomplete_trials = discard_incomplete_trials
 
@@ -209,7 +212,6 @@ class PPO:
         agent,
         problem_description,
         env_specification,
-        training_specification,
         lr,
         log_interval=1,
         rollout_data_device=torch.device("cpu"),
@@ -226,7 +228,7 @@ class PPO:
             mod = len(problem_description.train_psps)
         else:
             mod = 1
-        if training_specification.vecenv_type == "dummy":
+        if self.vecenv_type == "dummy":
             envs = gym.vector.SyncVectorEnv(
                 [
                     create_env(
@@ -270,7 +272,7 @@ class PPO:
             self.validator.validate(agent, self)
             print("... done initial validation")
         start_time = time.time()
-        num_updates = training_specification.total_timesteps // batch_size
+        num_updates = self.total_timesteps // batch_size
 
         self.n_epochs = 0
         self.start_time = time.time()
@@ -454,8 +456,8 @@ class PPO:
                 )
 
             if (
-                training_specification.validation_freq is not None
-                and iteration % training_specification.validation_freq == 0
+                self.validation_freq is not None
+                and iteration % self.validation_freq == 0
                 and self.validator is not None
             ):
                 self.validator.validate(agent, self)

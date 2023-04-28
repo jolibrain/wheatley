@@ -23,28 +23,12 @@
 # You should have received a copy of the GNU General Public License
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
-
 import torch
-from .dadapt_adam import DAdaptAdam
 
 
 class AgentSpecification:
     def __init__(
         self,
-        lr,
-        fe_lr,
-        n_steps_episode,
-        batch_size,
-        iter_size,
-        n_epochs,
-        gamma,
-        clip_range,
-        target_kl,
-        ent_coef,
-        vf_coef,
-        normalize_advantage,
-        optimizer,
-        freeze_graph,
         n_features,
         gconv_type,
         graph_has_relu,
@@ -52,7 +36,6 @@ class AgentSpecification:
         layer_pooling,
         mlp_act,
         mlp_act_graph,
-        n_workers,
         device,
         n_mlp_layers_features_extractor,
         n_layers_features_extractor,
@@ -71,23 +54,7 @@ class AgentSpecification:
         dropout,
         cache_lap_node_id,
         lap_node_id_k,
-        rpo,
-        rpo_smoothing_param,
     ):
-        self.lr = lr
-        self.fe_lr = fe_lr
-        self.n_steps_episode = n_steps_episode
-        self.batch_size = batch_size
-        self.iter_size = iter_size
-        self.n_epochs = n_epochs
-        self.gamma = gamma
-        self.clip_range = clip_range
-        self.target_kl = target_kl
-        self.ent_coef = ent_coef
-        self.vf_coef = vf_coef
-        self.normalize_advantage = normalize_advantage
-        self.optimizer = optimizer
-        self.freeze_graph = freeze_graph
         self.n_features = n_features
         self.gconv_type = gconv_type
         self.graph_has_relu = graph_has_relu
@@ -95,7 +62,6 @@ class AgentSpecification:
         self.layer_pooling = layer_pooling
         self.mlp_act = mlp_act
         self.mlp_act_graph = mlp_act_graph
-        self.n_workers = n_workers
         self.device = device
         self.n_mlp_layers_features_extractor = n_mlp_layers_features_extractor
         self.n_layers_features_extractor = n_layers_features_extractor
@@ -114,8 +80,6 @@ class AgentSpecification:
         self.dropout = dropout
         self.cache_lap_node_id = cache_lap_node_id
         self.lap_node_id_k = lap_node_id_k
-        self.rpo = rpo
-        self.rpo_smoothing_param = rpo_smoothing_param
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -144,19 +108,6 @@ class AgentSpecification:
         else:
             raise Exception("Activation not recognized")
 
-        if optimizer.lower() == "adam":
-            self.optimizer_class = torch.optim.Adam
-        elif optimizer.lower() == "sgd":
-            self.optimizer_class = torch.optim.SGD
-        elif optimizer.lower() == "adamw":
-            self.optimizer_class = torch.optim.AdamW
-        elif optimizer.lower() == "radam":
-            self.optimizer_class = torch.optim.RAdam
-        elif optimizer.lower() == "dadam":
-            self.optimizer_class = DAdaptAdam
-        else:
-            raise Exception("Optimizer not recognized")
-
         pi = [hidden_dim_actor] * n_mlp_layers_actor
         vf = [hidden_dim_critic] * n_mlp_layers_critic
         self.net_arch = dict(vf=vf, pi=pi)
@@ -164,20 +115,9 @@ class AgentSpecification:
     def print_self(self):
         print(
             f"==========Agent Description   ==========\n"
-            f"Learning rate:                    {self.lr}\n"
-            f"Number steps per episode:         {self.n_steps_episode}\n"
-            f"Batch size:                       {self.batch_size}\n"
-            f"Number of epochs:                 {self.n_epochs}\n"
-            f"Discount factor (gamma):          {self.gamma}\n"
-            f"Entropy coefficient:              {self.ent_coef}\n"
-            f"Value function coefficient:       {self.vf_coef}\n"
-            f"Normalize advantage:              {self.normalize_advantage}\n"
-            f"Optimizer:                        {self.optimizer}\n"
             f"Features extractor type:          {self.fe_type}\n"
             f"Layer Pooling:                    {self.layer_pooling}\n"
             f"Dropout:                          {self.dropout}\n"
-            f"RPO:                              {self.rpo}\n"
-            f"RPO smoothing:                    {self.rpo_smoothing_param}\n"
         )
         if self.fe_type == "tokengt":
             print(f"Net shapes:")
@@ -209,7 +149,6 @@ class AgentSpecification:
         else:
             print(
                 f"Convolutional FE\n"
-                f"Freezing graph during training:   {'Yes' if self.freeze_graph else 'No'}\n"
                 f"Graph convolution type:           {self.gconv_type.upper()}\n"
                 f"Add (R)eLU between graph layers:  {'Yes' if self.graph_has_relu else 'No'}\n"
                 f"Graph pooling type:               {self.graph_pooling.title()}\n"
