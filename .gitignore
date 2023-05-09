@@ -8,3 +8,5 @@ __pycache__
 profile.data
 profile.pdf
 benchmark/*.csv
+results
+instances/generated

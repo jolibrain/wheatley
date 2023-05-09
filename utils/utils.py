@@ -24,17 +24,17 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
+import os
+import sys
+from collections import defaultdict
+from copy import deepcopy
+from typing import List, Optional, Tuple, Union
+
 import numpy as np
 import torch
-from typing import List, Optional, Tuple, Union
-from collections import defaultdict
-import sys
-import os
-from copy import deepcopy
 
 
 def get_exp_name(args):
-
     exp_name = (
         f"{args.n_j}j{args.n_m}m_D{args.duration_type}_T{args.transition_model_config}_"
         + f"R{args.reward_model_config}_GNN{args.fe_type}"
@@ -66,7 +66,10 @@ def get_exp_name(args):
 
 
 def get_path(arg_path, exp_name):
-    path = arg_path + "/" + exp_name + "/"
+    path = os.path.join(arg_path, exp_name)
+    if not path.endswith("/"):
+        path += "/"
+
     try:
         os.mkdir(path)
     except OSError as error:
@@ -437,7 +440,6 @@ def put_back_one_hot_encoding_unbatched(
     features,
     max_n_machines,
 ):
-
     machineid = features[:, :, 6].long()
     one_hot_machine_id = torch.diag(
         torch.Tensor([1] * max_n_machines).to(features.device)
@@ -564,7 +566,7 @@ def obs_as_tensor(obs):
         if "n_conflict_edges" in obs:
             max_nconflicts_edges = max(obs["n_conflict_edges"])
         newobs = {}
-        for (key, _obs) in obs.items():
+        for key, _obs in obs.items():
             if key == "features":
                 newobs[key] = torch.tensor(_obs[:, :max_nnodes, :])
             elif key == "edge_index":
@@ -589,7 +591,7 @@ def single_obs_as_tensor(obs):
         if "n_conflict_edges" in obs:
             max_nconflicts_edges = obs["n_conflict_edges"]
         newobs = {}
-        for (key, _obs) in obs.items():
+        for key, _obs in obs.items():
             if key == "features":
                 newobs[key] = torch.tensor(_obs[:max_nnodes, :]).unsqueeze(0)
             elif key == "edge_index":
@@ -614,7 +616,7 @@ def obs_as_tensor_add_batch_dim(obs):
         if "n_conflict_edges" in obs:
             max_nconflicts_edges = obs["n_conflict_edges"]
         newobs = {}
-        for (key, _obs) in obs.items():
+        for key, _obs in obs.items():
             if key == "features":
                 newobs[key] = torch.tensor(_obs[:max_nnodes, :]).unsqueeze(0)
             elif key == "edge_index":

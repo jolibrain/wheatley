@@ -26,26 +26,21 @@ import os
 import numpy as np
 import torch
 
-from env.psp_env_specification import PSPEnvSpecification
-from env.psp_env import PSPEnv
-from models.psp_agent import PSPAgent as Agent
-from models.agent_validator import AgentValidator
-from models.agent_specification import AgentSpecification
-from models.training_specification import TrainingSpecification
-from problem.psp_description import PSPDescription
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from utils.utils import (
-    generate_deterministic_problem,
-    generate_problem_distrib,
-)
+from args import args, exp_name, get_path, path
+from env.psp_env import PSPEnv
+from env.psp_env_specification import PSPEnvSpecification
+from models.agent_specification import AgentSpecification
+from models.agent_validator import AgentValidator
+from models.psp_agent import PSPAgent as Agent
+from models.training_specification import TrainingSpecification
+from problem.psp_description import PSPDescription
 from utils.loaders import PSPLoader
-
-from args import args, exp_name, path, get_path
+from utils.utils import generate_deterministic_problem, generate_problem_distrib
 
 
 def main():
-
     exp_name = args.exp_name_appendix
     path = get_path(args.path, exp_name)
     torch.distributions.Distribution.set_default_validate_args(False)
@@ -206,6 +201,8 @@ def main():
         env_specification,
         args.device,
         training_specification,
+        args.log_file,
+        args.disable_visdom,
     )
     ppo = PPO(
         training_specification,

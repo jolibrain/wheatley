@@ -1,5 +1,5 @@
-from utils.ortools import get_ortools_makespan
 from models.agent_validator import AgentValidator
+from utils.ortools import get_ortools_makespan
 
 
 class PSPAgentValidator(AgentValidator):
@@ -10,6 +10,8 @@ class PSPAgentValidator(AgentValidator):
         env_cls,
         device,
         training_specification,
+        log_file,
+        disable_visdom,
         verbose=2,
     ):
         super().__init__(
@@ -18,6 +20,8 @@ class PSPAgentValidator(AgentValidator):
             env_cls,
             device,
             training_specification,
+            log_file,
+            disable_visdom,
             verbose=2,
         )
 

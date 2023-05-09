@@ -24,28 +24,29 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import time
-import sys
-import numpy as np
-import visdom
-import csv
 import copy
+import csv
+import sys
+import time
+
+import numpy as np
 import torch
 import tqdm
+import visdom
 
+from env.jssp_env import JSSPEnv
+from env.psp_env import PSPEnv
 from models.custom_agent import CustomAgent
 from models.random_agent import RandomAgent
 from problem.jssp_description import JSSPDescription
-from env.psp_env import PSPEnv
-from env.jssp_env import JSSPEnv
 from utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
 from utils.ortools import get_ortools_makespan_psp
 from utils.utils import (
+    decode_mask,
     generate_problem_durations,
+    get_obs,
     obs_as_tensor_add_batch_dim,
     safe_mean,
-    get_obs,
-    decode_mask,
 )
 
 
@@ -56,6 +57,8 @@ class AgentValidator:
         env_specification,
         device,
         training_specification,
+        log_file,
+        disable_visdom,
         verbose=2,
     ):
         super().__init__()
@@ -81,7 +84,11 @@ class AgentValidator:
         self.n_validation_env = training_specification.n_validation_env
         self.fixed_validation = training_specification.fixed_validation
         self.fixed_random_validation = training_specification.fixed_random_validation
-        self.vis = visdom.Visdom(env=training_specification.display_env)
+        self.vis = visdom.Visdom(
+            env=training_specification.display_env,
+            log_to_filename=log_file,
+            offline=disable_visdom,
+        )
         self.path = training_specification.path
         self.ortools_strategy = training_specification.ortools_strategy
 
@@ -305,7 +312,6 @@ class AgentValidator:
             print("...done")
 
         for i in tqdm.tqdm(range(self.n_validation_env), desc="   evaluating         "):
-
             if self.batch_size == 0:
                 obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
                 done = False

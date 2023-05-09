@@ -26,26 +26,26 @@ import os
 import numpy as np
 import torch
 
-from env.jssp_env_specification import JSSPEnvSpecification
-from models.jssp_agent import JSSPAgent as Agent
-from models.agent_validator import AgentValidator
-from models.agent_specification import AgentSpecification
-from models.training_specification import TrainingSpecification
-from problem.jssp_description import JSSPDescription as ProblemDescription
-from env.jssp_env import JSSPEnv
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
+from env.env_specification import EnvSpecification
+from env.jssp_env import JSSPEnv
+from env.jssp_env_specification import JSSPEnvSpecification
+from models.agent import Agent
+from models.agent_specification import AgentSpecification
+from models.agent_validator import AgentValidator
+from models.jssp_agent import JSSPAgent as Agent
+from models.training_specification import TrainingSpecification
+from problem.jssp_description import JSSPDescription as ProblemDescription
+from problem.problem_description import ProblemDescription
 from utils.utils import (
     generate_deterministic_problem,
     generate_problem_distrib,
     load_problem,
 )
 
-from args import args, exp_name, path
 
-
-def main():
-
+def main(args, exp_name, path):
     torch.distributions.Distribution.set_default_validate_args(False)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -210,7 +210,7 @@ def main():
         )
 
     # And finally, we train the model on the specified training mode
-    # Note: The saving of the best model is hanlded in the agent.train method.
+    # Note: The saving of the best model is handled in the agent.train method.
     # We save every time we hit a min RL / OR-Tools ratio
     # agent.train(problem_description, training_specification)
 
@@ -219,6 +219,8 @@ def main():
         env_specification,
         args.device,
         training_specification,
+        args.log_file,
+        args.disable_visdom,
     )
     ppo = PPO(
         training_specification,
@@ -239,4 +241,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from args import args, exp_name, path
+
+    main(args, exp_name, path)
