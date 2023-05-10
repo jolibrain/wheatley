@@ -28,16 +28,13 @@ import torch
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from env.env_specification import EnvSpecification
 from env.jssp_env import JSSPEnv
 from env.jssp_env_specification import JSSPEnvSpecification
-from models.agent import Agent
 from models.agent_specification import AgentSpecification
 from models.agent_validator import AgentValidator
 from models.jssp_agent import JSSPAgent as Agent
 from models.training_specification import TrainingSpecification
 from problem.jssp_description import JSSPDescription as ProblemDescription
-from problem.problem_description import ProblemDescription
 from utils.utils import (
     generate_deterministic_problem,
     generate_problem_distrib,
