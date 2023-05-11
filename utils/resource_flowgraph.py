@@ -55,7 +55,7 @@ class ResourceFlowGraph:
         frontier_idx = -1
         while available_cons < level:
             frontier_idx = frontier_idx + 1
-            available_cons = available_cons + self.frontier[frontier_idx][2]
+            available_cons += self.frontier[frontier_idx][2]
         return self.frontier[frontier_idx][0]
 
     # Returns the max position pos in self.frontier such that frontier[pos][0] <= date
@@ -84,7 +84,10 @@ class ResourceFlowGraph:
         available_capa = 0
         to_add_in_frontier = []
         flow_dict = {}
-        while available_capa < level:
+        # while available_capa < level:
+        # while abs(available_capa - level) > self.unit_val / 2:
+        while available_capa < level - self.unit_val / 2:
+            # rounding errors can cause severe errors !
             available_capa = available_capa + self.frontier[cur_pos][2]
             to_add_in_frontier.append([end, consumer_id, self.unit_val])
             origin_node = self.frontier[cur_pos][1]
