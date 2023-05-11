@@ -79,7 +79,7 @@ class PSPAgentObservation:
         gnew.edata["type"] = torch.LongTensor(type0)
         gnew.edata["rid"] = torch.zeros((nn_edges), dtype=torch.int)
         gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
-        gnew.edata["att_rc"] = torch.zeros((nn_edges, 1), dtype=torch.float32)
+        gnew.edata["att_rc"] = torch.zeros((nn_edges, 2), dtype=torch.float32)
         return gnew
 
     @classmethod
@@ -328,11 +328,11 @@ class PSPAgentObservation:
                 all_nce = []
 
                 for i in range(orig_feat.shape[0]):
-                    one_rc_edges, rid, rval = compute_resources_graph_torch(
+                    one_rc_edges, rid, rval, rvalr = compute_resources_graph_torch(
                         orig_feat[i, :, 9:]
                     )
                     rc_edges.append(one_rc_edges)
-                    att = torch.stack([rid, rval]).t()
+                    att = torch.stack([rid, rval, rvalr]).t()
                     rc_att.append(att)
                     nce = torch.LongTensor([one_rc_edges.shape[1]])
                     all_nce.append(nce)
