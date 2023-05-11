@@ -73,6 +73,7 @@ class PSPAgent(Agent):
                 residual=agent_specification.residual_gnn,
                 normalize=agent_specification.normalize_gnn,
                 conflicts=agent_specification.conflicts,
+                edge_embedding_flavor=agent_specification.edge_embedding_flavor,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -145,6 +146,7 @@ class PSPAgent(Agent):
                 residual=agent_specification.residual_gnn,
                 normalize=agent_specification.normalize_gnn,
                 conflicts=agent_specification.conflicts,
+                edge_embedding_flavor=agent_specification.edge_embedding_flavor,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(
