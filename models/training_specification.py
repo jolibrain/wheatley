@@ -26,6 +26,7 @@
 
 import torch
 from .dadapt_adam import DAdaptAdam
+from .lion_pytorch import Lion
 
 
 class TrainingSpecification:
@@ -100,6 +101,8 @@ class TrainingSpecification:
             self.optimizer_class = torch.optim.RAdam
         elif optimizer.lower() == "dadam":
             self.optimizer_class = DAdaptAdam
+        elif optimizer.lower() == "lion":
+            self.optimizer_class = Lion
         else:
             raise Exception("Optimizer not recognized")
         self.n_workers = n_workers
