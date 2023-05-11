@@ -346,6 +346,13 @@ parser.add_argument(
 parser.add_argument(
     "--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic"
 )
+parser.add_argument(
+    "--edge_embedding_flavor",
+    type=str,
+    default="sum",
+    choices=["sum", "cat"],
+    help="edge embedding technique for RCPSP",
+)
 
 # =================================================ENVIRONMENT SPECIFICATION================================================
 parser.add_argument(

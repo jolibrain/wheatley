@@ -54,6 +54,7 @@ class AgentSpecification:
         dropout,
         cache_lap_node_id,
         lap_node_id_k,
+        edge_embedding_flavor,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -80,6 +81,7 @@ class AgentSpecification:
         self.dropout = dropout
         self.cache_lap_node_id = cache_lap_node_id
         self.lap_node_id_k = lap_node_id_k
+        self.edge_embedding_flavor = edge_embedding_flavor
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
