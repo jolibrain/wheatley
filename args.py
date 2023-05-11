@@ -122,7 +122,7 @@ parser.add_argument(
     "--optimizer",
     type=str,
     default="adam",
-    choices=["adam", "sgd", "adamw", "radam", "dadam"],
+    choices=["adam", "sgd", "adamw", "radam", "dadam", "lion"],
     help="Which optimizer to use",
 )
 parser.add_argument(
