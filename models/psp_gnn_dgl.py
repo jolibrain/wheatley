@@ -47,6 +47,7 @@ class PSPGnnDGL(torch.nn.Module):
         normalize=False,
         conflicts="att",
         edge_embedding_flavor="sum",
+        layer_pooling="all",
     ):
 
         super().__init__()
@@ -55,10 +56,15 @@ class PSPGnnDGL(torch.nn.Module):
         self.normalize = normalize
         self.max_n_nodes = max_n_nodes
         self.input_dim_features_extractor = input_dim_features_extractor
-        self.features_dim = (
-            input_dim_features_extractor
-            + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
-        )
+        self.layer_pooling = layer_pooling
+        if layer_pooling == "all":
+            self.features_dim = (
+                input_dim_features_extractor
+                + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
+            )
+        else:
+            self.features_dim = hidden_dim_features_extractor
+
         self.features_dim *= 2
         self.max_n_resources = max_n_resources
 
@@ -266,17 +272,23 @@ class PSPGnnDGL(torch.nn.Module):
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
             )
 
-        features_list = []
+        if self.layer_pooling == "all":
+            features_list = []
         if self.normalize:
             features = self.norm0(features)
-        features_list.append(features)
+        if self.layer_pooling == "all":
+            features_list.append(features)
         features = self.features_embedder(features)
         if self.normalize:
             features = self.norm1(features)
-        features_list.append(features)
+        if self.layer_pooling == "all":
+            features_list.append(features)
 
         # update edge feautes below
         g.edata["emb"] = self.embed_edges(g)
+
+        if self.layer_pooling == "last":
+            previous_feat = features
 
         for layer in range(self.n_layers_features_extractor):
             # do not update edge features below
@@ -290,14 +302,21 @@ class PSPGnnDGL(torch.nn.Module):
             if self.normalize:
                 features = self.norms[layer](features)
             if self.residual:
-                features += features_list[-1]
+                if self.layer_pooling == "all":
+                    features += features_list[-1]
+                else:
+                    features += previous_feat
                 if self.normalize:
                     features = self.normsbis[layer](features)
-            features_list.append(features)
+                if self.layer_pooling == "last":
+                    previous_feat = features
+            if self.layer_pooling == "all":
+                features_list.append(features)
 
-        features = torch.cat(
-            features_list, axis=1
-        )  # The final embedding is concatenation of all layers embeddings
+        if self.layer_pooling == "all":
+            features = torch.cat(
+                features_list, axis=1
+            )  # The final embedding is concatenation of all layers embeddings
         node_features = features[:num_nodes, :]
         node_features = node_features.reshape(batch_size, n_nodes, -1)
 
