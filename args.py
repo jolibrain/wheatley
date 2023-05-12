@@ -350,7 +350,7 @@ parser.add_argument(
     "--edge_embedding_flavor",
     type=str,
     default="sum",
-    choices=["sum", "cat"],
+    choices=["sum", "cat", "cartesian"],
     help="edge embedding technique for RCPSP",
 )
 
