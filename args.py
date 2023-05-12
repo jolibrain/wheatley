@@ -122,7 +122,7 @@ parser.add_argument(
     "--optimizer",
     type=str,
     default="adam",
-    choices=["adam", "sgd", "adamw", "radam", "dadam"],
+    choices=["adam", "sgd", "adamw", "radam", "dadam", "lion"],
     help="Which optimizer to use",
 )
 parser.add_argument(
@@ -273,9 +273,9 @@ parser.add_argument(
     choices=["vanilla", "linear", "performer"],
 )
 parser.add_argument(
-    "--cache_lap_node_id",
+    "--dont_cache_lap_node_id",
     action="store_true",
-    help="enable laplacian cache for tokengt",
+    help="disable laplacian cache for tokengt",
 )
 parser.add_argument(
     "--lap_node_id_k", type=int, default=10, help="laplacian id size for tokengt"
@@ -345,6 +345,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic"
+)
+parser.add_argument(
+    "--edge_embedding_flavor",
+    type=str,
+    default="sum",
+    choices=["sum", "cat", "cartesian"],
+    help="edge embedding technique for RCPSP",
 )
 
 # =================================================ENVIRONMENT SPECIFICATION================================================

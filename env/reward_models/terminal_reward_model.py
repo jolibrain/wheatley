@@ -38,5 +38,5 @@ class TerminalRewardModel:
         is_done = state.done()
         if not is_done:
             return 0
-        makespan = state.tct(-1)[0].item() / state.max_duration / state.n_resources
+        makespan = state.tct(-1)[0].item() / state.max_duration  # / state.n_resources
         return -makespan

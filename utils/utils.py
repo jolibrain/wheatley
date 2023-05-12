@@ -515,7 +515,13 @@ def compute_resources_graph_np(r_info):
     # conflicts[2] is ressource id
     # both directions are created at once
     conflicts_val = r_info[conflicts[0], conflicts[2]]
-    return np.stack([conflicts[0], conflicts[1]]), conflicts[2], conflicts_val
+    conflicts_val_r = r_info[conflicts[1], conflicts[2]]
+    return (
+        np.stack([conflicts[0], conflicts[1]]),
+        conflicts[2],
+        conflicts_val,
+        conflicts_val_r,
+    )
 
 
 def compute_resources_graph_torch(r_info):
@@ -533,7 +539,13 @@ def compute_resources_graph_torch(r_info):
     # conflicts[2] is ressource id
     # both directions are created at once
     conflicts_val = r_info[conflicts[0], conflicts[2]]
-    return torch.stack([conflicts[0], conflicts[1]]), conflicts[2], conflicts_val
+    conflicts_val_r = r_info[conflicts[1], conflicts[2]]
+    return (
+        torch.stack([conflicts[0], conflicts[1]]),
+        conflicts[2],
+        conflicts_val,
+        conflicts_val_r,
+    )
 
 
 def compute_conflicts_cliques(machineid):

@@ -85,12 +85,14 @@ class PSPState:
                 self.resource_conf_edges,
                 self.resource_conf_id,
                 self.resource_conf_val,
+                self.resource_conf_val_r,
             ) = compute_resources_graph_np(self.features[:, 9:])
 
         else:
             self.resource_conf_edges = None
             self.resource_conf_id = None
             self.resource_conf_val = None
+            self.resource_conf_val_r = None
 
         self.resource_prec_edges = []
         self.resource_prec_att = []
@@ -136,12 +138,14 @@ class PSPState:
                 self.resource_conf_edges,
                 self.resource_conf_id,
                 self.resource_conf_val,
+                self.resource_conf_val_r,
             ) = compute_resources_graph_np(self.features[:, 9:])
 
         else:
             self.resource_conf_edges = None
             self.resource_conf_id = None
             self.resource_conf_val = None
+            self.resource_conf_val_r = None
 
         self.resource_prec_edges = []
         self.resource_prec_att = []
@@ -270,7 +274,14 @@ class PSPState:
 
         if self.observe_conflicts_as_cliques:
             rce = self.resource_conf_edges
-            rca = np.stack([self.resource_conf_id, self.resource_conf_val], axis=1)
+            rca = np.stack(
+                [
+                    self.resource_conf_id,
+                    self.resource_conf_val,
+                    self.resource_conf_val_r,
+                ],
+                axis=1,
+            )
         else:
             rce = None
             rca = None
@@ -357,7 +368,9 @@ class PSPState:
         fig.legend(handles=patches)
 
         figimg = io.BytesIO()
-        fig.savefig(figimg, format="png", dpi=300)
+        fig.savefig(figimg, format="png", dpi=150)
+        plt.clf()
+        plt.close("all")
         figimg.seek(0)
         npimg = np.fromstring(figimg.read(), dtype="uint8")
         cvimg = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)

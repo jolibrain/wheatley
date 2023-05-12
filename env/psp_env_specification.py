@@ -76,7 +76,7 @@ class PSPEnvSpecification:
             )
             self.shape_rc_att = (
                 self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
-                2,
+                3,
             )
             self.shape_rp = (
                 2,
@@ -93,11 +93,10 @@ class PSPEnvSpecification:
                 2,
                 self.max_n_edges * self.max_n_resources,
             )
-            print("shape_rc", self.shape_rc)
             self.shape_rc_att = (
                 # rid, rval
                 self.max_n_edges * self.max_n_resources,
-                1,
+                3,
             )
             self.shape_rp = (
                 2,

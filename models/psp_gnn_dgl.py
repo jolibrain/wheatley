@@ -46,6 +46,8 @@ class PSPGnnDGL(torch.nn.Module):
         residual=True,
         normalize=False,
         conflicts="att",
+        edge_embedding_flavor="sum",
+        layer_pooling="all",
     ):
 
         super().__init__()
@@ -54,10 +56,15 @@ class PSPGnnDGL(torch.nn.Module):
         self.normalize = normalize
         self.max_n_nodes = max_n_nodes
         self.input_dim_features_extractor = input_dim_features_extractor
-        self.features_dim = (
-            input_dim_features_extractor
-            + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
-        )
+        self.layer_pooling = layer_pooling
+        if layer_pooling == "all":
+            self.features_dim = (
+                input_dim_features_extractor
+                + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
+            )
+        else:
+            self.features_dim = hidden_dim_features_extractor
+
         self.features_dim *= 2
         self.max_n_resources = max_n_resources
 
@@ -84,13 +91,50 @@ class PSPGnnDGL(torch.nn.Module):
         # for rc edges : type,  rid, rval
         # for rp edges : type, rid , level, criticial, timetype
 
-        self.resource_id_embedder = torch.nn.Embedding(
-            self.max_n_resources + 1, hidden_dim_features_extractor
-        )
-        self.edge_type_embedder = torch.nn.Embedding(7, hidden_dim_features_extractor)
+        self.edge_embedding_flavor = edge_embedding_flavor
+        if self.edge_embedding_flavor == "sum":
+            self.resource_id_embedder = torch.nn.Embedding(
+                self.max_n_resources + 1, hidden_dim_features_extractor
+            )
+            self.edge_type_embedder = torch.nn.Embedding(
+                7, hidden_dim_features_extractor
+            )
 
-        self.rc_att_embedder = torch.nn.Linear(1, hidden_dim_features_extractor)
-        self.rp_att_embedder = torch.nn.Linear(3, hidden_dim_features_extractor)
+            self.rc_att_embedder = torch.nn.Linear(2, hidden_dim_features_extractor)
+            self.rp_att_embedder = torch.nn.Linear(3, hidden_dim_features_extractor)
+        elif self.edge_embedding_flavor == "cat":
+            self.edge_type_embedder = torch.nn.Embedding(7, 7)
+            self.resource_id_embedder = torch.nn.Embedding(
+                self.max_n_resources + 1, self.max_n_resources + 1
+            )
+            rest = hidden_dim_features_extractor - 7 - self.max_n_resources - 1
+            if rest < 4:
+                raise ValueError(
+                    f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
+                )
+            self.rc_att_hidden_dim = int(rest / 2)
+            self.rp_att_hidden_dim = rest - self.rc_att_hidden_dim
+            self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
+            self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
+        elif self.edge_embedding_flavor == "cartesian":
+            self.type_rid_hidden_dim = int(hidden_dim_features_extractor / 2)
+            self.type_rid_embedder = torch.nn.Embedding(
+                7 * (self.max_n_resources + 1), self.type_rid_hidden_dim
+            )
+            self.rc_att_hidden_dim = int(
+                (hidden_dim_features_extractor - self.type_rid_hidden_dim) / 2
+            )
+            self.rp_att_hidden_dim = (
+                hidden_dim_features_extractor
+                - self.type_rid_hidden_dim
+                - self.rc_att_hidden_dim
+            )
+            self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
+            self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
+        else:
+            raise ValueError(
+                "unknown edge embedding flavor " + self.edge_embedding_flavor
+            )
 
         self.pool_node_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
 
@@ -139,17 +183,45 @@ class PSPGnnDGL(torch.nn.Module):
             )
 
     def embed_edges(self, g):
-        ret = self.edge_type_embedder(g.edata["type"])
-        ret += self.resource_id_embedder(g.edata["rid"])
-        try:
-            ret += self.rc_att_embedder(g.edata["att_rc"])
-        except KeyError:
-            pass
-        try:  # if no ressource priory info in graph (ie at start state), key is absent
-            ret += self.rp_att_embedder(g.edata["att_rp"].float())
-        except KeyError:
-            pass
-        return ret
+        if self.edge_embedding_flavor == "sum":
+            ret = self.edge_type_embedder(g.edata["type"])
+            ret += self.resource_id_embedder(g.edata["rid"])
+            try:
+                ret += self.rc_att_embedder(g.edata["att_rc"])
+            except KeyError:
+                pass
+            try:  # if no ressource priory info in graph (ie at start state), key is absent
+                ret += self.rp_att_embedder(g.edata["att_rp"].float())
+            except KeyError:
+                pass
+            return ret
+
+        if self.edge_embedding_flavor == "cat":
+            et = self.edge_type_embedder(g.edata["type"])
+            ei = self.resource_id_embedder(g.edata["rid"])
+            try:
+                ec = self.rc_att_embedder(g.edata["att_rc"])
+            except KeyError:
+                ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
+            try:
+                ep = self.rp_att_embedder(g.edata["att_rp"])
+            except KeyError:
+                ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
+            return torch.cat([et, ei, ec, ep], dim=-1)
+
+        if self.edge_embedding_flavor == "cartesian":
+            eit = self.type_rid_embedder(
+                g.edata["type"] * (self.max_n_resources + 1) + g.edata["rid"]
+            )
+            try:
+                ec = self.rc_att_embedder(g.edata["att_rc"])
+            except KeyError:
+                ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
+            try:
+                ep = self.rp_att_embedder(g.edata["att_rp"])
+            except KeyError:
+                ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
+            return torch.cat([eit, ec, ep], dim=-1)
 
     def forward(self, obs):
 
@@ -200,17 +272,23 @@ class PSPGnnDGL(torch.nn.Module):
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
             )
 
-        features_list = []
+        if self.layer_pooling == "all":
+            features_list = []
         if self.normalize:
             features = self.norm0(features)
-        features_list.append(features)
+        if self.layer_pooling == "all":
+            features_list.append(features)
         features = self.features_embedder(features)
         if self.normalize:
             features = self.norm1(features)
-        features_list.append(features)
+        if self.layer_pooling == "all":
+            features_list.append(features)
 
         # update edge feautes below
         g.edata["emb"] = self.embed_edges(g)
+
+        if self.layer_pooling == "last":
+            previous_feat = features
 
         for layer in range(self.n_layers_features_extractor):
             # do not update edge features below
@@ -224,14 +302,21 @@ class PSPGnnDGL(torch.nn.Module):
             if self.normalize:
                 features = self.norms[layer](features)
             if self.residual:
-                features += features_list[-1]
+                if self.layer_pooling == "all":
+                    features += features_list[-1]
+                else:
+                    features += previous_feat
                 if self.normalize:
                     features = self.normsbis[layer](features)
-            features_list.append(features)
+                if self.layer_pooling == "last":
+                    previous_feat = features
+            if self.layer_pooling == "all":
+                features_list.append(features)
 
-        features = torch.cat(
-            features_list, axis=1
-        )  # The final embedding is concatenation of all layers embeddings
+        if self.layer_pooling == "all":
+            features = torch.cat(
+                features_list, axis=1
+            )  # The final embedding is concatenation of all layers embeddings
         node_features = features[:num_nodes, :]
         node_features = node_features.reshape(batch_size, n_nodes, -1)
 

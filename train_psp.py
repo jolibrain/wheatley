@@ -166,8 +166,9 @@ def main():
             fe_type=args.fe_type,
             transformer_flavor=args.transformer_flavor,
             dropout=args.dropout,
-            cache_lap_node_id=args.cache_lap_node_id,
+            cache_lap_node_id=not args.dont_cache_lap_node_id,
             lap_node_id_k=args.lap_node_id_k,
+            edge_embedding_flavor=args.edge_embedding_flavor,
         )
         agent_specification.print_self()
         agent = Agent(

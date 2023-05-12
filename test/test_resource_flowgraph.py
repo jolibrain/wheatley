@@ -57,11 +57,43 @@ def test_resource_flowgraph_cumul():
 
 def test_resource_flowgraph_norm():
     rg = ResourceFlowGraph(1, unit_val=0.25, renewable=True)
+    date = rg.availability(0.5)
+    assert date == 0
     rg.consume(1, 0.5, 0, 3)
+    date2 = rg.availability(0.5)
+    assert date2 == 0
     rg.consume(2, 0.5, 0, 4)
+    date3 = rg.availability(0.5)
+    assert date3 == 3
     rg.consume(3, 0.5, 4, 10)
+    date4 = rg.availability(0.5)
+    assert date4 == 3
     rg.consume(4, 0.5, 4, 6)
+    date5 = rg.availability(0.75)
+    assert date5 == 10
     rg.consume(5, 0.75, 10, 11)
+    date6 = rg.availability(0.75)
+    assert date6 == 11
     rg.consume(6, 0.75, 11, 15)
     assert rg.edges == [(0, 1), (0, 2), (2, 3), (1, 4), (3, 5), (4, 5), (5, 6)]
     assert rg.edges_att == [0.5, 0.5, 0.5, 0.5, 0.5, 0.25, 0.75]
+
+
+def test_resource_flowgraph_insert():
+    rg = ResourceFlowGraph(10, renewable=True)
+    rg.consume(1, 5, 0, 3)
+    rg.consume(2, 8, 3, 6)
+    date = rg.availability(5)
+    assert date == 6
+    date2 = rg.availability(2)
+    assert date2 == 0
+
+
+def test_resource_flowgraph_insert_norm():
+    rg = ResourceFlowGraph(1, unit_val=0.1, renewable=True)
+    rg.consume(1, 0.5, 0, 3)
+    rg.consume(2, 0.8, 3, 6)
+    date = rg.availability(0.5)
+    assert date == 6
+    date2 = rg.availability(0.2)
+    assert date2 == 0
