@@ -369,6 +369,8 @@ class PSPState:
 
         figimg = io.BytesIO()
         fig.savefig(figimg, format="png", dpi=150)
+        plt.clf()
+        plt.close("all")
         figimg.seek(0)
         npimg = np.fromstring(figimg.read(), dtype="uint8")
         cvimg = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
