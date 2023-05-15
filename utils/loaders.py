@@ -1,6 +1,6 @@
 import numpy as np
 import pathlib
-
+from utils.rcpsp import Rcpsp
 
 def load_problem(
     problem_file,
@@ -474,16 +474,15 @@ class PSPLoader:
         }
         
     def load_single_rcpsp(self, problem_file):
-
         self.f = open(problem_file, "r")
         self.nextline()
 
-        if not self.deterministic:
-            print("Loading problem with uncertainties, using customized format")
-            if self.generate_bounds > 0:
-                print(
-                    "Generating random duration bounds of ", self.generate_bounds, " %"
-                )
+        if self.generate_bounds is not None:
+            print(
+                "If not present, generating random duration bounds of ",
+                self.generate_bounds,
+                " %",
+            )
         job_info = []
         durations = []
         resources = []

@@ -4,6 +4,9 @@ sys.path.append(".")
 
 import pytest
 import numpy as np
+import matplotlib.pyplot as plt
+import networkx as nx
+
 from utils.rcpsp import Rcpsp
 from utils.loaders import PSPLoader
 
@@ -60,6 +63,52 @@ def test_rcpsp_small():
     assert(rcpsp2.max_resource_consumption == 3)
     assert(rcpsp2.source_id == rcpsp2.job_to_id(1))
     assert(rcpsp2.sink_id == rcpsp2.job_to_id(8))
+
+    # g = rcpsp2.precGraph
+    # nx.draw(g, with_labels = True)
+    # plt.show()
+
+    dist_source = rcpsp2.computeDistSourceStart()
+    assert(dist_source[rcpsp2.job_to_id(1)] == 0)
+    assert(dist_source[rcpsp2.job_to_id(2)] == 0)
+    assert(dist_source[rcpsp2.job_to_id(3)] == 0)
+    assert(dist_source[rcpsp2.job_to_id(4)] == 4)
+    assert(dist_source[rcpsp2.job_to_id(5)] == 4)
+    assert(dist_source[rcpsp2.job_to_id(6)] == 10)
+    assert(dist_source[rcpsp2.job_to_id(7)] == 6)
+    assert(dist_source[rcpsp2.job_to_id(8)] == 11)
+
+    dist_sink = rcpsp2.computeDistStartSink()
+    assert(dist_sink[rcpsp2.job_to_id(1)] == 11)
+    assert(dist_sink[rcpsp2.job_to_id(2)] == 10)
+    assert(dist_sink[rcpsp2.job_to_id(3)] == 11)
+    assert(dist_sink[rcpsp2.job_to_id(4)] == 7)
+    assert(dist_sink[rcpsp2.job_to_id(5)] == 6)
+    assert(dist_sink[rcpsp2.job_to_id(6)] == 1)
+    assert(dist_sink[rcpsp2.job_to_id(7)] == 4)
+    assert(dist_sink[rcpsp2.job_to_id(8)] == 0)
+
+    rs_1_3 = rcpsp2.sample_topological(1,3)
+    rs_2_3 = rcpsp2.sample_topological(2,3)
+    rs_2_4 = rcpsp2.sample_topological(2,4)
+    rs_1_5 = rcpsp2.sample_topological(1,5)
+    rs_1_6 = rcpsp2.sample_topological(1,6)
+    rs_3_7 = rcpsp2.sample_topological(3,7)
+
+    assert(rs_1_3.n_jobs == 6)
+    assert(rs_1_3.successors_id == [[1, 2], [3], [3, 4], [5], [5], []])
+    assert(rs_2_3.n_jobs == 4)
+    assert(rs_2_3.successors_id == [[1, 2], [3], [3], []])
+    assert(rs_2_3.durations == [[[0]], [[6]], [[2]], [[0]]])
+    assert(rs_2_4.n_jobs == 6)
+    assert(rs_2_4.successors_id == [[1, 2], [3], [3, 4], [5], [5], []])
+    assert(rs_1_5.n_jobs == 8)
+    assert(rs_1_5.successors_id == rcpsp2.successors_id)
+    assert(rs_1_6.n_jobs == 8)
+    assert(rs_1_6.successors_id == rcpsp2.successors_id)
+    assert(rs_3_7.n_jobs == 4)
+    assert(rs_3_7.successors_id == [[1, 2], [3], [3], []])
+
 
 def test_rcpsp_c154_3():
     psp = PSPLoader()
