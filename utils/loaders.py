@@ -473,7 +473,7 @@ class PSPLoader:
             "max_resource_request": max_resource_request,
         }
         
-        def load_single_rcpsp(self, problem_file):
+    def load_single_rcpsp(self, problem_file):
 
         self.f = open(problem_file, "r")
         self.nextline()
