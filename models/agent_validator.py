@@ -57,7 +57,6 @@ class AgentValidator:
         env_specification,
         device,
         training_specification,
-        log_file,
         disable_visdom,
         verbose=2,
     ):
@@ -86,7 +85,7 @@ class AgentValidator:
         self.fixed_random_validation = training_specification.fixed_random_validation
         self.vis = visdom.Visdom(
             env=training_specification.display_env,
-            log_to_filename=log_file,
+            log_to_filename="/dev/null",
             offline=disable_visdom,
         )
         self.path = training_specification.path
@@ -140,6 +139,8 @@ class AgentValidator:
         self.ep_rew_means = []
         self.fpss = []
         self.dpss = []
+        self.stabilities = []
+        self.monotonies = []
         self.total_timestepss = []
         self.first_callback = True
         self.gantt_rl_img = None
@@ -507,6 +508,8 @@ class AgentValidator:
             )
         )
         self.total_timestepss.append(alg.global_step)
+        self.stabilities.append(alg.logger.name_to_value["train/ratio_stability"])
+        self.monotonies.append(alg.logger.name_to_value["train/ratio_monotony"])
 
         X = list(range(1, len(self.losses) + 1))
         Y_list = [
@@ -534,6 +537,8 @@ class AgentValidator:
             "actions_per_second": self.fpss,
             "updates_per_second": self.dpss,
             "total_timesteps": self.total_timestepss,
+            "ratio_stability": self.stabilities,
+            "ratio_monotony": self.monotonies,
         }
         for title, data in charts.items():
             self.vis.line(X=X, Y=data, win=title, opts={"title": title})

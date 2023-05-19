@@ -24,16 +24,18 @@
 
 import random
 import time
+from collections import deque
 
 import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from .logger import Logger, configure_logger
-from collections import deque
-from utils.utils import safe_mean, get_obs, decode_mask
 import tqdm
+
+from utils.utils import decode_mask, get_obs, safe_mean
+
+from .logger import Logger, configure_logger, monotony, stability
 
 
 def create_env(env_cls, problem_description, env_specification, i):
@@ -52,9 +54,10 @@ class PPO:
         validator=None,
         discard_incomplete_trials=True,
     ):
-
         self.optimizer_class = training_specification.optimizer_class
-        self.logger = configure_logger()
+        self.logger = configure_logger(
+            folder=training_specification.path, format_strings=["json"]
+        )
         self.env_cls = env_cls
 
         self.num_envs = training_specification.n_workers
@@ -277,7 +280,6 @@ class PPO:
         self.n_epochs = 0
         self.start_time = time.time()
         for update in range(1, num_updates + 1):
-
             print("UPDATE ", update)
 
             agent.to(rollout_agent_device)
@@ -323,7 +325,6 @@ class PPO:
                     desc="   minibatches        ",
                     leave=False,
                 ):
-
                     end = start + self.minibatch_size
                     mb_inds = b_inds[start:end]
 
@@ -455,12 +456,51 @@ class PPO:
                     "time/total_timesteps", self.global_step, exclude="tensorboard"
                 )
 
+                ratio_to_ortools = np.array(self.validator.makespans) / np.array(
+                    self.validator.ortools_makespans
+                )
+                self.logger.record("train/ratio_monotony", monotony(ratio_to_ortools))
+                self.logger.record("train/ratio_stability", stability(ratio_to_ortools))
+
             if (
                 self.validation_freq is not None
                 and iteration % self.validation_freq == 0
                 and self.validator is not None
             ):
                 self.validator.validate(agent, self)
+
+                # Statistics from the agent validator.
+                self.logger.record(
+                    "validation/ppo_makespan",
+                    self.validator.makespans[-1],
+                )
+                self.logger.record(
+                    "validation/ortools_makespan",
+                    self.validator.ortools_makespans[-1],
+                )
+                self.logger.record(
+                    "validation/random_makepsan",
+                    self.validator.random_makespans[-1],
+                )
+                self.logger.record(
+                    "validation/ratio_to_ortools",
+                    self.validator.makespans[-1] / self.validator.ortools_makespans[-1],
+                )
+                self.logger.record(
+                    "validation/dist_to_ortools",
+                    self.validator.makespans[-1] - self.validator.ortools_makespans[-1],
+                )
+                if self.validator.custom_name != "None":
+                    self.logger.record(
+                        f"validation/{self.validator.custom_name}",
+                        self.validator.custom_makespans[-1],
+                    )
+                    self.logger.record(
+                        f"validation/{self.validator.custom_name}_ratio_to_ortools",
+                        self.validator.custom_makespans[-1]
+                        / self.validator.ortools_makespans[-1],
+                    )
+
             self.logger.dump(step=self.global_step)
 
         envs.close()

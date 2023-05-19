@@ -4,6 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 
+from torch.cuda import OutOfMemoryError
 from tqdm import tqdm
 
 from args import get_exp_name, get_path
@@ -99,7 +100,7 @@ def benchmark_small_exp_to_big_exp_generalisation(args, n_tries: int):
 
 def benchmark_dgl_hyperparams(args, n_tries: int):
     params_space = {
-        "graph_pooling": ["max", "average", "learn"],
+        "graph_pooling": ["max", "learn"],
         "layer_pooling": ["last", "all"],
         "mlp_act_graph": ["relu", "tanh", "gelu", "selu"],
         "n_mlp_layers_features_extractor": [1, 3, 5],
@@ -130,12 +131,16 @@ def benchmark_dgl_hyperparams(args, n_tries: int):
         exp_name = get_exp_name(args)
         path = get_path(args.path, exp_name)
 
-        # Save to log files.
-        setattr(args, "log_file", Path(path) / "visdom.jsonl")
-        log_hyperparams(sampled, Path(path) / "hyperparams.json")
+        # Disable visdom to avoid spamming the server.
         setattr(args, "disable_visdom", True)
 
-        main(args, exp_name, path)
+        try:
+            main(args, exp_name, path)
+        except OutOfMemoryError:
+            print("Out of memory, skipping.")
+            sampled["out_of_memory"] = True
+        finally:
+            log_hyperparams(sampled, Path(path) / "hyperparams.json")
 
 
 if __name__ == "__main__":
