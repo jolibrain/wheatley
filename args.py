@@ -273,6 +273,32 @@ parser.add_argument(
     choices=["vanilla", "linear", "performer"],
 )
 parser.add_argument(
+    "--performer_nb_features",
+    type=int,
+    default=None,
+    help="number of projections features for performer (for tokengt), default is n.log(n), where n is head dim",
+)
+parser.add_argument(
+    "--performer_redraw_interval",
+    type=int,
+    default=1000,
+    help="redraw interval for features basis  for performer (for tokengt)",
+)
+parser.add_argument(
+    "--performer_generalized_attention",
+    action="store_true",
+    default=False,
+    help="generalized attention  for performer (for tokengt)",
+)
+parser.add_argument(
+    "--performer_auto_check_redraw",
+    default=False,
+    action="store_true",
+    help="auto check redraw for performer (for tokengt)",
+)
+
+
+parser.add_argument(
     "--dont_cache_lap_node_id",
     action="store_true",
     help="disable laplacian cache for tokengt",
