@@ -28,6 +28,7 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg
 import dgl.backend as F
 import dgl
+from packaging import version
 
 # import time
 
@@ -63,7 +64,10 @@ def get_laplacian_pe_simple(g, cache=None, k=50):
 
     # classical computation
     # start = time.time()
-    A = g.adj(scipy_fmt="csr")  # adjacency matrix
+    if version.parse(dgl.__version__) >= version.parse("1.1.0"):
+        A = g.adj_external(scipy_fmt="csr")  # adjacency matrix
+    else:
+        A = g.adj(scipy_fmt="csr")  # adjacency matrix
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
     L = sparse.eye(g.num_nodes()) - N @ A @ N
     EigVal, EigVec = np.linalg.eigh(L.toarray())

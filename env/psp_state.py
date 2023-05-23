@@ -527,14 +527,9 @@ class PSPState:
             self.resource_prec_edges = []
             edge_index = {}
             for r in range(self.n_resources):
-                print("r", r)
                 for i in range(3):
-                    print("i", i)
                     for ie, e in enumerate(self.resources[r][i + 1].edges):
-                        print("edge_index", edge_index)
-                        print("ie, e", ie, e)
                         if e not in edge_index:
-                            print("e not in")
                             if self.resource_prec_att is None:
                                 self.resource_prec_att = np.zeros(
                                     (1, self.env_specification.max_n_resources * 3)
@@ -553,13 +548,10 @@ class PSPState:
                                     ]
                                 )
                             edge_index[e] = self.resource_prec_att.shape[0] - 1
-                            print("edge_index", edge_index)
                             self.resource_prec_edges.append(e)
-                            print("rpe", self.resource_prec_edges)
                         self.resource_prec_att[
                             edge_index[e], r * 3 + i
                         ] = self.resources[r][i + 1].edges_att[ie]
-                        print("rpa", self.resource_prec_att)
 
         else:
             self.resource_prec_edges = []
