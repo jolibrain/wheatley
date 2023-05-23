@@ -37,12 +37,18 @@ class ResourceFlowGraph:
         # edges are labeled by the flow between each node
         self.edges = []
         self.edges_att = []
+        self.new_edges_cache = []
+        self.new_edges_att_cache = []
         # the frontier contains a list of tuples [releaseDate,nodeId,consReleased],
         # that indicate that consReleased units of the resource are available at releaseDate from nodeId
         self.frontier = []
         self.unit_val = unit_val
         for i in range(0, int(self.max_level / self.unit_val)):
             self.frontier.insert(i, [0, 0, self.unit_val])
+
+    def reset_new_cache(self):
+        self.new_edges_cache = []
+        self.new_edges_att_cache = []
 
     def availability(self, level):
         # should return date, position in frontier associated to date
@@ -103,6 +109,8 @@ class ResourceFlowGraph:
         for node in flow_dict:
             self.edges.append((node, consumer_id))
             self.edges_att.append(flow_dict[node])
+            self.new_edges_cache.append((node, consumer_id))
+            self.new_edges_att_cache.append(flow_dict[node])
 
     def generate_graph(self):
         return 0
