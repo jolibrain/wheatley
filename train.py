@@ -184,6 +184,10 @@ def main(args, exp_name, path):
             cache_lap_node_id=not args.dont_cache_lap_node_id,
             lap_node_id_k=args.lap_node_id_k,
             edge_embedding_flavor=args.edge_embedding_flavor,
+            performer_nb_features=args.performer_nb_features,
+            performer_feature_redraw_interval=args.performer_redraw_interval,
+            performer_generalized_attention=args.performer_generalized_attention,
+            performer_auto_check_redraw=args.performer_auto_check_redraw,
         )
         agent_specification.print_self()
         agent = Agent(
