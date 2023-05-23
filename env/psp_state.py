@@ -44,6 +44,8 @@ class PSPState:
 
         self.normalize = normalize_features
 
+        self.factored_rp = env_specification.factored_rp
+
         # features :
         # 0: is_affected
         # 1: is selectable
@@ -519,22 +521,63 @@ class PSPState:
             self.update_resource_prec(constraining_resource)
 
     def update_resource_prec(self, constraining_resource):
-        self.resource_prec_edges = []
-        self.resource_prec_att = None
-        for r in range(self.n_resources):
-            for i in range(3):
-                self.resource_prec_edges.extend(self.resources[r][i + 1].edges)
-                rpa = np.empty((len(self.resources[r][i + 1].edges_att), 4))
-                rpa[:, 0] = r
-                rpa[:, 1] = self.resources[r][i + 1].edges_att
-                rpa[:, 2] = constraining_resource[i] == r
-                rpa[:, 3] = i
-                if self.resource_prec_att is None:
-                    self.resource_prec_att = rpa
-                else:
-                    self.resource_prec_att = np.concatenate(
-                        [self.resource_prec_att, rpa]
-                    )
+
+        if self.factored_rp:
+            self.resource_prec_att = None
+            self.resource_prec_edges = []
+            edge_index = {}
+            for r in range(self.n_resources):
+                print("r", r)
+                for i in range(3):
+                    print("i", i)
+                    for ie, e in enumerate(self.resources[r][i + 1].edges):
+                        print("edge_index", edge_index)
+                        print("ie, e", ie, e)
+                        if e not in edge_index:
+                            print("e not in")
+                            if self.resource_prec_att is None:
+                                self.resource_prec_att = np.zeros(
+                                    (1, self.env_specification.max_n_resources * 3)
+                                )
+                            else:
+                                self.resource_prec_att = np.concatenate(
+                                    [
+                                        self.resource_prec_att,
+                                        np.zeros(
+                                            (
+                                                1,
+                                                self.env_specification.max_n_resources
+                                                * 3,
+                                            )
+                                        ),
+                                    ]
+                                )
+                            edge_index[e] = self.resource_prec_att.shape[0] - 1
+                            print("edge_index", edge_index)
+                            self.resource_prec_edges.append(e)
+                            print("rpe", self.resource_prec_edges)
+                        self.resource_prec_att[
+                            edge_index[e], r * 3 + i
+                        ] = self.resources[r][i + 1].edges_att[ie]
+                        print("rpa", self.resource_prec_att)
+
+        else:
+            self.resource_prec_edges = []
+            self.resource_prec_att = None
+            for r in range(self.n_resources):
+                for i in range(3):
+                    self.resource_prec_edges.extend(self.resources[r][i + 1].edges)
+                    rpa = np.empty((len(self.resources[r][i + 1].edges_att), 4))
+                    rpa[:, 0] = r
+                    rpa[:, 1] = self.resources[r][i + 1].edges_att
+                    rpa[:, 2] = constraining_resource[i] == r
+                    rpa[:, 3] = i
+                    if self.resource_prec_att is None:
+                        self.resource_prec_att = rpa
+                    else:
+                        self.resource_prec_att = np.concatenate(
+                            [self.resource_prec_att, rpa]
+                        )
 
     def add_resource_precedence(self, prec, succ, on_start, critical, timetype, rid):
         self.resource_prec_edges.append((prec, succ))
