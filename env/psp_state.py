@@ -44,6 +44,13 @@ class PSPState:
 
         self.normalize = normalize_features
 
+        self.factored_rp = env_specification.factored_rp
+
+        self.edge_index = {}
+
+        self.resource_prec_edges = []
+        self.resource_prec_att = []
+
         # features :
         # 0: is_affected
         # 1: is selectable
@@ -94,8 +101,6 @@ class PSPState:
             self.resource_conf_val = None
             self.resource_conf_val_r = None
 
-        self.resource_prec_edges = []
-        self.resource_prec_att = []
         # self.resources_edges.append((prec, succ))
         # self.resources_edges_att.append((on_start, critical))
 
@@ -132,6 +137,9 @@ class PSPState:
         self.reset_is_affected()
         self.reset_resources()
         self.reset_selectable()
+        self.edge_index = {}
+        self.resource_prec_att = []
+        self.resource_prec_edges = []
 
         if self.observe_conflicts_as_cliques:
             (
@@ -146,9 +154,6 @@ class PSPState:
             self.resource_conf_id = None
             self.resource_conf_val = None
             self.resource_conf_val_r = None
-
-        self.resource_prec_edges = []
-        self.resource_prec_att = []
 
     def reset_resources(self):
         self.n_resources = self.problem["n_resources"]
@@ -288,7 +293,7 @@ class PSPState:
 
         if len(self.resource_prec_edges) > 0:
             rpe = np.transpose(self.resource_prec_edges)
-            rpa = self.resource_prec_att
+            rpa = np.concatenate(self.resource_prec_att)
         else:
             rpe = None
             rpa = None
@@ -519,22 +524,39 @@ class PSPState:
             self.update_resource_prec(constraining_resource)
 
     def update_resource_prec(self, constraining_resource):
-        self.resource_prec_edges = []
-        self.resource_prec_att = None
-        for r in range(self.n_resources):
-            for i in range(3):
-                self.resource_prec_edges.extend(self.resources[r][i + 1].edges)
-                rpa = np.empty((len(self.resources[r][i + 1].edges_att), 4))
-                rpa[:, 0] = r
-                rpa[:, 1] = self.resources[r][i + 1].edges_att
-                rpa[:, 2] = constraining_resource[i] == r
-                rpa[:, 3] = i
-                if self.resource_prec_att is None:
-                    self.resource_prec_att = rpa
-                else:
-                    self.resource_prec_att = np.concatenate(
-                        [self.resource_prec_att, rpa]
+
+        if self.factored_rp:
+            for r in range(self.n_resources):
+                for i in range(3):
+                    for ie, e in enumerate(self.resources[r][i + 1].new_edges_cache):
+                        if e not in self.edge_index:
+                            self.resource_prec_att.append(
+                                np.zeros(
+                                    (1, self.env_specification.max_n_resources * 3)
+                                )
+                            )
+                            self.edge_index[e] = len(self.resource_prec_att) - 1
+                            self.resource_prec_edges.append(e)
+                        self.resource_prec_att[self.edge_index[e]][
+                            0, r * 3 + i
+                        ] = self.resources[r][i + 1].new_edges_att_cache[ie]
+                    self.resources[r][i + 1].reset_new_cache()
+
+        else:
+            for r in range(self.n_resources):
+                for i in range(3):
+                    self.resource_prec_edges.extend(
+                        self.resources[r][i + 1].new_edges_cache
                     )
+                    rpa = np.empty(
+                        (len(self.resources[r][i + 1].new_edges_att_cache), 4)
+                    )
+                    rpa[:, 0] = r
+                    rpa[:, 1] = self.resources[r][i + 1].new_edges_att_cache
+                    rpa[:, 2] = constraining_resource[i] == r
+                    rpa[:, 3] = i
+                    self.resource_prec_att.append(rpa)
+                    self.resources[r][i + 1].reset_new_cache()
 
     def add_resource_precedence(self, prec, succ, on_start, critical, timetype, rid):
         self.resource_prec_edges.append((prec, succ))

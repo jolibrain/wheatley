@@ -56,7 +56,7 @@ class PSPAgentObservation:
             return int(self.graphs.num_nodes() / self.graphs.batch_size)
 
     @classmethod
-    def build_graph(cls, n_edges, edges, nnodes, feats, bidir):
+    def build_graph(cls, n_edges, edges, nnodes, feats, bidir, max_n_resources):
         edges0 = edges[0]
         edges1 = edges[1]
         type0 = [cls.edgeType["prec"]] * n_edges
@@ -78,7 +78,12 @@ class PSPAgentObservation:
             nn_edges = n_edges
         gnew.edata["type"] = torch.LongTensor(type0)
         gnew.edata["rid"] = torch.zeros((nn_edges), dtype=torch.int)
-        gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
+        if max_n_resources == -1:
+            gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
+        else:
+            gnew.edata["att_rp"] = torch.zeros(
+                (nn_edges, 3 * max_n_resources), dtype=torch.float32
+            )
         gnew.edata["att_rc"] = torch.zeros((nn_edges, 2), dtype=torch.float32)
         return gnew
 
@@ -89,13 +94,13 @@ class PSPAgentObservation:
         return torch.max(machine_one_hot, dim=1)
 
     @classmethod
-    def add_edges(cls, g, t, edges, rid, att):
+    def add_edges(cls, g, t, edges, rid, att, type_offset=True):
         t_type = torch.LongTensor([cls.edgeType[t]] * edges.shape[1])
         if t == "rrp":
             tt = "rp"
         else:
             tt = t
-        if tt == "rp":
+        if tt == "rp" and type_offset:
             # offset for timetype to make it different from fill value (which is zero)
             att[:, -1] = att[:, -1] + 1
         g.add_edges(
@@ -297,6 +302,8 @@ class PSPAgentObservation:
         laplacian_pe_cache=None,
         n_laplacian_eigv=50,
         bidir=True,
+        factored_rp=False,
+        max_n_resources=-1,
     ):
 
         # batching on CPU for performance reasons...
@@ -353,27 +360,42 @@ class PSPAgentObservation:
                 nnodes.item(),
                 orig_feat[i, : nnodes.item(), :],
                 bidir,
+                max_n_resources,
             )
 
             # resource pririty edges
             if rp_edges.nelement() != 0:
-                gnew = PSPAgentObservation.add_edges(
-                    gnew,
-                    "rp",
-                    rp_edges[i][:, : n_rp_edges[i].item()],
-                    rp_att[i][: n_rp_edges[i].item(), 0],
-                    rp_att[i][: n_rp_edges[i].item(), 1:],
-                )
-                rpe = torch.empty((2, n_rp_edges[i].item()), dtype=rp_edges.dtype)
-                rpe[0] = rp_edges[i][1, : n_rp_edges[i].item()]
-                rpe[1] = rp_edges[i][0, : n_rp_edges[i].item()]
-                gnew = PSPAgentObservation.add_edges(
-                    gnew,
-                    "rrp",
-                    rpe,
-                    rp_att[i][: n_rp_edges[i].item(), 0],
-                    rp_att[i][: n_rp_edges[i].item(), 1:],
-                )
+
+                if factored_rp:
+                    gnew = PSPAgentObservation.add_edges(
+                        gnew,
+                        "rp",
+                        rp_edges[i][:, : n_rp_edges[i].item()],
+                        torch.zeros((n_rp_edges[i].item())),
+                        rp_att[i][: n_rp_edges[i].item(), :],
+                        type_offset=False,
+                    )
+                else:
+                    gnew = PSPAgentObservation.add_edges(
+                        gnew,
+                        "rp",
+                        rp_edges[i][:, : n_rp_edges[i].item()],
+                        rp_att[i][: n_rp_edges[i].item(), 0],
+                        rp_att[i][: n_rp_edges[i].item(), 1:],
+                    )
+                    if bidir:
+                        rpe = torch.empty(
+                            (2, n_rp_edges[i].item()), dtype=rp_edges.dtype
+                        )
+                        rpe[0] = rp_edges[i][1, : n_rp_edges[i].item()]
+                        rpe[1] = rp_edges[i][0, : n_rp_edges[i].item()]
+                        gnew = PSPAgentObservation.add_edges(
+                            gnew,
+                            "rrp",
+                            rpe,
+                            rp_att[i][: n_rp_edges[i].item(), 0],
+                            rp_att[i][: n_rp_edges[i].item(), 1:],
+                        )
 
             # resource conflicts edges
             if conflicts == "clique":
