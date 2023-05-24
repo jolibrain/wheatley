@@ -30,11 +30,6 @@ import dgl.backend as F
 import dgl
 from packaging import version
 
-# import time
-
-# from numba import jit
-# from tinydb import Query
-
 
 def get_activation_fn(activation: str) -> Callable:
     """Returns the activation function corresponding to `activation`"""
@@ -53,33 +48,37 @@ def get_activation_fn(activation: str) -> Callable:
         raise RuntimeError("--activation-fn {} not supported".format(activation))
 
 
-# @jit(forceobj=True)
 def get_laplacian_pe_simple(g, cache=None, k=50):
 
     if cache is not None:
-        edges = g.edges()
-        key = (tuple(edges[0].tolist()), tuple(edges[1].tolist()))
+        edges = g.edges(order="srcdst")
+        # key = (tuple(edges[0].tolist()), tuple(edges[1].tolist()))
+        # key = tuple(edges[0].tolist() + edges[1].tolist())
+        key = (*(edges[0].tolist() + edges[1].tolist()),)
         if key in cache:
             return cache[key]
 
     # classical computation
-    # start = time.time()
     if version.parse(dgl.__version__) >= version.parse("1.1.0"):
         A = g.adj_external(scipy_fmt="csr")  # adjacency matrix
     else:
         A = g.adj(scipy_fmt="csr")  # adjacency matrix
     N = sparse.diags(F.asnumpy(g.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
     L = sparse.eye(g.num_nodes()) - N @ A @ N
+    # BELOW TOKENGT style
     EigVal, EigVec = np.linalg.eigh(L.toarray())
-    kpartition_indices = np.argpartition(EigVal, k + 1)[: k + 1]
-    topk_eigvals = EigVal[kpartition_indices]
-    topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
-    topk_EigVec = np.real(EigVec[:, topk_indices])
-    ret = torch.from_numpy(topk_EigVec).float()
-    # print("classicaltime", time.time() - start)
+    ret = torch.from_numpy(EigVec).float()[:, :k]
 
+    # BELOW DGL style
+    # EigVal, EigVec = np.linalg.eig(L.toarray())
+    # kpartition_indices = np.argpartition(EigVal, k + 1)[: k + 1]
+    # topk_eigvals = EigVal[kpartition_indices]
+    # topk_indices = kpartition_indices[topk_eigvals.argsort()][1:]
+    # topk_EigVec = np.real(EigVec[:, topk_indices])
+    # ret = torch.from_numpy(topk_EigVec).float()
+
+    # BELOW scipy.sparse style
     # sparse + iterative + approximated
-    # start = time.time()
     # g2 = g
     # A = g2.adj(scipy_fmt="csr")  # adjacency matrix
     # N = sparse.diags(F.asnumpy(g2.in_degrees()).clip(1) ** -0.5, dtype=float)  # D^-1/2
@@ -88,7 +87,6 @@ def get_laplacian_pe_simple(g, cache=None, k=50):
     # topk_indices2 = np.arange(k + 1)[EigVal2.argsort()][1:]
     # topk_eigvec2 = np.real(EigVec2[:, topk_indices2])
     # ret = torch.from_numpy(topk_eigvec2).float()
-    # print("sparse time", time.time() - start)
     # exit()
 
     # select eigenvector
