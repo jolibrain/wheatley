@@ -447,9 +447,18 @@ class AgentValidator:
         # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
 
         # ratio to OR-tools
-        opts = {"title": "PPO / OR-tools"}
+        opts = {
+            "title": "PPO / OR-tools",
+            "legend": ["PPO/OR-tools", "Min PPO/OR-tools"],
+        }
         ratio_to_ortools = np.array(self.makespans) / np.array(self.ortools_makespans)
-        self.vis.line(X=X, Y=ratio_to_ortools, win="ratio_to_ortools", opts=opts)
+        min_ratio_to_ortools = np.minimum.accumulate(ratio_to_ortools)
+        self.vis.line(
+            X=X,
+            Y=np.stack([ratio_to_ortools, min_ratio_to_ortools], axis=1),
+            win="ratio_to_ortools",
+            opts=opts,
+        )
 
         # distance to OR-tools
         opts = {"title": "Distance to OR-tools"}
