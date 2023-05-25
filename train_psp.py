@@ -135,7 +135,7 @@ def main():
             observe_conflicts_as_cliques=observe_clique,
             observe_real_duration_when_affect=observe_real_duration_when_affect,
             do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
-            factored_rp=(args.fe_type == "tokengt"),
+            factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
         )
         env_specification.print_self()
         if args.batch_size == 1 and not args.dont_normalize_advantage:
