@@ -25,17 +25,12 @@
 #
 
 
-from models.mlp import MLP
-import torch
 import dgl
-from dgl.nn import (
-    GINEConv,
-    EGATConv,
-    PNAConv,
-    DGNConv,
-    GCN2Conv,
-)
+import torch
 from dgl import LaplacianPE
+from dgl.nn import DGNConv, EGATConv, GCN2Conv, GINEConv, PNAConv
+
+from models.mlp import MLP
 from utils.jssp_agent_observation import JSSPAgentObservation as AgentObservation
 
 
@@ -57,7 +52,6 @@ class JSSPGnnDGL(torch.nn.Module):
         normalize=False,
         conflicts="att",
     ):
-
         super().__init__()
         self.conflicts = conflicts
         self.residual = residual
@@ -141,7 +135,6 @@ class JSSPGnnDGL(torch.nn.Module):
             # self.mlps_edges = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
-
             if self.normalize:
                 self.norms.append(torch.nn.BatchNorm1d(self.hidden_dim))
                 if self.residual:
@@ -239,7 +232,6 @@ class JSSPGnnDGL(torch.nn.Module):
                 sys.exit()
 
     def forward(self, obs):
-
         observation = AgentObservation.from_gym_observation(
             obs, conflicts=self.conflicts, max_n_machines=self.max_n_machines
         )
@@ -401,7 +393,7 @@ class JSSPGnnDGL(torch.nn.Module):
             max_elts, max_ind = torch.max(node_features, dim=1)
             graph_embedding = max_elts
         elif self.graph_pooling == "avg":
-            graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
+            graph_pooling = torch.ones(n_nodes, device=features.device) / n_nodes
             graph_embedding = torch.matmul(graph_pooling, node_features)
         elif self.graph_pooling == "learn":
             graph_embedding = features[num_nodes : num_nodes + batch_size, :]

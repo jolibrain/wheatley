@@ -221,7 +221,6 @@ def main(args, exp_name, path):
         env_specification,
         args.device,
         training_specification,
-        args.log_file,
         args.disable_visdom,
     )
     ppo = PPO(

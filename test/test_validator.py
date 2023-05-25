@@ -12,7 +12,6 @@ def test_validator_psp(
     env_specification_small,
     training_specification,
     psp_agent,
-    log_file,
     disable_visdom,
 ):
     validator = AgentValidator(
@@ -20,7 +19,6 @@ def test_validator_psp(
         env_specification_small,
         torch.device("cpu"),
         training_specification,
-        log_file,
         disable_visdom,
     )
 
