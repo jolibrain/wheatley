@@ -409,6 +409,13 @@ parser.add_argument(
     help="do not observe task completion time",
 )
 
+parser.add_argument(
+    "--factored_rp",
+    default=False,
+    action="store_true",
+    help="factor resource priority link (automatically used  for tokengt)",
+)
+
 
 parser.add_argument(
     "--reward_model_config",
