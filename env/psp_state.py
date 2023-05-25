@@ -188,9 +188,7 @@ class PSPState:
             for i in range(4):
                 self.resources[r].append(
                     self.resourceModel(
-                        max_level=self.resource_levels[
-                            r + self.problem["n_renewable_resources"]
-                        ],
+                        max_level=self.resource_levels[r],
                         renewable=False,
                     )
                 )
