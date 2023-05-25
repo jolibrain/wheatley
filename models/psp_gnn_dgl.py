@@ -108,9 +108,7 @@ class PSPGnnDGL(torch.nn.Module):
                     3 * self.max_n_resources, hidden_dim_features_extractor
                 )
             else:
-                self.rp_att_embedder = torch.nn.Linear(
-                    3 * self.max_n_resources, hidden_dim_features_extractor
-                )
+                self.rp_att_embedder = torch.nn.Linear(3, hidden_dim_features_extractor)
 
         elif self.edge_embedding_flavor == "cat":
             self.edge_type_embedder = torch.nn.Embedding(7, 7)
@@ -125,9 +123,12 @@ class PSPGnnDGL(torch.nn.Module):
             self.rc_att_hidden_dim = int(rest / 2)
             self.rp_att_hidden_dim = rest - self.rc_att_hidden_dim
             self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            self.rp_att_embedder = torch.nn.Linear(
-                3 * self.max_n_resources, self.rp_att_hidden_dim
-            )
+            if self.factored_rp:
+                self.rp_att_embedder = torch.nn.Linear(
+                    3 * self.max_n_resources, self.rp_att_hidden_dim
+                )
+            else:
+                self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
         elif self.edge_embedding_flavor == "cartesian":
             self.type_rid_hidden_dim = int(hidden_dim_features_extractor / 2)
             self.type_rid_embedder = torch.nn.Embedding(
@@ -142,9 +143,12 @@ class PSPGnnDGL(torch.nn.Module):
                 - self.rc_att_hidden_dim
             )
             self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            self.rp_att_embedder = torch.nn.Linear(
-                3 * max_n_resources, self.rp_att_hidden_dim
-            )
+            if self.factored_rp:
+                self.rp_att_embedder = torch.nn.Linear(
+                    3 * max_n_resources, self.rp_att_hidden_dim
+                )
+            else:
+                self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
         else:
             raise ValueError(
                 "unknown edge embedding flavor " + self.edge_embedding_flavor
