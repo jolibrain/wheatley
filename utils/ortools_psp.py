@@ -173,7 +173,7 @@ def SolveRcpsp(
     for t in all_active_tasks:
         # task = problem.tasks[t]
         # num_recipes = len(task.recipes)
-        num_recipes = len(problem["durations"][0][t])
+        num_recipes = len(problem["durations"][0][t - 1])
         all_recipes = range(num_recipes)
 
         start_var = model.NewIntVar(0, horizon, f"start_of_task_{t}")
@@ -301,28 +301,12 @@ def SolveRcpsp(
 
                 model.AddCumulative(intervals, demands, c)
         else:  # Non empty non renewable resource. (single mode only)
-            if problem.is_consumer_producer:
-                reservoir_starts = []
-                reservoir_demands = []
-                for t in all_active_tasks:
-                    if task_resource_to_fixed_demands[(t, res)][0]:
-                        reservoir_starts.append(task_starts[t])
-                        reservoir_demands.append(
-                            task_resource_to_fixed_demands[(t, res)][0]
-                        )
-                model.AddReservoirConstraint(
-                    reservoir_starts,
-                    reservoir_demands,
-                    resource.min_capacity,
-                    resource.max_capacity,
+            model.Add(
+                cp_model.LinearExpr.Sum(
+                    [task_to_resource_demands[t][res] for t in all_active_tasks]
                 )
-            else:  # No producer-consumer. We just sum the demands.
-                model.Add(
-                    cp_model.LinearExpr.Sum(
-                        [task_to_resource_demands[t][res] for t in all_active_tasks]
-                    )
-                    <= c
-                )
+                <= c
+            )
 
     # Objective.
     objective = makespan
