@@ -221,7 +221,10 @@ class AgentValidator:
             )
 
     def _get_random_makespan(self, i):
-        return self.random_agent.predict(self.validation_envs[i]).get_makespan()
+        sol = self.random_agent.predict(self.validation_envs[i])
+        if sol is None:
+            return self.validation_envs[i].state.undoable_makespan
+        return sol.get_makespan()
 
     # transform list of dicts to dict of lists
     def _list_to_dict(self, batch_list):
@@ -326,23 +329,31 @@ class AgentValidator:
                         action.long().item()
                     )
             solution = self.validation_envs[i].get_solution()
-            schedule = solution.schedule
-            makespan = solution.get_makespan()
+            if solution is not None:
+                schedule = solution.schedule
+                makespan = solution.get_makespan()
 
-            if i == 0:
-                self.gantt_rl_img = self.validation_envs[i].render_solution(schedule)
+                if i == 0:
+                    self.gantt_rl_img = self.validation_envs[i].render_solution(
+                        schedule
+                    )
 
-            if makespan < self.best_makespan_wheatley:
-                self.best_makespan_wheatley = makespan
-                self.save_csv(
-                    "wheatley",
-                    makespan,
-                    "unknown",
-                    schedule,
-                    self.validation_envs[i].sampled_jobs,
-                )
+                if makespan < self.best_makespan_wheatley:
+                    self.best_makespan_wheatley = makespan
+                    self.save_csv(
+                        "wheatley",
+                        makespan,
+                        "unknown",
+                        schedule,
+                        self.validation_envs[i].sampled_jobs,
+                    )
 
-            mean_makespan += makespan / self.n_validation_env
+                mean_makespan += makespan / self.n_validation_env
+            else:
+                schedule = None
+                state = self.validation_envs[i].state
+                mean_makespan += state.undoable_makespan / self.n_validation_env
+                self.gantt_rl_img = self.validation_envs[i].render_fail()
 
             if self.fixed_validation:
                 or_tools_makespan, or_tools_schedule, optimal = self.fixed_ortools[i]

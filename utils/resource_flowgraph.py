@@ -30,6 +30,8 @@ class ResourceFlowGraph:
         # max_level should be the true capacity
         self.max_level = max_level
         self.renewable = renewable
+        if not self.renewable:
+            self.remaining_level = max_level
         # sourceNode contains the id of the source Node in the graph with all activities
         self.sourceNode = 0
         # contains all nodes of graph. A node is simply the id of the activity
@@ -50,16 +52,21 @@ class ResourceFlowGraph:
         self.new_edges_cache = []
         self.new_edges_att_cache = []
 
+    def still_available(self, level):
+        if self.renewable:
+            return True
+        else:
+            return self.remaining_level + self.unit_val / 2 >= level
+
     def availability(self, level):
         # should return date, position in frontier associated to date
         # indicating if tp is start or end of previous consumer
         # this version return first available date
-        assert level <= self.max_level
-
+        assert level <= self.max_level + self.unit_val / 2
         # starts from the beginning of the frontier and returns the smallest date d_i such that \sum_{j <= i} consReleased[j] >= level
         available_cons = 0
         frontier_idx = -1
-        while available_cons < level:
+        while available_cons + self.unit_val / 2 < level:
             frontier_idx = frontier_idx + 1
             available_cons += self.frontier[frontier_idx][2]
         return self.frontier[frontier_idx][0]
@@ -85,7 +92,10 @@ class ResourceFlowGraph:
             self.frontier.insert(max_pos + 1, [date, consumer_id, self.unit_val])
 
     def consume(self, consumer_id, level, start, end, debug=False):
-        assert level <= self.max_level
+        assert level <= self.max_level + self.unit_val / 2
+        if not self.renewable:
+            assert level <= self.remaining_level + self.unit_val / 2
+            self.remaining_level -= level
         cur_pos = self.find_max_pos(start)
         available_capa = 0
         to_add_in_frontier = []
@@ -95,7 +105,8 @@ class ResourceFlowGraph:
         while available_capa < level - self.unit_val / 2:
             # rounding errors can cause severe errors !
             available_capa = available_capa + self.frontier[cur_pos][2]
-            to_add_in_frontier.append([end, consumer_id, self.unit_val])
+            if self.renewable:
+                to_add_in_frontier.append([end, consumer_id, self.unit_val])
             origin_node = self.frontier[cur_pos][1]
             self.frontier.pop(cur_pos)
             cur_pos = cur_pos - 1
