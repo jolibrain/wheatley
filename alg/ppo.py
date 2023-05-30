@@ -144,9 +144,14 @@ class PPO:
             next_obs, reward, done, _, info = envs.step(action.cpu().numpy())
             action_mask = decode_mask(info["mask"])
             if "final_info" in info:
-                self.ep_info_buffer.extend(
-                    [ep_info["episode"] for ep_info in info["final_info"]]
-                )
+                for ep_info in info["final_info"]:
+                    if (
+                        ep_info is not None
+                    ):  # some episode may be finished and other not
+                        self.ep_info_buffer.append(ep_info["episode"])
+                # self.ep_info_buffer.extend(
+                #     [ep_info["episode"] for ep_info in info["final_info"]]
+                # )
 
             next_obs = agent.obs_as_tensor(next_obs)
             rewards[step] = torch.tensor(reward).view(-1).to(data_device)

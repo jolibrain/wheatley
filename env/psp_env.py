@@ -136,6 +136,9 @@ class PSPEnv(gym.Env):
     def render_solution(self, schedule, scaling=1.0):
         return self.state.render_solution(schedule, scaling)
 
+    def render_fail(self):
+        return self.state.render_fail()
+
     def chunk_problem(self, problem, n_jobs):
         # TODO
         return problem, problem["n_modes"]

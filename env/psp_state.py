@@ -67,6 +67,7 @@ class PSPState:
             for mi in range(m, m + j[0]):
                 self.features[mi, 2] = n
             m += j[0]
+
         self.problem_edges = []
         for n, j in enumerate(job_info):
             for succ_job in j[1]:
@@ -127,6 +128,10 @@ class PSPState:
         if redraw_real:
             self.real_durations = self.draw_real_durations(self.features[:, 3:6])
         self.max_duration = max(flat_dur)
+        self.duration_upper_bound = 0
+        for j in self.job_modes:
+            self.duration_upper_bound += np.max(self.features[j, 5])
+        self.undoable_makespan = self.duration_upper_bound + self.max_duration
 
     def reset_is_affected(self):
         self.features[:, 0] = 0
@@ -188,7 +193,8 @@ class PSPState:
             for i in range(4):
                 self.resources[r].append(
                     self.resourceModel(
-                        max_level=self.resource_levels[r],
+                        max_level=1.0,
+                        unit_val=1.0 / self.resource_levels[r],
                         renewable=False,
                     )
                 )
@@ -270,8 +276,14 @@ class PSPState:
     ############################### EXTERNAL API ############################
 
     def done(self):
-        return self.features[-1, 0] == 1
+        return self.finished() or self.succeeded()
         # return np.sum(self.features[:, 0]) == self.problem["n_jobs"]
+
+    def finished(self):
+        return np.where(self.selectables() == 1)[0].size == 0
+
+    def succeeded(self):
+        return self.features[-1, 0] == 1
 
     def to_features_and_edge_index(self, normalize):
 
@@ -308,7 +320,42 @@ class PSPState:
     def affect_job(self, node_id):
         self.affect_node(node_id)
         self.compute_dates_on_affectation(node_id)
+        self.mask_wrt_non_renewable_resources()
         self.update_completion_times_after(node_id)
+
+    def mask_wrt_non_renewable_resources(self):
+        selectables = np.where(self.features[:, 1] == 1)[0]
+        for n in selectables:
+            for r, level in enumerate(self.resources_usage(n)):
+                if not self.resources[r][0].still_available(level):
+                    self.set_unselectable(n)
+                    break
+
+    def render_fail(self):
+        plt.text(
+            0.5,
+            0.5,
+            "invalid",
+            size=50,
+            rotation=0.0,
+            ha="center",
+            va="center",
+            bbox=dict(
+                boxstyle="round",
+                ec=(1.0, 0.5, 0.5),
+                fc=(1.0, 0.8, 0.8),
+            ),
+        )
+        figimg = io.BytesIO()
+        plt.savefig(figimg, format="png", dpi=150)
+        plt.clf()
+        plt.close("all")
+        figimg.seek(0)
+        npimg = np.fromstring(figimg.read(), dtype="uint8")
+        cvimg = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
+        npimg = np.transpose(cvimg, (2, 0, 1))
+        torchimg = torch.from_numpy(npimg)
+        return torchimg
 
     def render_solution(self, schedule, scaling=1.0):
         n_jobs = self.problem["n_jobs"]
@@ -316,7 +363,6 @@ class PSPState:
         modes = schedule[1]
         nres = self.problem["n_resources"]
         maxres = self.problem["resource_availability"]
-        # print("job_modes", self.job_modes)
         ends = [
             # starts[j] + self.problem["durations"][0][j][modes[j]] for j in range(n_jobs)
             starts[j] + int(self.duration_real(self.job_modes[j][modes[j]]))
@@ -382,8 +428,8 @@ class PSPState:
         return torchimg
 
     def get_solution(self):
-        if not self.done():
-            return False
+        if not self.succeeded():
+            return None
         tct = self.real_tct
         schedule = tct - self.real_durations[:]
 
