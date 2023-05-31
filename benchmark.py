@@ -103,11 +103,11 @@ def benchmark_dgl_hyperparams(args, n_tries: int):
         "graph_pooling": ["max", "learn"],
         "layer_pooling": ["last", "all"],
         "mlp_act_graph": ["relu", "tanh", "gelu", "selu"],
-        "n_mlp_layers_features_extractor": [1, 3, 5],
-        "n_layers_features_extractor": [1, 3, 6, 10],
+        "n_mlp_layers_features_extractor": [1, 2, 3, 4, 5],
+        "n_layers_features_extractor": [1, 3, 4, 5, 6, 10],
         "hidden_dim_features_extractor": [16, 32, 64],
         "residual_gnn": [True, False],
-        "normalize_gnn": [True, False],
+        "normalize_gnn": [False],
         "fe_type": ["dgl"],
         "n_mlp_layers_actor": [1],
         "n_mlp_layers_critic": [1],
@@ -119,7 +119,9 @@ def benchmark_dgl_hyperparams(args, n_tries: int):
     for seed in tqdm(range(n_tries), desc="BENCHMARKING DGL HYPERPARAMS"):
         args = deepcopy(args)
 
-        setattr(args, "seed", seed)
+        # We do not change the seed, so that the validation set is the same across
+        # all experiments.
+        # setattr(args, "seed", seed)
 
         # Sample hyperparams.
         sampled = sample_hyperparams(params_space)
@@ -148,4 +150,4 @@ if __name__ == "__main__":
 
     # benchmark_seed(args, 10)
     # benchmark_single_experiment_generalisation(args, 10)
-    benchmark_dgl_hyperparams(args, 100)
+    benchmark_dgl_hyperparams(args, 1000)
