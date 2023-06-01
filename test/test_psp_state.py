@@ -766,3 +766,97 @@ def test_state_nonren(state_nonren):
     s.affect_job(nid)
     makespan = s.tct(-1)[0].item()
     print("makespan", makespan)
+
+
+def test_forget(state_small):
+    s = state_small
+    s.forget_nodes()
+    print("affecting 0")
+    s.affect_job(0)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+
+    print("affecting 1")
+    s.affect_job(1)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+    print("affecting 2")
+    s.affect_job(2)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+    print("affecting 3")
+    s.affect_job(3)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+    print("affecting 4")
+    s.affect_job(4)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+    print("affecting 5")
+    s.affect_job(5)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+    print("affecting 6")
+    s.affect_job(6)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)
+    print("affecting 7")
+    s.affect_job(7)
+    (
+        features,
+        problem_edge_index,
+        resource_conf_edges,
+        resource_conf_att,
+        resource_prec_edges,
+        resource_prec_att,
+    ) = s.to_features_and_edge_index(True)
+    print("features.shape", features.shape)

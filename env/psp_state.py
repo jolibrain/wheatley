@@ -27,6 +27,7 @@ class PSPState:
         observe_conflicts_as_cliques=True,
         resource_model="flowGraph",  # or timeline
         normalize_features=True,
+        forget_past=True,
     ):
         self.problem = problem
         self.problem_description = problem_description
@@ -37,6 +38,7 @@ class PSPState:
         self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
         self.env_specification = env_specification
         self.resource_model = resource_model
+        self.forget_past = forget_past
         if self.resource_model == "flowGraph":
             self.resourceModel = ResourceFlowGraph
         else:
@@ -285,6 +287,47 @@ class PSPState:
 
     def to_features_and_edge_index(self, normalize):
 
+        if self.forget_past:
+            nodes_to_keep = self.forget_nodes()
+
+            if self.observe_conflicts_as_cliques:
+                rce = self.resource_conf_edges
+                rca = np.stack(
+                    [
+                        self.resource_conf_id,
+                        self.resource_conf_val,
+                        self.resource_conf_val_r,
+                    ],
+                    axis=1,
+                )
+                edges_to_keep = self.forget_edges(rce, nodes_to_keep)
+                rce = rce[:, edges_to_keep]
+                rca = rca[edges_to_keep]
+            else:
+                rce = None
+                rca = None
+
+            if len(self.resource_prec_edges) > 0:
+                rpe = np.transpose(self.resource_prec_edges)
+                rpa = np.concatenate(self.resource_prec_att)
+                edges_to_keep = self.forget_edges(rpe, nodes_to_keep)
+                rpe = rpe[:, edges_to_keep]
+                rpa = rpa[edges_to_keep]
+            else:
+                rpe = None
+                rpa = None
+
+            return (
+                self.normalize_features(self.features),
+                self.numpy_problem_graph[
+                    :, self.forget_edges(self.numpy_problem_graph, nodes_to_keep)
+                ],
+                rce,
+                rca,
+                rpe,
+                rpa,
+            )
+
         if self.observe_conflicts_as_cliques:
             rce = self.resource_conf_edges
             rca = np.stack(
@@ -307,7 +350,7 @@ class PSPState:
             rpa = None
 
         return (
-            self.normalize_features(),
+            self.normalize_features(self.features),
             self.numpy_problem_graph,
             rce,
             rca,
@@ -471,12 +514,12 @@ class PSPState:
                 # make selectable, at last
                 self.set_selectable(successor)
 
-    def normalize_features(self):
+    def normalize_features(self, features):
         if self.normalize:
-            feat = np.copy(self.features)
+            feat = np.copy(features)
             feat[:, 3:9] /= self.max_duration
             return feat
-        return self.features
+        return features
 
     def get_last_finishing_dates(self, jobs):
         if len(jobs) == 0:
@@ -676,3 +719,51 @@ class PSPState:
                             break
                     if to_open:
                         open_nodes.append(successor)
+
+    def forget_nodes(self):
+        affected_jobs = []
+        for i in range(len(self.job_modes)):
+            for m in self.job_modes[i]:
+                if self.affected(m):
+                    affected_jobs.append(i)
+                    break
+        jobs_to_keep = set()
+        for ei in range(self.numpy_problem_graph.shape[1]):
+            jid1 = self.jobid(self.numpy_problem_graph[0, ei])
+            jid2 = self.jobid(self.numpy_problem_graph[1, ei])
+            if not jid1 in affected_jobs or not jid2 in affected_jobs:
+                jobs_to_keep.add(jid1)
+                jobs_to_keep.add(jid2)
+
+        # rp edges are added between affected nodes ? case of node 0 ?
+        if len(self.resource_prec_edges) > 0:
+            rpe = np.transpose(self.resource_prec_edges)
+            for ei in range(rpe.shape[1]):
+                jid1 = self.jobid(rpe[0, ei])
+                jid2 = self.jobid(rpe[1, ei])
+                if not jid1 in affected_jobs or not jid2 in affected_jobs:
+                    jobs_to_keep.add(jid1)
+                    jobs_to_keep.add(jid2)
+
+        nodes_in_frontier = set()
+        for r in self.resources:
+            for i in range(4):
+                for fe in r[i].frontier:
+                    nodes_in_frontier.add(fe[1])
+        jobs_in_frontier = set()
+        for n in nodes_in_frontier:
+            jobs_to_keep.add(self.jobid(n))
+
+        nodes_to_keep = []
+        for i in range(self.n_nodes):
+            if self.jobid(i) in jobs_to_keep:
+                nodes_to_keep.append(i)
+
+        return nodes_to_keep
+
+    def forget_edges(self, edges, nodes_to_keep):
+        remaining = []
+        for ei in range(edges.shape[1]):
+            if edges[0, ei] in nodes_to_keep or edges[1, ei] in nodes_to_keep:
+                remaining.append(ei)
+        return remaining
