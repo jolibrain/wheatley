@@ -246,7 +246,7 @@ class PSPGnnDGL(torch.nn.Module):
         observation = AgentObservation.from_gym_observation(
             obs,
             conflicts=self.conflicts,
-            add_self_loops=False,
+            add_self_loops=True,
             factored_rp=self.factored_rp,
             max_n_resources=self.max_n_resources,
         )
