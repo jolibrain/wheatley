@@ -215,6 +215,12 @@ class PPO:
             b_action_masks,
         )
 
+    def pb_ids(self, problem_description):
+        if not hasattr(problem_description, "train_psps"):
+            return list(range(self.num_envs))  # simple env id
+        # for psps, we should return a list per env of list of problems for this env
+        return [list(range(len(problem_description.train_psps)))] * self.num_envs
+
     def train(
         self,
         agent,
@@ -232,15 +238,15 @@ class PPO:
         batch_size = self.num_envs * self.num_steps
         classVecEnv = gym.vector.AsyncVectorEnv
         print("creating environments")
-        if hasattr(problem_description, "train_psps"):
-            mod = len(problem_description.train_psps)
-        else:
-            mod = 1
+        pbs_per_env = self.pb_ids(problem_description)
         if self.vecenv_type == "dummy":
             envs = gym.vector.SyncVectorEnv(
                 [
                     create_env(
-                        self.env_cls, problem_description, env_specification, i % mod
+                        self.env_cls,
+                        problem_description,
+                        env_specification,
+                        pbs_per_env[i],
                     )
                     for i in range(self.num_envs)
                 ],
@@ -249,7 +255,10 @@ class PPO:
             envs = gym.vector.AsyncVectorEnv(
                 [
                     create_env(
-                        self.env_cls, problem_description, env_specification, i % mod
+                        self.env_cls,
+                        problem_description,
+                        env_specification,
+                        pbs_per_env[i],
                     )
                     for i in range(self.num_envs)
                 ],

@@ -497,7 +497,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_edges_upper_bound_factor",
     type=int,
-    default=2,
+    default=4,
     help="Upper bound factor to max_n_edges, allows lowering the overall memory usage",
 )
 
@@ -563,6 +563,15 @@ parser.add_argument(
     default=None,
     help="Load problem in Taillard format (machine numbering starts at 0)",
 )
+parser.add_argument("--train_dir", type=str, default=None, help="psp train dir")
+parser.add_argument("--test_dir", type=str, default=None, help="psp test dir")
+parser.add_argument(
+    "--train_test_split",
+    type=float,
+    default=0.2,
+    help="train/test split if no test_dir is provided",
+)
+
 parser.add_argument(
     "--first_machine_id_is_one",
     default=False,

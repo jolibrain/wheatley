@@ -110,14 +110,25 @@ class AgentValidator:
 
         # Inner variables
         if hasattr(self.problem_description, "test_psps"):
-            mod = len(self.problem_description.test_psps)
+            n_test_pb = len(self.problem_description.test_psps)
+
+            if (
+                n_test_pb == self.n_validation_env
+            ):  # if possible, one env per test, good for deterministic
+                aff = [[i] for i in range(self.n_validation_env)]
+            else:  # TODO: maybe use fixed random validation as number of sample of tests
+                aff = [
+                    list(range(len(self.problem_description.test_psps)))
+                ] * self.n_validation_env
+
         else:
-            mod = 1
+            aff = [[0]] * self.n_validation_env
+
         self.validation_envs = [
             self.env_cls(
                 self.problem_description,
                 self.env_specification,
-                i % mod,
+                aff[i],
                 validate=True,
             )
             for i in range(self.n_validation_env)
@@ -148,8 +159,8 @@ class AgentValidator:
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
-        self.best_makespan_wheatley = float("inf")
-        self.best_makespan_ortools = float("inf")
+        self.best_makespan_wheatley = [float("inf")] * self.n_validation_env
+        self.best_makespan_ortools = [float("inf")] * self.n_validation_env
         self.ortools_env_zero_is_optimal = False
 
         self.batch_size = training_specification.validation_batch_size
@@ -338,10 +349,10 @@ class AgentValidator:
                         schedule
                     )
 
-                if makespan < self.best_makespan_wheatley:
-                    self.best_makespan_wheatley = makespan
+                if makespan < self.best_makespan_wheatley[i]:
+                    self.best_makespan_wheatley[i] = makespan
                     self.save_csv(
-                        "wheatley",
+                        f"wheatley_{i}",
                         makespan,
                         "unknown",
                         schedule,
@@ -370,10 +381,10 @@ class AgentValidator:
                 )
                 self.ortools_env_zero_is_optimal = optimal
 
-            if or_tools_makespan < self.best_makespan_ortools:
-                self.best_makespan_ortools = or_tools_makespan
+            if or_tools_makespan < self.best_makespan_ortools[i]:
+                self.best_makespan_ortools[i] = or_tools_makespan
                 self.save_csv(
-                    "ortools",
+                    f"ortools_{i}",
                     or_tools_makespan,
                     optimal,
                     or_tools_schedule,
