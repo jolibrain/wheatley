@@ -35,10 +35,8 @@ class PSPTransitionModel:
     def __init__(
         self,
         env_specification,
-        problem,
     ):
         self.env_specification = env_specification
-        self.problem = problem
 
     def run(self, state, node_id):  # noqa
         state.affect_job(node_id)
