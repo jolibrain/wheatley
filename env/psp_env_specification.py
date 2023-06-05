@@ -145,9 +145,7 @@ class PSPEnvSpecification:
                     shape=self.shape_rp,
                     dtype=np.int64,
                 ),
-                "rp_att": Box(
-                    low=0, high=1000, shape=self.shape_rp_att, dtype=np.int64
-                ),
+                "rp_att": Box(low=0, high=1000, shape=self.shape_rp_att, dtype=float),
             }
         )
 
