@@ -114,6 +114,7 @@ def SolveRcpsp(
     in_main_solve=False,
     initial_solution=None,
     lower_bound=0,
+    max_time_ortools=0,
 ):
     """Parse and solve a given RCPSP problem in proto format.
     The model will only look at the tasks {source} + {sink} + active_tasks, and
@@ -356,6 +357,8 @@ def SolveRcpsp(
     if not in_main_solve:
         solver.parameters.num_search_workers = 16
         solver.parameters.max_time_in_seconds = 0.0
+    else:
+        solver.parameters.max_time_in_seconds = max_time_ortools
     # if in_main_solve:
     #     solver.parameters.log_search_progress = True
     status = solver.Solve(model)
@@ -384,6 +387,8 @@ def SolveRcpsp(
             (assignment_start, assignment_mode),
             status == cp_model.OPTIMAL,
         )
+    if in_main_solve:
+        print("unfeasible solution in ortools")
     return -1, -1, None, None
 
 
