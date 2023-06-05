@@ -80,6 +80,7 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
         in_main_solve=True,
         initial_solution=initial_solution,
         lower_bound=lower_bound,
+        max_time_ortools=max_time_ortools,
     )
 
     return (
