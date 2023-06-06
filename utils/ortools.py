@@ -235,7 +235,6 @@ def get_ortools_makespan_psp(
         env.state.all_jobid(),
         real_durations=env.state.real_durations,
     )
-    print("real_makespan", real_makespan)
     return real_makespan, solution2.schedule, optimal
 
 

@@ -113,13 +113,14 @@ class AgentValidator:
             n_test_pb = len(self.problem_description.test_psps)
 
             if (
-                n_test_pb == self.n_validation_env
+                n_test_pb == self.n_validation_env and self.fixed_random_validation == 0
             ):  # if possible, one env per test, good for deterministic
                 aff = [[i] for i in range(self.n_validation_env)]
             else:  # TODO: maybe use fixed random validation as number of sample of tests
                 aff = [
                     list(range(len(self.problem_description.test_psps)))
-                ] * self.n_validation_env
+                ] * self.fixed_random_validation
+                self.n_validation_env = len(aff)
 
         else:
             aff = [[0]] * self.n_validation_env
