@@ -112,9 +112,7 @@ class PSPState:
             return durs[:, 0]
         else:
             d = np.zeros((durs.shape[0]))
-            r = np.random.triangular(
-                durs[1:-1, 1], durs[1:-1, 0], durs[1:-1, 2]
-            ).astype(int)
+            r = np.random.triangular(durs[1:-1, 1], durs[1:-1, 0], durs[1:-1, 2])
             d[1:-1] = r
             return d
 
@@ -400,7 +398,7 @@ class PSPState:
                 )
                 ax[r].add_patch(rect)
                 if rusage[i][r] != 0:
-                    max_level = max(levels[r][starts[i] : ends[i]])
+                    max_level = max(levels[r][starts[i] : ends[i] + 1])
                     ax[r].text(
                         starts[i] + (ends[i] - starts[i]) / 2,
                         max_level + rusage[i][r] / 2 - 0.2,

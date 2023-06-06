@@ -289,8 +289,8 @@ class PSPLoader:
     def do_generate_bounds(self, mode):
         if self.generate_bounds is None:
             return mode, mode
-        return int(mode * (1 - self.generate_bounds[0])), int(
-            mode * (1 + self.generate_bounds[1])
+        return mode * (1 - self.generate_bounds[0]), mode * (
+            1 + self.generate_bounds[1]
         )
 
     def load_single(self, problem_file):
