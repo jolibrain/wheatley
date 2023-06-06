@@ -104,7 +104,7 @@ class PSPEnvObservation:
         features = np.empty(
             (self.max_n_modes, self.features.shape[1]), dtype=np.float32
         )
-        features[: self.get_n_nodes(), :] = self.features
+        features[: self.features.shape[0], :] = self.features
         pr_edge_index = np.empty(self.env_specification.shape_pr, dtype=np.int64)
         pr_edge_index[:, : self.get_n_pr_edges()] = self.problem_edge_index
         rp_edge_index = np.empty(self.env_specification.shape_rp, dtype=np.int64)

@@ -114,6 +114,7 @@ def SolveRcpsp(
     in_main_solve=False,
     initial_solution=None,
     lower_bound=0,
+    max_time_ortools=0,
 ):
     """Parse and solve a given RCPSP problem in proto format.
     The model will only look at the tasks {source} + {sink} + active_tasks, and
@@ -173,7 +174,7 @@ def SolveRcpsp(
     for t in all_active_tasks:
         # task = problem.tasks[t]
         # num_recipes = len(task.recipes)
-        num_recipes = len(problem["durations"][0][t])
+        num_recipes = len(problem["durations"][0][t - 1])
         all_recipes = range(num_recipes)
 
         start_var = model.NewIntVar(0, horizon, f"start_of_task_{t}")
@@ -301,28 +302,12 @@ def SolveRcpsp(
 
                 model.AddCumulative(intervals, demands, c)
         else:  # Non empty non renewable resource. (single mode only)
-            if problem.is_consumer_producer:
-                reservoir_starts = []
-                reservoir_demands = []
-                for t in all_active_tasks:
-                    if task_resource_to_fixed_demands[(t, res)][0]:
-                        reservoir_starts.append(task_starts[t])
-                        reservoir_demands.append(
-                            task_resource_to_fixed_demands[(t, res)][0]
-                        )
-                model.AddReservoirConstraint(
-                    reservoir_starts,
-                    reservoir_demands,
-                    resource.min_capacity,
-                    resource.max_capacity,
+            model.Add(
+                cp_model.LinearExpr.Sum(
+                    [task_to_resource_demands[t][res] for t in all_active_tasks]
                 )
-            else:  # No producer-consumer. We just sum the demands.
-                model.Add(
-                    cp_model.LinearExpr.Sum(
-                        [task_to_resource_demands[t][res] for t in all_active_tasks]
-                    )
-                    <= c
-                )
+                <= c
+            )
 
     # Objective.
     objective = makespan
@@ -372,6 +357,8 @@ def SolveRcpsp(
     if not in_main_solve:
         solver.parameters.num_search_workers = 16
         solver.parameters.max_time_in_seconds = 0.0
+    else:
+        solver.parameters.max_time_in_seconds = max_time_ortools
     # if in_main_solve:
     #     solver.parameters.log_search_progress = True
     status = solver.Solve(model)
@@ -400,6 +387,8 @@ def SolveRcpsp(
             (assignment_start, assignment_mode),
             status == cp_model.OPTIMAL,
         )
+    if in_main_solve:
+        print("unfeasible solution in ortools")
     return -1, -1, None, None
 
 

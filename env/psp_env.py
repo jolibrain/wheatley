@@ -24,6 +24,7 @@
 import gymnasium as gym
 from gymnasium.spaces import Discrete, Dict, Box
 import numpy as np
+import random
 
 from env.transition_models.psp_transition_model import PSPTransitionModel
 from env.reward_models.terminal_reward_model import TerminalRewardModel
@@ -32,47 +33,52 @@ from env.psp_state import PSPState as State
 
 
 class PSPEnv(gym.Env):
-    def __init__(self, problem_description, env_specification, i, validate=False):
+    def __init__(self, problem_description, env_specification, pb_ids, validate=False):
         self.problem_description = problem_description
         self.env_specification = env_specification
-        self.sum_reward = 0
-        self.i = i
-        if validate:
-            self.problem = problem_description.test_psps[i]
-        else:
-            self.problem = problem_description.train_psps[i]
-
+        self.validate = validate
         self.transition_model_config = problem_description.transition_model_config
+        self._create_transition_model()
         self.reward_model_config = problem_description.reward_model_config
+        self._create_reward_model()
+        self.observe_conflicts_as_cliques = (
+            env_specification.observe_conflicts_as_cliques
+        )
+        self.deterministic = problem_description.deterministic
+        self.n_features = self.env_specification.n_features
+        self.observation_space = self.env_specification.observation_space
+        self.action_space = self.env_specification.action_space
+        self.pb_ids = pb_ids
+        random.shuffle(self.pb_ids)
+        self.pb_index = -1
+        self.reset()
+
+    def _problem_init(self):
+        self.pb_index += 1
+        if self.pb_index == len(self.pb_ids):
+            random.shuffle(self.pb_ids)
+            self.pb_index = 0
+
+        if self.validate:
+            self.problem = self.problem_description.test_psps[
+                self.pb_ids[self.pb_index]
+            ]
+        else:
+            self.problem = self.problem_description.train_psps[
+                self.pb_ids[self.pb_index]
+            ]
+
         self.n_jobs = self.problem["n_jobs"]
         self.n_modes = self.problem["n_modes"]
         self.n_resources = self.problem["n_resources"]
         # adjust n_jobs if we are going to sample or chunk
         self.sampled_jobs = None
-        if env_specification.sample_n_jobs != -1:
-            self.n_jobs = env_specification.sample_n_jobs
+        if self.env_specification.sample_n_jobs != -1:
+            self.n_jobs = self.env_specification.sample_n_jobs
             self.problem, self.n_modes = self.sample_problem(self.problem, self.n_jobs)
-        if env_specification.chunk_n_jobs != -1:
-            self.n_jobs = env_specification.chunk_n_jobs
+        if self.env_specification.chunk_n_jobs != -1:
+            self.n_jobs = self.env_specification.chunk_n_jobs
             self.problem, self.n_modes = self.chunk_problem(self.problem, self.n_jobs)
-        self.deterministic = problem_description.deterministic
-
-        self.observe_conflicts_as_cliques = (
-            env_specification.observe_conflicts_as_cliques
-        )
-
-        self.n_features = self.env_specification.n_features
-
-        self.transition_model = None
-        self.reward_model = None
-
-        self.n_steps = 0
-
-        self._create_reward_model()
-
-        self.observation_space = self.env_specification.observation_space
-        self.action_space = self.env_specification.action_space
-        self.reset()
 
     def step(self, action):
         # Getting current observation
@@ -112,11 +118,10 @@ class PSPEnv(gym.Env):
             self.state.reset()
 
         # Reset the state by creating a new one
+        # also may select a different problem
         else:
+            self._problem_init()
             self._create_state()
-
-        # Reset the transition model by creating a new one
-        self._create_transition_model()
 
         # Get the new observation
         observation = self.observe()
@@ -136,6 +141,9 @@ class PSPEnv(gym.Env):
     def render_solution(self, schedule, scaling=1.0):
         return self.state.render_solution(schedule, scaling)
 
+    def render_fail(self):
+        return self.state.render_fail()
+
     def chunk_problem(self, problem, n_jobs):
         # TODO
         return problem, problem["n_modes"]
@@ -154,7 +162,7 @@ class PSPEnv(gym.Env):
         )
 
     def _create_transition_model(self):
-        self.transition_model = PSPTransitionModel(self.env_specification, self.problem)
+        self.transition_model = PSPTransitionModel(self.env_specification)
 
     def _create_reward_model(self):
         self.reward_model = TerminalRewardModel()

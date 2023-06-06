@@ -22,6 +22,12 @@ def small_pb():
 
 
 @pytest.fixture
+def small_nonren():
+    loader = PSPLoader()
+    return loader.load_single("instances/psp/small/small_nonren.sm")
+
+
+@pytest.fixture
 def large_pb():
     loader = PSPLoader()
     return loader.load_single("instances/psp/sm/j3010_1.sm")
@@ -35,6 +41,17 @@ def problem_description_small(small_pb):
         deterministic=True,
         train_psps=[small_pb],
         test_psps=[small_pb],
+    )
+
+
+@pytest.fixture
+def problem_description_nonren(small_nonren):
+    return PSPDescription(
+        transition_model_config="simple",
+        reward_model_config="Sparse",
+        deterministic=True,
+        train_psps=[small_nonren],
+        test_psps=[small_nonren],
     )
 
 
@@ -61,6 +78,23 @@ def env_specification_small(problem_description_small):
         observe_conflicts_as_cliques=True,
         observe_real_duration_when_affect=False,
         do_not_observe_updated_bounds=False,
+        factored_rp=False,
+    )
+
+
+@pytest.fixture
+def env_specification_nonren(problem_description_nonren):
+    return PSPEnvSpecification(
+        problems=problem_description_nonren,
+        normalize_input=True,
+        input_list=["duration"],
+        max_edges_factor=2,
+        sample_n_jobs=-1,
+        chunk_n_jobs=-1,
+        observe_conflicts_as_cliques=True,
+        observe_real_duration_when_affect=False,
+        do_not_observe_updated_bounds=False,
+        factored_rp=False,
     )
 
 
@@ -76,6 +110,7 @@ def env_specification_large(problem_description_large):
         observe_conflicts_as_cliques=True,
         observe_real_duration_when_affect=False,
         do_not_observe_updated_bounds=False,
+        factored_rp=False,
     )
 
 
@@ -116,6 +151,17 @@ def state_small(problem_description_small, env_specification_small):
         env_specification_small,
         problem_description_small,
         problem_description_small.train_psps[0],
+        deterministic=True,
+        observe_conflicts_as_cliques=False,
+    )
+
+
+@pytest.fixture
+def state_nonren(problem_description_nonren, env_specification_nonren):
+    return PSPState(
+        env_specification_nonren,
+        problem_description_nonren,
+        problem_description_nonren.train_psps[0],
         deterministic=True,
         observe_conflicts_as_cliques=False,
     )

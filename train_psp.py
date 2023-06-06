@@ -25,6 +25,7 @@ import os
 
 import numpy as np
 import torch
+import random
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
@@ -50,17 +51,32 @@ def main():
     # If we want to load a specific problem, under the taillard (extended) format, and train on it, we first do it.
     # Note that this problem can be stochastic or deterministic
     loader = PSPLoader(generate_bounds=args.generate_duration_bounds)
-    psp = loader.load_single(args.load_problem)
-    train_psps = None
-    test_psps = None
+
+    if args.load_problem is None:
+        if args.train_dir is None:
+            print("--load_problem or --train_dir is mandatory")
+        else:
+            train_psps = loader.load_directory(args.train_dir)
+        if args.test_dir is not None:
+            test_psps = loader.load_directory(args.test_dir)
+        else:
+            test_psps = []
+            for i in range(int(len(train_psps) * args.train_test_split)):
+                tp = random.choice(train_psps)
+                test_psps.append(tp)
+                train_psps.remove(tp)
+    else:
+        psp = loader.load_single(args.load_problem)
+        train_psps = [psp]
+        test_psps = [psp]
 
     # Define problem and visualize it
     problem_description = PSPDescription(
         transition_model_config=args.transition_model_config,
         reward_model_config=args.reward_model_config,
         deterministic=(args.duration_type == "deterministic"),
-        train_psps=[psp],
-        test_psps=[psp],
+        train_psps=train_psps,
+        test_psps=test_psps,
     )
     problem_description.print_self()
 
@@ -68,7 +84,7 @@ def main():
 
     training_specification = TrainingSpecification(
         total_timesteps=args.total_timesteps,
-        n_validation_env=args.n_validation_env,
+        n_validation_env=len(test_psps),
         fixed_validation=args.fixed_validation,
         fixed_random_validation=args.fixed_random_validation,
         validation_batch_size=args.validation_batch_size,
@@ -121,6 +137,7 @@ def main():
         observe_conflicts_as_cliques=observe_clique,
         observe_real_duration_when_affect=observe_real_duration_when_affect,
         do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
+        factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -155,6 +172,10 @@ def main():
         cache_lap_node_id=not args.dont_cache_lap_node_id,
         lap_node_id_k=args.lap_node_id_k,
         edge_embedding_flavor=args.edge_embedding_flavor,
+        performer_nb_features=args.performer_nb_features,
+        performer_feature_redraw_interval=args.performer_redraw_interval,
+        performer_generalized_attention=args.performer_generalized_attention,
+        performer_auto_check_redraw=args.performer_auto_check_redraw,
     )
     agent_specification.print_self()
 

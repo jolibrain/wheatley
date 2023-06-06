@@ -1,5 +1,6 @@
 import numpy as np
 import pathlib
+import glob
 
 
 def load_problem(
@@ -281,17 +282,19 @@ class PSPLoader:
 
     def load_directory(self, directory):
         files = glob.glob(directory + "/*")
-        psps = [self.load_single(directory + "/" + f) for f in files]
+        psps = [self.load_single(f) for f in files]
+        print(f"loaded {len(psps)} files in {directory}")
         return psps
 
     def do_generate_bounds(self, mode):
         if self.generate_bounds is None:
             return mode, mode
-        return int(mode * (1 - self.generate_bounds[0])), int(
-            mode * (1 + self.generate_bounds[1])
+        return mode * (1 - self.generate_bounds[0]), mode * (
+            1 + self.generate_bounds[1]
         )
 
     def load_single(self, problem_file):
+        # print("loading ", problem_file)
         suffix = pathlib.Path(problem_file).suffix
         if suffix in [".sm", ".mm"]:
             return self.load_sm(problem_file)

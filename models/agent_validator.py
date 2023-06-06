@@ -110,14 +110,26 @@ class AgentValidator:
 
         # Inner variables
         if hasattr(self.problem_description, "test_psps"):
-            mod = len(self.problem_description.test_psps)
+            n_test_pb = len(self.problem_description.test_psps)
+
+            if (
+                n_test_pb == self.n_validation_env and self.fixed_random_validation == 0
+            ):  # if possible, one env per test, good for deterministic
+                aff = [[i] for i in range(self.n_validation_env)]
+            else:  # TODO: maybe use fixed random validation as number of sample of tests
+                aff = [
+                    list(range(len(self.problem_description.test_psps)))
+                ] * self.fixed_random_validation
+                self.n_validation_env = len(aff)
+
         else:
-            mod = 1
+            aff = [[0]] * self.n_validation_env
+
         self.validation_envs = [
             self.env_cls(
                 self.problem_description,
                 self.env_specification,
-                i % mod,
+                aff[i],
                 validate=True,
             )
             for i in range(self.n_validation_env)
@@ -148,8 +160,8 @@ class AgentValidator:
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
-        self.best_makespan_wheatley = float("inf")
-        self.best_makespan_ortools = float("inf")
+        self.best_makespan_wheatley = [float("inf")] * self.n_validation_env
+        self.best_makespan_ortools = [float("inf")] * self.n_validation_env
         self.ortools_env_zero_is_optimal = False
 
         self.batch_size = training_specification.validation_batch_size
@@ -221,7 +233,10 @@ class AgentValidator:
             )
 
     def _get_random_makespan(self, i):
-        return self.random_agent.predict(self.validation_envs[i]).get_makespan()
+        sol = self.random_agent.predict(self.validation_envs[i])
+        if sol is None:
+            return self.validation_envs[i].state.undoable_makespan
+        return sol.get_makespan()
 
     # transform list of dicts to dict of lists
     def _list_to_dict(self, batch_list):
@@ -326,23 +341,31 @@ class AgentValidator:
                         action.long().item()
                     )
             solution = self.validation_envs[i].get_solution()
-            schedule = solution.schedule
-            makespan = solution.get_makespan()
+            if solution is not None:
+                schedule = solution.schedule
+                makespan = solution.get_makespan()
 
-            if i == 0:
-                self.gantt_rl_img = self.validation_envs[i].render_solution(schedule)
+                if i == 0:
+                    self.gantt_rl_img = self.validation_envs[i].render_solution(
+                        schedule
+                    )
 
-            if makespan < self.best_makespan_wheatley:
-                self.best_makespan_wheatley = makespan
-                self.save_csv(
-                    "wheatley",
-                    makespan,
-                    "unknown",
-                    schedule,
-                    self.validation_envs[i].sampled_jobs,
-                )
+                if makespan < self.best_makespan_wheatley[i]:
+                    self.best_makespan_wheatley[i] = makespan
+                    self.save_csv(
+                        f"wheatley_{i}",
+                        makespan,
+                        "unknown",
+                        schedule,
+                        self.validation_envs[i].sampled_jobs,
+                    )
 
-            mean_makespan += makespan / self.n_validation_env
+                mean_makespan += makespan / self.n_validation_env
+            else:
+                schedule = None
+                state = self.validation_envs[i].state
+                mean_makespan += state.undoable_makespan / self.n_validation_env
+                self.gantt_rl_img = self.validation_envs[i].render_fail()
 
             if self.fixed_validation:
                 or_tools_makespan, or_tools_schedule, optimal = self.fixed_ortools[i]
@@ -359,10 +382,10 @@ class AgentValidator:
                 )
                 self.ortools_env_zero_is_optimal = optimal
 
-            if or_tools_makespan < self.best_makespan_ortools:
-                self.best_makespan_ortools = or_tools_makespan
+            if or_tools_makespan < self.best_makespan_ortools[i]:
+                self.best_makespan_ortools[i] = or_tools_makespan
                 self.save_csv(
-                    "ortools",
+                    f"ortools_{i}",
                     or_tools_makespan,
                     optimal,
                     or_tools_schedule,
