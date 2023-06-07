@@ -22,16 +22,17 @@
 #
 
 
+from functools import partial
+
+import numpy as np
 import torch
+from torch.distributions.categorical import Categorical
 
 from models.agent import Agent
 from models.jssp_gnn_dgl import JSSPGnnDGL as GnnDGL
 from models.jssp_gnn_tokengt import JSSPGnnTokenGT as GnnTokenGT
 from models.mlp import MLP
-from torch.distributions.categorical import Categorical
-from utils.utils import obs_as_tensor_add_batch_dim, obs_as_tensor, rebatch_obs
-from functools import partial
-import numpy as np
+from utils.utils import obs_as_tensor, obs_as_tensor_add_batch_dim, rebatch_obs
 
 
 class JSSPAgent(Agent):
@@ -150,7 +151,6 @@ class JSSPAgent(Agent):
                 n_layers_features_extractor=agent_specification.n_layers_features_extractor,
                 hidden_dim_features_extractor=agent_specification.hidden_dim_features_extractor,
                 n_attention_heads=agent_specification.n_attention_heads,
-                reverse_adj=agent_specification.reverse_adj,
                 residual=agent_specification.residual_gnn,
                 normalize=agent_specification.normalize_gnn,
                 conflicts=agent_specification.conflicts,
@@ -158,7 +158,6 @@ class JSSPAgent(Agent):
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(
                 input_dim_features_extractor=env_specification.n_features,
-                device=agent_specification.device,
                 max_n_nodes=env_specification.max_n_nodes,
                 max_n_machines=env_specification.max_n_machines,
                 conflicts=agent_specification.conflicts,
