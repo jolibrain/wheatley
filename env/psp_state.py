@@ -628,6 +628,7 @@ class PSPState:
             self.update_completion_times(n)
 
     def update_completion_times(self, node_id):
+        closed_nodes = []
         if node_id is None:
             open_nodes = np.where(np.array(self.problem_graph.in_degree())[:, 1] == 0)[
                 0
@@ -636,6 +637,7 @@ class PSPState:
             open_nodes = [node_id]
         while open_nodes:
             cur_node_id = open_nodes.pop(0)
+            closed_nodes.append(cur_node_id)
 
             if self.problem_graph.in_degree(cur_node_id) == 0:
                 max_tct_predecessors = np.zeros((3))
@@ -665,9 +667,11 @@ class PSPState:
                 self.set_tct_real(cur_node_id, new_completion_time_real)
 
                 for successor in self.problem_graph.successors(cur_node_id):
+                    if successor in open_nodes:
+                        continue
                     to_open = True
                     for p in self.problem_graph.predecessors(successor):
-                        if p in open_nodes:
+                        if p not in closed_nodes:
                             to_open = False
                             break
                     if to_open:
