@@ -58,6 +58,7 @@ class GraphFeatureTokenizer(nn.Module):
         type_id,
         hidden_dim,
         n_layers,
+        factored_rp,
     ):
         super(GraphFeatureTokenizer, self).__init__()
 
@@ -79,8 +80,10 @@ class GraphFeatureTokenizer(nn.Module):
             self.edge_type_embedder = torch.nn.Embedding(7, hidden_dim)
 
             self.rc_att_embedder = torch.nn.Linear(2, hidden_dim)
-            # self.rp_att_embedder = torch.nn.Linear(3, hidden_dim)
-            self.rp_att_embedder = torch.nn.Linear(3 * max_n_resources, hidden_dim)
+            if factored_rp:
+                self.rp_att_embedder = torch.nn.Linear(3 * max_n_resources, hidden_dim)
+            else:
+                self.rp_att_embedder = torch.nn.Linear(3, hidden_dim)
 
         self.graph_token = nn.Embedding(1, hidden_dim)
         self.null_token = nn.Embedding(1, hidden_dim)  # this is optional

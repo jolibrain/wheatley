@@ -94,14 +94,16 @@ class PSPAgent(Agent):
                 type_id=True,
                 transformer_flavor=agent_specification.transformer_flavor,
                 layer_pooling=agent_specification.layer_pooling,
-                dropout=agent_specification.dropout,
+                dropout=0.0,
                 attention_dropout=agent_specification.dropout,
                 act_dropout=agent_specification.dropout,
+                lap_node_id_eig_dropout=agent_specification.dropout,
                 cache_lap_node_id=agent_specification.cache_lap_node_id,
                 performer_nb_features=agent_specification.performer_nb_features,
                 performer_feature_redraw_interval=agent_specification.performer_feature_redraw_interval,
                 performer_generalized_attention=agent_specification.performer_generalized_attention,
                 performer_auto_check_redraw=agent_specification.performer_auto_check_redraw,
+                factored_rp=env_specification.factored_rp,
             )
         else:
             print("unknown fe_type: ", agent_specification.fe_type)
@@ -182,6 +184,7 @@ class PSPAgent(Agent):
                 performer_nb_features=agent_specification.performer_nb_features,
                 performer_feature_redraw_interval=agent_specification.performer_feature_redraw_interval,
                 performer_redraw_interval=agent_specification.performer_redraw_interval,
+                factored_rp=env_specification.factored_rp,
             )
         value_net = MLP(
             len(agent_specification.net_arch["vf"]),

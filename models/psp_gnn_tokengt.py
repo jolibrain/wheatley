@@ -21,7 +21,7 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from .tokengt.tokengt_graph_encoder import init_graphormer_params, TokenGTGraphEncoder
+from .tokengt.tokengt_graph_encoder import TokenGTGraphEncoder
 import torch
 from torch.nn import LayerNorm
 from utils.psp_agent_observation import PSPAgentObservation as AgentObservation
@@ -61,6 +61,7 @@ class PSPGnnTokenGT(torch.nn.Module):
         apply_graphormer_init=True,
         activation_fn=torch.nn.functional.gelu,
         layer_pooling="last",
+        factored_rp=True,
     ):
         super().__init__()
         self.layer_pooling = layer_pooling
@@ -69,6 +70,8 @@ class PSPGnnTokenGT(torch.nn.Module):
             self.laplacian_pe_cache = {}
         else:
             self.laplacian_pe_cache = None
+
+        self.factored_rp = factored_rp
 
         if self.layer_pooling == "all":
             self.features_dim = encoder_embed_dim * (encoder_layers + 1) * 2
@@ -129,6 +132,7 @@ class PSPGnnTokenGT(torch.nn.Module):
             apply_graphormer_init=apply_graphormer_init,
             activation_fn=activation_fn,
             # >
+            factored_rp=self.factored_rp,
         )
 
         self.lm_head_transform_weight = torch.nn.Linear(
@@ -149,7 +153,7 @@ class PSPGnnTokenGT(torch.nn.Module):
             laplacian_pe_cache=self.laplacian_pe_cache,
             n_laplacian_eigv=self.lap_node_id_k,
             bidir=False,
-            factored_rp=True,
+            factored_rp=self.factored_rp,
             max_n_resources=self.max_n_resources,
         ).to_graph()
 

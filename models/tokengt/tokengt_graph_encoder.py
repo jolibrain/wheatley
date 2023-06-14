@@ -63,6 +63,7 @@ def init_graphormer_params(module):
         normal_(module.to_q.weight.data)
         normal_(module.to_k.weight.data)
         normal_(module.to_v.weight.data)
+        # normal_(module.to_out.weight.data)
 
 
 class TokenGTGraphEncoder(nn.Module):
@@ -92,13 +93,14 @@ class TokenGTGraphEncoder(nn.Module):
         dropout: float = 0.1,
         attention_dropout: float = 0.1,
         activation_dropout: float = 0.1,
-        encoder_normalize_before: bool = True,
+        encoder_normalize_before: bool = False,
         layernorm_style: str = "prenorm",
         apply_graphormer_init: bool = False,
         activation_fn=torch.nn.functional.gelu,
         embed_scale: float = None,
         return_attention: bool = False,
         permute=False,
+        factored_rp=False,
     ) -> None:
 
         super().__init__()
@@ -123,6 +125,7 @@ class TokenGTGraphEncoder(nn.Module):
             type_id=type_id,
             hidden_dim=embedding_dim,
             n_layers=num_encoder_layers,
+            factored_rp=factored_rp,
         )
         self.embed_scale = embed_scale
 
