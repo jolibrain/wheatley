@@ -27,7 +27,7 @@ class PSPState:
         observe_conflicts_as_cliques=True,
         resource_model="flowGraph",  # or timeline
         normalize_features=True,
-        forget_past=True,
+        forget_past=False,
     ):
         self.problem = problem
         self.problem_description = problem_description
