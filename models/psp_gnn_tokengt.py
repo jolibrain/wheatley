@@ -62,6 +62,7 @@ class PSPGnnTokenGT(torch.nn.Module):
         activation_fn=torch.nn.functional.gelu,
         layer_pooling="last",
         factored_rp=True,
+        factored_rc=True,
     ):
         super().__init__()
         self.layer_pooling = layer_pooling
@@ -72,6 +73,7 @@ class PSPGnnTokenGT(torch.nn.Module):
             self.laplacian_pe_cache = None
 
         self.factored_rp = factored_rp
+        self.factored_rc = factored_rc
 
         if self.layer_pooling == "all":
             self.features_dim = encoder_embed_dim * (encoder_layers + 1) * 2
@@ -133,6 +135,7 @@ class PSPGnnTokenGT(torch.nn.Module):
             activation_fn=activation_fn,
             # >
             factored_rp=self.factored_rp,
+            factored_rc=self.factored_rc,
         )
 
         self.lm_head_transform_weight = torch.nn.Linear(
@@ -154,7 +157,9 @@ class PSPGnnTokenGT(torch.nn.Module):
             n_laplacian_eigv=self.lap_node_id_k,
             bidir=False,
             factored_rp=self.factored_rp,
+            factored_rc=self.factored_rc,
             max_n_resources=self.max_n_resources,
+            add_rp=False,
         ).to_graph()
 
         max_node_num = max([gr.num_nodes() for gr in g_list])
@@ -167,18 +172,24 @@ class PSPGnnTokenGT(torch.nn.Module):
             x = inner_states[-1]  # B x T x C
             # last LN does no good
             # x = self.layer_norm(self.activation_fn()(self.lm_head_transform_weight(x)))
-            x = self.lm_head_transform_weight(x)
+            # x = self.lm_head_transform_weight(x)
+            # x = self.activation_fn()(self.lm_head_transform_weight(x))
+            # x = self.activation_fn()(x)
             node_rep = x[:, 2 : max_node_num + 2, :]
+            graph_rep = x[:, 0, :]
         else:
-            graph_reps = [rep[:, 0, :] for rep in inner_states]
-            graph_rep = torch.cat(graph_reps, dim=1)
+            # graph_reps = [rep[:, 0, :] for rep in inner_states]
+            # graph_rep = torch.cat(graph_reps, dim=1)
             # istates = [self.layer_norm(self.activation_fn()(self.lm_head_transform_weight(rep))) for rep in inner_states]
             # last LN does no good
-            istates = [
-                self.activation_fn()(self.lm_head_transform_weight(rep))
-                for rep in inner_states
-            ]
-            node_rep = torch.cat(istates, dim=2)[:, 2 : max_node_num + 2, :]
+            # istates = [
+            #     self.activation_fn()(self.lm_head_transform_weight(rep))
+            #     for rep in inner_states
+            # ]
+            istates = inner_states  # remove last linear + activation
+            all_rep = torch.cat(istates, dim=2)
+            node_rep = all_rep[:, 2 : max_node_num + 2, :]
+            graph_rep = all_rep[:, 0, :]
         node_rep = torch.nn.functional.pad(
             node_rep,
             (0, 0, 0, self.max_n_nodes - node_rep.shape[1]),
