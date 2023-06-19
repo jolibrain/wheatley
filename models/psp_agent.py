@@ -104,6 +104,7 @@ class PSPAgent(Agent):
                 performer_generalized_attention=agent_specification.performer_generalized_attention,
                 performer_auto_check_redraw=agent_specification.performer_auto_check_redraw,
                 factored_rp=env_specification.factored_rp,
+                factored_rc=env_specification.factored_rc,
             )
         else:
             print("unknown fe_type: ", agent_specification.fe_type)
@@ -157,6 +158,7 @@ class PSPAgent(Agent):
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
+                factored_rc=env_specification.factored_rc,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(
@@ -185,6 +187,7 @@ class PSPAgent(Agent):
                 performer_feature_redraw_interval=agent_specification.performer_feature_redraw_interval,
                 performer_redraw_interval=agent_specification.performer_redraw_interval,
                 factored_rp=env_specification.factored_rp,
+                factored_rc=env_specification.factored_rc,
             )
         value_net = MLP(
             len(agent_specification.net_arch["vf"]),
