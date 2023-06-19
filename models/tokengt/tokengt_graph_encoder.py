@@ -101,6 +101,7 @@ class TokenGTGraphEncoder(nn.Module):
         return_attention: bool = False,
         permute=False,
         factored_rp=False,
+        factored_rc=False,
     ) -> None:
 
         super().__init__()
@@ -126,6 +127,7 @@ class TokenGTGraphEncoder(nn.Module):
             hidden_dim=embedding_dim,
             n_layers=num_encoder_layers,
             factored_rp=factored_rp,
+            factored_rc=factored_rc,
         )
         self.embed_scale = embed_scale
 
