@@ -540,6 +540,7 @@ def compute_resources_graph_torch(r_info):
     # both directions are created at once
     conflicts_val = r_info[conflicts[0], conflicts[2]]
     conflicts_val_r = r_info[conflicts[1], conflicts[2]]
+
     return (
         torch.stack([conflicts[0], conflicts[1]]),
         conflicts[2],
@@ -730,3 +731,23 @@ def get_obs(b_obs, mb_ind):
     for key in b_obs:
         minibatched_obs[key] = b_obs[key][mb_ind]
     return minibatched_obs
+
+
+def factor_rc(edges, rid, rval, max_n_resources):
+    edge_index = {}
+    new_edges = []
+    # new_att = []
+    new_att = torch.zeros((edges.shape[1], max_n_resources))
+    for i in range(edges.shape[1]):
+        # e = (edges[0][i].item(), edges[1][i].item())
+        e = tuple(edges[:, i].tolist())
+        if e not in edge_index:
+            # new_att.append(torch.zeros((1, max_n_resources)))
+            edge_index[e] = len(new_edges)
+            new_edges.append(e)
+        # new_att[edge_index[e]][0, rid[i]] = rval[i]
+        new_att[edge_index[e], rid[i]] = rval[i]
+    return (
+        torch.tensor(new_edges).t(),
+        new_att[: len(new_edges), :],
+    )  # torch.cat(new_att)

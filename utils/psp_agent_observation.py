@@ -27,9 +27,7 @@
 import torch
 import numpy as np
 from models.tokengt.utils import get_laplacian_pe_simple
-from .utils import (
-    compute_resources_graph_torch,
-)
+from .utils import compute_resources_graph_torch, factor_rc
 import dgl
 import time
 
@@ -57,7 +55,15 @@ class PSPAgentObservation:
 
     @classmethod
     def build_graph(
-        cls, n_edges, edges, nnodes, feats, bidir, factored_rp, max_n_resources
+        cls,
+        n_edges,
+        edges,
+        nnodes,
+        feats,
+        bidir,
+        factored_rp,
+        factored_rc,
+        max_n_resources,
     ):
         edges0 = edges[0]
         edges1 = edges[1]
@@ -87,7 +93,12 @@ class PSPAgentObservation:
         else:
             gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
 
-        gnew.edata["att_rc"] = torch.zeros((nn_edges, 2), dtype=torch.float32)
+        if factored_rc:
+            gnew.edata["arr_rc"] = torch.zeros(
+                (nn_edges, max_n_resources), dtype=torch.float32
+            )
+        else:
+            gnew.edata["att_rc"] = torch.zeros((nn_edges, 2), dtype=torch.float32)
         return gnew
 
     @classmethod
@@ -306,7 +317,9 @@ class PSPAgentObservation:
         n_laplacian_eigv=50,
         bidir=True,
         factored_rp=False,
+        factored_rc=False,
         max_n_resources=-1,
+        add_rp=True,
     ):
 
         # batching on CPU for performance reasons...
@@ -341,8 +354,14 @@ class PSPAgentObservation:
                     one_rc_edges, rid, rval, rvalr = compute_resources_graph_torch(
                         orig_feat[i, :, 9:]
                     )
+                    if factored_rc:
+                        one_rc_edges, att = factor_rc(
+                            one_rc_edges, rid, rval, max_n_resources
+                        )
+                    else:
+                        att = torch.stack([rid, rval, rvalr]).t()
+
                     rc_edges.append(one_rc_edges)
-                    att = torch.stack([rid, rval, rvalr]).t()
                     rc_att.append(att)
                     nce = torch.LongTensor([one_rc_edges.shape[1]])
                     all_nce.append(nce)
@@ -364,11 +383,12 @@ class PSPAgentObservation:
                 orig_feat[i, : nnodes.item(), :],
                 bidir,
                 factored_rp,
+                factored_rc,
                 max_n_resources,
             )
 
             # resource pririty edges
-            if rp_edges.nelement() != 0:
+            if rp_edges.nelement() != 0 and add_rp:
 
                 if factored_rp:
                     gnew = PSPAgentObservation.add_edges(
@@ -418,13 +438,22 @@ class PSPAgentObservation:
 
             # resource conflicts edges
             if conflicts == "clique":
-                gnew = PSPAgentObservation.add_edges(
-                    gnew,
-                    "rc",
-                    rc_edges[i][:, : n_rc_edges[i].item()],
-                    rc_att[i][: n_rc_edges[i].item(), 0],
-                    rc_att[i][: n_rc_edges[i].item(), 1:],
-                )
+                if factored_rc:
+                    gnew = PSPAgentObservation.add_edges(
+                        gnew,
+                        "rc",
+                        rc_edges[i][:, : n_rc_edges[i].item()],
+                        torch.zeros((n_rc_edges[i].item())),
+                        rc_att[i][: n_rc_edges[i].item(), :],
+                    )
+                else:
+                    gnew = PSPAgentObservation.add_edges(
+                        gnew,
+                        "rc",
+                        rc_edges[i][:, : n_rc_edges[i].item()],
+                        rc_att[i][: n_rc_edges[i].item(), 0],
+                        rc_att[i][: n_rc_edges[i].item(), 1:],
+                    )
 
             # TODO : add job_id edges, ie link modes that are for same job
 
