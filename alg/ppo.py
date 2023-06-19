@@ -322,6 +322,7 @@ class PPO:
 
             entropy_losses = []
             pg_losses = []
+            pg_losses_unclipped = []
             value_losses = []
             approx_kl_divs = []
             losses = []
@@ -356,9 +357,15 @@ class PPO:
                         # calculate approx_kl http://joschu.net/blog/kl-approx.html
                         approx_kl = ((ratio - 1) - logratio).mean()
                         approx_kl_divs.append(approx_kl.item())
-                        clipfracs += [
-                            ((ratio - 1.0).abs() > self.clip_coef).float().mean().item()
-                        ]
+                        if self.clip_coef is None:
+                            clipfracs += [0]
+                        else:
+                            clipfracs += [
+                                ((ratio - 1.0).abs() > self.clip_coef)
+                                .float()
+                                .mean()
+                                .item()
+                            ]
 
                     if self.target_kl is not None:
                         approx_kl_divs_on_epoch.append(approx_kl.item())
@@ -371,10 +378,13 @@ class PPO:
 
                     # Policy loss
                     pg_loss1 = -mb_advantages * ratio
-                    pg_loss2 = -mb_advantages * torch.clamp(
-                        ratio, 1 - self.clip_coef, 1 + self.clip_coef
-                    )
-                    pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                    if self.clip_coef is not None:
+                        pg_loss2 = -mb_advantages * torch.clamp(
+                            ratio, 1 - self.clip_coef, 1 + self.clip_coef
+                        )
+                        pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                    else:
+                        pg_loss = pg_loss1.mean()
 
                     # Value loss
                     newvalue = newvalue.view(-1)
@@ -400,6 +410,7 @@ class PPO:
                     losses.append(loss.item())
                     value_losses.append(v_loss.item())
                     pg_losses.append(pg_loss.item())
+                    pg_losses_unclipped.append(pg_loss1.mean().item())
                     entropy_losses.append(entropy_loss.item())
 
                     loss.backward()
@@ -411,14 +422,14 @@ class PPO:
                         iter_it = 0
 
                 if self.target_kl is not None:
-                    if np.mean(approx_kl_divs_on_epoch) > self.target_kl:
+                    if np.max(approx_kl_divs_on_epoch) > self.target_kl:
                         print(
-                            "stopping update due to too high kl divergence after epoch",
+                            "\nstopping update due to too high kl divergence after epoch",
                             epoch,
                             " / ",
                             self.update_epochs,
                         )
-
+                        self.optimizer.zero_grad()
                         break
 
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
@@ -431,6 +442,10 @@ class PPO:
             if log_interval is not None and iteration % log_interval == 0:
                 self.logger.record("train/entropy_loss", np.mean(entropy_losses))
                 self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
+                self.logger.record(
+                    "train/policy_gradient_loss_unclipped",
+                    np.mean(pg_losses_unclipped),
+                )
                 self.logger.record("train/value_loss", np.mean(value_losses))
                 self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
                 self.logger.record("train/clip_fraction", np.mean(clipfracs))
@@ -441,7 +456,10 @@ class PPO:
                     self.n_epochs,
                     exclude="tensorboard",
                 )
-                self.logger.record("train/clip_range", self.clip_coef)
+                if self.clip_coef is not None:
+                    self.logger.record("train/clip_range", self.clip_coef)
+                else:
+                    self.logger.record("train/clip_range", 0.0)
                 fps = int(self.global_step / (time.time() - self.start_time))
                 self.logger.record("time/iterations", iteration, exclude="tensorboard")
                 if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
