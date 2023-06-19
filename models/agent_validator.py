@@ -141,6 +141,7 @@ class AgentValidator:
         self.custom_makespans = []
         self.entropy_losses = []
         self.policy_gradient_losses = []
+        self.policy_gradient_losses_unclipped = []
         self.value_losses = []
         self.losses = []
         self.approx_kls = []
@@ -513,6 +514,9 @@ class AgentValidator:
         self.policy_gradient_losses.append(
             alg.logger.name_to_value["train/policy_gradient_loss"]
         )
+        self.policy_gradient_losses_unclipped.append(
+            alg.logger.name_to_value["train/policy_gradient_loss_unclipped"]
+        )
         self.value_losses.append(
             alg.vf_coef * alg.logger.name_to_value["train/value_loss"]
         )
@@ -548,16 +552,24 @@ class AgentValidator:
             self.losses,
             self.value_losses,
             self.policy_gradient_losses,
+            self.policy_gradient_losses_unclipped,
             self.entropy_losses,
         ]
         opts = {
-            "legend": ["loss", "value_loss", "policy_gradient_loss", "entropy_loss"],
+            "legend": [
+                "loss",
+                "value_loss",
+                "policy_gradient_loss",
+                "policy_gradient_loss_unclipped",
+                "entropy_loss",
+            ],
         }
         self.vis.line(X=X, Y=np.array(Y_list).T, win="losses", opts=opts)
 
         charts = {
             "entropy_loss": self.entropy_losses,
             "policy_gradient_loss": self.policy_gradient_losses,
+            "policy_gradient_loss_unclipped": self.policy_gradient_losses_unclipped,
             "value_loss": self.value_losses,
             "loss": self.losses,
             "approx_kl": self.approx_kls,
