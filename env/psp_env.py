@@ -45,6 +45,7 @@ class PSPEnv(gym.Env):
             env_specification.observe_conflicts_as_cliques
         )
         self.deterministic = problem_description.deterministic
+        self.forget_past = env_specification.forget_past
         self.n_features = self.env_specification.n_features
         self.observation_space = self.env_specification.observation_space
         self.action_space = self.env_specification.action_space
@@ -159,6 +160,7 @@ class PSPEnv(gym.Env):
             self.problem,
             self.deterministic,
             observe_conflicts_as_cliques=self.observe_conflicts_as_cliques,
+            forget_past=self.forget_past,
         )
 
     def _create_transition_model(self):

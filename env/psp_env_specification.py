@@ -41,6 +41,8 @@ class PSPEnvSpecification:
         observe_real_duration_when_affect,
         do_not_observe_updated_bounds,
         factored_rp,
+        factored_rc,
+        forget_past,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -53,6 +55,8 @@ class PSPEnvSpecification:
         self.normalize_input = normalize_input
         self.input_list = input_list
         self.factored_rp = factored_rp
+        self.factored_rc = factored_rc
+        self.forget_past = forget_past
         if "selectable" in input_list:
             self.input_list.remove("selectable")
         if "duration" in input_list:
