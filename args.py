@@ -197,11 +197,11 @@ parser.add_argument(
 
 # =================================================AGENT SPECIFICATION======================================================
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
-parser.add_argument("--clip_range", type=float, default=0.25, help="Clipping parameter")
+parser.add_argument("--clip_range", type=float, default=None, help="Clipping parameter")
 parser.add_argument(
     "--target_kl",
     type=float,
-    default=0.04,
+    default=None,
     help="Limit the KL divergence between updates",
 )
 parser.add_argument("--ent_coef", type=float, default=0.005, help="Entropy coefficient")
@@ -414,6 +414,18 @@ parser.add_argument(
     default=False,
     action="store_true",
     help="factor resource priority link (automatically used  for tokengt)",
+)
+parser.add_argument(
+    "--factored_rc",
+    default=False,
+    action="store_true",
+    help="factor resource conflicts links (automatically used  for tokengt)",
+)
+parser.add_argument(
+    "--forget_past",
+    default=False,
+    action="store_true",
+    help="forget some edges concerning decision already made",
 )
 
 
