@@ -89,7 +89,7 @@ class TokenGTGraphEncoderLayer(nn.Module):
         )
 
         # layer norm associated with the self attention layer
-        self.self_attn_layer_norm = LayerNorm(self.embedding_dim)
+        # self.self_attn_layer_norm = LayerNorm(self.embedding_dim)
 
         # drop path for stochastic depth
         self.drop_path1 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
@@ -103,7 +103,7 @@ class TokenGTGraphEncoderLayer(nn.Module):
         )
 
         # layer norm associated with the position wise feed-forward NN
-        self.final_layer_norm = LayerNorm(self.embedding_dim)
+        # self.final_layer_norm = LayerNorm(self.embedding_dim)
 
         # drop path for stochastic depth
         self.drop_path2 = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
@@ -178,7 +178,7 @@ class TokenGTGraphEncoderLayer(nn.Module):
         # x: T x B x C
         if self.layernorm_style == "prenorm":
             residual = x
-            x = self.self_attn_layer_norm(x)
+            # x = self.self_attn_layer_norm(x)
             if self.linear_transformer:
                 x = self.self_attn(x.transpose(0, 1), input_mask=self_attn_padding_mask)
                 x = x.transpose(0, 1)
