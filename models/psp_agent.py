@@ -76,6 +76,7 @@ class PSPAgent(Agent):
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
+                add_rp_edges=env_specification.add_rp_edges,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -155,6 +156,7 @@ class PSPAgent(Agent):
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
+                add_rp_edges=env_specification.add_rp_edges,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(

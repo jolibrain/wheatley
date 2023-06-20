@@ -135,9 +135,11 @@ def main():
         sample_n_jobs=args.sample_n_jobs,
         chunk_n_jobs=args.chunk_n_jobs,
         observe_conflicts_as_cliques=observe_clique,
+        add_rp_edges=args.add_rp_edges,
         observe_real_duration_when_affect=observe_real_duration_when_affect,
         do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
+        remove_old_resource_info=not args.use_old_resource_info,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:

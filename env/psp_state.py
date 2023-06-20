@@ -44,12 +44,14 @@ class PSPState:
 
         self.normalize = normalize_features
 
+        self.add_rp_edges = env_specification.add_rp_edges
         self.factored_rp = env_specification.factored_rp
 
         self.edge_index = {}
 
         self.resource_prec_edges = []
         self.resource_prec_att = []
+        self.remove_old_resource_info = env_specification.remove_old_resource_info
 
         # features :
         # 0: is_affected
@@ -158,6 +160,13 @@ class PSPState:
             self.resource_conf_val = None
             self.resource_conf_val_r = None
 
+    def reset_frontier(self):
+        self.nodes_in_frontier = set()
+        for r in self.resources:
+            for i in range(1, 4):
+                for fe in r[i].frontier:
+                    self.nodes_in_frontier.add(fe[1])
+
     def reset_resources(self):
         self.n_resources = self.problem["n_resources"]
         flat_res = np.array(
@@ -197,6 +206,8 @@ class PSPState:
                     )
                 )
         assert len(self.resources) == self.n_resources
+        if self.remove_old_resource_info:
+            self.reset_frontier()
 
     def reset_selectable(self):
         self.features[:, 1] = 0
@@ -240,6 +251,9 @@ class PSPState:
 
     def resource_usage(self, node_id, r):
         return self.features[node_id, 9 + r]
+
+    def remove_res(self, node_ids):
+        self.features[node_ids, 9:] = 0
 
     def selectables(self):
         return self.features[:, 1]
@@ -299,20 +313,27 @@ class PSPState:
             rce = None
             rca = None
 
-        if len(self.resource_prec_edges) > 0:
-            rpe = np.transpose(self.resource_prec_edges)
-            rpa = np.concatenate(self.resource_prec_att)
-        else:
-            rpe = None
-            rpa = None
+        if self.add_rp_edges:
+            if len(self.resource_prec_edges) > 0:
+                rpe = np.transpose(self.resource_prec_edges)
+                rpa = np.concatenate(self.resource_prec_att)
+            else:
+                rpe = None
+                rpa = None
+            return (
+                self.normalize_features(),
+                self.numpy_problem_graph,
+                rce,
+                rca,
+                rpe,
+                rpa,
+            )
 
         return (
             self.normalize_features(),
             self.numpy_problem_graph,
             rce,
             rca,
-            rpe,
-            rpa,
         )
 
     def affect_job(self, node_id):
@@ -320,6 +341,8 @@ class PSPState:
         self.compute_dates_on_affectation(node_id)
         self.mask_wrt_non_renewable_resources()
         self.update_completion_times_after(node_id)
+        if self.remove_old_resource_info:
+            self.remove_res_frontier()
 
     def mask_wrt_non_renewable_resources(self):
         selectables = np.where(self.features[:, 1] == 1)[0]
@@ -446,6 +469,10 @@ class PSPState:
         assert self.selectable(nodeid)
         # all modes become unselectable
         self.set_unselectable(self.modes(self.jobid(nodeid)))
+        if self.remove_old_resource_info:
+            other_modes = self.modes(self.jobid(nodeid)).copy()
+            other_modes.remove(nodeid)
+            self.remove_res(other_modes)
         # mark as affected
         self.set_affected(nodeid)
         # make sucessor selectable, if other parents *jobs* are affected
@@ -561,7 +588,7 @@ class PSPState:
         for i in range(3):
             self.consume(i + 1, node_id, start[i + 1], self.tct(node_id)[i])
 
-        if self.resource_model == "flowGraph":
+        if self.resource_model == "flowGraph" and self.add_rp_edges:
             # extract graph info
             self.update_resource_prec(constraining_resource)
 
@@ -672,3 +699,14 @@ class PSPState:
                             break
                     if to_open:
                         open_nodes.append(successor)
+
+    def remove_res_frontier(self):
+        new_nodes_in_frontier = set()
+        for r in self.resources:
+            for i in range(1, 4):
+                for fe in r[i].frontier:
+                    new_nodes_in_frontier.add(fe[1])
+
+        removed_from_frontier = self.nodes_in_frontier - new_nodes_in_frontier
+        self.remove_res(list(removed_from_frontier))
+        self.nodes_in_frontier = new_nodes_in_frontier

@@ -349,6 +349,21 @@ parser.add_argument(
     choices=["att", "clique", "node"],
 )
 parser.add_argument(
+    "--add_rp_edges",
+    default=False,
+    action="store_true",
+    help="take into account resource precedence edges",
+)
+
+parser.add_argument(
+    "--use_old_resource_info",
+    default=False,
+    action="store_true",
+    help="take into account already affected task resource info",
+)
+
+
+parser.add_argument(
     "--precompute_cliques",
     default=False,
     action="store_true",
