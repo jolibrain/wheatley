@@ -57,7 +57,15 @@ class PSPAgentObservation:
 
     @classmethod
     def build_graph(
-        cls, n_edges, edges, nnodes, feats, bidir, factored_rp, max_n_resources
+        cls,
+        n_edges,
+        edges,
+        nnodes,
+        feats,
+        bidir,
+        factored_rp,
+        add_rp_edges,
+        max_n_resources,
     ):
         edges0 = edges[0]
         edges1 = edges[1]
@@ -80,12 +88,13 @@ class PSPAgentObservation:
             nn_edges = n_edges
         gnew.edata["type"] = torch.LongTensor(type0)
         gnew.edata["rid"] = torch.zeros((nn_edges), dtype=torch.int)
-        if factored_rp:
-            gnew.edata["att_rp"] = torch.zeros(
-                (nn_edges, 3 * max_n_resources), dtype=torch.float32
-            )
-        else:
-            gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
+        if add_rp_edges != "none":
+            if factored_rp:
+                gnew.edata["att_rp"] = torch.zeros(
+                    (nn_edges, 3 * max_n_resources), dtype=torch.float32
+                )
+            else:
+                gnew.edata["att_rp"] = torch.zeros((nn_edges, 3), dtype=torch.float32)
 
         gnew.edata["att_rc"] = torch.zeros((nn_edges, 2), dtype=torch.float32)
         return gnew
@@ -128,9 +137,10 @@ class PSPAgentObservation:
             mnpre = _obs["n_pr_edges"].max().item()
             if mnpre > max_n_pr_edges:
                 max_n_pr_edges = mnpre
-            mnrpe = _obs["n_rp_edges"].max().item()
-            if mnrpe > max_n_rp_edges:
-                max_n_rp_edges = mnrpe
+            if "rp_edges" in _obs:
+                mnrpe = _obs["n_rp_edges"].max().item()
+                if mnrpe > max_n_rp_edges:
+                    max_n_rp_edges = mnrpe
             if "rc_edges" in _obs:
                 mnrce = _obs["n_rc_edges"].max().item()
                 if mrce > max_n_rc_edges:
@@ -228,7 +238,8 @@ class PSPAgentObservation:
             has_batch_dim = obs["features"].ndim == 3
             max_n_nodes = np.max(obs["n_nodes"])
             max_pr_edges = np.max(obs["n_pr_edges"])
-            max_rp_edges = np.max(obs["n_rp_edges"])
+            if "rp_edges" in obs:
+                max_rp_edges = np.max(obs["n_rp_edges"])
             if "rc_edges" in obs:
                 max_rc_edges = np.max(obs["n_rc_edges"])
             newobs = {}
@@ -306,6 +317,7 @@ class PSPAgentObservation:
         n_laplacian_eigv=50,
         bidir=True,
         factored_rp=False,
+        add_rp_edges="all",
         max_n_resources=-1,
     ):
 
@@ -314,9 +326,10 @@ class PSPAgentObservation:
 
         n_pr_edges = gym_observation["n_pr_edges"].long().to(torch.device("cpu"))
         pr_edges = gym_observation["pr_edges"].long().to(torch.device("cpu"))
-        n_rp_edges = gym_observation["n_rp_edges"].long().to(torch.device("cpu"))
-        rp_edges = gym_observation["rp_edges"].long().to(torch.device("cpu"))
-        rp_att = gym_observation["rp_att"].to(torch.device("cpu"))
+        if add_rp_edges != "none":
+            n_rp_edges = gym_observation["n_rp_edges"].long().to(torch.device("cpu"))
+            rp_edges = gym_observation["rp_edges"].long().to(torch.device("cpu"))
+            rp_att = gym_observation["rp_att"].to(torch.device("cpu"))
 
         orig_feat = gym_observation["features"]
         # .to(torch.device("cpu"))
@@ -364,11 +377,12 @@ class PSPAgentObservation:
                 orig_feat[i, : nnodes.item(), :],
                 bidir,
                 factored_rp,
+                add_rp_edges,
                 max_n_resources,
             )
 
-            # resource pririty edges
-            if rp_edges.nelement() != 0:
+            # resource priority edges
+            if add_rp_edges != "none" and rp_edges.nelement() != 0:
 
                 if factored_rp:
                     gnew = PSPAgentObservation.add_edges(

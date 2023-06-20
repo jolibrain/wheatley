@@ -59,6 +59,8 @@ class AgentSpecification:
         performer_feature_redraw_interval,
         performer_generalized_attention,
         performer_auto_check_redraw,
+        vnode,
+        update_edge_features,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -90,6 +92,8 @@ class AgentSpecification:
         self.performer_feature_redraw_interval = performer_feature_redraw_interval
         self.performer_generalized_attention = performer_generalized_attention
         self.performer_auto_check_redraw = performer_auto_check_redraw
+        self.vnode = vnode
+        self.update_edge_features = update_edge_features
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -164,6 +168,8 @@ class AgentSpecification:
                 f"Graph pooling type:               {self.graph_pooling.title()}\n"
                 f"Activation function of agent:     {self.mlp_act.title()}\n"
                 f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
+                f"Use VNode:                        {self.vnode}\n"
+                f"Update edge features:             {self.update_edge_features}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (

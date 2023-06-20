@@ -64,6 +64,7 @@ class TrainingSpecification:
         fe_lr,
         rpo,
         rpo_smoothing_param,
+        gae_lambda,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -91,6 +92,7 @@ class TrainingSpecification:
         self.freeze_graph = freeze_graph
         self.rpo = rpo
         self.rpo_smoothing_param = rpo_smoothing_param
+        self.gae_lambda = gae_lambda
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -133,6 +135,7 @@ class TrainingSpecification:
             f"Target KL:                        {self.target_kl}\n"
             f"Freeze graph:                     {self.freeze_graph}\n"
             f"Learning rate:                    {self.lr}\n"
+            f"GAE Lambda:                       {self.gae_lambda}\n"
             f"RPO:                              {self.rpo}\n"
             f"RPO smoothing:                    {self.rpo_smoothing_param}\n"
         )

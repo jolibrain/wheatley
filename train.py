@@ -135,6 +135,7 @@ def main(args, exp_name, path):
         fe_lr=args.fe_lr,
         rpo=args.rpo,
         rpo_smoothing_param=args.rpo_smoothing_param,
+        gae_lambda=args.gae_lambda,
     )
     training_specification.print_self()
 
@@ -198,6 +199,8 @@ def main(args, exp_name, path):
         performer_feature_redraw_interval=args.performer_redraw_interval,
         performer_generalized_attention=args.performer_generalized_attention,
         performer_auto_check_redraw=args.performer_auto_check_redraw,
+        vnode=args.vnode,
+        update_edge_features=not args.dont_update_edge_features,
     )
     agent_specification.print_self()
     # If we want to use a pretrained Agent, we only have to load it (if it exists)

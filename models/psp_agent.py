@@ -76,6 +76,10 @@ class PSPAgent(Agent):
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
+                add_rp_edges=env_specification.add_rp_edges,
+                add_self_loops=env_specification.remove_past_prec,
+                vnode=agent_specification.vnode,
+                update_edge_features=agent_specification.update_edge_features,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -126,6 +130,7 @@ class PSPAgent(Agent):
         # usually ppo use gain = np.sqrt(2) here
         # best so far below
         self.gnn.apply(partial(self.init_weights, gain=1.0, zero_bias=False))
+        # self.gnn.reset_egat()
         # usually ppo use gain = 0.01 here
         self.action_net.apply(partial(self.init_weights, gain=1.0, zero_bias=True))
         # usually ppo use gain = 1 here
@@ -155,6 +160,10 @@ class PSPAgent(Agent):
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
+                add_rp_edges=env_specification.add_rp_edges,
+                add_self_loops=env_specification.remove_old_nodes,
+                vnode=agent_specification.vnode,
+                update_edge_features=agent_specification.update_edge_features,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(

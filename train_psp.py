@@ -91,7 +91,7 @@ def main():
         validation_freq=1 if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,
-        custom_heuristic_name=args.custom_heuristic_name,
+        custom_heuristic_names=args.custom_heuristic_names,
         ortools_strategy=args.ortools_strategy,
         max_time_ortools=args.max_time_ortools,
         scaling_constant_ortools=args.scaling_constant_ortools,
@@ -114,6 +114,7 @@ def main():
         fe_lr=args.fe_lr,
         rpo=args.rpo,
         rpo_smoothing_param=args.rpo_smoothing_param,
+        gae_lambda=args.gae_lambda,
     )
     training_specification.print_self()
 
@@ -135,9 +136,12 @@ def main():
         sample_n_jobs=args.sample_n_jobs,
         chunk_n_jobs=args.chunk_n_jobs,
         observe_conflicts_as_cliques=observe_clique,
+        add_rp_edges=args.add_rp_edges,
         observe_real_duration_when_affect=observe_real_duration_when_affect,
         do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
+        remove_old_resource_info=not args.use_old_resource_info,
+        remove_past_prec=not args.keep_past_prec,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -176,6 +180,8 @@ def main():
         performer_feature_redraw_interval=args.performer_redraw_interval,
         performer_generalized_attention=args.performer_generalized_attention,
         performer_auto_check_redraw=args.performer_auto_check_redraw,
+        vnode=args.vnode,
+        update_edge_features=not args.dont_update_edge_features,
     )
     agent_specification.print_self()
 

@@ -43,8 +43,8 @@ class PSPEnvObservation:
         problem_edge_index,
         resource_conf_edges,
         resource_conf_att,
-        resource_prec_edges,
-        resource_prec_att,
+        resource_prec_edges=None,
+        resource_prec_att=None,
     ):
         """
         This should only hanlde cpu tensors, since it is used on the env side.
@@ -82,6 +82,7 @@ class PSPEnvObservation:
         self.resource_prec_edges = resource_prec_edges
         self.resource_prec_att = resource_prec_att
         self.env_specification = env_specification
+        self.add_rp_edges = env_specification.add_rp_edges
 
     def get_n_nodes(self):
         return self.n_nodes
@@ -92,6 +93,8 @@ class PSPEnvObservation:
         return self.resource_prec_edges.shape[1]
 
     def get_n_pr_edges(self):
+        if not self.problem_edge_index.any():
+            return 0
         return self.problem_edge_index.shape[1]
 
     def get_n_rc_edges(self):
@@ -107,11 +110,26 @@ class PSPEnvObservation:
         features[: self.features.shape[0], :] = self.features
         pr_edge_index = np.empty(self.env_specification.shape_pr, dtype=np.int64)
         pr_edge_index[:, : self.get_n_pr_edges()] = self.problem_edge_index
-        rp_edge_index = np.empty(self.env_specification.shape_rp, dtype=np.int64)
-        rp_att = np.empty(self.env_specification.shape_rp_att, dtype=np.float32)
-        if self.resource_prec_edges is not None:
-            rp_edge_index[:, : self.get_n_rp_edges()] = self.resource_prec_edges
-            rp_att[: self.get_n_rp_edges(), :] = self.resource_prec_att
+
+        ret = {
+            "n_jobs": self.n_jobs,
+            "n_nodes": self.n_modes,
+            "n_resources": self.n_resources,
+            "n_pr_edges": self.get_n_pr_edges(),
+            "n_rp_edges": self.get_n_rp_edges(),
+            "features": features,
+            "pr_edges": pr_edge_index,
+        }
+
+        if self.add_rp_edges != "none":
+            rp_edge_index = np.empty(self.env_specification.shape_rp, dtype=np.int64)
+            rp_att = np.empty(self.env_specification.shape_rp_att, dtype=np.float32)
+            if self.resource_prec_edges is not None:
+                rp_edge_index[:, : self.get_n_rp_edges()] = self.resource_prec_edges
+                rp_att[: self.get_n_rp_edges(), :] = self.resource_prec_att
+            ret["n_rp_edges"] = self.get_n_rp_edges()
+            ret["rp_edges"] = rp_edge_index
+            ret["rp_att"] = rp_att
 
         if self.observe_conflicts_as_cliques:
             rc_edge_index = np.empty(self.env_specification.shape_rc, dtype=np.int64)
@@ -119,29 +137,8 @@ class PSPEnvObservation:
             rc_att = np.empty(self.env_specification.shape_rc_att, dtype=np.float32)
             rc_att[: self.get_n_rc_edges(), :] = self.resource_conf_att
 
-            return {
-                "n_jobs": self.n_jobs,
-                "n_nodes": self.n_modes,
-                "n_resources": self.n_resources,
-                "n_pr_edges": self.get_n_pr_edges(),
-                "n_rp_edges": self.get_n_rp_edges(),
-                "n_rc_edges": self.get_n_rc_edges(),
-                "features": features,
-                "pr_edges": pr_edge_index,
-                "rp_edges": rp_edge_index,
-                "rc_edges": rc_edge_index,
-                "rc_att": rc_att,
-                "rp_att": rp_att,
-            }
-        else:
-            return {
-                "n_jobs": self.n_jobs,
-                "n_nodes": self.n_modes,
-                "n_resources": self.n_resources,
-                "n_pr_edges": self.get_n_pr_edges(),
-                "n_rp_edges": self.get_n_rp_edges(),
-                "features": features,
-                "pr_edges": pr_edge_index,
-                "rp_edges": rp_edge_index,
-                "rp_att": rp_att,
-            }
+            ret["n_rc_edges"] = self.get_n_rc_edges()
+            ret["rc_edges"] = rc_edge_index
+            ret["rc_att"] = rc_att
+
+        return ret

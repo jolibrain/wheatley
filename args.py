@@ -124,6 +124,7 @@ parser.add_argument(
 parser.add_argument(
     "--rpo_smoothing_param", type=float, default=1.0, help="RPO-style smoothing param"
 )
+parser.add_argument("--gae_lambda", type=float, default=0.95, help="GAE lambda param")
 
 parser.add_argument(
     "--optimizer",
@@ -205,6 +206,8 @@ parser.add_argument(
 # =================================================AGENT SPECIFICATION======================================================
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
 parser.add_argument("--clip_range", type=float, default=0.25, help="Clipping parameter")
+# parser.add_argument("--clip_range", type=float, default=None, help="Clipping parameter")
+
 parser.add_argument(
     "--target_kl",
     type=float,
@@ -355,6 +358,36 @@ parser.add_argument(
     default="clique",
     choices=["att", "clique", "node"],
 )
+parser.add_argument(
+    "--add_rp_edges",
+    default="all",
+    choices=["all", "frontier", "frontier_strict", "none"],
+    help="take into account resource precedence edges",
+)
+
+parser.add_argument(
+    "--use_old_resource_info",
+    default=False,
+    action="store_true",
+    help="take into account already affected task resource info",
+)
+
+parser.add_argument(
+    "--keep_past_prec",
+    default=False,
+    action="store_true",
+    help="keep past precedencies",
+)
+parser.add_argument(
+    "--vnode", default=False, action="store_true", help="add vnode to MP-graph"
+)
+parser.add_argument(
+    "--dont_update_edge_features",
+    default=False,
+    action="store_true",
+    help="do not update edge features",
+)
+
 parser.add_argument(
     "--precompute_cliques",
     default=False,
