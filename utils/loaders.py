@@ -1,5 +1,6 @@
 import numpy as np
 import pathlib
+from utils.rcpsp import Rcpsp
 import glob
 
 
@@ -475,3 +476,115 @@ class PSPLoader:
             "max_resource_availability": max_resource_availability,
             "max_resource_request": max_resource_request,
         }
+        
+    def load_single_rcpsp(self, problem_file):
+        self.f = open(problem_file, "r")
+        self.nextline()
+
+        if self.generate_bounds is not None:
+            print(
+                "If not present, generating random duration bounds of ",
+                self.generate_bounds,
+                " %",
+            )
+        job_info = []
+        durations = []
+        resources = []
+        n_modes = 0
+        max_resource_availability = 0
+        max_resource_request = 0
+
+         # Number of jobs in the graph
+        n_jobs = 0
+        # Number of modes for each job
+        n_modes_per_job = []
+        # Successors for each job. Successors are given by a list
+        successors = []
+        # Capacity of each resource
+        resource_availabilities = []
+        # Number of renewable resources
+        n_renewable_resources = 0
+        # Number of non renewable resources
+        n_nonrenewable_resources = 0
+        # Number of doubly constrained resources
+        n_doubly_constrained_resources = 0
+        # Durations for each job and for each mode. Durations are expressed through an array [MIN, MAX, MOD]
+        durations = []
+        # Consumption for each job and for each mode of jobs
+        resources_cons = []
+        
+        self.firstchar("*")
+        self.firstword("file")
+        self.firstword("initial")
+        self.firstchar("*")
+        self.firstword("projects")
+        self.firstword("jobs", True)
+        n_jobs = int(self.sline[4])
+
+        self.nextline()
+        self.firstword("horizon")
+        self.firstword("RESOURCES")
+        self.word(1, "renewable", True)
+        n_renewable_resources = int(self.sline[3])
+        self.nextline()
+        self.word(1, "nonrenewable", True)
+        n_nonrenewable_resources = int(self.sline[3])
+        self.nextline()
+        self.word(1, "doubly", True)
+        n_doubly_constrained_resources = int(self.sline[4])
+        n_resources = (
+            n_renewable_resources
+            + n_nonrenewable_resources
+            + n_doubly_constrained_resources
+        )
+        self.nextline()
+        self.firstchar("*")
+        self.firstword("PROJECT")
+        self.firstword("pronr.")
+        reldate = self.sline[2]
+        duedate = self.sline[3]
+        tardcost = self.sline[4]
+        MPMtime = self.sline[5]
+        self.nextline()
+        self.firstchar("*")
+        self.firstword("PRECEDENCE")
+        self.firstword("jobnr.")
+        for j in range(n_jobs):
+            n_modes += int(self.sline[1])
+            n_modes_per_job.append(int(self.sline[1]))
+            successors.append([int(s) for s in self.sline[3:]])
+            self.nextline()
+        self.firstchar("*")
+        self.firstword("REQUESTS/DURATIONS:")
+        self.firstword("jobnr.")
+        self.firstchar("-")
+        for j in range(n_jobs):
+            job_durations = []
+            job_resources = []
+            job_durations.append([int(self.sline[2])])
+            req = [int(d) for d in self.sline[3:]]
+            job_resources.append(req)
+            self.nextline()
+            # Starts at 1 so that the code is only executed for jobs that have more than 1 mode
+            for m in range(1,n_modes_per_job[j]):
+                job_durations.append([int(self.sline[1])])
+                job_resources.append([int(d) for d in self.sline[2:]])
+                self.nextline()
+            durations.append(job_durations)
+            resources_cons.append(job_resources)
+        self.firstchar("*")
+        self.firstword("RESOURCEAVAILABILITIES:")
+        self.nextline()
+        resource_availabilities = [int(rl) for rl in self.sline]
+        
+        self.cleanup()
+
+        return Rcpsp(n_jobs=n_jobs, 
+            n_modes_per_job=n_modes_per_job, 
+            successors=successors, 
+            durations=durations, 
+            resource_cons=resources_cons, 
+            resource_availabilities = resource_availabilities, 
+            n_renewable_resources = n_renewable_resources,
+            n_nonrenewable_resources= n_nonrenewable_resources,
+            n_doubly_constrained_resources= n_doubly_constrained_resources)
