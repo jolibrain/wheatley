@@ -53,6 +53,8 @@ class PSPState:
         self.resource_prec_att = []
         self.remove_old_resource_info = env_specification.remove_old_resource_info
 
+        self.remove_past_prec = env_specification.remove_past_prec
+
         # features :
         # 0: is_affected
         # 1: is selectable
@@ -285,6 +287,9 @@ class PSPState:
     def all_affected(self):
         return self.features[:, 0] == 1
 
+    def all_not_affected(self):
+        return self.features[:, 0] == 0
+
     ############################### EXTERNAL API ############################
 
     def done(self):
@@ -329,6 +334,17 @@ class PSPState:
                 rpa,
             )
 
+        if self.remove_past_prec:
+            fresh_nodes = list(
+                set(np.where(self.all_not_affected())[0]).union(self.nodes_in_frontier)
+            )
+
+            return (
+                self.normalize_features(),
+                self.remove_past_edges(fresh_nodes),
+                rce,
+                rca,
+            )
         return (
             self.normalize_features(),
             self.numpy_problem_graph,
@@ -710,3 +726,10 @@ class PSPState:
         removed_from_frontier = self.nodes_in_frontier - new_nodes_in_frontier
         self.remove_res(list(removed_from_frontier))
         self.nodes_in_frontier = new_nodes_in_frontier
+
+    def remove_past_edges(self, fresh_nodes):
+        new_edges = []
+        for edge in self.problem_edges:
+            if edge[0] in fresh_nodes and edge[1] in fresh_nodes:
+                new_edges.append((edge[0], edge[1]))
+        return np.transpose(np.array(new_edges))

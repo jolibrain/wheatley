@@ -50,6 +50,7 @@ class PSPGnnDGL(torch.nn.Module):
         layer_pooling="all",
         factored_rp=False,
         add_rp_edges=False,
+        add_self_loops=False,
     ):
 
         super().__init__()
@@ -71,6 +72,7 @@ class PSPGnnDGL(torch.nn.Module):
         self.add_rp_edges = add_rp_edges
         self.features_dim *= 2
         self.max_n_resources = max_n_resources
+        self.add_self_loops = add_self_loops
 
         self.hidden_dim = hidden_dim_features_extractor
         self.graph_pooling = graph_pooling
@@ -259,7 +261,7 @@ class PSPGnnDGL(torch.nn.Module):
         observation = AgentObservation.from_gym_observation(
             obs,
             conflicts=self.conflicts,
-            add_self_loops=False,
+            add_self_loops=self.add_self_loops,
             factored_rp=self.factored_rp,
             add_rp_edges=self.add_rp_edges,
             max_n_resources=self.max_n_resources,

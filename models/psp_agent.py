@@ -77,6 +77,7 @@ class PSPAgent(Agent):
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
                 add_rp_edges=env_specification.add_rp_edges,
+                add_self_loops=env_specification.remove_past_prec,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -157,6 +158,7 @@ class PSPAgent(Agent):
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
                 add_rp_edges=env_specification.add_rp_edges,
+                add_self_loops=env_specification.remove_old_nodes,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(

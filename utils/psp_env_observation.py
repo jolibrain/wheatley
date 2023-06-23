@@ -93,6 +93,8 @@ class PSPEnvObservation:
         return self.resource_prec_edges.shape[1]
 
     def get_n_pr_edges(self):
+        if not self.problem_edge_index.any():
+            return 0
         return self.problem_edge_index.shape[1]
 
     def get_n_rc_edges(self):
@@ -125,9 +127,9 @@ class PSPEnvObservation:
             if self.resource_prec_edges is not None:
                 rp_edge_index[:, : self.get_n_rp_edges()] = self.resource_prec_edges
                 rp_att[: self.get_n_rp_edges(), :] = self.resource_prec_att
-                ret["n_rp_edges"] = self.get_n_rp_edges()
-                ret["rp_edges"] = rp_edge_index
-                ret["rp_att"] = rp_att
+            ret["n_rp_edges"] = self.get_n_rp_edges()
+            ret["rp_edges"] = rp_edge_index
+            ret["rp_att"] = rp_att
 
         if self.observe_conflicts_as_cliques:
             rc_edge_index = np.empty(self.env_specification.shape_rc, dtype=np.int64)

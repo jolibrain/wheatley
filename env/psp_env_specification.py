@@ -43,6 +43,7 @@ class PSPEnvSpecification:
         do_not_observe_updated_bounds,
         factored_rp,
         remove_old_resource_info,
+        remove_past_prec,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -70,6 +71,7 @@ class PSPEnvSpecification:
         self.do_not_observe_updated_bounds = do_not_observe_updated_bounds
         self.action_space = Discrete(self.max_n_nodes)
         self.remove_old_resource_info = remove_old_resource_info
+        self.remove_past_prec = remove_past_prec
 
         if self.max_edges_factor > 0:
             self.shape_pr = (
@@ -133,52 +135,53 @@ class PSPEnvSpecification:
                         4,
                     )
 
-        self.observation_space = Dict(
-            {
-                "n_jobs": Discrete(self.max_n_jobs + 1),
-                "n_nodes": Discrete(self.max_n_modes + 1),
-                "n_resources": Discrete(self.max_n_resources + 1),
-                "n_pr_edges": Discrete(self.max_n_edges + 1),
-                "features": Box(
-                    low=0,
-                    high=1000,
-                    shape=(self.max_n_nodes, self.n_features),
-                ),
-                "pr_edges": Box(
-                    low=0,
-                    high=self.max_n_nodes,
-                    shape=self.shape_pr,
-                    dtype=np.int64,
-                ),
-            }
-        )
+        # self.observation_space = Dict(
+        dict_specif = {
+            "n_jobs": Discrete(self.max_n_jobs + 1),
+            "n_nodes": Discrete(self.max_n_modes + 1),
+            "n_resources": Discrete(self.max_n_resources + 1),
+            "n_pr_edges": Discrete(self.max_n_edges + 1),
+            "features": Box(
+                low=0,
+                high=1000,
+                shape=(self.max_n_nodes, self.n_features),
+            ),
+            "pr_edges": Box(
+                low=0,
+                high=self.max_n_nodes,
+                shape=self.shape_pr,
+                dtype=np.int64,
+            ),
+        }
 
         if self.add_rp_edges:
-            self.observation_space["n_rp_edges"] = Discrete(self.max_n_edges + 1)
-            self.observation_space["rp_edges"] = Box(
+            dict_specif["n_rp_edges"] = Discrete(self.max_n_edges + 1)
+            dict_specif["rp_edges"] = Box(
                 low=0,
                 high=self.max_n_nodes,
                 shape=self.shape_rp,
                 dtype=np.int64,
             )
-            self.observation_space["rp_att"] = (
-                Box(low=0, high=1000, shape=self.shape_rp_att, dtype=float),
+            dict_specif["rp_att"] = Box(
+                low=0, high=1000, shape=self.shape_rp_att, dtype=float
             )
 
         if self.observe_conflicts_as_cliques:
-            self.observation_space["n_rc_edges"] = Discrete(self.max_n_edges + 1)
-            self.observation_space["rc_edges"] = Box(
+            dict_specif["n_rc_edges"] = Discrete(self.max_n_edges + 1)
+            dict_specif["rc_edges"] = Box(
                 low=0,
                 high=self.max_n_nodes,
                 shape=self.shape_rc,
                 dtype=np.int64,
             )
-            self.observation_space["rc_att"] = Box(
+            dict_specif["rc_att"] = Box(
                 low=0,
                 high=1000,
                 shape=self.shape_rc_att,
                 dtype=np.int64,
             )
+
+        self.observation_space = Dict(dict_specif)
 
     def get_n_features(self):
         # 3 for task completion times,
@@ -205,6 +208,7 @@ class PSPEnvSpecification:
             f"Do not observe tct:                 {self.do_not_observe_updated_bounds}\n"
             f"add resource prcedence edges:       {self.add_rp_edges}\n"
             f"remove old resource info:           {self.remove_old_resource_info}\n"
+            f"remove past prec:                   {self.remove_past_prec}\n"
             f"List of features:\n - Task Completion Times - selectable"
         )
         print(" - " + "\n - ".join(print_input_list) + "\n")

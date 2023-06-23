@@ -362,6 +362,13 @@ parser.add_argument(
     help="take into account already affected task resource info",
 )
 
+parser.add_argument(
+    "--keep_past_prec",
+    default=False,
+    action="store_true",
+    help="remove past precedencies",
+)
+
 
 parser.add_argument(
     "--precompute_cliques",
