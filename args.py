@@ -38,6 +38,12 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--n_j", type=int, default=5, help="Number of jobs")
 parser.add_argument("--n_m", type=int, default=5, help="Number of machines")
 parser.add_argument(
+    "--eval_n_j", type=int, required=False, help="Number of jobs for eval"
+)
+parser.add_argument(
+    "--eval_n_m", type=int, required=False, help="Number of machines for eval"
+)
+parser.add_argument(
     "--max_duration", type=int, default=99, help="Max duration for problems"
 )
 
@@ -627,16 +633,21 @@ args = parser.parse_args()
 exp_name = get_exp_name(args)
 path = get_path(args.path, exp_name)
 
+if args.eval_n_j is None:
+    args.eval_n_j = args.n_j
+
+if args.eval_n_m is None:
+    args.eval_n_m = args.n_m
 
 # Max n_jobs must be under n_jobs
 if args.max_n_j == -1:
-    args.max_n_j = args.n_j
+    args.max_n_j = max(args.n_j, args.eval_n_j)
 elif args.max_n_j < args.n_j:
     raise Exception("Max number of jobs should be higher than current number of jobs")
 
 # Max n_machines must be under n_machines
 if args.max_n_m == -1:
-    args.max_n_m = args.n_m
+    args.max_n_m = max(args.n_m, args.eval_n_m)
 elif args.max_n_m < args.n_m:
     raise Exception(
         "Max number of machines should be higher than current number of machines"

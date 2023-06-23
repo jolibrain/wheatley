@@ -24,24 +24,23 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
+import datetime
 from copy import deepcopy
 from queue import PriorityQueue
 
-import networkx as nx
+import cv2
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
-import torch
-
-import datetime
 import pandas as pd
 import plotly.figure_factory as ff
-import cv2
+import torch
 
 from problem.solution import Solution
 from utils.utils import (
-    node_to_job_and_task,
-    job_and_task_to_node,
     compute_conflicts_cliques,
+    job_and_task_to_node,
+    node_to_job_and_task,
 )
 
 
@@ -129,7 +128,7 @@ class JSSPState:
 
     def is_affected(self, job_id, task_id):
         return self.features[
-            job_and_task_to_node(job_id, task_id, self.max_n_machines), 0
+            job_and_task_to_node(job_id, task_id, self.n_machines), 0
         ].item()
 
     def is_affected_by_node(self, node_id):
@@ -137,7 +136,7 @@ class JSSPState:
 
     def affect(self, node_id):
         self.features[node_id, 0] = 1
-        self.affected[node_to_job_and_task(node_id, self.max_n_machines)] = 1
+        self.affected[node_to_job_and_task(node_id, self.n_machines)] = 1
 
     def set_all_task_completion_times(self, tct):
         self.features[:, 1:5] = torch.as_tensor(tct).reshape(
@@ -163,7 +162,7 @@ class JSSPState:
         return self.features[:, 1:5]
 
     def set_task_completion_times(self, node_id, ct):
-        j, t = node_to_job_and_task(node_id, self.max_n_machines)
+        j, t = node_to_job_and_task(node_id, self.n_machines)
         self.features[node_id, 1:5] = ct.clone()
 
     # no more one hot due to perf issues when adding conflcits as cliques
@@ -174,7 +173,7 @@ class JSSPState:
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 machine_id = self.affectations[job_id, task_id]
-                node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
+                node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                 if machine_id != -1:
                     self.features[
                         node_id, 6 : 6 + self.max_n_machines
@@ -184,7 +183,7 @@ class JSSPState:
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
                 machine_id = self.affectations[job_id, task_id]
-                node_id = job_and_task_to_node(job_id, task_id, self.max_n_machines)
+                node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                 if machine_id == -1:
                     self.features[node_id, 6 : 6 + self.max_n_machines] = torch.zeros(
                         self.max_n_machines
@@ -210,7 +209,7 @@ class JSSPState:
             # return durs.clone()
             return self.features[node_id, dof[0] : dof[1]]
         return torch.as_tensor(
-            self.durations[node_to_job_and_task(node_id, self.max_n_machines)],
+            self.durations[node_to_job_and_task(node_id, self.n_machines)],
             dtype=torch.float,
         )
 
@@ -246,7 +245,6 @@ class JSSPState:
         ) = compute_conflicts_cliques(self.features[:, 6].long())
 
     def compute_pre_features(self):
-
         self.total_job_time = np.sum(
             np.where(self.original_durations < 0, 0, self.original_durations), axis=1
         )
@@ -260,7 +258,7 @@ class JSSPState:
         for j in range(self.n_jobs):
             if self.affectations[j, 0] != -1:
                 self.features[
-                    job_and_task_to_node(j, 0, self.max_n_machines), of[0] : of[1]
+                    job_and_task_to_node(j, 0, self.n_machines), of[0] : of[1]
                 ] = 1
 
         if "total_job_time" in self.features_offset:
@@ -301,7 +299,7 @@ class JSSPState:
                 if "total_machine_time" in self.features_offset:
                     tmtof = self.features_offset["total_machine_time"]
                     self.features[
-                        job_and_task_to_node(job_id, task_id, self.max_n_machines),
+                        job_and_task_to_node(job_id, task_id, self.n_machines),
                         tmtof[0] : tmtof[1],
                     ] = self.total_machine_time[self.affectations[job_id, task_id]]
 
@@ -336,12 +334,12 @@ class JSSPState:
                     )
                     result[result != result] = 0
                     self.features[
-                        job_and_task_to_node(job_id, task_id, self.max_n_machines),
+                        job_and_task_to_node(job_id, task_id, self.n_machines),
                         mcpof[0] : mcpof[1],
                     ] = result
                     if self.total_machine_time_job_task[job_id, task_id][0] < 0:
                         self.features[
-                            job_and_task_to_node(job_id, task_id, self.max_n_machines),
+                            job_and_task_to_node(job_id, task_id, self.n_machines),
                             mcpof[0],
                         ] = -1
 
@@ -686,14 +684,14 @@ class JSSPState:
         sj = []
         for t in range(self.max_n_machines):
             if self.affectations[jid, t] != -1:
-                sj.append(job_and_task_to_node(jid, t, self.max_n_machines))
+                sj.append(job_and_task_to_node(jid, t, self.n_machines))
             self.same_job[jid] = sj
         return sj
 
     def on_machine(self, machine_id):
         coord = np.asarray(self.affectations == machine_id).nonzero()
         return [
-            job_and_task_to_node(j[0], j[1], self.max_n_machines)
+            job_and_task_to_node(j[0], j[1], self.n_machines)
             for j in zip(coord[0], coord[1])
         ]
 
@@ -710,7 +708,6 @@ class JSSPState:
         machine_id = self.affectations[job_id, task_id]
 
         if machine_id != -1:
-
             if (
                 "job_completion_percentage" in self.features_offset
                 or "total_job_time" in self.features_offset
@@ -770,7 +767,7 @@ class JSSPState:
                 or "machine_completion_percentage" in self.features_offset
             ):
                 for nid in on_machine:
-                    jid, tid = node_to_job_and_task(nid, self.max_n_machines)
+                    jid, tid = node_to_job_and_task(nid, self.n_machines)
                     if self.total_machine_time_job_task[jid, tid][0] < 0:
                         self.total_machine_time_job_task[jid, tid][
                             0
@@ -959,7 +956,7 @@ class JSSPState:
         else:
             raise Exception("Metric for job_availability not recognized")
         tct = self.features[
-            job_and_task_to_node(job_id, task_id - 1, self.max_n_machines)
+            job_and_task_to_node(job_id, task_id - 1, self.n_machines)
         ]
         return tct[index].item()
 
