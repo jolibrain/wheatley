@@ -149,6 +149,8 @@ class PSPGnnTokenGT(torch.nn.Module):
             laplacian_pe_cache=self.laplacian_pe_cache,
             n_laplacian_eigv=self.lap_node_id_k,
             bidir=False,
+            factored_rp=True,
+            max_n_resources=self.max_n_resources,
         ).to_graph()
 
         max_node_num = max([gr.num_nodes() for gr in g_list])

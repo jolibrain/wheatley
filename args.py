@@ -225,7 +225,7 @@ parser.add_argument(
     "--graph_pooling",
     type=str,
     default="learn",
-    choices=["max", "average", "learn"],
+    choices=["max", "avg", "learn"],
     help="which pooling to use (avg , max or learn)",
 )
 parser.add_argument(
@@ -272,6 +272,32 @@ parser.add_argument(
     help="transformer implementation for tokengt",
     choices=["vanilla", "linear", "performer"],
 )
+parser.add_argument(
+    "--performer_nb_features",
+    type=int,
+    default=None,
+    help="number of projections features for performer (for tokengt), default is n.log(n), where n is head dim",
+)
+parser.add_argument(
+    "--performer_redraw_interval",
+    type=int,
+    default=1000,
+    help="redraw interval for features basis  for performer (for tokengt)",
+)
+parser.add_argument(
+    "--performer_generalized_attention",
+    action="store_true",
+    default=False,
+    help="generalized attention  for performer (for tokengt)",
+)
+parser.add_argument(
+    "--performer_auto_check_redraw",
+    default=False,
+    action="store_true",
+    help="auto check redraw for performer (for tokengt)",
+)
+
+
 parser.add_argument(
     "--dont_cache_lap_node_id",
     action="store_true",
@@ -383,6 +409,13 @@ parser.add_argument(
     help="do not observe task completion time",
 )
 
+parser.add_argument(
+    "--factored_rp",
+    default=False,
+    action="store_true",
+    help="factor resource priority link (automatically used  for tokengt)",
+)
+
 
 parser.add_argument(
     "--reward_model_config",
@@ -464,7 +497,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_edges_upper_bound_factor",
     type=int,
-    default=2,
+    default=4,
     help="Upper bound factor to max_n_edges, allows lowering the overall memory usage",
 )
 
@@ -530,6 +563,15 @@ parser.add_argument(
     default=None,
     help="Load problem in Taillard format (machine numbering starts at 0)",
 )
+parser.add_argument("--train_dir", type=str, default=None, help="psp train dir")
+parser.add_argument("--test_dir", type=str, default=None, help="psp test dir")
+parser.add_argument(
+    "--train_test_split",
+    type=float,
+    default=0.2,
+    help="train/test split if no test_dir is provided",
+)
+
 parser.add_argument(
     "--first_machine_id_is_one",
     default=False,
@@ -574,12 +616,6 @@ parser.add_argument(
     help="Factor for OR-Tools, since it only solves integer problems",
 )
 parser.add_argument(
-    "--log_file",
-    type=str,
-    default="/dev/null",
-    help="File to log to, note that visdom produce `jsonl` files, the file is logged in the experiment folder unless it is the `/dev/null` file",
-)
-parser.add_argument(
     "--disable_visdom",
     action="store_true",
     help="Disable visdom logging",
@@ -614,8 +650,3 @@ if args.sample_n_jobs != -1 and args.chunk_n_jobs != -1:
 
 # Sorting the features
 args.features = sorted(args.features)
-
-# Full log path
-args.log_file = (
-    os.path.join(path, args.log_file) if args.log_file != "/dev/null" else args.log_file
-)

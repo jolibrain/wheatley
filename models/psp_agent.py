@@ -75,6 +75,7 @@ class PSPAgent(Agent):
                 conflicts=agent_specification.conflicts,
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
+                factored_rp=env_specification.factored_rp,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -97,6 +98,10 @@ class PSPAgent(Agent):
                 attention_dropout=agent_specification.dropout,
                 act_dropout=agent_specification.dropout,
                 cache_lap_node_id=agent_specification.cache_lap_node_id,
+                performer_nb_features=agent_specification.performer_nb_features,
+                performer_feature_redraw_interval=agent_specification.performer_feature_redraw_interval,
+                performer_generalized_attention=agent_specification.performer_generalized_attention,
+                performer_auto_check_redraw=agent_specification.performer_auto_check_redraw,
             )
         else:
             print("unknown fe_type: ", agent_specification.fe_type)
@@ -149,6 +154,7 @@ class PSPAgent(Agent):
                 conflicts=agent_specification.conflicts,
                 edge_embedding_flavor=agent_specification.edge_embedding_flavor,
                 layer_pooling=agent_specification.layer_pooling,
+                factored_rp=env_specification.factored_rp,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(
@@ -172,6 +178,9 @@ class PSPAgent(Agent):
                 attention_dropout=agent_specification.dropout,
                 act_dropout=agent_specification.dropout,
                 cache_lap_node_id=agent_specification.cache_lap_node_id,
+                performer_nb_features=agent_specification.performer_nb_features,
+                performer_feature_redraw_interval=agent_specification.performer_feature_redraw_interval,
+                performer_redraw_interval=agent_specification.performer_redraw_interval,
             )
         value_net = MLP(
             len(agent_specification.net_arch["vf"]),

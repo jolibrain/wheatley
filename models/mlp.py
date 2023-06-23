@@ -44,40 +44,32 @@ class MLP(torch.nn.Module):
         if self.batch_norm:
             self.batch_norms = torch.nn.ModuleList()
 
-        if self.n_layers == 1:
-            self.layers.append(torch.nn.Linear(input_dim, output_dim))
-        else:
-            self.layers.append(torch.nn.Linear(input_dim, hidden_dim))
-            for i in range(self.n_layers - 2):
-                self.layers.append(torch.nn.Linear(hidden_dim, hidden_dim))
-                if self.batch_norm:
-                    self.batch_norms.append(torch.nn.BatchNorm1d(hidden_dim))
-            self.layers.append(torch.nn.Linear(hidden_dim, output_dim))
+        last_dim = input_dim
+        for layer_id in range(self.n_layers - 1):
+            self.layers.append(torch.nn.Linear(last_dim, hidden_dim))
             if self.batch_norm:
-                self.batch_norms.append(torch.nn.BatchNorm1d(output_dim))
+                self.batch_norms.append(torch.nn.BatchNorm1d(hidden_dim))
+
+            last_dim = hidden_dim
+
+        self.layers.append(torch.nn.Linear(last_dim, output_dim))
 
         if type(activation) == str:
-            if activation == "tanh":
-                self.activation_layer = torch.nn.Tanh()
-            elif activation == "relu":
-                self.activation_layer = torch.nn.LeakyReLU()
-            elif activation == "elu":
-                self.activation_layer = torch.nn.ELU()
-            elif activation == "gelu":
-                self.activation_layer = torch.nn.GELU()
-            elif activation == "selu":
-                self.activation_layer = torch.nn.SELU()
-            else:
-                raise Exception("Activation not recognized")
-        else:
-            self.activation_layer = activation()
+            act_map = {
+                "tanh": torch.nn.Tanh,
+                "relu": torch.nn.LeakyReLU,
+                "elu": torch.nn.ELU,
+                "gelu": torch.nn.GELU,
+                "selu": torch.nn.SELU,
+            }
+            activation = act_map[activation]
+
+        self.activation_layer = activation()
 
     def forward(self, x):
         for layer in range(self.n_layers - 1):
+            x = self.activation_layer(self.layers[layer](x))
             if self.batch_norm:
-                x = self.batch_norms[layer](
-                    self.activation_layer(self.layers[layer](x))
-                )
-            else:
-                x = self.activation_layer(self.layers[layer](x))
+                x = self.batch_norms[layer](x)
+
         return self.layers[-1](x)

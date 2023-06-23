@@ -64,7 +64,7 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
     delays, initial_solution, optimal_found = ComputeDelaysBetweenNodes(
         problem, intervals_of_tasks
     )
-    last_task = problem["n_modes"]
+    last_task = problem["n_jobs"]
     key = (0, last_task)
     lower_bound = delays[key][0] if key in delays else 0
 
@@ -72,7 +72,7 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
         problem=problem,
         proto_file="",
         params="",
-        active_tasks=set(range(1, last_task)),
+        active_tasks=set(range(1, last_task + 1)),
         source=0,
         sink=last_task,
         intervals_of_tasks=intervals_of_tasks,
@@ -80,6 +80,7 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
         in_main_solve=True,
         initial_solution=initial_solution,
         lower_bound=lower_bound,
+        max_time_ortools=max_time_ortools,
     )
 
     return (
@@ -234,7 +235,6 @@ def get_ortools_makespan_psp(
         env.state.all_jobid(),
         real_durations=env.state.real_durations,
     )
-    print("real_makespan", real_makespan)
     return real_makespan, solution2.schedule, optimal
 
 

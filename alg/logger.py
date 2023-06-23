@@ -745,3 +745,33 @@ def read_csv(filename: str) -> pandas.DataFrame:
     :return: the data in the csv
     """
     return pandas.read_csv(filename, index_col=None, comment="#")
+
+
+# ================================================================
+# Metrics
+# ================================================================
+
+
+def monotony(serie: np.ndarray) -> float:
+    """Compute the monotony of a serie.
+
+    It is the mean of the sign of the difference between two consecutive values.
+    """
+    if len(serie) < 2:
+        return 0.0
+
+    diff = serie[:-1] - serie[1:]
+    signs = np.sign(diff)
+    return np.mean(signs[signs != 0])
+
+
+def stability(serie: np.ndarray) -> float:
+    """Compute the stability of a serie.
+
+    It is the mean of the absolute value of the difference between two consecutive values.
+    """
+    if len(serie) < 2:
+        return 0.0
+
+    diff = serie[:-1] - serie[1:]
+    return np.mean(np.abs(diff))

@@ -55,6 +55,10 @@ class AgentSpecification:
         cache_lap_node_id,
         lap_node_id_k,
         edge_embedding_flavor,
+        performer_nb_features,
+        performer_feature_redraw_interval,
+        performer_generalized_attention,
+        performer_auto_check_redraw,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -82,6 +86,10 @@ class AgentSpecification:
         self.cache_lap_node_id = cache_lap_node_id
         self.lap_node_id_k = lap_node_id_k
         self.edge_embedding_flavor = edge_embedding_flavor
+        self.performer_nb_features = performer_nb_features
+        self.performer_feature_redraw_interval = performer_feature_redraw_interval
+        self.performer_generalized_attention = performer_generalized_attention
+        self.performer_auto_check_redraw = performer_auto_check_redraw
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU

@@ -10,7 +10,6 @@ class PSPAgentValidator(AgentValidator):
         env_cls,
         device,
         training_specification,
-        log_file,
         disable_visdom,
         verbose=2,
     ):
@@ -20,7 +19,6 @@ class PSPAgentValidator(AgentValidator):
             env_cls,
             device,
             training_specification,
-            log_file,
             disable_visdom,
             verbose=2,
         )

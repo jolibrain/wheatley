@@ -71,4 +71,6 @@ class PSPDescription:
             f"Transition model:                 {self.transition_model_config}\n"
             f"Reward model:                     {self.reward_model_config}\n"
             f"Deterministic/Stochastic:         {'Deterministic' if self.deterministic else 'Stochastic'}\n"
+            f"Train set size:                   {len(self.train_psps)}\n"
+            f"Test set size:                    {len(self.test_psps)}\n"
         )

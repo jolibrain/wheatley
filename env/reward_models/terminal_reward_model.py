@@ -35,8 +35,9 @@ class TerminalRewardModel:
         """
         Reward is 0 for every time steps, except for the last one, where it is the opposite of the Makespan
         """
-        is_done = state.done()
-        if not is_done:
-            return 0
-        makespan = state.tct(-1)[0].item() / state.max_duration  # / state.n_resources
-        return -makespan
+        if state.succeeded():
+            makespan = state.tct(-1)[0].item() / len(state.job_modes)
+            return -makespan
+        if state.finished():
+            return -state.undoable_makespan / len(state.job_modes)
+        return 0

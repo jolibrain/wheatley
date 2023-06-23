@@ -475,3 +475,294 @@ def test_render(state_small):
     s.affect_job(6)
     s.affect_job(7)
     s.render_solution(s.get_solution().schedule)
+
+
+def test_state_nonren(state_nonren):
+    s = state_nonren
+
+    print("s.job_modes", s.job_modes)
+    # ortools solution
+    s.affect_job(0)  # j0/0
+    print("\n")
+    nid = (1 - 1) * 3 + 1 + 0  # j1/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (2 - 1) * 3 + 1 + 2  # j2/2
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (3 - 1) * 3 + 1 + 1  # j3/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (4 - 1) * 3 + 1 + 0  # j4/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (5 - 1) * 3 + 1 + 0  # j5/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (6 - 1) * 3 + 1 + 1  # j6/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (7 - 1) * 3 + 1 + 1  # j7/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (8 - 1) * 3 + 1 + 2  # j8/2
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (9 - 1) * 3 + 1 + 0  # j9/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (10 - 1) * 3 + 1 + 0  # j10/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (11 - 1) * 3 + 1 + 0  # j11/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (12 - 1) * 3 + 1 + 0  # j12/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (13 - 1) * 3 + 1 + 0  # j13/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (14 - 1) * 3 + 1 + 1  # j14/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (15 - 1) * 3 + 1 + 1  # j15/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (16 - 1) * 3 + 1 + 0  # j16/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (17 - 1) * 3 + 1 + 0  # j17/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+
+    makespan = s.tct(-1)[0].item()
+    print("makespan", makespan)
+
+    s.reset()
+    # WHEATLEY solution
+    s.affect_job(0)  # j0/0
+    print("\n")
+    nid = (1 - 1) * 3 + 1 + 0  # j1/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (2 - 1) * 3 + 1 + 0  # j2/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (3 - 1) * 3 + 1 + 1  # j3/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (4 - 1) * 3 + 1 + 0  # j4/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (5 - 1) * 3 + 1 + 0  # j5/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (6 - 1) * 3 + 1 + 0  # j6/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (7 - 1) * 3 + 1 + 0  # j7/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (8 - 1) * 3 + 1 + 0  # j8/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (9 - 1) * 3 + 1 + 0  # j9/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (10 - 1) * 3 + 1 + 0  # j10/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (11 - 1) * 3 + 1 + 1  # j11/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (12 - 1) * 3 + 1 + 0  # j12/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (13 - 1) * 3 + 1 + 0  # j13/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (14 - 1) * 3 + 1 + 1  # j14/1
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (15 - 1) * 3 + 1 + 2  # j15/2
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (16 - 1) * 3 + 1 + 0  # j16/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    nid = (17 - 1) * 3 + 1 + 0  # j17/0
+    for r in range(2, 4):
+        print("r", r)
+        print("avail", s.resources[r][0].remaining_level)
+        print("rusage", s.resource_usage(nid, r))
+        assert s.resource_usage(nid, r) <= s.resources[r][0].remaining_level
+    print("affecting", nid)
+    s.affect_job(nid)
+    makespan = s.tct(-1)[0].item()
+    print("makespan", makespan)

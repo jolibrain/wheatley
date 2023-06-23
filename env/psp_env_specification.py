@@ -40,6 +40,7 @@ class PSPEnvSpecification:
         observe_conflicts_as_cliques,
         observe_real_duration_when_affect,
         do_not_observe_updated_bounds,
+        factored_rp,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -51,6 +52,7 @@ class PSPEnvSpecification:
         self.max_resource_availability = self.problems.max_resource_availability
         self.normalize_input = normalize_input
         self.input_list = input_list
+        self.factored_rp = factored_rp
         if "selectable" in input_list:
             self.input_list.remove("selectable")
         if "duration" in input_list:
@@ -82,10 +84,16 @@ class PSPEnvSpecification:
                 2,
                 self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
             )
-            self.shape_rp_att = (
-                self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
-                4,
-            )
+            if self.factored_rp:
+                self.shape_rp_att = (
+                    self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
+                    self.max_n_resources * 3,
+                )
+            else:
+                self.shape_rp_att = (
+                    self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
+                    4,
+                )
 
         else:
             self.shape_pr = (2, self.max_n_edges)
@@ -102,11 +110,16 @@ class PSPEnvSpecification:
                 2,
                 self.max_n_edges * self.max_n_resources,
             )
-            self.shape_rp_att = (
-                # on_start, critical, timetype
-                self.max_n_edges * self.max_n_resources,
-                3,
-            )
+            if self.factored_rp:
+                self.shape_rp_att = (
+                    self.max_n_edges * self.max_n_resources,
+                    self.max_n_resources * 3,
+                )
+            else:
+                self.shape_rp_att = (
+                    self.max_n_edges * self.max_n_resources,
+                    4,
+                )
 
         self.observation_space = Dict(
             {
@@ -132,9 +145,7 @@ class PSPEnvSpecification:
                     shape=self.shape_rp,
                     dtype=np.int64,
                 ),
-                "rp_att": Box(
-                    low=0, high=1000, shape=self.shape_rp_att, dtype=np.int64
-                ),
+                "rp_att": Box(low=0, high=1000, shape=self.shape_rp_att, dtype=float),
             }
         )
 
