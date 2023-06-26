@@ -86,7 +86,7 @@ class PSPEnvSpecification:
                 self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
                 3,
             )
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 self.shape_rp = (
                     2,
                     self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
@@ -119,7 +119,7 @@ class PSPEnvSpecification:
                 self.max_n_edges * self.max_n_resources,
                 3,
             )
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 self.shape_rp = (
                     2,
                     self.max_n_edges * self.max_n_resources,
@@ -154,7 +154,7 @@ class PSPEnvSpecification:
             ),
         }
 
-        if self.add_rp_edges:
+        if self.add_rp_edges != "none":
             dict_specif["n_rp_edges"] = Discrete(self.max_n_edges + 1)
             dict_specif["rp_edges"] = Box(
                 low=0,

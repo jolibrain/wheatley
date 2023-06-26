@@ -350,8 +350,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--add_rp_edges",
-    default=False,
-    action="store_true",
+    default="all",
+    choices=["all", "frontier", "frontier_strict", "none"],
     help="take into account resource precedence edges",
 )
 

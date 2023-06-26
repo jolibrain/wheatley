@@ -318,10 +318,17 @@ class PSPState:
             rce = None
             rca = None
 
-        if self.add_rp_edges:
+        if self.add_rp_edges != "none":
             if len(self.resource_prec_edges) > 0:
-                rpe = np.transpose(self.resource_prec_edges)
-                rpa = np.concatenate(self.resource_prec_att)
+                if self.add_rp_edges == "all":
+                    rpe = np.transpose(self.resource_prec_edges)
+                    rpa = np.concatenate(self.resource_prec_att)
+                elif self.add_rp_edges == "frontier":
+                    rpe, rpa = self.rp_edges_to_keep()
+                elif self.add_rp_edges == "frontier_strict":
+                    rpe, rpa = self.rp_edges_to_keep_strict()
+                else:
+                    raise NotImplementedError
             else:
                 rpe = None
                 rpa = None
@@ -604,7 +611,7 @@ class PSPState:
         for i in range(3):
             self.consume(i + 1, node_id, start[i + 1], self.tct(node_id)[i])
 
-        if self.resource_model == "flowGraph" and self.add_rp_edges:
+        if self.resource_model == "flowGraph" and self.add_rp_edges != "none":
             # extract graph info
             self.update_resource_prec(constraining_resource)
 
@@ -733,3 +740,33 @@ class PSPState:
             if edge[0] in fresh_nodes and edge[1] in fresh_nodes:
                 new_edges.append((edge[0], edge[1]))
         return np.transpose(np.array(new_edges))
+
+    def rp_edges_to_keep(self):
+        new_edges = []
+        edge_indices = []
+        for ei, edge in enumerate(self.resource_prec_edges):
+            # TODO : check AND / OR performances
+            if edge[0] in self.nodes_in_frontier or edge[1] in self.nodes_in_frontier:
+                new_edges.append(edge)
+                edge_indices.append(ei)
+        if len(new_edges) == 0:
+            return None, None
+        return (
+            np.transpose(new_edges),
+            np.concatenate(self.resource_prec_att)[edge_indices],
+        )
+
+    def rp_edges_to_keep_strict(self):
+        new_edges = []
+        edge_indices = []
+        for ei, edge in enumerate(self.resource_prec_edges):
+            # TODO : check AND / OR performances
+            if edge[0] in self.nodes_in_frontier and edge[1] in self.nodes_in_frontier:
+                new_edges.append(edge)
+                edge_indices.append(ei)
+        if len(new_edges) == 0:
+            return None, None
+        return (
+            np.transpose(new_edges),
+            np.concatenate(self.resource_prec_att)[edge_indices],
+        )

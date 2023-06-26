@@ -168,7 +168,7 @@ class PSPEnv(gym.Env):
         self.reward_model = TerminalRewardModel()
 
     def observe(self):
-        if self.env_specification.add_rp_edges:
+        if self.env_specification.add_rp_edges != "none":
             (
                 features,
                 problem_edge_index,
