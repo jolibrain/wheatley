@@ -77,6 +77,21 @@ def main(args, exp_name, path):
     )
     problem_description.print_self()
 
+    # Specific evaluation problem, can be different from the training problem
+    eval_problem_description = ProblemDescription(
+        transition_model_config=args.transition_model_config,
+        reward_model_config=args.reward_model_config,
+        deterministic=(args.duration_type == "deterministic"),
+        fixed=args.fixed_problem,
+        affectations=affectations,
+        durations=durations,
+        n_jobs=args.eval_n_j,
+        n_machines=args.eval_n_m,
+        max_duration=args.max_duration,
+        duration_mode_bounds=args.duration_mode_bounds,
+        duration_delta=args.duration_delta,
+    )
+
     # Then specify the variables used for the training
 
     training_specification = TrainingSpecification(
@@ -220,7 +235,7 @@ def main(args, exp_name, path):
     # agent.train(problem_description, training_specification)
 
     validator = AgentValidator(
-        problem_description,
+        eval_problem_description,
         env_specification,
         args.device,
         training_specification,
