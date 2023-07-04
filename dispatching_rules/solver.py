@@ -57,7 +57,8 @@ class Solver:
         """
         valid_candidates = self.candidates(machine_id)
         if len(valid_candidates) == 0:
-            next_ending_time, _ = self.priority_queue.get()
+            next_ending_time, next_machine_id = self.priority_queue.get()
+            self.priority_queue.put((next_ending_time, next_machine_id))
             self.priority_queue.put((next_ending_time + 1, machine_id))
             return
 
