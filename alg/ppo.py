@@ -504,14 +504,15 @@ class PPO:
                     "validation/dist_to_ortools",
                     self.validator.makespans[-1] - self.validator.ortools_makespans[-1],
                 )
-                if self.validator.custom_name != "None":
+                for custom_agent in self.validator.custom_agents:
+                    name = custom_agent.rule
                     self.logger.record(
-                        f"validation/{self.validator.custom_name}",
-                        self.validator.custom_makespans[-1],
+                        f"validation/{name}",
+                        self.validator.custom_makespans[name][-1],
                     )
                     self.logger.record(
-                        f"validation/{self.validator.custom_name}_ratio_to_ortools",
-                        self.validator.custom_makespans[-1]
+                        f"validation/{name}_ratio_to_ortools",
+                        self.validator.custom_makespans[name][-1]
                         / self.validator.ortools_makespans[-1],
                     )
 

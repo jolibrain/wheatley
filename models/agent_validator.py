@@ -94,19 +94,16 @@ class AgentValidator:
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
-        self.custom_name = training_specification.custom_heuristic_name
+        self.custom_names = training_specification.custom_heuristic_names
 
         self.max_time_ortools = training_specification.max_time_ortools
         self.scaling_constant_ortools = training_specification.scaling_constant_ortools
 
         # Comparative agents
         self.random_agent = RandomAgent()
-        if self.custom_name != "None":
-            self.custom_agent = CustomAgent(
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
-                custom_name.lower(),
-            )
+        self.custom_agents = [
+            CustomAgent(rule, self.ortools_strategy) for rule in self.custom_names
+        ]
 
         # Inner variables
         if hasattr(self.problem_description, "test_psps"):
@@ -138,7 +135,7 @@ class AgentValidator:
         self.makespans = []
         self.ortools_makespans = []
         self.random_makespans = []
-        self.custom_makespans = []
+        self.custom_makespans = {agent.rule: [] for agent in self.custom_agents}
         self.entropy_losses = []
         self.policy_gradient_losses = []
         self.value_losses = []
@@ -157,6 +154,7 @@ class AgentValidator:
         self.first_callback = True
         self.gantt_rl_img = None
         self.gantt_or_img = None
+        self.gantt_mopnr_img = None
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
@@ -179,6 +177,21 @@ class AgentValidator:
                 " / ",
                 self.n_validation_env,
             )
+
+            self.fixed_custom_solutions = dict()
+            for agent in self.custom_agents:
+                self.fixed_custom_solutions[agent.rule] = []
+                for i in tqdm.tqdm(
+                    range(self.n_validation_env),
+                    desc=f"Computing fixed {agent.rule} solutions",
+                ):
+                    solution = agent.predict(
+                        self.validation_envs[i].state.original_durations,
+                        self.validation_envs[i].state.affectations,
+                    )
+                    self.fixed_custom_solutions[agent.rule].append(
+                        solution.get_makespan()
+                    )
 
         # Compute random solutions once if validations are fixed
         if self.fixed_random_validation:
@@ -291,7 +304,7 @@ class AgentValidator:
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
-        custom_mean_makespan = 0
+        custom_mean_makespan = {agent.rule: 0 for agent in self.custom_agents}
         start_eval = time.time()
 
         if self.batch_size != 0:
@@ -400,38 +413,33 @@ class AgentValidator:
                 random_makespan = self._get_random_makespan(i)
             random_mean_makespan += random_makespan / self.n_validation_env
 
-            if self.custom_name != "None":
-                custom_mean_makespan += (
-                    np.max(
-                        self.custom_agent.predict(
-                            ProblemDescription(
-                                transition_model_config=self.validation_envs[
-                                    i
-                                ].transition_model_config,
-                                reward_model_config=self.validation_envs[
-                                    i
-                                ].reward_model_config,
-                                affectations=self.validation_envs[
-                                    i
-                                ].transition_model.affectations,
-                                durations=self.validation_envs[
-                                    i
-                                ].transition_model.durations,
-                                n_jobs=self.validation_envs[i].n_jobs,
-                                n_machines=self.validation_envs[i].n_machines,
-                            ),
-                            True,
-                            None,
-                        ).get_makespan()
+            for custom_agent in self.custom_agents:
+                name = custom_agent.rule
+
+                if self.fixed_validation:
+                    makespan = self.fixed_custom_solutions[name][i]
+                else:
+                    solution = custom_agent.predict(
+                        self.validation_envs[i].state.original_durations,
+                        self.validation_envs[i].state.affectations,
                     )
-                    / self.n_validation_env
-                )
+                    makespan = solution.get_makespan()
+                    if custom_agent.rule == "MOPNR" and i == 0:
+                        self.gantt_mopnr_img = self.validation_envs[i].render_solution(
+                            solution.schedule
+                        )
+
+                custom_mean_makespan[name] += makespan / self.n_validation_env
+
         print("--- mean_makespan=", mean_makespan, " ---")
         print("--- eval time=", time.time() - start_eval, "  ---")
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
-        self.custom_makespans.append(custom_mean_makespan)
+        for custom_agent in self.custom_agents:
+            self.custom_makespans[custom_agent.rule].append(
+                custom_mean_makespan[custom_agent.rule]
+            )
 
     def _visdom_metrics(self, agent, alg):
         commandline = " ".join(sys.argv)
@@ -446,6 +454,7 @@ class AgentValidator:
         X = list(range(len(self.makespans)))
         Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]
         opts = {
+            "title": "Validation makespan",
             "legend": ["PPO", "Random", "OR-tools"],
             "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
         }
@@ -457,15 +466,31 @@ class AgentValidator:
             "legend": ["PPO / OR-tools", "Random / OR-tools"],
             "linecolor": np.array([[31, 119, 180], [255, 127, 14]]),
         }
-        if self.custom_name != "None":
-            Y_list.append(self.custom_makespans)
-            Y2_list.append(self.custom_makespans / np.array(self.ortools_makespans))
-            opts["legend"].append(self.custom_name)
-            opts["linecolor"] = np.array(
-                [[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]]
+        agent_colors = np.array(
+            [
+                [255, 0, 0],
+                [200, 0, 0],
+                [150, 0, 0],
+                [150, 50, 0],
+                [127, 127, 0],
+            ]
+        )
+        for custom_agent_id, custom_agent in enumerate(self.custom_agents):
+            name = custom_agent.rule
+            Y = np.array(self.custom_makespans[name])
+            Y_list.append(Y)
+            Y2_list.append(Y / np.array(self.ortools_makespans))
+
+            opts["linecolor"] = np.concatenate(
+                (opts["linecolor"], agent_colors[custom_agent_id].reshape(1, 3)), axis=0
             )
-            opts2["legend"].append(self.custom_name + " / OR-tools")
-            opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
+            opts["legend"].append(name)
+
+            opts2["legend"].append(name + " / OR-tools")
+            opts2["linecolor"] = np.concatenate(
+                (opts["linecolor"], agent_colors[custom_agent_id].reshape(1, 3)), axis=0
+            )
+
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
         # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
 
@@ -590,4 +615,11 @@ class AgentValidator:
                 self.gantt_or_img,
                 opts=opts,
                 win="or_schedule",
+            )
+
+        if self.gantt_mopnr_img is not None:
+            self.vis.image(
+                self.gantt_mopnr_img,
+                opts={"caption": "Gantt MOPNR schedule"},
+                win="mopnr_schedule",
             )

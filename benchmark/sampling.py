@@ -28,30 +28,31 @@ import sys
 
 sys.path.append("..")
 
+import csv
+import itertools
+import json
 import os
+import socket
+import time
+
 import numpy as np
 import torch
-import time
-import json
-import csv
-import socket
-import itertools
 from stable_baselines3.common.logger import configure
 
+from args import args, exp_name, path
+from env.env import Env
 from env.env_specification import EnvSpecification
 from models.agent import Agent
 from models.agent_specification import AgentSpecification
 from models.training_specification import TrainingSpecification
 from problem.problem_description import ProblemDescription
+from utils.ortools import get_ortools_makespan
 from utils.utils import (
-    get_n_features,
     generate_deterministic_problem,
     generate_problem_distrib,
+    get_n_features,
     load_problem,
 )
-from args import args, exp_name, path
-from env.env import Env
-from utils.ortools import get_ortools_makespan
 
 EPSILON = 1e-3  # because of OR-tools int/float conversion, ignore small overlaps
 
@@ -60,7 +61,7 @@ EPSILON = 1e-3  # because of OR-tools int/float conversion, ignore small overlap
 def metric_overlap(state):
     total = 0
     # check all pairs of jobs
-    for (j1, j2) in itertools.combinations(range(state.n_jobs), 2):
+    for j1, j2 in itertools.combinations(range(state.n_jobs), 2):
         # check all pairs of machine
         for m1 in range(state.n_machines):
             # not affected
@@ -100,7 +101,7 @@ def metric_parallel(state, schedule):
     maxi = 0
     for time in times:
         current = 0
-        for (start, finish) in intervals:
+        for start, finish in intervals:
             if start <= time < finish - EPSILON:
                 # print(time, 'in interval [', start, '-', finish - EPSILON, ']')
                 current += 1
@@ -175,7 +176,7 @@ def sampling(sample_n_jobs, writer=None):
         else args.validation_freq,
         display_env=exp_name,
         path=path,
-        custom_heuristic_name=args.custom_heuristic_name,
+        custom_heuristic_names=args.custom_heuristic_names,
         ortools_strategy=args.ortools_strategy,
         max_time_ortools=args.max_time_ortools,
         scaling_constant_ortools=args.scaling_constant_ortools,
@@ -221,7 +222,6 @@ def sampling(sample_n_jobs, writer=None):
 
 
 def main():
-
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
