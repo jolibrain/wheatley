@@ -15,7 +15,12 @@ class Solver:
             Shape of [n_jobs, n_machines].
     """
 
-    def __init__(self, processing_times: np.ndarray, machines: np.ndarray):
+    def __init__(
+        self,
+        processing_times: np.ndarray,
+        machines: np.ndarray,
+        ignore_unfinished_precedences: bool,
+    ):
         n_jobs, n_machines = processing_times.shape
         assert (
             processing_times.shape == machines.shape
@@ -31,6 +36,7 @@ class Solver:
         self.processing_times = processing_times
         self.machines = machines
         self.n_jobs, self.n_machines = processing_times.shape
+        self.ignore_unfinished_precedences = ignore_unfinished_precedences
 
         # -1 for unknown starting times.
         self.starting_times = (
@@ -55,10 +61,15 @@ class Solver:
         """Update the priority queue and the current solution by adding
         a job for the given machine.
         """
-        valid_candidates = self.candidates(machine_id)
+        valid_candidates = self.candidates(machine_id, current_time)
         if len(valid_candidates) == 0:
-            next_ending_time, next_machine_ids = self.priority_queue.get()
-            next_machine_ids.append(machine_id)
+            if self.priority_queue.qsize() != 0:
+                next_ending_time, next_machine_ids = self.priority_queue.get()
+                next_machine_ids.append(machine_id)
+            else:
+                next_ending_time = current_time
+                next_machine_ids = [machine_id]
+
             self.priority_queue.put((next_ending_time, next_machine_ids))
             return
 
@@ -70,7 +81,7 @@ class Solver:
         self.priority_queue.put((ending_time, [machine_id]))
         self.starting_times[selected_job, task_id] = starting_time
 
-    def candidates(self, machine_id: int) -> np.ndarray:
+    def candidates(self, machine_id: int, current_time: int) -> np.ndarray:
         """Select the valid candidates.
         A candidate is valid if it is the next unplaced task in its job,
         and if that task is to be done on the given `machine_id`.
@@ -81,6 +92,7 @@ class Solver:
         ---
         Args:
             machine_id: The machine onto which we filter the valid candidates.
+            current_time: The current time of the simulation.
 
         ---
         Returns:
@@ -101,7 +113,27 @@ class Solver:
         # `machine_candidates` is of shape [n_jobs,].
         machine_candidates = machine_ids[self.machines == machine_id]
 
-        valid_jobs = job_ids[machine_candidates == frontier_candidates]
+        # Ignore frontier candidates that do not concern the given `machine_id`.
+        filter = machine_candidates == frontier_candidates
+
+        if self.ignore_unfinished_precedences:
+            # Find the ending time of each precedent frontier candidate.
+            # In case of a starting candidate, its precedent ending time will be 0.
+            ending_times = self.starting_times[:, :-1] + self.processing_times
+            ending_times = np.concatenate(
+                (np.zeros((self.n_jobs, 1), dtype=np.int32), ending_times),
+                axis=1,
+            )
+            precedences_indices = np.expand_dims(frontier_candidates, axis=1)
+            precedences_ending_times = np.take_along_axis(
+                ending_times, precedences_indices, axis=1
+            )
+            precedences_ending_times = np.squeeze(precedences_ending_times, axis=1)
+
+            # Also ignore tasks that have unfinished precedences.
+            filter = filter & (precedences_ending_times <= current_time)
+
+        valid_jobs = job_ids[filter]
         return valid_jobs
 
     def priority_rule(self, candidates: np.ndarray) -> int:
