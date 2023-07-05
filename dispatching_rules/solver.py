@@ -3,6 +3,8 @@ from queue import PriorityQueue
 import numpy as np
 from einops import repeat
 
+from .heuristics import HEURISTICS
+
 
 class Solver:
     """Solver using a simulation rollout with dispatching rules.
@@ -19,6 +21,7 @@ class Solver:
         self,
         processing_times: np.ndarray,
         machines: np.ndarray,
+        heuristic: str,
         ignore_unfinished_precedences: bool,
     ):
         n_jobs, n_machines = processing_times.shape
@@ -32,11 +35,13 @@ class Solver:
         assert np.all(
             np.sort(machines, axis=1) == repeat(ordered_index, "m -> n m", n=n_jobs)
         ), "The machines are not all used once for each job"
+        assert heuristic in HEURISTICS, "Unknown heuristic"
 
         self.processing_times = processing_times
         self.machines = machines
         self.n_jobs, self.n_machines = processing_times.shape
         self.ignore_unfinished_precedences = ignore_unfinished_precedences
+        self.heuristic = HEURISTICS[heuristic]
 
         # -1 for unknown starting times.
         self.starting_times = (
@@ -138,8 +143,12 @@ class Solver:
 
     def priority_rule(self, candidates: np.ndarray) -> int:
         """Choose a candidate among the selected ones."""
-        rng = np.random.default_rng(0)
-        return rng.choice(candidates)
+        return self.heuristic(
+            self.processing_times,
+            self.machines,
+            self.starting_times,
+            candidates,
+        )
 
     def canditate_starting_time(self, job_id: int, current_time: int) -> int:
         """Determine the candidate starting time, which is either
