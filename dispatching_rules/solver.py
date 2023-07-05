@@ -39,13 +39,13 @@ class Solver:
         self.priority_queue = PriorityQueue(maxsize=self.n_machines)
 
         # The first events are empty.
-        for machine_id in range(self.n_machines):
-            self.priority_queue.put((0, machine_id))
+        self.priority_queue.put((0, list(range(self.n_machines))))
 
     def solve(self) -> int:
         while np.any(self.starting_times[:, :-1] == -1):
-            current_time, machine_id = self.priority_queue.get()
-            self.step(machine_id, current_time)
+            current_time, machine_ids = self.priority_queue.get()
+            for machine_id in machine_ids:
+                self.step(machine_id, current_time)
 
         ending_times = self.starting_times[:, :-1] + self.processing_times
         makespan = ending_times.max()
@@ -57,9 +57,9 @@ class Solver:
         """
         valid_candidates = self.candidates(machine_id)
         if len(valid_candidates) == 0:
-            next_ending_time, next_machine_id = self.priority_queue.get()
-            self.priority_queue.put((next_ending_time, next_machine_id))
-            self.priority_queue.put((next_ending_time + 1, machine_id))
+            next_ending_time, next_machine_ids = self.priority_queue.get()
+            next_machine_ids.append(machine_id)
+            self.priority_queue.put((next_ending_time, next_machine_ids))
             return
 
         selected_job = self.priority_rule(valid_candidates)
@@ -67,7 +67,7 @@ class Solver:
 
         task_id = self.starting_times[selected_job].argmin()
         ending_time = starting_time + self.processing_times[selected_job, task_id]
-        self.priority_queue.put((ending_time, machine_id))
+        self.priority_queue.put((ending_time, [machine_id]))
         self.starting_times[selected_job, task_id] = starting_time
 
     def candidates(self, machine_id: int) -> np.ndarray:
