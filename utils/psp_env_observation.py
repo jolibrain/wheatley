@@ -121,7 +121,7 @@ class PSPEnvObservation:
             "pr_edges": pr_edge_index,
         }
 
-        if self.add_rp_edges:
+        if self.add_rp_edges != "none":
             rp_edge_index = np.empty(self.env_specification.shape_rp, dtype=np.int64)
             rp_att = np.empty(self.env_specification.shape_rp_att, dtype=np.float32)
             if self.resource_prec_edges is not None:
