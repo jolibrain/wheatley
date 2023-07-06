@@ -25,6 +25,7 @@
 #
 
 import torch
+
 from .dadapt_adam import DAdaptAdam
 from .lion_pytorch import Lion
 
@@ -40,7 +41,7 @@ class TrainingSpecification:
         validation_freq,
         display_env,
         path,
-        custom_heuristic_name,
+        custom_heuristic_names,
         ortools_strategy,
         max_time_ortools,
         scaling_constant_ortools,
@@ -74,7 +75,7 @@ class TrainingSpecification:
         self.validation_freq = validation_freq
         self.display_env = display_env
         self.path = path
-        self.custom_heuristic_name = custom_heuristic_name
+        self.custom_heuristic_names = custom_heuristic_names
         self.ortools_strategy = ortools_strategy
         self.max_time_ortools = max_time_ortools
         self.scaling_constant_ortools = scaling_constant_ortools

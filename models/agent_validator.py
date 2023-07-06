@@ -94,17 +94,14 @@ class AgentValidator:
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
-        self.custom_name = training_specification.custom_heuristic_name
+        self.custom_names = training_specification.custom_heuristic_names
 
         self.max_time_ortools = training_specification.max_time_ortools
         self.scaling_constant_ortools = training_specification.scaling_constant_ortools
 
         # Comparative agents
         self.random_agent = RandomAgent()
-        if self.custom_name != "None":
-            self.custom_agent = CustomAgent(
-                self.custom_name,
-            )
+        self.custom_agents = [CustomAgent(rule) for rule in self.custom_names]
 
         # Inner variables
         if hasattr(self.problem_description, "test_psps"):
@@ -136,7 +133,7 @@ class AgentValidator:
         self.makespans = []
         self.ortools_makespans = []
         self.random_makespans = []
-        self.custom_makespans = []
+        self.custom_makespans = {agent.rule: [] for agent in self.custom_agents}
         self.entropy_losses = []
         self.policy_gradient_losses = []
         self.value_losses = []
@@ -289,7 +286,7 @@ class AgentValidator:
         mean_makespan = 0
         ortools_mean_makespan = 0
         random_mean_makespan = 0
-        custom_mean_makespan = 0
+        custom_mean_makespan = {agent.rule: 0 for agent in self.custom_agents}
         start_eval = time.time()
 
         if self.batch_size != 0:
@@ -398,32 +395,34 @@ class AgentValidator:
                 random_makespan = self._get_random_makespan(i)
             random_mean_makespan += random_makespan / self.n_validation_env
 
-            if self.custom_name != "None":
-                custom_mean_makespan += (
-                    self.custom_agent.predict(
-                        JSSPDescription(
-                            transition_model_config=self.validation_envs[
-                                i
-                            ].transition_model_config,
-                            reward_model_config=self.validation_envs[
-                                i
-                            ].reward_model_config,
-                            deterministic=self.validation_envs[i].state.deterministic,
-                            fixed=True,  # Evaluate on the current problem.
-                            affectations=self.validation_envs[i].state.affectations,
-                            durations=self.validation_envs[i].state.original_durations,
-                            n_jobs=self.validation_envs[i].n_jobs,
-                            n_machines=self.validation_envs[i].n_machines,
-                        ),
-                    ).get_makespan()
-                    / self.n_validation_env
+            for custom_agent in self.custom_agents:
+                makespan = custom_agent.predict(
+                    JSSPDescription(
+                        transition_model_config=self.validation_envs[
+                            i
+                        ].transition_model_config,
+                        reward_model_config=self.validation_envs[i].reward_model_config,
+                        deterministic=self.validation_envs[i].state.deterministic,
+                        fixed=True,  # Evaluate on the current problem.
+                        affectations=self.validation_envs[i].state.affectations,
+                        durations=self.validation_envs[i].state.original_durations,
+                        n_jobs=self.validation_envs[i].n_jobs,
+                        n_machines=self.validation_envs[i].n_machines,
+                    ),
+                ).get_makespan()
+                custom_mean_makespan[custom_agent.rule] += (
+                    makespan / self.n_validation_env
                 )
+
         print("--- mean_makespan=", mean_makespan, " ---")
         print("--- eval time=", time.time() - start_eval, "  ---")
         self.makespans.append(mean_makespan)
         self.ortools_makespans.append(ortools_mean_makespan)
         self.random_makespans.append(random_mean_makespan)
-        self.custom_makespans.append(custom_mean_makespan)
+        for custom_agent in self.custom_agents:
+            self.custom_makespans[custom_agent.rule].append(
+                custom_mean_makespan[custom_agent.rule]
+            )
 
     def _visdom_metrics(self, agent, alg):
         commandline = " ".join(sys.argv)
@@ -438,6 +437,7 @@ class AgentValidator:
         X = list(range(len(self.makespans)))
         Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]
         opts = {
+            "title": "Validation makespan",
             "legend": ["PPO", "Random", "OR-tools"],
             "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
         }
@@ -449,15 +449,31 @@ class AgentValidator:
             "legend": ["PPO / OR-tools", "Random / OR-tools"],
             "linecolor": np.array([[31, 119, 180], [255, 127, 14]]),
         }
-        if self.custom_name != "None":
-            Y_list.append(self.custom_makespans)
-            Y2_list.append(self.custom_makespans / np.array(self.ortools_makespans))
-            opts["legend"].append(self.custom_name)
-            opts["linecolor"] = np.array(
-                [[31, 119, 180], [255, 127, 14], [44, 160, 44], [255, 0, 0]]
+        agent_colors = np.array(
+            [
+                [255, 0, 0],
+                [200, 0, 0],
+                [150, 0, 0],
+                [150, 50, 0],
+                [127, 127, 0],
+            ]
+        )
+        for custom_agent_id, custom_agent in enumerate(self.custom_agents):
+            name = custom_agent.rule
+            Y = np.array(self.custom_makespans[name])
+            Y_list.append(Y)
+            Y2_list.append(Y / np.array(self.ortools_makespans))
+
+            opts["linecolor"] = np.concatenate(
+                (opts["linecolor"], agent_colors[custom_agent_id].reshape(1, 3)), axis=0
             )
-            opts2["legend"].append(self.custom_name + " / OR-tools")
-            opts2["linecolor"] = np.array([[31, 119, 180], [255, 127, 14], [255, 0, 0]])
+            opts["legend"].append(name)
+
+            opts2["legend"].append(name + " / OR-tools")
+            opts2["linecolor"] = np.concatenate(
+                (opts["linecolor"], agent_colors[custom_agent_id].reshape(1, 3)), axis=0
+            )
+
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
         # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
 

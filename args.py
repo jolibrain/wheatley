@@ -27,9 +27,8 @@
 import argparse
 import os
 
+from dispatching_rules.heuristics import HEURISTICS
 from utils.utils import get_exp_name, get_path
-
-from .dispatching_rules.heuristics import HEURISTICS
 
 parser = argparse.ArgumentParser(
     description="These args can be used with train.py, test.py and benchmark/run_taillard.py. They specify how the training"
@@ -139,12 +138,10 @@ parser.add_argument(
     action="store_true",
     help="Freezes graph during training",
 )
-available_heuristics = list(HEURISTICS.keys())
-available_heuristics.append("None")
 parser.add_argument(
-    "--custom_heuristic_name",
-    default="None",
-    choices=available_heuristics,
+    "--custom_heuristic_names",
+    choices=list(HEURISTICS.keys()),
+    nargs="*",
     help="Which custom heuristic to run",
 )
 parser.add_argument(

@@ -103,7 +103,7 @@ def main(args, exp_name, path):
         validation_freq=1 if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
         path=path,
-        custom_heuristic_name=args.custom_heuristic_name,
+        custom_heuristic_names=args.custom_heuristic_names,
         ortools_strategy=args.ortools_strategy,
         max_time_ortools=args.max_time_ortools,
         scaling_constant_ortools=args.scaling_constant_ortools,
