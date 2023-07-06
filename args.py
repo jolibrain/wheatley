@@ -198,6 +198,8 @@ parser.add_argument(
 # =================================================AGENT SPECIFICATION======================================================
 parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
 parser.add_argument("--clip_range", type=float, default=0.25, help="Clipping parameter")
+# parser.add_argument("--clip_range", type=float, default=None, help="Clipping parameter")
+
 parser.add_argument(
     "--target_kl",
     type=float,
@@ -366,7 +368,7 @@ parser.add_argument(
     "--keep_past_prec",
     default=False,
     action="store_true",
-    help="remove past precedencies",
+    help="keep past precedencies",
 )
 
 
