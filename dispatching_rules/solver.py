@@ -4,6 +4,7 @@ import numpy as np
 from einops import repeat
 
 from .heuristics import HEURISTICS
+from .validate import validate_instance, validate_solution
 
 
 class Solver:
@@ -25,16 +26,7 @@ class Solver:
         ignore_unfinished_precedences: bool,
     ):
         n_jobs, n_machines = processing_times.shape
-        assert (
-            processing_times.shape == machines.shape
-        ), "Wrong number of jobs or machines"
-        assert (
-            machines.min() == 0 and machines.max() == n_machines - 1
-        ), "The indices must be in the range [0, n_machines - 1]"
-        ordered_index = np.arange(n_machines)
-        assert np.all(
-            np.sort(machines, axis=1) == repeat(ordered_index, "m -> n m", n=n_jobs)
-        ), "The machines are not all used once for each job"
+        validate_instance(processing_times, machines)
         assert heuristic in HEURISTICS, "Unknown heuristic"
 
         self.processing_times = processing_times
@@ -58,6 +50,11 @@ class Solver:
             for machine_id in machine_ids:
                 self.step(machine_id, current_time)
 
+        validate_solution(
+            self.processing_times,
+            self.machines,
+            self.starting_times[:, :-1],
+        )
         ending_times = self.starting_times[:, :-1] + self.processing_times
         makespan = ending_times.max()
         return makespan
