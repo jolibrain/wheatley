@@ -208,8 +208,7 @@ class PSPState:
                     )
                 )
         assert len(self.resources) == self.n_resources
-        if self.remove_old_resource_info:
-            self.reset_frontier()
+        self.reset_frontier()
 
     def reset_selectable(self):
         self.features[:, 1] = 0
@@ -366,6 +365,12 @@ class PSPState:
         self.update_completion_times_after(node_id)
         if self.remove_old_resource_info:
             self.remove_res_frontier()
+        else:
+            self.nodes_in_frontier = set()
+            for r in self.resources:
+                for i in range(1, 4):
+                    for fe in r[i].frontier:
+                        self.nodes_in_frontier.add(fe[1])
 
     def mask_wrt_non_renewable_resources(self):
         selectables = np.where(self.features[:, 1] == 1)[0]
@@ -737,7 +742,7 @@ class PSPState:
     def remove_past_edges(self, fresh_nodes):
         new_edges = []
         for edge in self.problem_edges:
-            if edge[0] in fresh_nodes and edge[1] in fresh_nodes:
+            if edge[0] in fresh_nodes or edge[1] in fresh_nodes:
                 new_edges.append((edge[0], edge[1]))
         return np.transpose(np.array(new_edges))
 
@@ -745,7 +750,6 @@ class PSPState:
         new_edges = []
         edge_indices = []
         for ei, edge in enumerate(self.resource_prec_edges):
-            # TODO : check AND / OR performances
             if edge[0] in self.nodes_in_frontier or edge[1] in self.nodes_in_frontier:
                 new_edges.append(edge)
                 edge_indices.append(ei)
@@ -760,7 +764,6 @@ class PSPState:
         new_edges = []
         edge_indices = []
         for ei, edge in enumerate(self.resource_prec_edges):
-            # TODO : check AND / OR performances
             if edge[0] in self.nodes_in_frontier and edge[1] in self.nodes_in_frontier:
                 new_edges.append(edge)
                 edge_indices.append(ei)
