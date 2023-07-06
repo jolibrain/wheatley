@@ -49,7 +49,7 @@ class PSPGnnDGL(torch.nn.Module):
         edge_embedding_flavor="sum",
         layer_pooling="all",
         factored_rp=False,
-        add_rp_edges=False,
+        add_rp_edges="all",
         add_self_loops=False,
     ):
 
@@ -103,11 +103,11 @@ class PSPGnnDGL(torch.nn.Module):
                 self.max_n_resources + 1, hidden_dim_features_extractor
             )
             self.edge_type_embedder = torch.nn.Embedding(
-                7, hidden_dim_features_extractor
+                8, hidden_dim_features_extractor
             )
 
             self.rc_att_embedder = torch.nn.Linear(2, hidden_dim_features_extractor)
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 if self.factored_rp:
                     self.rp_att_embedder = torch.nn.Linear(
                         3 * self.max_n_resources, hidden_dim_features_extractor
@@ -118,18 +118,18 @@ class PSPGnnDGL(torch.nn.Module):
                     )
 
         elif self.edge_embedding_flavor == "cat":
-            self.edge_type_embedder = torch.nn.Embedding(7, 7)
+            self.edge_type_embedder = torch.nn.Embedding(8, 8)
             self.resource_id_embedder = torch.nn.Embedding(
                 self.max_n_resources + 1, self.max_n_resources + 1
             )
-            rest = hidden_dim_features_extractor - 7 - self.max_n_resources - 1
+            rest = hidden_dim_features_extractor - 8 - self.max_n_resources - 1
             if rest < 4:
                 raise ValueError(
                     f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
                 )
             self.rc_att_hidden_dim = int(rest / 2)
             self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 self.rp_att_hidden_dim = rest - self.rc_att_hidden_dim
                 if self.factored_rp:
                     self.rp_att_embedder = torch.nn.Linear(
@@ -140,13 +140,13 @@ class PSPGnnDGL(torch.nn.Module):
         elif self.edge_embedding_flavor == "cartesian":
             self.type_rid_hidden_dim = int(hidden_dim_features_extractor / 2)
             self.type_rid_embedder = torch.nn.Embedding(
-                7 * (self.max_n_resources + 1), self.type_rid_hidden_dim
+                8 * (self.max_n_resources + 1), self.type_rid_hidden_dim
             )
             self.rc_att_hidden_dim = int(
                 (hidden_dim_features_extractor - self.type_rid_hidden_dim) / 2
             )
             self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 self.rp_att_hidden_dim = (
                     hidden_dim_features_extractor
                     - self.type_rid_hidden_dim
@@ -210,6 +210,10 @@ class PSPGnnDGL(torch.nn.Module):
                 )
             )
 
+    def reset_egat(self):
+        for egat in self.features_extractors:
+            egat.reset_parameters()
+
     def embed_edges(self, g):
         if self.edge_embedding_flavor == "sum":
             ret = self.edge_type_embedder(g.edata["type"])
@@ -218,7 +222,7 @@ class PSPGnnDGL(torch.nn.Module):
                 ret += self.rc_att_embedder(g.edata["att_rc"])
             except KeyError:
                 pass
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 try:  # if no ressource priory info in graph (ie at start state), key is absent
                     ret += self.rp_att_embedder(g.edata["att_rp"].float())
                 except KeyError:
@@ -232,7 +236,7 @@ class PSPGnnDGL(torch.nn.Module):
                 ec = self.rc_att_embedder(g.edata["att_rc"])
             except KeyError:
                 ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 try:
                     ep = self.rp_att_embedder(g.edata["att_rp"])
                 except KeyError:
@@ -248,7 +252,7 @@ class PSPGnnDGL(torch.nn.Module):
                 ec = self.rc_att_embedder(g.edata["att_rc"])
             except KeyError:
                 ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
-            if self.add_rp_edges:
+            if self.add_rp_edges != "none":
                 try:
                     ep = self.rp_att_embedder(g.edata["att_rp"])
                 except KeyError:
@@ -291,11 +295,11 @@ class PSPGnnDGL(torch.nn.Module):
                 ei1 += list(range(startnode, startnode + origbnn[i]))
                 startnode += origbnn[i]
 
-            g.add_edges(
-                list(range(num_nodes, num_nodes + batch_size)),
-                list(range(num_nodes, num_nodes + batch_size)),
-                data={"type": torch.LongTensor([0] * batch_size)},
-            )
+            # g.add_edges(
+            #     list(range(num_nodes, num_nodes + batch_size)),
+            #     list(range(num_nodes, num_nodes + batch_size)),
+            #     data={"type": torch.LongTensor([0] * batch_size)},
+            # )
 
             g.add_edges(ei1, ei0, data={"type": torch.LongTensor([6] * len(ei0))})
             # INVERSE POOLING BELOW !
