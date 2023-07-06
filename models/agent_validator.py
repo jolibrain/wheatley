@@ -103,9 +103,7 @@ class AgentValidator:
         self.random_agent = RandomAgent()
         if self.custom_name != "None":
             self.custom_agent = CustomAgent(
-                self.env_specification.max_n_jobs,
-                self.env_specification.max_n_machines,
-                custom_name.lower(),
+                self.custom_name,
             )
 
         # Inner variables
@@ -402,28 +400,22 @@ class AgentValidator:
 
             if self.custom_name != "None":
                 custom_mean_makespan += (
-                    np.max(
-                        self.custom_agent.predict(
-                            ProblemDescription(
-                                transition_model_config=self.validation_envs[
-                                    i
-                                ].transition_model_config,
-                                reward_model_config=self.validation_envs[
-                                    i
-                                ].reward_model_config,
-                                affectations=self.validation_envs[
-                                    i
-                                ].transition_model.affectations,
-                                durations=self.validation_envs[
-                                    i
-                                ].transition_model.durations,
-                                n_jobs=self.validation_envs[i].n_jobs,
-                                n_machines=self.validation_envs[i].n_machines,
-                            ),
-                            True,
-                            None,
-                        ).get_makespan()
-                    )
+                    self.custom_agent.predict(
+                        JSSPDescription(
+                            transition_model_config=self.validation_envs[
+                                i
+                            ].transition_model_config,
+                            reward_model_config=self.validation_envs[
+                                i
+                            ].reward_model_config,
+                            deterministic=self.validation_envs[i].state.deterministic,
+                            fixed=True,  # Evaluate on the current problem.
+                            affectations=self.validation_envs[i].state.affectations,
+                            durations=self.validation_envs[i].state.original_durations,
+                            n_jobs=self.validation_envs[i].n_jobs,
+                            n_machines=self.validation_envs[i].n_machines,
+                        ),
+                    ).get_makespan()
                     / self.n_validation_env
                 )
         print("--- mean_makespan=", mean_makespan, " ---")

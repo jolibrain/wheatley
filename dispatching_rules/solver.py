@@ -27,7 +27,7 @@ class Solver:
     ):
         n_jobs, n_machines = processing_times.shape
         validate_instance(processing_times, machines)
-        assert heuristic in HEURISTICS, "Unknown heuristic"
+        assert heuristic in HEURISTICS, f"Unknown heuristic {heuristic}"
 
         self.processing_times = processing_times
         self.machines = machines
@@ -55,9 +55,7 @@ class Solver:
             self.machines,
             self.starting_times[:, :-1],
         )
-        ending_times = self.starting_times[:, :-1] + self.processing_times
-        makespan = ending_times.max()
-        return makespan
+        return self.starting_times[:, :-1]
 
     def step(self, machine_id: int, current_time: int):
         """Update the priority queue and the current solution by adding
