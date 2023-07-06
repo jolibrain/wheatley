@@ -88,7 +88,7 @@ class PSPAgentObservation:
             nn_edges = n_edges
         gnew.edata["type"] = torch.LongTensor(type0)
         gnew.edata["rid"] = torch.zeros((nn_edges), dtype=torch.int)
-        if add_rp_edges:
+        if add_rp_edges != "none":
             if factored_rp:
                 gnew.edata["att_rp"] = torch.zeros(
                     (nn_edges, 3 * max_n_resources), dtype=torch.float32
@@ -317,7 +317,7 @@ class PSPAgentObservation:
         n_laplacian_eigv=50,
         bidir=True,
         factored_rp=False,
-        add_rp_edges=False,
+        add_rp_edges="all",
         max_n_resources=-1,
     ):
 
@@ -326,7 +326,7 @@ class PSPAgentObservation:
 
         n_pr_edges = gym_observation["n_pr_edges"].long().to(torch.device("cpu"))
         pr_edges = gym_observation["pr_edges"].long().to(torch.device("cpu"))
-        if add_rp_edges:
+        if add_rp_edges != "none":
             n_rp_edges = gym_observation["n_rp_edges"].long().to(torch.device("cpu"))
             rp_edges = gym_observation["rp_edges"].long().to(torch.device("cpu"))
             rp_att = gym_observation["rp_att"].to(torch.device("cpu"))
@@ -382,7 +382,7 @@ class PSPAgentObservation:
             )
 
             # resource priority edges
-            if add_rp_edges and rp_edges.nelement() != 0:
+            if add_rp_edges != "none" and rp_edges.nelement() != 0:
 
                 if factored_rp:
                     gnew = PSPAgentObservation.add_edges(
