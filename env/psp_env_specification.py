@@ -209,6 +209,8 @@ class PSPEnvSpecification:
             f"add resource prcedence edges:       {self.add_rp_edges}\n"
             f"remove old resource info:           {self.remove_old_resource_info}\n"
             f"remove past prec:                   {self.remove_past_prec}\n"
-            f"List of features:\n - Task Completion Times - selectable"
+            f"List of features:\n - Task Completion Times\n - selectable\n - duration"
         )
-        print(" - " + "\n - ".join(print_input_list) + "\n")
+
+        if len(print_input_list) != 0:
+            print(" - " + "\n - ".join(print_input_list) + "\n")
