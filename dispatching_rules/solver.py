@@ -42,7 +42,7 @@ class Solver:
         # The first events are empty.
         self.priority_queue.put((0, list(range(self.n_machines))))
 
-    def solve(self) -> int:
+    def solve(self) -> np.ndarray:
         while np.any(self.schedule[:, :-1] == -1):
             current_time, machine_ids = self.priority_queue.get()
             for machine_id in machine_ids:
