@@ -662,3 +662,6 @@ if args.sample_n_jobs != -1 and args.chunk_n_jobs != -1:
 
 # Sorting the features
 args.features = sorted(args.features)
+
+if args.custom_heuristic_names is None:
+    args.custom_heuristic_names = []

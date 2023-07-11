@@ -157,3 +157,99 @@ class Solver:
         previous_ending_time = previous_starting_time + previous_process_time
 
         return max(previous_ending_time, current_time)
+
+
+def reschedule(
+    durations: np.ndarray, affectations: np.ndarray, schedule: np.ndarray
+) -> np.ndarray:
+    """Adapt the current schedule to take into account the given durations.
+    Does not modify the order of the schedule.
+
+    ---
+    Args:
+        durations: The new durations of the tasks.
+            Shape of [n_jobs, n_machines].
+        affectations: The affectations of the tasks.
+            Shape of [n_jobs, n_machines].
+        schedule: The current schedule.
+            Shape of [n_jobs, n_machines].
+
+    ---
+    Returns:
+        The new schedule.
+            Shape of [n_jobs, n_machines].
+    """
+    # Iterate until we have a fixed point solution.
+    # During each iteration, we separately fix the job constraints and the
+    # machines constraints.
+    new_schedule = _reschedule_jobs(durations, affectations, schedule)
+    new_schedule = _reschedule_machines(durations, affectations, new_schedule)
+    while not np.all(schedule == new_schedule):
+        schedule = new_schedule
+        new_schedule = _reschedule_jobs(durations, affectations, new_schedule)
+        new_schedule = _reschedule_machines(durations, affectations, new_schedule)
+
+    return new_schedule
+
+
+def _reschedule_jobs(
+    durations: np.ndarray, affectations: np.ndarray, schedule: np.ndarray
+) -> np.ndarray:
+    """Modify the schedule to make sure that the job constraints
+    are respected.
+    """
+    n_tasks = durations.shape[1]
+    schedule = schedule.copy()
+
+    for task_id in range(1, n_tasks):
+        starting_times = np.stack(
+            (
+                schedule[:, task_id],
+                schedule[:, task_id - 1] + durations[:, task_id - 1],
+            ),
+            axis=1,
+        )
+        schedule[:, task_id] = np.max(starting_times, axis=1)
+
+    return schedule
+
+
+def _reschedule_machines(
+    durations: np.ndarray, affectations: np.ndarray, schedule: np.ndarray
+) -> np.ndarray:
+    """Modify the schedule to make sure that the machine constraints
+    are respected.
+    """
+    schedule = schedule.copy()
+
+    # Order the tasks by the machine they are affected to.
+    sort_by_machines = np.argsort(affectations, axis=1)
+    durations = np.take_along_axis(durations, sort_by_machines, axis=1)
+    schedule = np.take_along_axis(schedule, sort_by_machines, axis=1)
+
+    # Read to [n_machines, n_jobs].
+    durations = durations.transpose()
+    schedule = schedule.transpose()
+
+    # Order the tasks chronogically for each machine.
+    sort_by_starting_times = np.argsort(schedule, axis=1)
+    schedule = np.take_along_axis(schedule, sort_by_starting_times, axis=1)
+    durations = np.take_along_axis(durations, sort_by_starting_times, axis=1)
+
+    # Make sure each task starts after the precedent task on each machine.
+    n_tasks = durations.shape[1]
+    for task_id in range(1, n_tasks):
+        starting_times = np.stack(
+            (
+                schedule[:, task_id],
+                schedule[:, task_id - 1] + durations[:, task_id - 1],
+            ),
+            axis=1,
+        )
+        schedule[:, task_id] = np.max(starting_times, axis=1)
+
+    # Go back to the original schedule format.
+    schedule = np.take_along_axis(schedule, np.argsort(sort_by_starting_times), axis=1)
+    schedule = schedule.transpose()
+    schedule = np.take_along_axis(schedule, affectations, axis=1)
+    return schedule

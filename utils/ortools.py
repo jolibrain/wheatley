@@ -24,31 +24,31 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
+import collections
 import time
+from copy import deepcopy
+from operator import itemgetter
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 import visdom
-import collections
-from operator import itemgetter
+from ortools.sat.python import cp_model
 
-from copy import deepcopy
+from dispatching_rules.solver import reschedule
+from dispatching_rules.validate import validate_solution
 from env.jssp_state import JSSPState as State
 from problem.jssp_description import JSSPDescription as ProblemDescription
-from utils.utils import obs_as_tensor_add_batch_dim, decode_mask
-from ortools.sat.python import cp_model
-from problem.solution import Solution, PSPSolution
+from problem.solution import PSPSolution, Solution
 from utils.ortools_psp import (
     AnalyseDependencyGraph,
     ComputeDelaysBetweenNodes,
     SolveRcpsp,
 )
-
-import torch
+from utils.utils import decode_mask, obs_as_tensor_add_batch_dim
 
 
 def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
-
     durations = (durations * scaling_constant_ortools).astype(int)
 
     # update problem durations with real_durations
@@ -276,6 +276,13 @@ def get_ortools_makespan(
     )
     state.reset()
 
+    # TEST: Is my rescheduling doing the same things as OR-Tools?
+    solver_schedule = reschedule(
+        state.original_durations[:, :, 0], affectations, solution.schedule
+    )
+    validate_solution(state.original_durations[:, :, 0], affectations, solver_schedule)
+    solver_makespan = np.max(solver_schedule + state.original_durations[:, :, 0])
+
     # use the same durations to compute machines occupancies
     state.durations = state.original_durations
     for i in range(n_j * n_m):
@@ -309,6 +316,9 @@ def get_ortools_makespan(
     )
 
     makespan = torch.max(state.get_all_task_completion_times()[:, 0].flatten())
+
+    print(f"Testing solver reschedule: {makespan} vs {solver_makespan}")
+    assert makespan - solver_makespan >= 0, f"{makespan} vs {solver_makespan}"
 
     return makespan, tct - durations[:, :, 0], optimal
 
