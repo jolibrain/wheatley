@@ -101,7 +101,9 @@ class AgentValidator:
 
         # Comparative agents
         self.random_agent = RandomAgent()
-        self.custom_agents = [CustomAgent(rule) for rule in self.custom_names]
+        self.custom_agents = [
+            CustomAgent(rule, self.ortools_strategy) for rule in self.custom_names
+        ]
 
         # Inner variables
         if hasattr(self.problem_description, "test_psps"):

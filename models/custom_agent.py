@@ -24,24 +24,40 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from dispatching_rules.solver import Solver
+from dispatching_rules.solver import Solver, reschedule
 from problem.jssp_description import JSSPDescription
 from problem.solution import Solution
 
 
 class CustomAgent:
-    def __init__(self, rule: str = "MOPNR"):
+    def __init__(
+        self, rule: str = "MOPNR", stochasticity_strategy: str = "averagistic"
+    ):
         self.rule = rule
+        self.stochasticity_strategy = stochasticity_strategy
 
     def predict(self, problem_description: JSSPDescription) -> Solution:
-        machines = problem_description.affectations
-        processing_times = problem_description.durations
-        processing_times = processing_times.mean(
-            axis=2
-        )  # TODO: Handle the non-deterministic case.
+        affectations = problem_description.affectations
+        durations = problem_description.durations
+        real_durations = durations[:, :, 0]
+
+        if self.stochasticity_strategy == "realistic" or durations.shape[2] == 1:
+            durations = durations[:, :, 0]
+        elif self.stochasticity_strategy == "pessimistic":
+            durations = durations[:, :, 2]
+        elif self.stochasticity_strategy == "optimistic":
+            durations = durations[:, :, 1]
+        elif self.stochasticity_strategy == "averagistic":
+            durations = durations[:, :, 3]
+        else:
+            raise ValueError(
+                f"Unknown stochasticity strategy {self.stochasticity_strategy}"
+            )
+
         solver = Solver(
-            processing_times, machines, self.rule, ignore_unfinished_precedences=True
+            durations, affectations, self.rule, ignore_unfinished_precedences=True
         )
         schedule = solver.solve()
-        solution = Solution(schedule, processing_times)
+        true_schedule = reschedule(real_durations, affectations, schedule)
+        solution = Solution(true_schedule, durations)
         return solution
