@@ -152,6 +152,7 @@ class AgentValidator:
         self.first_callback = True
         self.gantt_rl_img = None
         self.gantt_or_img = None
+        self.gantt_mopnr_img = None
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
@@ -396,7 +397,7 @@ class AgentValidator:
             random_mean_makespan += random_makespan / self.n_validation_env
 
             for custom_agent in self.custom_agents:
-                makespan = custom_agent.predict(
+                solution = custom_agent.predict(
                     JSSPDescription(
                         transition_model_config=self.validation_envs[
                             i
@@ -409,7 +410,12 @@ class AgentValidator:
                         n_jobs=self.validation_envs[i].n_jobs,
                         n_machines=self.validation_envs[i].n_machines,
                     ),
-                ).get_makespan()
+                )
+                makespan = solution.get_makespan()
+                if custom_agent.rule == "MOPNR" and i == 0:
+                    self.gantt_mopnr_img = self.validation_envs[i].render_solution(
+                        solution.schedule
+                    )
                 custom_mean_makespan[custom_agent.rule] += (
                     makespan / self.n_validation_env
                 )
@@ -598,4 +604,11 @@ class AgentValidator:
                 self.gantt_or_img,
                 opts=opts,
                 win="or_schedule",
+            )
+
+        if self.gantt_mopnr_img is not None:
+            self.vis.image(
+                self.gantt_mopnr_img,
+                opts={"caption": "Gantt MOPNR schedule"},
+                win="mopnr_schedule",
             )

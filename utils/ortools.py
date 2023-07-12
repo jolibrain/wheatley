@@ -35,8 +35,6 @@ import torch
 import visdom
 from ortools.sat.python import cp_model
 
-from dispatching_rules.solver import reschedule
-from dispatching_rules.validate import validate_solution
 from env.jssp_state import JSSPState as State
 from problem.jssp_description import JSSPDescription as ProblemDescription
 from problem.solution import PSPSolution, Solution
@@ -276,13 +274,6 @@ def get_ortools_makespan(
     )
     state.reset()
 
-    # TEST: Is my rescheduling doing the same things as OR-Tools?
-    solver_schedule = reschedule(
-        state.original_durations[:, :, 0], affectations, solution.schedule
-    )
-    validate_solution(state.original_durations[:, :, 0], affectations, solver_schedule)
-    solver_makespan = np.max(solver_schedule + state.original_durations[:, :, 0])
-
     # use the same durations to compute machines occupancies
     state.durations = state.original_durations
     for i in range(n_j * n_m):
@@ -316,9 +307,6 @@ def get_ortools_makespan(
     )
 
     makespan = torch.max(state.get_all_task_completion_times()[:, 0].flatten())
-
-    print(f"Testing solver reschedule: {makespan} vs {solver_makespan}")
-    assert makespan - solver_makespan >= 0, f"{makespan} vs {solver_makespan}"
 
     return makespan, tct - durations[:, :, 0], optimal
 

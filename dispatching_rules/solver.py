@@ -179,22 +179,26 @@ def reschedule(
         The new schedule.
             Shape of [n_jobs, n_machines].
     """
+    # Save the original tasks order of each machine.
+    occupancy = _occupancy(affectations, schedule)
+    # Start by a trivial schedule and make sure that each task job is at least
+    # starting right after its precedency.
+    new_schedule = _init_schedule(durations)
+
     # Iterate until we have a fixed point solution.
     # During each iteration, we separately fix the job constraints and the
     # machines constraints.
-    new_schedule = _reschedule_jobs(durations, affectations, schedule)
-    new_schedule = _reschedule_machines(durations, affectations, new_schedule)
     while not np.all(schedule == new_schedule):
         schedule = new_schedule
-        new_schedule = _reschedule_jobs(durations, affectations, new_schedule)
-        new_schedule = _reschedule_machines(durations, affectations, new_schedule)
+        new_schedule = _reschedule_jobs(durations, new_schedule)
+        new_schedule = _reschedule_machines(
+            durations, affectations, occupancy, new_schedule
+        )
 
     return new_schedule
 
 
-def _reschedule_jobs(
-    durations: np.ndarray, affectations: np.ndarray, schedule: np.ndarray
-) -> np.ndarray:
+def _reschedule_jobs(durations: np.ndarray, schedule: np.ndarray) -> np.ndarray:
     """Modify the schedule to make sure that the job constraints
     are respected.
     """
@@ -215,7 +219,10 @@ def _reschedule_jobs(
 
 
 def _reschedule_machines(
-    durations: np.ndarray, affectations: np.ndarray, schedule: np.ndarray
+    durations: np.ndarray,
+    affectations: np.ndarray,
+    occupancy: np.ndarray,
+    schedule: np.ndarray,
 ) -> np.ndarray:
     """Modify the schedule to make sure that the machine constraints
     are respected.
@@ -224,17 +231,16 @@ def _reschedule_machines(
 
     # Order the tasks by the machine they are affected to.
     sort_by_machines = np.argsort(affectations, axis=1)
-    durations = np.take_along_axis(durations, sort_by_machines, axis=1)
     schedule = np.take_along_axis(schedule, sort_by_machines, axis=1)
+    durations = np.take_along_axis(durations, sort_by_machines, axis=1)
 
     # Read to [n_machines, n_jobs].
-    durations = durations.transpose()
     schedule = schedule.transpose()
+    durations = durations.transpose()
 
-    # Order the tasks chronogically for each machine.
-    sort_by_starting_times = np.argsort(schedule, axis=1)
-    schedule = np.take_along_axis(schedule, sort_by_starting_times, axis=1)
-    durations = np.take_along_axis(durations, sort_by_starting_times, axis=1)
+    # Order the tasks by the original occupancy schedule.
+    schedule = np.take_along_axis(schedule, occupancy, axis=1)
+    durations = np.take_along_axis(durations, occupancy, axis=1)
 
     # Make sure each task starts after the precedent task on each machine.
     n_tasks = durations.shape[1]
@@ -249,7 +255,39 @@ def _reschedule_machines(
         schedule[:, task_id] = np.max(starting_times, axis=1)
 
     # Go back to the original schedule format.
-    schedule = np.take_along_axis(schedule, np.argsort(sort_by_starting_times), axis=1)
+    schedule = np.take_along_axis(schedule, np.argsort(occupancy), axis=1)
     schedule = schedule.transpose()
     schedule = np.take_along_axis(schedule, affectations, axis=1)
     return schedule
+
+
+def _init_schedule(durations: np.ndarray) -> np.ndarray:
+    """Initialize a schedule by starting each job task when its precedency
+    is finished. This is important to make sure that no gap between two tasks
+    is let unfilled.
+    """
+    schedule = np.zeros_like(durations)
+    for task_id in range(1, durations.shape[1]):
+        schedule[:, task_id] = schedule[:, task_id - 1] + durations[:, task_id - 1]
+
+    return schedule
+
+
+def _occupancy(affectations: np.ndarray, schedule: np.ndarray) -> np.ndarray:
+    """Compute the occupancy of each machine of the given schedule.
+    The occupancy of a machine is the order a machine treat each job.
+
+    ---
+    Returns:
+        The occupancy of each machine.
+            Shape of [n_machines, n_jobs].
+    """
+    # Order the tasks by the machine they are affected to.
+    sort_by_machines = np.argsort(affectations, axis=1)
+    schedule = np.take_along_axis(schedule, sort_by_machines, axis=1)
+
+    schedule = schedule.transpose()
+
+    # Chronological order of the jobs for each machine.
+    occupancy = np.argsort(schedule, axis=1)
+    return occupancy
