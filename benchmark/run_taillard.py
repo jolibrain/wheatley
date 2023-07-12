@@ -45,16 +45,15 @@ from models.agent_specification import AgentSpecification  # noqa E402
 from models.training_specification import TrainingSpecification  # noqa E402
 from problem.problem_description import ProblemDescription  # noqa E402
 from utils.ortools import solve_jssp  # noqa E402
-from utils.utils import (
+from utils.utils import (  # noqa E402
     get_exp_name,
     get_n_features,
     get_path,
     load_taillard_problem,
-)  # noqa E402
+)
 
 
 def main():
-
     # Get Taillard problem files
     problem_files = glob.glob("../instances/taillard/" + args.taillard_pbs + ".txt")
 
@@ -96,7 +95,7 @@ def main():
             validation_freq=args.validation_freq,
             display_env=exp_name,
             path=path,
-            custom_heuristic_name=args.custom_heuristic_name,
+            custom_heuristic_names=args.custom_heuristic_names,
             ortools_strategy=args.ortools_strategy,
             max_time_ortools=args.max_time_ortools,
             scaling_constant_ortools=args.scaling_constant_ortools,
