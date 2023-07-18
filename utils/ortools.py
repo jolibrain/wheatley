@@ -24,31 +24,29 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
+import collections
 import time
+from copy import deepcopy
+from operator import itemgetter
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 import visdom
-import collections
-from operator import itemgetter
+from ortools.sat.python import cp_model
 
-from copy import deepcopy
 from env.jssp_state import JSSPState as State
 from problem.jssp_description import JSSPDescription as ProblemDescription
-from utils.utils import obs_as_tensor_add_batch_dim, decode_mask
-from ortools.sat.python import cp_model
-from problem.solution import Solution, PSPSolution
+from problem.solution import PSPSolution, Solution
 from utils.ortools_psp import (
     AnalyseDependencyGraph,
     ComputeDelaysBetweenNodes,
     SolveRcpsp,
 )
-
-import torch
+from utils.utils import decode_mask, obs_as_tensor_add_batch_dim
 
 
 def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
-
     durations = (durations * scaling_constant_ortools).astype(int)
 
     # update problem durations with real_durations

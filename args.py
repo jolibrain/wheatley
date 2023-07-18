@@ -27,6 +27,7 @@
 import argparse
 import os
 
+from dispatching_rules.heuristics import HEURISTICS
 from utils.utils import get_exp_name, get_path
 
 parser = argparse.ArgumentParser(
@@ -138,9 +139,9 @@ parser.add_argument(
     help="Freezes graph during training",
 )
 parser.add_argument(
-    "--custom_heuristic_name",
-    default="None",
-    choices=["None", "mwkr", "mopnr"],
+    "--custom_heuristic_names",
+    choices=list(HEURISTICS.keys()),
+    nargs="*",
     help="Which custom heuristic to run",
 )
 parser.add_argument(
@@ -661,3 +662,6 @@ if args.sample_n_jobs != -1 and args.chunk_n_jobs != -1:
 
 # Sorting the features
 args.features = sorted(args.features)
+
+if args.custom_heuristic_names is None:
+    args.custom_heuristic_names = []
