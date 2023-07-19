@@ -66,7 +66,7 @@ class PPO:
         self.norm_adv = training_specification.normalize_advantage
         self.ent_coef = training_specification.ent_coef
         self.num_steps = training_specification.n_steps_episode
-        self.gae_lambda = 1.0
+        self.gae_lambda = training_specification.gae_lambda
         self.clip_vloss = False
         self.clip_coef = training_specification.clip_range
         self.ent_coef = training_specification.ent_coef
@@ -354,10 +354,13 @@ class PPO:
                         # calculate approx_kl http://joschu.net/blog/kl-approx.html
                         approx_kl = ((ratio - 1) - logratio).mean()
                         approx_kl_divs.append(approx_kl.item())
-                        clipfracs += [
-                            ((ratio - 1.0).abs() > self.clip_coef).float().mean().item()
-                        ]
-
+                        if self.clip_coef is not None:
+                            clipfracs += [
+                                ((ratio - 1.0).abs() > self.clip_coef)
+                                .float()
+                                .mean()
+                                .item()
+                            ]
                     if self.target_kl is not None:
                         approx_kl_divs_on_epoch.append(approx_kl.item())
 
@@ -369,10 +372,13 @@ class PPO:
 
                     # Policy loss
                     pg_loss1 = -mb_advantages * ratio
-                    pg_loss2 = -mb_advantages * torch.clamp(
-                        ratio, 1 - self.clip_coef, 1 + self.clip_coef
-                    )
-                    pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                    if self.clip_coef is not None:
+                        pg_loss2 = -mb_advantages * torch.clamp(
+                            ratio, 1 - self.clip_coef, 1 + self.clip_coef
+                        )
+                        pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+                    else:
+                        pg_loss = pg_loss1.mean()
 
                     # Value loss
                     newvalue = newvalue.view(-1)
@@ -431,7 +437,10 @@ class PPO:
                 self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
                 self.logger.record("train/value_loss", np.mean(value_losses))
                 self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
-                self.logger.record("train/clip_fraction", np.mean(clipfracs))
+                if self.clip_coef is not None:
+                    self.logger.record("train/clip_fraction", np.mean(clipfracs))
+                else:
+                    self.logger.record("train/clip_fraction", 0.0)
                 self.logger.record("train/loss", np.mean(losses))
                 self.logger.record("train/explained_variance", explained_var)
                 self.logger.record(
@@ -439,7 +448,10 @@ class PPO:
                     self.n_epochs,
                     exclude="tensorboard",
                 )
-                self.logger.record("train/clip_range", self.clip_coef)
+                if self.clip_coef is not None:
+                    self.logger.record("train/clip_range", self.clip_coef)
+                else:
+                    self.logger.record("train/clip_range", 0.0)
                 fps = int(self.global_step / (time.time() - self.start_time))
                 self.logger.record("time/iterations", iteration, exclude="tensorboard")
                 if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:

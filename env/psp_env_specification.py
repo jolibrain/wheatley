@@ -38,9 +38,12 @@ class PSPEnvSpecification:
         sample_n_jobs,
         chunk_n_jobs,
         observe_conflicts_as_cliques,
+        add_rp_edges,
         observe_real_duration_when_affect,
         do_not_observe_updated_bounds,
         factored_rp,
+        remove_old_resource_info,
+        remove_past_prec,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -53,6 +56,7 @@ class PSPEnvSpecification:
         self.normalize_input = normalize_input
         self.input_list = input_list
         self.factored_rp = factored_rp
+        self.add_rp_edges = add_rp_edges
         if "selectable" in input_list:
             self.input_list.remove("selectable")
         if "duration" in input_list:
@@ -66,6 +70,8 @@ class PSPEnvSpecification:
         self.observe_real_duration_when_affect = observe_real_duration_when_affect
         self.do_not_observe_updated_bounds = do_not_observe_updated_bounds
         self.action_space = Discrete(self.max_n_nodes)
+        self.remove_old_resource_info = remove_old_resource_info
+        self.remove_past_prec = remove_past_prec
 
         if self.max_edges_factor > 0:
             self.shape_pr = (
@@ -80,20 +86,27 @@ class PSPEnvSpecification:
                 self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
                 3,
             )
-            self.shape_rp = (
-                2,
-                self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
-            )
-            if self.factored_rp:
-                self.shape_rp_att = (
+            if self.add_rp_edges != "none":
+                self.shape_rp = (
+                    2,
                     self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
-                    self.max_n_resources * 3,
                 )
-            else:
-                self.shape_rp_att = (
-                    self.max_edges_factor * self.max_n_nodes * self.max_n_resources * 2,
-                    4,
-                )
+                if self.factored_rp:
+                    self.shape_rp_att = (
+                        self.max_edges_factor
+                        * self.max_n_nodes
+                        * self.max_n_resources
+                        * 2,
+                        self.max_n_resources * 3,
+                    )
+                else:
+                    self.shape_rp_att = (
+                        self.max_edges_factor
+                        * self.max_n_nodes
+                        * self.max_n_resources
+                        * 2,
+                        4,
+                    )
 
         else:
             self.shape_pr = (2, self.max_n_edges)
@@ -106,63 +119,69 @@ class PSPEnvSpecification:
                 self.max_n_edges * self.max_n_resources,
                 3,
             )
-            self.shape_rp = (
-                2,
-                self.max_n_edges * self.max_n_resources,
-            )
-            if self.factored_rp:
-                self.shape_rp_att = (
+            if self.add_rp_edges != "none":
+                self.shape_rp = (
+                    2,
                     self.max_n_edges * self.max_n_resources,
-                    self.max_n_resources * 3,
                 )
-            else:
-                self.shape_rp_att = (
-                    self.max_n_edges * self.max_n_resources,
-                    4,
-                )
+                if self.factored_rp:
+                    self.shape_rp_att = (
+                        self.max_n_edges * self.max_n_resources,
+                        self.max_n_resources * 3,
+                    )
+                else:
+                    self.shape_rp_att = (
+                        self.max_n_edges * self.max_n_resources,
+                        4,
+                    )
 
-        self.observation_space = Dict(
-            {
-                "n_jobs": Discrete(self.max_n_jobs + 1),
-                "n_nodes": Discrete(self.max_n_modes + 1),
-                "n_resources": Discrete(self.max_n_resources + 1),
-                "n_pr_edges": Discrete(self.max_n_edges + 1),
-                "n_rp_edges": Discrete(self.max_n_edges + 1),
-                "features": Box(
-                    low=0,
-                    high=1000,
-                    shape=(self.max_n_nodes, self.n_features),
-                ),
-                "pr_edges": Box(
-                    low=0,
-                    high=self.max_n_nodes,
-                    shape=self.shape_pr,
-                    dtype=np.int64,
-                ),
-                "rp_edges": Box(
-                    low=0,
-                    high=self.max_n_nodes,
-                    shape=self.shape_rp,
-                    dtype=np.int64,
-                ),
-                "rp_att": Box(low=0, high=1000, shape=self.shape_rp_att, dtype=float),
-            }
-        )
+        # self.observation_space = Dict(
+        dict_specif = {
+            "n_jobs": Discrete(self.max_n_jobs + 1),
+            "n_nodes": Discrete(self.max_n_modes + 1),
+            "n_resources": Discrete(self.max_n_resources + 1),
+            "n_pr_edges": Discrete(self.max_n_edges + 1),
+            "features": Box(
+                low=0,
+                high=1000,
+                shape=(self.max_n_nodes, self.n_features),
+            ),
+            "pr_edges": Box(
+                low=0,
+                high=self.max_n_nodes,
+                shape=self.shape_pr,
+                dtype=np.int64,
+            ),
+        }
+
+        if self.add_rp_edges != "none":
+            dict_specif["n_rp_edges"] = Discrete(self.max_n_edges + 1)
+            dict_specif["rp_edges"] = Box(
+                low=0,
+                high=self.max_n_nodes,
+                shape=self.shape_rp,
+                dtype=np.int64,
+            )
+            dict_specif["rp_att"] = Box(
+                low=0, high=1000, shape=self.shape_rp_att, dtype=float
+            )
 
         if self.observe_conflicts_as_cliques:
-            self.observation_space["n_rc_edges"] = Discrete(self.max_n_edges + 1)
-            self.observation_space["rc_edges"] = Box(
+            dict_specif["n_rc_edges"] = Discrete(self.max_n_edges + 1)
+            dict_specif["rc_edges"] = Box(
                 low=0,
                 high=self.max_n_nodes,
                 shape=self.shape_rc,
                 dtype=np.int64,
             )
-            self.observation_space["rc_att"] = Box(
+            dict_specif["rc_att"] = Box(
                 low=0,
                 high=1000,
                 shape=self.shape_rc_att,
                 dtype=np.int64,
             )
+
+        self.observation_space = Dict(dict_specif)
 
     def get_n_features(self):
         # 3 for task completion times,
@@ -187,6 +206,11 @@ class PSPEnvSpecification:
             f"Input normalization:                {'Yes' if self.normalize_input else 'No'}\n"
             f"Observe real duration when affect:  {self.observe_real_duration_when_affect}\n"
             f"Do not observe tct:                 {self.do_not_observe_updated_bounds}\n"
-            f"List of features:\n - Task Completion Times - selectable"
+            f"add resource prcedence edges:       {self.add_rp_edges}\n"
+            f"remove old resource info:           {self.remove_old_resource_info}\n"
+            f"remove past prec:                   {self.remove_past_prec}\n"
+            f"List of features:\n - Task Completion Times\n - selectable\n - duration"
         )
-        print(" - " + "\n - ".join(print_input_list) + "\n")
+
+        if len(print_input_list) != 0:
+            print(" - " + "\n - ".join(print_input_list) + "\n")

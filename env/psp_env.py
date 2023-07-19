@@ -168,17 +168,42 @@ class PSPEnv(gym.Env):
         self.reward_model = TerminalRewardModel()
 
     def observe(self):
+        if self.env_specification.add_rp_edges != "none":
+            (
+                features,
+                problem_edge_index,
+                resource_conf_edges,
+                resource_conf_att,
+                resource_prec_edges,
+                resource_prec_att,
+            ) = self.state.to_features_and_edge_index(
+                self.env_specification.normalize_input
+            )
+            return EnvObservation(
+                self.env_specification,
+                self.n_jobs,
+                self.n_modes,
+                self.n_resources,
+                self.env_specification.max_n_jobs,
+                self.problem_description.max_n_modes,
+                self.env_specification.max_n_resources,
+                self.env_specification.max_edges_factor,
+                features,
+                problem_edge_index,
+                resource_conf_edges,
+                resource_conf_att,
+                resource_prec_edges,
+                resource_prec_att,
+            )
+
         (
             features,
             problem_edge_index,
             resource_conf_edges,
             resource_conf_att,
-            resource_prec_edges,
-            resource_prec_att,
         ) = self.state.to_features_and_edge_index(
             self.env_specification.normalize_input
         )
-
         return EnvObservation(
             self.env_specification,
             self.n_jobs,
@@ -192,8 +217,6 @@ class PSPEnv(gym.Env):
             problem_edge_index,
             resource_conf_edges,
             resource_conf_att,
-            resource_prec_edges,
-            resource_prec_att,
         )
 
     def done(self):
