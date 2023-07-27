@@ -129,7 +129,14 @@ class PSPAgent(Agent):
         )
         # usually ppo use gain = np.sqrt(2) here
         # best so far below
-        self.gnn.apply(partial(self.init_weights, gain=1.0, zero_bias=False))
+        self.gnn.apply(
+            partial(
+                self.init_weights,
+                gain=1.0,
+                zero_bias=False,
+                ortho_embed=agent_specification.ortho_embed,
+            )
+        )
         # self.gnn.reset_egat()
         # usually ppo use gain = 0.01 here
         self.action_net.apply(partial(self.init_weights, gain=1.0, zero_bias=True))

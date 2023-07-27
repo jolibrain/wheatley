@@ -93,6 +93,9 @@ class PSPGnnDGL(torch.nn.Module):
         # reverse resource priority 5
         # graph_pooling 6
         # reverse graph pooling 7
+        # to/from vnode 8 , 9
+        # resource node self-loop : 10 .. 10 + rnres
+        # resrouce node edges 10+nres .. 10+2*nres
         # we also have attributes
         # for resource conflicts : rid, rval (normalized)
         # for resource prioiries : rid, level, critical, timetype
@@ -101,13 +104,15 @@ class PSPGnnDGL(torch.nn.Module):
         # for rc edges : type,  rid, rval
         # for rp edges : type, rid , level, criticial, timetype
 
+        n_edge_type = 11 + self.max_n_resources * 3
+
         self.edge_embedding_flavor = edge_embedding_flavor
         if self.edge_embedding_flavor == "sum":
             self.resource_id_embedder = torch.nn.Embedding(
                 self.max_n_resources + 1, hidden_dim_features_extractor
             )
             self.edge_type_embedder = torch.nn.Embedding(
-                10, hidden_dim_features_extractor
+                n_edge_type, hidden_dim_features_extractor
             )
 
             self.rc_att_embedder = torch.nn.Linear(2, hidden_dim_features_extractor)
@@ -121,11 +126,11 @@ class PSPGnnDGL(torch.nn.Module):
                         3, hidden_dim_features_extractor
                     )
         elif self.edge_embedding_flavor == "cat":
-            self.edge_type_embedder = torch.nn.Embedding(10, 10)
+            self.edge_type_embedder = torch.nn.Embedding(n_edge_type, n_edge_type)
             self.resource_id_embedder = torch.nn.Embedding(
                 self.max_n_resources + 1, self.max_n_resources + 1
             )
-            rest = hidden_dim_features_extractor - 10 - self.max_n_resources - 1
+            rest = hidden_dim_features_extractor - 12 - self.max_n_resources - 1
             if rest < 4:
                 raise ValueError(
                     f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
@@ -169,6 +174,9 @@ class PSPGnnDGL(torch.nn.Module):
 
         self.pool_node_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
         self.vnode_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
+        self.resource_node_embedder = torch.nn.Embedding(
+            max_n_resources, input_dim_features_extractor
+        )
 
         self.features_embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
@@ -302,7 +310,7 @@ class PSPGnnDGL(torch.nn.Module):
         origbnn = g.batch_num_nodes()
 
         if self.graph_pooling == "learn":
-            poolnodes = list(range(num_nodes, num_nodes + batch_size))
+            poolnodes = list(range(node_offset, node_offset + batch_size))
             g.add_nodes(
                 batch_size,
                 data={
@@ -313,13 +321,13 @@ class PSPGnnDGL(torch.nn.Module):
             ei1 = []
             startnode = 0
             for i in range(batch_size):
-                ei0 += [num_nodes + i] * origbnn[i]
+                ei0 += [node_offset + i] * origbnn[i]
                 ei1 += list(range(startnode, startnode + origbnn[i]))
                 startnode += origbnn[i]
 
             g.add_edges(
-                list(range(num_nodes, num_nodes + batch_size)),
-                list(range(num_nodes, num_nodes + batch_size)),
+                list(range(node_offset, node_offset + batch_size)),
+                list(range(node_offset, node_offset + batch_size)),
                 data={"type": torch.LongTensor([0] * batch_size)},
             )
 
@@ -327,6 +335,77 @@ class PSPGnnDGL(torch.nn.Module):
             # INVERSE POOLING BELOW !
             # g.add_edges(ei0, ei1, data={"type": torch.LongTensor([7] * len(ei0))})
             node_offset += batch_size
+
+        if self.conflicts == "node":
+            resources_used = g.ndata["feat"][:, 9:]
+            num_resources = resources_used.shape[1]
+            resource_nodes = list(
+                range(node_offset, node_offset + num_resources * batch_size)
+            )
+            batch_id = []
+            for i, nn in enumerate(origbnn):
+                batch_id.extend([i] * nn)
+            batch_id = torch.IntTensor(batch_id)
+            g.add_nodes(
+                num_resources * batch_size,
+                data={
+                    "feat": torch.zeros(
+                        (
+                            batch_size * self.max_n_resources,
+                            self.input_dim_features_extractor,
+                        )
+                    )
+                },
+            )
+            idxaffected = torch.where(resources_used != 0)
+            consumers = idxaffected[0]
+            nconsumers = consumers.shape[0]
+            resource_start_per_batch = []
+            for i in range(batch_size):
+                resource_start_per_batch.append(node_offset + num_resources * i)
+            resource_start_per_batch = torch.IntTensor(resource_start_per_batch)
+            resource_index = (
+                idxaffected[1] + resource_start_per_batch[batch_id[consumers]]
+            )
+
+            rntype = torch.LongTensor(
+                list(range(num_resources)) * batch_size
+            ) + torch.LongTensor([10] * len(resource_nodes))
+
+            g.add_edges(
+                resource_nodes,
+                resource_nodes,
+                # we could use different self loop type per resource
+                data={"type": rntype},
+                # data={"type": torch.LongTensor([10] * len(resource_nodes))},
+            )
+            rc = torch.gather(
+                resources_used[consumers], 1, idxaffected[1].unsqueeze(1)
+            ).expand(nconsumers, 2)
+
+            g.add_edges(
+                consumers,
+                resource_index,
+                data={
+                    # "type": torch.LongTensor([10] * nconsumers),
+                    "type": torch.LongTensor([10 + num_resources] * nconsumers)
+                    + idxaffected[1].long(),
+                    "rid": idxaffected[1].int(),
+                    "att_rc": rc,
+                },
+            )
+            g.add_edges(
+                resource_index,
+                consumers,
+                data={
+                    # "type": torch.LongTensor([11] * nconsumers),
+                    "type": torch.LongTensor([10 + 2 * num_resources] * nconsumers)
+                    + idxaffected[1].long(),
+                    "rid": idxaffected[1].int(),
+                    "att_rc": rc,
+                },
+            )
+            node_offset += num_resources * batch_size
 
         if self.vnode:
             vnodes = list(range(node_offset, node_offset + batch_size))
@@ -364,7 +443,13 @@ class PSPGnnDGL(torch.nn.Module):
 
         if self.vnode:
             features[vnodes] = self.vnode_embedder(
-                torch.LongTensor([0] * len(poolnodes)).to(features.device)
+                torch.LongTensor([0] * len(vnodes)).to(features.device)
+            )
+        if self.conflicts == "node":
+            features[resource_nodes] = self.resource_node_embedder(
+                torch.LongTensor(list(range(num_resources)) * batch_size).to(
+                    features.device
+                )
             )
 
         if self.layer_pooling == "all":

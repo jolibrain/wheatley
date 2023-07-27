@@ -182,6 +182,8 @@ def main():
         performer_auto_check_redraw=args.performer_auto_check_redraw,
         vnode=args.vnode,
         update_edge_features=not args.dont_update_edge_features,
+        ortho_embed=args.ortho_embed,
+        no_tct=args.no_tct,
     )
     agent_specification.print_self()
 

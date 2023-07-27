@@ -359,6 +359,12 @@ parser.add_argument(
     choices=["att", "clique", "node"],
 )
 parser.add_argument(
+    "--no_tct",
+    default=False,
+    action="store_true",
+    help="do not explicitly compute/use tct before gnn",
+)
+parser.add_argument(
     "--add_rp_edges",
     default="all",
     choices=["all", "frontier", "frontier_strict", "none"],
@@ -381,11 +387,18 @@ parser.add_argument(
 parser.add_argument(
     "--vnode", default=False, action="store_true", help="add vnode to MP-graph"
 )
+
 parser.add_argument(
     "--dont_update_edge_features",
     default=False,
     action="store_true",
     help="do not update edge features",
+)
+parser.add_argument(
+    "--ortho_embed",
+    default=False,
+    action="store_true",
+    help="init nn.Embeddings with ortho init",
 )
 
 parser.add_argument(

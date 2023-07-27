@@ -54,11 +54,13 @@ class Agent(torch.nn.Module):
         self.agent_specification = agent_specification
 
     @staticmethod
-    def init_weights(module, gain=1, zero_bias=True) -> None:
+    def init_weights(module, gain=1, zero_bias=True, ortho_embed=False) -> None:
         if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d)):
             torch.nn.init.orthogonal_(module.weight, gain=gain)
             if module.bias is not None and zero_bias:
                 module.bias.data.fill_(0.0)
+        if ortho_embed and isinstance(module, torch.nn.Embedding):
+            torch.nn.init.orthogonal_(module.weight, gain=gain)
 
     def save(self, path):
         """Saving an agent corresponds to saving his model and a few args to specify how the model is working"""
