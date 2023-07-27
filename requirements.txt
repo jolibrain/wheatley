@@ -10,3 +10,4 @@ matplotlib
 opencv-python
 kaleido
 pandas
+torchinfo

@@ -591,6 +591,12 @@ parser.add_argument(
     action="store_true",
     help="Do not perform initial eval",
 )
+parser.add_argument(
+    "--skip_model_trace",
+    default=False,
+    action="store_true",
+    help="Do not print the model trace (torchinfo)",
+)
 
 parser.add_argument(
     "--taillard_pbs",

@@ -22,11 +22,11 @@
 #
 
 
-import torch
-
-from torch.distributions.categorical import Categorical
 from functools import partial
+
 import numpy as np
+import torch
+from torch.distributions.categorical import Categorical
 
 
 class Agent(torch.nn.Module):
@@ -173,3 +173,8 @@ class Agent(torch.nn.Module):
             mask = info["mask"]
 
         return env.get_solution()
+
+    def forward(self, observation, action=None, action_masks=None, deterministic=False):
+        return self.get_action_and_value(
+            observation, action, action_masks, deterministic
+        )
