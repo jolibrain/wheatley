@@ -25,12 +25,14 @@
 import random
 import time
 from collections import deque
+from functools import partial
 
 import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchinfo
 import tqdm
 
 from utils.utils import decode_mask, get_obs, safe_mean
@@ -233,6 +235,7 @@ class PPO:
         train_device=torch.device("cpu"),
         opt_state_dict=None,
         skip_initial_eval=False,
+        skip_model_trace=False,
     ):
         # env setup
         batch_size = self.num_envs * self.num_steps
@@ -281,6 +284,11 @@ class PPO:
         print("collecting rollouts using", rollout_agent_device)
         print("storing rollouts on", rollout_data_device)
         print("learning on", train_device)
+
+        if not skip_model_trace:
+            obs, info = self.validator.validation_envs[0].reset(soft=True)
+            obs = agent.obs_as_tensor_add_batch_dim(obs)
+            torchinfo.summary(agent, input_data=(obs,), depth=3, verbose=1)
 
         self.global_step = 0
         if not skip_initial_eval:

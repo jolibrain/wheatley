@@ -22,10 +22,10 @@
 #
 
 import os
+import random
 
 import numpy as np
 import torch
-import random
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
@@ -252,6 +252,7 @@ def main():
         rollout_agent_device=args.device,
         opt_state_dict=None,
         skip_initial_eval=args.skip_initial_eval,
+        skip_model_trace=args.skip_model_trace,
     )
 
 
