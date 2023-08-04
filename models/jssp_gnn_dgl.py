@@ -51,6 +51,7 @@ class JSSPGnnDGL(torch.nn.Module):
         residual=True,
         normalize=False,
         conflicts="att",
+        no_tct=False,
     ):
         super().__init__()
         self.conflicts = conflicts
@@ -70,6 +71,7 @@ class JSSPGnnDGL(torch.nn.Module):
         self.graph_pooling = graph_pooling
         self.n_layers_features_extractor = n_layers_features_extractor
         self.features_extractors = torch.nn.ModuleList()
+        self.no_tct = no_tct
 
         self.edge_embedder = torch.nn.ModuleList()
         # self_loops 0
@@ -233,7 +235,10 @@ class JSSPGnnDGL(torch.nn.Module):
 
     def forward(self, obs):
         observation = AgentObservation.from_gym_observation(
-            obs, conflicts=self.conflicts, max_n_machines=self.max_n_machines
+            obs,
+            conflicts=self.conflicts,
+            max_n_machines=self.max_n_machines,
+            no_tct=self.no_tct,
         )
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()

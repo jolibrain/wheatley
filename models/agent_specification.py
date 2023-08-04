@@ -61,6 +61,8 @@ class AgentSpecification:
         performer_auto_check_redraw,
         vnode,
         update_edge_features,
+        ortho_embed,
+        no_tct,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -94,6 +96,8 @@ class AgentSpecification:
         self.performer_auto_check_redraw = performer_auto_check_redraw
         self.vnode = vnode
         self.update_edge_features = update_edge_features
+        self.ortho_embed = ortho_embed
+        self.no_tct = no_tct
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -132,6 +136,8 @@ class AgentSpecification:
             f"Features extractor type:          {self.fe_type}\n"
             f"Layer Pooling:                    {self.layer_pooling}\n"
             f"Dropout:                          {self.dropout}\n"
+            f"Ortho embed:                      {self.ortho_embed}\n"
+            f"Remove tct:                       {self.no_tct}\n"
         )
         if self.fe_type == "tokengt":
             print(f"Net shapes:")

@@ -111,13 +111,24 @@ class JSSPAgentObservation:
         laplacian_pe_cache=None,
         n_laplacian_eigv=50,
         bidir=True,
+        no_tct=False,
     ):
 
         # batching on CPU for performance reasons...
         n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
         n_edges = gym_observation["n_edges"].long().to(torch.device("cpu"))
         edge_index = gym_observation["edge_index"].long().to(torch.device("cpu"))
-        orig_feat = gym_observation["features"]  # .to(torch.device("cpu"))
+        orig_feat = gym_observation["features"].clone()  # .to(torch.device("cpu"))
+        # print("orig_feat.shape", orig_feat.shape)
+        # remove real tct
+        # replace with mode
+        orig_feat[:, :, 1] = torch.where(
+            orig_feat[:, :, 1] == -1, -1, orig_feat[:, :, 4]
+        )
+        # replace with -1
+        # orig_feat[:, :, 1] = -1
+        if no_tct:
+            orig_feat[:, :, 1:5] = -1
 
         if conflicts != "clique":
             # orig_feat = put_back_one_hot_encoding_unbatched(orig_feat, max_n_machines)
