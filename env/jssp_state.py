@@ -918,7 +918,7 @@ class JSSPState:
             return False
         tct = (
             self.features[:, 1]
-            .reshape((self.n_jobs, self.max_n_machines, 1))
+            .reshape((self.n_jobs, self.n_machines, 1))
             .squeeze_(2)
             .numpy()
         )
