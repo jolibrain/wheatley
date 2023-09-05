@@ -212,7 +212,12 @@ class PSPState:
 
     def reset_selectable(self):
         self.features[:, 1] = 0
-        no_parents = np.where(np.array(self.problem_graph.in_degree())[:, 1] == 0)[0]
+        in_deg = np.array(self.problem_graph.in_degree())
+
+        no_parents_pos = np.where(in_deg[:, 1] == 0)[0]
+        no_parents = in_deg[no_parents_pos][:, 0]
+        # print('no_parents', no_parents)
+
         self.features[no_parents, 1] = 1
 
     def reset_tct(self):
@@ -302,7 +307,6 @@ class PSPState:
         return self.features[-1, 0] == 1
 
     def to_features_and_edge_index(self, normalize):
-
         if self.observe_conflicts_as_cliques:
             rce = self.resource_conf_edges
             rca = np.stack(
@@ -621,7 +625,6 @@ class PSPState:
             self.update_resource_prec(constraining_resource)
 
     def update_resource_prec(self, constraining_resource):
-
         if self.factored_rp:
             for r in range(self.n_resources):
                 for i in range(3):
@@ -715,7 +718,6 @@ class PSPState:
             if (new_completion_time_real != self.tct_real(cur_node_id)) or (
                 np.any(np.not_equal(new_completion_time, self.tct(cur_node_id)))
             ):
-
                 self.set_tct(cur_node_id, new_completion_time)
                 self.set_tct_real(cur_node_id, new_completion_time_real)
 
