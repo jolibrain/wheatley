@@ -320,7 +320,6 @@ class PSPAgentObservation:
         add_rp_edges="all",
         max_n_resources=-1,
     ):
-
         # batching on CPU for performance reasons...
         n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
 
@@ -352,7 +351,7 @@ class PSPAgentObservation:
 
                 for i in range(orig_feat.shape[0]):
                     one_rc_edges, rid, rval, rvalr = compute_resources_graph_torch(
-                        orig_feat[i, :, 9:]
+                        orig_feat[i, :, 10:]
                     )
                     rc_edges.append(one_rc_edges)
                     att = torch.stack([rid, rval, rvalr]).t()
@@ -383,7 +382,6 @@ class PSPAgentObservation:
 
             # resource priority edges
             if add_rp_edges != "none" and rp_edges.nelement() != 0:
-
                 if factored_rp:
                     gnew = PSPAgentObservation.add_edges(
                         gnew,

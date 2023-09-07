@@ -189,7 +189,8 @@ class PSPEnvSpecification:
         # 1 for mandatory selectable
         # 1 for job id (in case of several modes per job)
         # 3 for duration
-        n_features = 9
+        # 1 for source/sink/middle
+        n_features = 10
         # level of resource used by every node
         n_features += self.max_n_resources
         # most features make 4 values
