@@ -263,7 +263,7 @@ parser.add_argument("--dropout", type=float, default=0.0, help="dropout ratio")
 parser.add_argument(
     "--ortools_strategy",
     type=str,
-    default="averagistic",
+    nargs="*",
     choices=["realistic", "optimistic", "pessimistic", "averagistic"],
     help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic realistic means omiscient, "
     "ie sees the future",
@@ -717,6 +717,12 @@ args.features = sorted(args.features)
 
 if args.custom_heuristic_names is None:
     args.custom_heuristic_names = []
+
+if args.ortools_strategy is None:
+    if args.duration_type == "stochastic":
+        args.ortools_strategy = ["averagistic"]
+    else:
+        args.ortools_strategy = ["realistic"]
 
 if args.resume:
     args.skip_initial_eval = True

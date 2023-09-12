@@ -90,7 +90,8 @@ class AgentValidator:
             offline=disable_visdom,
         )
         self.path = training_specification.path
-        self.ortools_strategy = training_specification.ortools_strategy
+        # self.ortools_strategies = [training_specification.ortools_strategy, "realistic"]
+        self.ortools_strategies = training_specification.ortools_strategy
 
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
@@ -103,7 +104,8 @@ class AgentValidator:
         # Comparative agents
         self.random_agent = RandomAgent()
         self.custom_agents = [
-            CustomAgent(rule, self.ortools_strategy) for rule in self.custom_names
+            CustomAgent(rule, stochasticity_strategy="averagistic")
+            for rule in self.custom_names
         ]
 
         # Inner variables
@@ -134,7 +136,9 @@ class AgentValidator:
         ]
         self.makespan_ratio = 1000
         self.makespans = []
-        self.ortools_makespans = []
+        self.ortools_makespans = {
+            ortools_strategy: [] for ortools_strategy in self.ortools_strategies
+        }
         self.random_makespans = []
         self.custom_makespans = {agent.rule: [] for agent in self.custom_agents}
         self.entropy_losses = []
@@ -167,14 +171,25 @@ class AgentValidator:
 
         # Compute OR-Tools solutions once if validations are fixed
         if self.fixed_validation:
-            self.fixed_ortools = []
+            self.fixed_ortools = {
+                ortools_strategy: [] for ortools_strategy in self.ortools_strategies
+            }
             for i in tqdm.tqdm(
                 range(self.n_validation_env), desc="Computing fixed OR-Tools solutions"
             ):
-                self.fixed_ortools.append(self._get_ortools_makespan(i))
+                for ortools_strategy in self.ortools_strategies:
+                    self.fixed_ortools[ortools_strategy].append(
+                        self._get_ortools_makespan(i, ortools_strategy)
+                    )
+
             print(
-                "   optimal solutions:",
-                sum([res[2] for res in self.fixed_ortools]),
+                f"   optimal solutions ({self.default_ortools_strategy}):",
+                sum(
+                    [
+                        res[2]
+                        for res in self.fixed_ortools[self.default_ortools_strategy]
+                    ]
+                ),
                 " / ",
                 self.n_validation_env,
             )
@@ -219,7 +234,11 @@ class AgentValidator:
         #     np.array(self.makespans[-4 : len(self.makespans)])
         #     / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
         # )
-        cur_ratio = self.makespans[-1] / self.ortools_makespans[-1]
+
+        cur_ratio = (
+            self.makespans[-1]
+            / self.ortools_makespans[self.default_ortools_strategy][-1]
+        )
         if cur_ratio <= self.makespan_ratio:
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")
@@ -229,13 +248,13 @@ class AgentValidator:
             self.makespan_ratio = cur_ratio
             print(f"Current ratio : {cur_ratio:.3f}")
 
-    def _get_ortools_makespan(self, i):
+    def _get_ortools_makespan(self, i: int, ortools_strategy: str):
         if self.psp:
             return get_ortools_makespan_psp(
                 self.validation_envs[i],
                 self.max_time_ortools,
                 self.scaling_constant_ortools,
-                self.ortools_strategy,
+                ortools_strategy,
             )
         else:
             return get_ortools_makespan_jssp(
@@ -244,7 +263,7 @@ class AgentValidator:
                 self.env_specification.n_features,
                 self.max_time_ortools,
                 self.scaling_constant_ortools,
-                self.ortools_strategy,
+                ortools_strategy,
             )
 
     def _get_random_makespan(self, i):
@@ -304,7 +323,9 @@ class AgentValidator:
 
     def _evaluate_agent(self, agent):
         mean_makespan = 0
-        ortools_mean_makespan = 0
+        ortools_mean_makespan = {
+            ortools_strategy: 0 for ortools_strategy in self.ortools_strategies
+        }
         random_mean_makespan = 0
         custom_mean_makespan = {agent.rule: 0 for agent in self.custom_agents}
         start_eval = time.time()
@@ -382,32 +403,42 @@ class AgentValidator:
                 mean_makespan += state.undoable_makespan / self.n_validation_env
                 self.gantt_rl_img = self.validation_envs[i].render_fail()
 
-            if self.fixed_validation:
-                or_tools_makespan, or_tools_schedule, optimal = self.fixed_ortools[i]
-            else:
-                (
-                    or_tools_makespan,
-                    or_tools_schedule,
-                    optimal,
-                ) = self._get_ortools_makespan(i)
+            for ortools_strategy in self.ortools_strategies:
+                if self.fixed_validation:
+                    (
+                        or_tools_makespan,
+                        or_tools_schedule,
+                        optimal,
+                    ) = self.fixed_ortools[ortools_strategy][i]
+                else:
+                    (
+                        or_tools_makespan,
+                        or_tools_schedule,
+                        optimal,
+                    ) = self._get_ortools_makespan(i, ortools_strategy)
 
-            if i == 0:
-                self.gantt_or_img = self.validation_envs[i].render_solution(
-                    or_tools_schedule, scaling=1.0
+                if i == 0 and ortools_strategy == self.default_ortools_strategy:
+                    self.gantt_or_img = self.validation_envs[i].render_solution(
+                        or_tools_schedule, scaling=1.0
+                    )
+                    self.ortools_env_zero_is_optimal = optimal
+
+                if (
+                    ortools_strategy == self.default_ortools_strategy
+                    and or_tools_makespan < self.best_makespan_ortools[i]
+                ):
+                    self.best_makespan_ortools[i] = or_tools_makespan
+                    self.save_csv(
+                        f"ortools_{i}",
+                        or_tools_makespan,
+                        optimal,
+                        or_tools_schedule,
+                        self.validation_envs[i].sampled_jobs,
+                    )
+
+                ortools_mean_makespan[ortools_strategy] += (
+                    or_tools_makespan / self.n_validation_env
                 )
-                self.ortools_env_zero_is_optimal = optimal
-
-            if or_tools_makespan < self.best_makespan_ortools[i]:
-                self.best_makespan_ortools[i] = or_tools_makespan
-                self.save_csv(
-                    f"ortools_{i}",
-                    or_tools_makespan,
-                    optimal,
-                    or_tools_schedule,
-                    self.validation_envs[i].sampled_jobs,
-                )
-
-            ortools_mean_makespan += or_tools_makespan / self.n_validation_env
 
             if self.fixed_random_validation:
                 random_makespan = self.fixed_random[i]
@@ -436,7 +467,10 @@ class AgentValidator:
         print("--- mean_makespan=", mean_makespan, " ---")
         print("--- eval time=", time.time() - start_eval, "  ---")
         self.makespans.append(mean_makespan)
-        self.ortools_makespans.append(ortools_mean_makespan)
+        for ortools_strategy in self.ortools_strategies:
+            self.ortools_makespans[ortools_strategy].append(
+                ortools_mean_makespan[ortools_strategy]
+            )
         self.random_makespans.append(random_mean_makespan)
         for custom_agent in self.custom_agents:
             self.custom_makespans[custom_agent.rule].append(
@@ -454,20 +488,38 @@ class AgentValidator:
         self.vis.text(html, win="html", opts={"width": 372, "height": 336})
 
         X = list(range(len(self.makespans)))
-        Y_list = [self.makespans, self.random_makespans, self.ortools_makespans]
+        Y_list = [self.makespans, self.random_makespans]
         opts = {
             "title": "Validation makespan",
-            "legend": ["PPO", "Random", "OR-tools"],
-            "linecolor": np.array([[31, 119, 180], [255, 127, 14], [44, 160, 44]]),
+            "legend": ["PPO", "Random"],
+            "linecolor": [[31, 119, 180], [255, 127, 14]],
         }
         Y2_list = [
-            np.array(self.makespans) / np.array(self.ortools_makespans),
-            np.array(self.random_makespans) / np.array(self.ortools_makespans),
+            np.array(self.makespans)
+            / np.array(self.ortools_makespans[self.default_ortools_strategy]),
+            np.array(self.random_makespans)
+            / np.array(self.ortools_makespans[self.default_ortools_strategy]),
         ]
         opts2 = {
             "legend": ["PPO / OR-tools", "Random / OR-tools"],
-            "linecolor": np.array([[31, 119, 180], [255, 127, 14]]),
+            "linecolor": [[31, 119, 180], [255, 127, 14]],
         }
+
+        # OR-Tools plots
+        ortools_colors = [
+            [44, 160, 44],
+            [214, 39, 40],
+            [148, 103, 189],
+            [140, 86, 75],
+            [227, 119, 194],
+            [127, 127, 127],
+        ]
+        for ortools_strategy_id, ortools_strategy in enumerate(self.ortools_strategies):
+            Y_list.append(self.ortools_makespans[ortools_strategy])
+            opts["legend"].append("OR-Tools - " + ortools_strategy)
+            opts["linecolor"].append(ortools_colors[ortools_strategy_id])
+
+        # Custom agent plots
         agent_colors = np.array(
             [
                 [255, 0, 0],
@@ -481,19 +533,19 @@ class AgentValidator:
             name = custom_agent.rule
             Y = np.array(self.custom_makespans[name])
             Y_list.append(Y)
-            Y2_list.append(Y / np.array(self.ortools_makespans))
-
-            opts["linecolor"] = np.concatenate(
-                (opts["linecolor"], agent_colors[custom_agent_id].reshape(1, 3)), axis=0
+            Y2_list.append(
+                Y / np.array(self.ortools_makespans[self.default_ortools_strategy])
             )
+
+            opts["linecolor"].append(agent_colors[custom_agent_id])
             opts["legend"].append(name)
 
             opts2["legend"].append(name + " / OR-tools")
-            opts2["linecolor"] = np.concatenate(
-                (opts["linecolor"], agent_colors[custom_agent_id].reshape(1, 3)), axis=0
-            )
+            opts2["linecolor"].append(agent_colors[custom_agent_id])
 
+        opts["linecolor"] = np.array(opts["linecolor"])
         self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
+        # opts2["linecolor"] = np.array(opts2["linecolor"])
         # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
 
         # ratio to OR-tools
@@ -501,7 +553,9 @@ class AgentValidator:
             "title": "PPO / OR-tools",
             "legend": ["PPO/OR-tools", "Min PPO/OR-tools"],
         }
-        ratio_to_ortools = np.array(self.makespans) / np.array(self.ortools_makespans)
+        ratio_to_ortools = np.array(self.makespans) / np.array(
+            self.ortools_makespans[self.default_ortools_strategy]
+        )
         min_ratio_to_ortools = np.minimum.accumulate(ratio_to_ortools)
         self.vis.line(
             X=X,
@@ -512,7 +566,9 @@ class AgentValidator:
 
         # distance to OR-tools
         opts = {"title": "Distance to OR-tools"}
-        dist_to_ortools = np.array(self.makespans) - np.array(self.ortools_makespans)
+        dist_to_ortools = np.array(self.makespans) - np.array(
+            self.ortools_makespans[self.default_ortools_strategy]
+        )
         self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
 
         # time to OR-tools
@@ -520,7 +576,7 @@ class AgentValidator:
         count = min(len(self.makespans), 100)
         for i in range(1, count + 1):
             ppo = self.makespans[-i]
-            ortools = self.ortools_makespans[-i]
+            ortools = self.ortools_makespans[self.default_ortools_strategy][-i]
             if ppo <= ortools or np.isclose(ppo, ortools):
                 wins += 1
         pct = 100 * wins / count
@@ -626,6 +682,15 @@ class AgentValidator:
                 win="mopnr_schedule",
             )
 
+    @property
+    def default_ortools_strategy(self) -> str:
+        if "realistic" in self.ortools_strategies:
+            return "realistic"
+        elif "averagistic" in self.ortools_strategies:
+            return "averagistic"
+        else:
+            return self.ortools_strategies[0]
+
     def save_state(self, filepath: str):
         validator_state = {
             "makespan_ratio": self.makespan_ratio,
@@ -695,6 +760,8 @@ class AgentValidator:
         self.time_to_ortools = validator_state["time_to_ortools"]
         self.best_makespan_wheatley = validator_state["best_makespan_wheatley"]
         self.best_makespan_ortools = validator_state["best_makespan_ortools"]
-        self.ortools_env_zero_is_optimal = validator_state["ortools_env_zero_is_optimal"]
+        self.ortools_env_zero_is_optimal = validator_state[
+            "ortools_env_zero_is_optimal"
+        ]
 
         return self
