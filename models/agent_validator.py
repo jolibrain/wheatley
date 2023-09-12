@@ -26,6 +26,7 @@
 
 import copy
 import csv
+import pickle
 import sys
 import time
 
@@ -209,8 +210,8 @@ class AgentValidator:
 
     def validate(self, agent, alg):
         self._evaluate_agent(agent)
-        self._save_if_best_model(agent, alg)
         self._visdom_metrics(agent, alg)
+        self._save_if_best_model(agent, alg)
         return True
 
     def _save_if_best_model(self, agent, alg):
@@ -223,6 +224,7 @@ class AgentValidator:
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")
             torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
+            self.save_state(self.path + "validator.pkl")
 
             self.makespan_ratio = cur_ratio
             print(f"Current ratio : {cur_ratio:.3f}")
@@ -623,3 +625,76 @@ class AgentValidator:
                 opts={"caption": "Gantt MOPNR schedule"},
                 win="mopnr_schedule",
             )
+
+    def save_state(self, filepath: str):
+        validator_state = {
+            "makespan_ratio": self.makespan_ratio,
+            "makespans": self.makespans,
+            "ortools_makespans": self.ortools_makespans,
+            "random_makespans": self.random_makespans,
+            "custom_makespans": self.custom_makespans,
+            "entropy_losses": self.entropy_losses,
+            "policy_gradient_losses": self.policy_gradient_losses,
+            "value_losses": self.value_losses,
+            "losses": self.losses,
+            "approx_kls": self.approx_kls,
+            "clip_fractions": self.clip_fractions,
+            "explained_variances": self.explained_variances,
+            "clip_ranges": self.clip_ranges,
+            "ep_len_means": self.ep_len_means,
+            "ep_rew_means": self.ep_rew_means,
+            "fpss": self.fpss,
+            "dpss": self.dpss,
+            "stabilities": self.stabilities,
+            "monotonies": self.monotonies,
+            "total_timestepss": self.total_timestepss,
+            "first_callback": self.first_callback,
+            "gantt_rl_img": self.gantt_rl_img,
+            "gantt_or_img": self.gantt_or_img,
+            "gantt_mopnr_img": self.gantt_mopnr_img,
+            "all_or_tools_makespan": self.all_or_tools_makespan,
+            "all_or_tools_schedule": self.all_or_tools_schedule,
+            "time_to_ortools": self.time_to_ortools,
+            "best_makespan_wheatley": self.best_makespan_wheatley,
+            "best_makespan_ortools": self.best_makespan_ortools,
+            "ortools_env_zero_is_optimal": self.ortools_env_zero_is_optimal,
+        }
+        with open(filepath, "wb") as f:
+            pickle.dump(validator_state, f)
+
+    def reload_state(self, filepath: str) -> "AgentValidator":
+        with open(filepath, "rb") as f:
+            validator_state = pickle.load(f)
+
+        self.makespan_ratio = validator_state["makespan_ratio"]
+        self.makespans = validator_state["makespans"]
+        self.ortools_makespans = validator_state["ortools_makespans"]
+        self.random_makespans = validator_state["random_makespans"]
+        self.custom_makespans = validator_state["custom_makespans"]
+        self.entropy_losses = validator_state["entropy_losses"]
+        self.policy_gradient_losses = validator_state["policy_gradient_losses"]
+        self.value_losses = validator_state["value_losses"]
+        self.losses = validator_state["losses"]
+        self.approx_kls = validator_state["approx_kls"]
+        self.clip_fractions = validator_state["clip_fractions"]
+        self.explained_variances = validator_state["explained_variances"]
+        self.clip_ranges = validator_state["clip_ranges"]
+        self.ep_len_means = validator_state["ep_len_means"]
+        self.ep_rew_means = validator_state["ep_rew_means"]
+        self.fpss = validator_state["fpss"]
+        self.dpss = validator_state["dpss"]
+        self.stabilities = validator_state["stabilities"]
+        self.monotonies = validator_state["monotonies"]
+        self.total_timestepss = validator_state["total_timestepss"]
+        self.first_callback = validator_state["first_callback"]
+        self.gantt_rl_img = validator_state["gantt_rl_img"]
+        self.gantt_or_img = validator_state["gantt_or_img"]
+        self.gantt_mopnr_img = validator_state["gantt_mopnr_img"]
+        self.all_or_tools_makespan = validator_state["all_or_tools_makespan"]
+        self.all_or_tools_schedule = validator_state["all_or_tools_schedule"]
+        self.time_to_ortools = validator_state["time_to_ortools"]
+        self.best_makespan_wheatley = validator_state["best_makespan_wheatley"]
+        self.best_makespan_ortools = validator_state["best_makespan_ortools"]
+        self.ortools_env_zero_is_optimal = validator_state["ortools_env_zero_is_optimal"]
+
+        return self
