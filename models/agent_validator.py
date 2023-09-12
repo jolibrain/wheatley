@@ -550,16 +550,22 @@ class AgentValidator:
 
         # ratio to OR-tools
         opts = {
-            "title": "PPO / OR-tools",
-            "legend": ["PPO/OR-tools", "Min PPO/OR-tools"],
+            "title": "PPO / OR-Tools",
+            "legend": [],
         }
-        ratio_to_ortools = np.array(self.makespans) / np.array(
-            self.ortools_makespans[self.default_ortools_strategy]
-        )
-        min_ratio_to_ortools = np.minimum.accumulate(ratio_to_ortools)
+        Y_ratios = []
+        for ortools_strategy in self.ortools_strategies:
+            opts["legend"].append(f"PPO/OR-Tools {ortools_strategy}")
+            opts["legend"].append(f"Min PPO/OR-Tools {ortools_strategy}")
+            ratio_to_ortools = np.array(self.makespans) / np.array(
+                self.ortools_makespans[ortools_strategy]
+            )
+            Y_ratios.append(ratio_to_ortools)
+            Y_ratios.append(np.minimum.accumulate(ratio_to_ortools))
+
         self.vis.line(
             X=X,
-            Y=np.stack([ratio_to_ortools, min_ratio_to_ortools], axis=1),
+            Y=np.array(Y_ratios).T,
             win="ratio_to_ortools",
             opts=opts,
         )
