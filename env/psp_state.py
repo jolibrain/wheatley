@@ -59,9 +59,10 @@ class PSPState:
         # 0: is_affected
         # 1: is selectable
         # 2: job_id (in case of several mode per job)
-        # 3,4,5: durations (min max mode)
-        # 6,7,8 : tct (min max mode)
-        # 9.. 8+max_n_resources : level of resource i used by this mode (normalized)
+        # 3 : type (source/sink/none)
+        # 4,5,6: durations (min max mode)
+        # 7,8,9 : tct (min max mode)
+        # 10.. 9+max_n_resources : level of resource i used by this mode (normalized)
 
         job_info = problem["job_info"]
         self.job_modes = []
@@ -91,6 +92,7 @@ class PSPState:
         self.reset_is_affected()
         self.reset_resources()
         self.reset_selectable()
+        self.reset_type()
 
         if self.observe_conflicts_as_cliques:
             (
@@ -98,7 +100,7 @@ class PSPState:
                 self.resource_conf_id,
                 self.resource_conf_val,
                 self.resource_conf_val_r,
-            ) = compute_resources_graph_np(self.features[:, 9:])
+            ) = compute_resources_graph_np(self.features[:, 10:])
 
         else:
             self.resource_conf_edges = None
@@ -126,13 +128,13 @@ class PSPState:
             flat_dur = [
                 item for sublist in self.problem["durations"][i] for item in sublist
             ]
-            self.features[:, 3 + i] = np.array(flat_dur)
+            self.features[:, 4 + i] = np.array(flat_dur)
         if redraw_real:
-            self.real_durations = self.draw_real_durations(self.features[:, 3:6])
+            self.real_durations = self.draw_real_durations(self.features[:, 4:7])
         self.max_duration = max(flat_dur)
         self.duration_upper_bound = 0
         for j in self.job_modes:
-            self.duration_upper_bound += np.max(self.features[j, 5])
+            self.duration_upper_bound += np.max(self.features[j, 6])
         self.undoable_makespan = self.duration_upper_bound + self.max_duration
 
     def reset_is_affected(self):
@@ -144,6 +146,7 @@ class PSPState:
         self.reset_is_affected()
         self.reset_resources()
         self.reset_selectable()
+        self.reset_type()
         self.edge_index = {}
         self.resource_prec_att = []
         self.resource_prec_edges = []
@@ -154,7 +157,7 @@ class PSPState:
                 self.resource_conf_id,
                 self.resource_conf_val,
                 self.resource_conf_val_r,
-            ) = compute_resources_graph_np(self.features[:, 9:])
+            ) = compute_resources_graph_np(self.features[:, 10:])
 
         else:
             self.resource_conf_edges = None
@@ -179,7 +182,7 @@ class PSPState:
         for i in range(self.problem["n_resources"]):
             flat_res[:, i] /= self.problem["resource_availability"][i]
         self.resource_levels = np.array(self.problem["resource_availability"])
-        self.features[:, 9 : 9 + self.n_resources] = flat_res
+        self.features[:, 10 : 10 + self.n_resources] = flat_res
 
         self.resources = []
         for r in range(self.problem["n_renewable_resources"]):
@@ -210,6 +213,21 @@ class PSPState:
         assert len(self.resources) == self.n_resources
         self.reset_frontier()
 
+    def reset_type(self):
+        self.features[:, 3] = 0
+        in_deg = np.array(self.problem_graph.in_degree())
+
+        no_parents_pos = np.where(in_deg[:, 1] == 0)[0]
+        no_parents = in_deg[no_parents_pos][:, 0]
+        # print('no_parents', no_parents)
+
+        self.features[no_parents, 3] = -1  # source
+
+        out_deg = np.array(self.problem_graph.out_degree())
+        no_child_pos = np.where(out_deg[:, 1] == 0)[0]
+        no_child = out_deg[no_child_pos][:, 0]
+        self.features[no_child, 3] = 1  # sink
+
     def reset_selectable(self):
         self.features[:, 1] = 0
         in_deg = np.array(self.problem_graph.in_degree())
@@ -226,7 +244,7 @@ class PSPState:
     ############################### ACCESSORS ############################
 
     def tct(self, nodeid):
-        return self.features[nodeid, 6:9]
+        return self.features[nodeid, 7:10]
 
     def all_tct_real(self):
         return self.real_tct
@@ -235,16 +253,16 @@ class PSPState:
         return self.real_tct[nodeid]
 
     def set_tct(self, nodeid, ct):
-        self.features[nodeid, 6:9] = ct
+        self.features[nodeid, 7:10] = ct
 
     def set_tct_real(self, nodeid, ct):
         self.real_tct[nodeid] = ct
 
     def all_durations(self):
-        return self.features[:, 3:6]
+        return self.features[:, 4:7]
 
     def durations(self, nodeid):
-        return self.features[nodeid, 3:6]
+        return self.features[nodeid, 4:7]
 
     def duration_real(self, nodeid):
         return self.real_durations[nodeid]
@@ -253,16 +271,19 @@ class PSPState:
         return self.real_durations[:]
 
     def resources_usage(self, node_id):
-        return self.features[node_id, 9:]
+        return self.features[node_id, 10:]
 
     def resource_usage(self, node_id, r):
-        return self.features[node_id, 9 + r]
+        return self.features[node_id, 10 + r]
 
     def remove_res(self, node_ids):
-        self.features[node_ids, 9:] = 0
+        self.features[node_ids, 10:] = 0
 
     def selectables(self):
         return self.features[:, 1]
+
+    def types(self):
+        return self.features[:, 3]
 
     def selectable(self, node_id):
         return self.features[node_id, 1] == 1
@@ -304,7 +325,11 @@ class PSPState:
         return np.where(self.selectables() == 1)[0].size == 0
 
     def succeeded(self):
-        return self.features[-1, 0] == 1
+        sinks = np.where(self.types() == 1)[0]
+        # sinks_selected = self.features[sinks, 0] == 1
+        all_sinks_selected = np.all(self.features[sinks, 0] == 1)
+        # return self.features[-1, 0] == 1
+        return all_sinks_selected
 
     def to_features_and_edge_index(self, normalize):
         if self.observe_conflicts_as_cliques:
@@ -533,7 +558,7 @@ class PSPState:
     def normalize_features(self):
         if self.normalize:
             feat = np.copy(self.features)
-            feat[:, 3:9] /= self.max_duration
+            feat[:, 4:10] /= self.max_duration
             return feat
         return self.features
 

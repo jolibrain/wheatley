@@ -54,7 +54,6 @@ class PSPGnnDGL(torch.nn.Module):
         vnode=False,
         update_edge_features=False,
     ):
-
         super().__init__()
         self.conflicts = conflicts
         self.residual = residual
@@ -198,7 +197,6 @@ class PSPGnnDGL(torch.nn.Module):
             self.mlps_edges = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
-
             if self.normalize:
                 self.norms.append(torch.nn.BatchNorm1d(self.hidden_dim))
                 if self.residual:
@@ -290,7 +288,6 @@ class PSPGnnDGL(torch.nn.Module):
             return torch.cat([eit, ec], dim=-1)
 
     def forward(self, obs):
-
         observation = AgentObservation.from_gym_observation(
             obs,
             conflicts=self.conflicts,
@@ -337,7 +334,7 @@ class PSPGnnDGL(torch.nn.Module):
             node_offset += batch_size
 
         if self.conflicts == "node":
-            resources_used = g.ndata["feat"][:, 9:]
+            resources_used = g.ndata["feat"][:, 10:]
             num_resources = resources_used.shape[1]
             resource_nodes = list(
                 range(node_offset, node_offset + num_resources * batch_size)
