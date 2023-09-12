@@ -717,3 +717,6 @@ args.features = sorted(args.features)
 
 if args.custom_heuristic_names is None:
     args.custom_heuristic_names = []
+
+if args.resume:
+    args.skip_initial_eval = True

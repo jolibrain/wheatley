@@ -255,6 +255,10 @@ def main(args, exp_name, path):
         training_specification,
         args.disable_visdom,
     )
+    if args.resume and os.path.exists(path + "/validator.pkl"):
+        validator = validator.reload_state(path + "/validator.pkl")
+        print("Validator reloaded.")
+
     ppo = PPO(
         training_specification,
         JSSPEnv,
