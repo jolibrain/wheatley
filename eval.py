@@ -66,6 +66,7 @@ def load_agent(args: argparse.Namespace, path: str) -> JSSPAgent:
     agent = JSSPAgent.load(path)
     agent.env_specification = env_specification
     agent.agent_specification = agent_specification
+    agent.to(agent_specification.device)
     return agent
 
 
@@ -144,9 +145,12 @@ def eval_on_instances(
 
         perfs[f"{n_j}x{n_m}"] = {
             "PPO": validator.makespans[-1],
-            "OR-tools": validator.ortools_makespans[-1].cpu().item(),
             "Random": validator.random_makespans[-1],
         }
+        for ortools_strategies, values in validator.ortools_makespans.items():
+            perfs[f"{n_j}x{n_m}"][f"OR-Tools - {ortools_strategies}"] = (
+                values[-1].cpu().item()
+            )
         for custom_agent in validator.custom_agents:
             perfs[f"{n_j}x{n_m}"][custom_agent.rule] = validator.custom_makespans[
                 custom_agent.rule

@@ -491,7 +491,9 @@ class PPO:
                 )
 
                 ratio_to_ortools = np.array(self.validator.makespans) / np.array(
-                    self.validator.ortools_makespans
+                    self.validator.ortools_makespans[
+                        self.validator.default_ortools_strategy
+                    ]
                 )
                 self.logger.record("train/ratio_monotony", monotony(ratio_to_ortools))
                 self.logger.record("train/ratio_stability", stability(ratio_to_ortools))
@@ -508,21 +510,28 @@ class PPO:
                     "validation/ppo_makespan",
                     self.validator.makespans[-1],
                 )
-                self.logger.record(
-                    "validation/ortools_makespan",
-                    self.validator.ortools_makespans[-1],
-                )
+                for ortools_strategy in self.validator.ortools_strategies:
+                    self.logger.record(
+                        f"validation/ortools_{ortools_strategy}_makespan",
+                        self.validator.ortools_makespans[ortools_strategy][-1],
+                    )
                 self.logger.record(
                     "validation/random_makepsan",
                     self.validator.random_makespans[-1],
                 )
                 self.logger.record(
                     "validation/ratio_to_ortools",
-                    self.validator.makespans[-1] / self.validator.ortools_makespans[-1],
+                    self.validator.makespans[-1]
+                    / self.validator.ortools_makespans[
+                        self.validator.default_ortools_strategy
+                    ][-1],
                 )
                 self.logger.record(
                     "validation/dist_to_ortools",
-                    self.validator.makespans[-1] - self.validator.ortools_makespans[-1],
+                    self.validator.makespans[-1]
+                    - self.validator.ortools_makespans[
+                        self.validator.default_ortools_strategy
+                    ][-1],
                 )
                 for custom_agent in self.validator.custom_agents:
                     name = custom_agent.rule
@@ -533,7 +542,7 @@ class PPO:
                     self.logger.record(
                         f"validation/{name}_ratio_to_ortools",
                         self.validator.custom_makespans[name][-1]
-                        / self.validator.ortools_makespans[-1],
+                        / self.validator.ortools_makespans[self.validator.default_ortools_strategy][-1],
                     )
 
             self.logger.dump(step=self.global_step)
