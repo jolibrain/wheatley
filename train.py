@@ -232,14 +232,15 @@ def main(args, exp_name, path):
             problem_description,
             env_specification,
             training_specification,
+            JSSPEnv,
             num_envs=args.pretrain_num_envs,
+            num_eval_envs=args.pretrain_num_eval_envs,
             prob=args.pretrain_prob,
         )
         pretrainer.pretrain(
             agent,
             args.pretrain_epochs,
             args.pretrain_batch_size,
-            args.pretrain_n_steps_episode,
             lr=args.pretrain_lr,
         )
 

@@ -21,15 +21,18 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from problem.jssp_description import JSSPDescription as ProblemDescription
-from env.jssp_env_specification import JSSPEnvSpecification
-from models.training_specification import TrainingSpecification
-from models.jssp_agent import JSSPAgent as Agent
-from utils.utils import rebatch_obs, get_obs
-from utils.ortools import *
 import numpy as np
 import torch
+import visdom
 from torch.distributions.categorical import Categorical
+from tqdm import tqdm
+
+from env.jssp_env_specification import JSSPEnvSpecification
+from models.jssp_agent import JSSPAgent as Agent
+from models.training_specification import TrainingSpecification
+from problem.jssp_description import JSSPDescription as ProblemDescription
+from utils.ortools import *
+from utils.utils import get_obs, rebatch_obs
 
 
 class Pretrainer:
@@ -40,13 +43,20 @@ class Pretrainer:
         training_specification,
         env_cls,
         num_envs=1,
+        num_eval_envs=1,
         prob=0.9,
     ):
         self.problem_description = problem_description
         self.env_specification = env_specification
         self.training_specification = training_specification
+        self.env_cls = env_cls
         self.num_envs = num_envs
+        self.num_eval_envs = num_eval_envs
         self.prob = prob
+
+        self.vis = visdom.Visdom(env=self.training_specification.display_env)
+        self.train_losses = []
+        self.eval_losses = []
 
     def get_target_probs(self, all_masks, all_past_actions, pa_to_a, mb_inds):
         masks = all_masks[mb_inds]
@@ -58,7 +68,7 @@ class Pretrainer:
         p = torch.where(masks, 1, 0)
         l = torch.empty(masks.shape)
         for n, i in enumerate(mb_inds):
-            sum_non_masked = p[i].sum()
+            sum_non_masked = p[n].sum()
             pa = all_past_actions[i]
             actions = pa_to_a[tuple(pa)]
             nactions = len(actions)
@@ -68,34 +78,34 @@ class Pretrainer:
             else:
                 rest = (1 - self.prob) / (sum_non_masked - nactions)
                 real_prob = self.prob / nactions
-            r = torch.where(p[i] == 1, rest, 0)
+            r = torch.where(p[n] == 1, rest, 0)
             for a in actions:
                 r[a] = real_prob
             l[n] = r
         return l
 
-    def pretrain(self, agent, num_epochs, minibatch_size, n_traj, lr=0.0002):
-
+    def generate_dataset_(self, num_envs: int) -> tuple:
         all_obs = []
         all_masks = []
         all_actions = []
         all_past_actions = []
-        for e in range(self.num_envs):
-            env = self.env_cls(self.problem_description, self.env_specification)
-            for i in range(n_traj):
-                (
-                    obs,
-                    masks,
-                    actions,
-                    past_actions,
-                ) = get_ortools_trajectory_and_past_actions(env)
-                all_obs.extend(obs)
-                all_masks.extend(masks)
-                all_actions.extend(actions)
-                all_past_actions.extend(past_actions)
+        for e in tqdm(range(num_envs), desc="Generating pretraining dataset"):
+            env = self.env_cls(self.problem_description, self.env_specification, e)
+            (
+                obs,
+                masks,
+                actions,
+                past_actions,
+            ) = get_ortools_trajectory_and_past_actions(env)
+            all_obs.extend(obs)
+            all_masks.extend(masks)
+            all_actions.extend(actions)
+            all_past_actions.extend(past_actions)
+
         all_obs = rebatch_obs(all_obs)
         all_masks = torch.tensor(np.array(all_masks))
         all_actions = torch.tensor(all_actions)
+
         pa_to_a = {}
         for pa, a in zip(all_past_actions, all_actions):
             key = tuple(pa)
@@ -104,28 +114,92 @@ class Pretrainer:
             else:
                 pa_to_a[key] = set([a.long().item()])
 
-        b_inds = np.arange(len(actions))
+        return all_obs, all_masks, all_actions, all_past_actions, pa_to_a
+
+    def pretrain(self, agent, num_epochs, minibatch_size, lr=0.0002):
+        (
+            train_obs,
+            train_masks,
+            train_actions,
+            train_past_actions,
+            train_pa_to_a,
+        ) = self.generate_dataset_(self.num_envs)
+
+        (
+            eval_obs,
+            eval_masks,
+            eval_actions,
+            eval_past_actions,
+            eval_pa_to_a,
+        ) = self.generate_dataset_(self.num_eval_envs)
+
+        b_inds = np.arange(len(train_actions))
 
         optimizer = self.training_specification.optimizer_class(
             agent.parameters(), lr=lr
         )
-        for epoch in range(num_epochs):
-            # np.random.shuffle(b_inds)
+        for _ in tqdm(range(num_epochs), desc="Pretrain"):
+            np.random.shuffle(b_inds)
+
             eloss = 0
-            for start in range(0, len(actions), minibatch_size):
-                end = start + minibatch_size
+            for start in range(0, len(train_actions), minibatch_size):
+                end = min(start + minibatch_size, len(train_actions))
                 mb_inds = b_inds[start:end]
 
                 action_probs = agent.get_action_probs(
-                    get_obs(all_obs, mb_inds), all_masks[mb_inds]
+                    get_obs(train_obs, mb_inds), train_masks[mb_inds]
                 )
                 target_probs = self.get_target_probs(
-                    all_masks, all_past_actions, pa_to_a, mb_inds
+                    train_masks, train_past_actions, train_pa_to_a, mb_inds
                 ).to(action_probs.device)
                 loss = torch.nn.functional.mse_loss(
-                    action_probs, target_probs, reduction="sum"
+                    action_probs,
+                    target_probs,
+                    reduction="none",
                 )
-                eloss += loss.item()
-                loss.backward()
+                # loss = torch.nn.functional.kl_div(
+                #     action_probs,
+                #     target_probs,
+                #     log_target=False,
+                #     reduction="none",
+                # )
+                eloss += loss.sum().item()
+                loss.mean().backward()
                 optimizer.step()
-            print("pretrain loss:", eloss / len(actions))
+
+            self.train_losses.append(eloss / len(train_actions))
+
+            eloss = 0
+            with torch.inference_mode():
+                for start in range(0, len(eval_actions), minibatch_size):
+                    end = min(start + minibatch_size, len(eval_actions))
+                    mb_inds = np.arange(start, end)
+
+                    action_probs = agent.get_action_probs(
+                        get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
+                    )
+                    target_probs = self.get_target_probs(
+                        eval_masks, eval_past_actions, eval_pa_to_a, mb_inds
+                    ).to(action_probs.device)
+                    loss = torch.nn.functional.mse_loss(
+                        action_probs,
+                        target_probs,
+                        reduction="sum"
+                    )
+                    # loss = torch.nn.functional.kl_div(
+                    #     action_probs,
+                    #     target_probs,
+                    #     log_target=False,
+                    #     reduction="sum",
+                    # )
+                    eloss += loss.item()
+
+            self.eval_losses.append(eloss / len(eval_actions))
+
+            Y = np.array([self.train_losses, self.eval_losses])
+            self.vis.line(
+                Y=Y.T,
+                X=np.arange(len(self.train_losses)),
+                win="pretrain-loss",
+                opts={"title": "Pretrain Loss", "legend": ["train", "eval"]},
+            )

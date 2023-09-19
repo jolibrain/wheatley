@@ -568,7 +568,13 @@ parser.add_argument(
 parser.add_argument(
     "--pretrain_num_envs",
     type=int,
-    default=1,
+    default=100,
+    help="number of pretrain envs (1 is enough for determinisitic case)",
+)
+parser.add_argument(
+    "--pretrain_num_eval_envs",
+    type=int,
+    default=10,
     help="number of pretrain envs (1 is enough for determinisitic case)",
 )
 parser.add_argument(
@@ -582,12 +588,6 @@ parser.add_argument(
     type=int,
     default=128,
     help="size of batch_size for pretrain",
-)
-parser.add_argument(
-    "--pretrain_n_steps_episode",
-    type=int,
-    default=1024,
-    help="pretrain: number of steps per env",
 )
 parser.add_argument(
     "--pretrain_lr",
