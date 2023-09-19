@@ -30,10 +30,12 @@ import pickle
 import sys
 import time
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import tqdm
 import visdom
+from PIL import Image
 
 from env.jssp_env import JSSPEnv
 from env.psp_env import PSPEnv
@@ -139,6 +141,8 @@ class AgentValidator:
         self.ortools_makespans = {
             ortools_strategy: [] for ortools_strategy in self.ortools_strategies
         }
+        self.last_ortools_makespans = [0 for _ in range(self.n_validation_env)]
+        self.last_ppo_makespans = [0 for _ in range(self.n_validation_env)]
         self.random_makespans = []
         self.custom_makespans = {agent.rule: [] for agent in self.custom_agents}
         self.entropy_losses = []
@@ -160,6 +164,7 @@ class AgentValidator:
         self.gantt_rl_img = None
         self.gantt_or_img = None
         self.gantt_mopnr_img = None
+        self.current_scatter_fig = None
         self.all_or_tools_makespan = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
@@ -247,6 +252,9 @@ class AgentValidator:
 
             self.makespan_ratio = cur_ratio
             print(f"Current ratio : {cur_ratio:.3f}")
+
+            print(f"Saving the figure {self.path + 'best-ortools-ppo-cactus.png'}")
+            self.current_scatter_fig.savefig(self.path + "best-ortools-ppo-cactus.png")
 
     def _get_ortools_makespan(self, i: int, ortools_strategy: str):
         if self.psp:
@@ -396,10 +404,13 @@ class AgentValidator:
                         self.validation_envs[i].sampled_jobs,
                     )
 
+                self.last_ppo_makespans[i] = makespan
+
                 mean_makespan += makespan / self.n_validation_env
             else:
                 schedule = None
                 state = self.validation_envs[i].state
+                self.last_ppo_makespans[i] = state.undoable_makespan
                 mean_makespan += state.undoable_makespan / self.n_validation_env
                 self.gantt_rl_img = self.validation_envs[i].render_fail()
 
@@ -416,6 +427,9 @@ class AgentValidator:
                         or_tools_schedule,
                         optimal,
                     ) = self._get_ortools_makespan(i, ortools_strategy)
+
+                if ortools_strategy == self.averagistic_ortools_strategy:
+                    self.last_ortools_makespans[i] = or_tools_makespan
 
                 if i == 0 and ortools_strategy == self.default_ortools_strategy:
                     self.gantt_or_img = self.validation_envs[i].render_solution(
@@ -592,9 +606,60 @@ class AgentValidator:
             X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts
         )
 
+        # Plot OR-Tools solutions vs PPO solutions.
+        # Visdom is a little bit limited so we build the plot ourself using matplotlib
+        # and save the image on disk. We can directly plot this image with visdom.
+        # This is a bit hacky but it works.
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ppo_makespans = np.array(self.last_ppo_makespans)
+        ortools_makespans = np.array(self.last_ortools_makespans)
+        ax.scatter(
+            ppo_makespans,
+            ortools_makespans,
+            c=-ppo_makespans / ortools_makespans,
+            cmap="viridis",
+        )
+        ax.plot(
+            [0, max(self.last_ppo_makespans + self.last_ortools_makespans)],
+            [0, max(self.last_ppo_makespans + self.last_ortools_makespans)],
+            color="red",
+        )
+        ax.set_xlabel("PPO makespan")
+        ax.set_ylabel("OR-Tools makespan")
+        ax.set_title(
+            f"OR-Tools {self.averagistic_ortools_strategy} vs PPO - {(ppo_makespans / ortools_makespans).mean():.2f}"
+        )
+        fig.savefig(self.path + "ortools-ppo-cactus.png")
+
+        if self.current_scatter_fig is not None:
+            plt.close(self.current_scatter_fig)
+        self.current_scatter_fig = fig
+
+        # Load the image into a numpy array and pass it to visdom.
+        image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
+        image = image.transpose(2, 0, 1)
+        image = image[:3, :, :]  # Remove alpha channel.
+        self.vis.image(
+            image,
+            win="ortools-ppo-cactus",
+            opts={"caption": "OR-Tools vs PPO"},
+        )
+
         if self.first_callback:
             self.first_callback = False
             return
+
+        if self.makespan_ratio <= (ppo_makespans / ortools_makespans).mean():
+            image = np.array(Image.open(self.path + "best-ortools-ppo-cactus.png"))
+        else:
+            image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
+        image = image.transpose(2, 0, 1)
+        image = image[:3, :, :]  # Remove alpha channel.
+        self.vis.image(
+            image,
+            win="best-ortools-ppo-cactus",
+            opts={"caption": "Best OR-Tools vs PPO"},
+        )
 
         self.entropy_losses.append(
             alg.ent_coef * alg.logger.name_to_value["train/entropy_loss"]
@@ -690,10 +755,21 @@ class AgentValidator:
 
     @property
     def default_ortools_strategy(self) -> str:
+        """realistic > averagistic > others"""
         if "realistic" in self.ortools_strategies:
             return "realistic"
         elif "averagistic" in self.ortools_strategies:
             return "averagistic"
+        else:
+            return self.ortools_strategies[0]
+
+    @property
+    def averagistic_ortools_strategy(self) -> str:
+        """averagistic > realistic > others"""
+        if "averagistic" in self.ortools_strategies:
+            return "averagistic"
+        elif "realistic" in self.ortools_strategies:
+            return "realistic"
         else:
             return self.ortools_strategies[0]
 

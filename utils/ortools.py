@@ -317,7 +317,8 @@ def get_ortools_schedule(
     scaling_constant_ortools=1000,
     ortools_strategy="averagistic",
 ):
-    _, ortools_schedule, optimal = get_ortools_makespan(
+    # TODO: Is it a bug to use the original durations? Edit: Looks OK.
+    makespan, ortools_schedule, optimal = get_ortools_makespan(
         env.state.affectations,
         env.state.original_durations,
         env.env_specification.n_features,
@@ -325,7 +326,7 @@ def get_ortools_schedule(
         scaling_constant_ortools,
         ortools_strategy,
     )
-    return ortools_schedule, optimal
+    return makespan, ortools_schedule, optimal
 
 
 def get_ortools_actions(env, ortools_schedule):
@@ -359,14 +360,25 @@ def get_ortools_actions(env, ortools_schedule):
 
 
 def get_ortools_trajectory_and_past_actions(env):
-    schedule, optimal = get_ortools_schedule(env)
+    # print("OR-Tools")
+    # print(env.state.affectations)
+    # print(env.state.durations)
+
+    makespan, schedule, optimal = get_ortools_schedule(
+        env, ortools_strategy="realistic"
+    )
     # if optimal:
     #     print("using optimal solution from or-tools")
     trajectory = []
     past_actions = []
     obs = []
     masks = []
-    o, info = env.reset()
+    # TODO: Make sure the reset is not sampling new durations, as the schedule would be
+    # based on wrong features for the model. Edit: Looks OK.
+    o, info = env.reset(soft=True)
+    # print("Trajectory")
+    # print(env.state.affectations)
+    # print(env.state.durations, "\n")
     next_obs = obs_as_tensor_add_batch_dim(o)
     action_mask = decode_mask(info["mask"])
     while not env.done():
@@ -380,4 +392,4 @@ def get_ortools_trajectory_and_past_actions(env):
         next_obs = obs_as_tensor_add_batch_dim(next_obs)
         past_actions.append(trajectory.copy())
         trajectory.append(action)
-    return obs, masks, trajectory, past_actions
+    return obs, masks, trajectory, past_actions, makespan

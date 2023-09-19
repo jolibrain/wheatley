@@ -147,15 +147,15 @@ parser.add_argument(
 )
 parser.add_argument(
     "--retrain",
-    default=False,
-    action="store_true",
-    help="Use this flag if you want to retrain a pretrained model. The script will look for existing model at path loc.",
+    type=str,
+    default="",
+    help="Use this flag if you want to retrain a trained model. You must provide the direct path to the model you want to load.",
 )
 parser.add_argument(
     "--resume",
     default=False,
     action="store_true",
-    help="Resume a previous training",
+    help="Resume a previous training. The script will look for trained model named \"agent.pkl\" in the directory experiment.",
 )
 
 # =================================================VALIDATION SPECIFICATION=================================================
@@ -568,8 +568,20 @@ parser.add_argument(
 parser.add_argument(
     "--pretrain_num_envs",
     type=int,
-    default=1,
+    default=100,
     help="number of pretrain envs (1 is enough for determinisitic case)",
+)
+parser.add_argument(
+    "--pretrain_num_eval_envs",
+    type=int,
+    default=10,
+    help="number of pretrain envs (1 is enough for determinisitic case)",
+)
+parser.add_argument(
+    "--pretrain_trajectories",
+    type=int,
+    default=10,
+    help="number of trajectories sampled per envs",
 )
 parser.add_argument(
     "--pretrain_epochs",
@@ -584,16 +596,16 @@ parser.add_argument(
     help="size of batch_size for pretrain",
 )
 parser.add_argument(
-    "--pretrain_n_steps_episode",
-    type=int,
-    default=1024,
-    help="pretrain: number of steps per env",
-)
-parser.add_argument(
     "--pretrain_lr",
     type=float,
     default=2e-4,
     help="learning rate for pretrain",
+)
+parser.add_argument(
+    "--pretrain_vf_coef",
+    type=float,
+    default=1e-2,
+    help="value function loss weight",
 )
 
 
