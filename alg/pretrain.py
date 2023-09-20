@@ -44,6 +44,7 @@ class Pretrainer:
         env_cls,
         num_envs=1,
         num_eval_envs=1,
+        trajectories=10,
         prob=0.9,
     ):
         self.problem_description = problem_description
@@ -52,6 +53,7 @@ class Pretrainer:
         self.env_cls = env_cls
         self.num_envs = num_envs
         self.num_eval_envs = num_eval_envs
+        self.trajectories = trajectories
         self.prob = prob
 
         self.vis = visdom.Visdom(env=self.training_specification.display_env)
@@ -84,23 +86,32 @@ class Pretrainer:
             l[n] = r
         return l
 
-    def generate_dataset_(self, num_envs: int) -> tuple:
+    def generate_dataset_(self, num_envs: int, trajectories: int) -> tuple:
         all_obs = []
         all_masks = []
         all_actions = []
         all_past_actions = []
+        env = self.env_cls(self.problem_description, self.env_specification, 0)
+
         for e in tqdm(range(num_envs), desc="Generating pretraining dataset"):
-            env = self.env_cls(self.problem_description, self.env_specification, e)
-            (
-                obs,
-                masks,
-                actions,
-                past_actions,
-            ) = get_ortools_trajectory_and_past_actions(env)
-            all_obs.extend(obs)
-            all_masks.extend(masks)
-            all_actions.extend(actions)
-            all_past_actions.extend(past_actions)
+            env.reset()
+            for _ in tqdm(range(trajectories), desc="Trajectories", leave=False):
+                if self.problem_description.deterministic:
+                    env.reset(soft=True)
+                else:
+                    # WARNING: This works only for fixed problems. There should be
+                    # a way to do this with non-fixed problems.
+                    env.reset()  # Sample new durations within the bounds.
+                (
+                    obs,
+                    masks,
+                    actions,
+                    past_actions,
+                ) = get_ortools_trajectory_and_past_actions(env)
+                all_obs.extend(obs)
+                all_masks.extend(masks)
+                all_actions.extend(actions)
+                all_past_actions.extend(past_actions)
 
         all_obs = rebatch_obs(all_obs)
         all_masks = torch.tensor(np.array(all_masks))
@@ -123,7 +134,7 @@ class Pretrainer:
             train_actions,
             train_past_actions,
             train_pa_to_a,
-        ) = self.generate_dataset_(self.num_envs)
+        ) = self.generate_dataset_(self.num_envs, self.trajectories)
 
         (
             eval_obs,
@@ -131,7 +142,7 @@ class Pretrainer:
             eval_actions,
             eval_past_actions,
             eval_pa_to_a,
-        ) = self.generate_dataset_(self.num_eval_envs)
+        ) = self.generate_dataset_(self.num_eval_envs, max(self.trajectories // 10, 1))
 
         b_inds = np.arange(len(train_actions))
 
@@ -142,7 +153,11 @@ class Pretrainer:
             np.random.shuffle(b_inds)
 
             eloss = 0
-            for start in range(0, len(train_actions), minibatch_size):
+            for start in tqdm(
+                range(0, len(train_actions), minibatch_size),
+                desc="Batches",
+                leave=False,
+            ):
                 end = min(start + minibatch_size, len(train_actions))
                 mb_inds = b_inds[start:end]
 
@@ -182,9 +197,7 @@ class Pretrainer:
                         eval_masks, eval_past_actions, eval_pa_to_a, mb_inds
                     ).to(action_probs.device)
                     loss = torch.nn.functional.mse_loss(
-                        action_probs,
-                        target_probs,
-                        reduction="sum"
+                        action_probs, target_probs, reduction="sum"
                     )
                     # loss = torch.nn.functional.kl_div(
                     #     action_probs,
@@ -193,6 +206,12 @@ class Pretrainer:
                     #     reduction="sum",
                     # )
                     eloss += loss.item()
+
+            if self.eval_losses == [] or (
+                min(self.eval_losses) > eloss / len(eval_actions)
+            ):
+                pretrain_model_path = self.training_specification.path + "pretrain.pkl"
+                agent.save(pretrain_model_path)
 
             self.eval_losses.append(eloss / len(eval_actions))
 

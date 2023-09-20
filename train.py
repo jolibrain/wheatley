@@ -206,9 +206,9 @@ def main(args, exp_name, path):
     )
     agent_specification.print_self()
     # If we want to use a pretrained Agent, we only have to load it (if it exists)
-    if args.retrain and os.path.exists(path + "/agent.pkl"):
+    if args.retrain:
         print("Retraining an already existing agent\n")
-        agent = Agent.load(path)
+        agent = Agent.load(args.retrain)
         agent.env_specification = env_specification
         agent.agent_specification = agent_specification
     elif (
@@ -235,6 +235,7 @@ def main(args, exp_name, path):
             JSSPEnv,
             num_envs=args.pretrain_num_envs,
             num_eval_envs=args.pretrain_num_eval_envs,
+            trajectories=args.pretrain_trajectories,
             prob=args.pretrain_prob,
         )
         pretrainer.pretrain(

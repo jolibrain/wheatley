@@ -147,15 +147,15 @@ parser.add_argument(
 )
 parser.add_argument(
     "--retrain",
-    default=False,
-    action="store_true",
-    help="Use this flag if you want to retrain a pretrained model. The script will look for existing model at path loc.",
+    type=str,
+    default="",
+    help="Use this flag if you want to retrain a trained model. You must provide the direct path to the model you want to load.",
 )
 parser.add_argument(
     "--resume",
     default=False,
     action="store_true",
-    help="Resume a previous training",
+    help="Resume a previous training. The script will look for trained model named \"agent.pkl\" in the directory experiment.",
 )
 
 # =================================================VALIDATION SPECIFICATION=================================================
@@ -576,6 +576,12 @@ parser.add_argument(
     type=int,
     default=10,
     help="number of pretrain envs (1 is enough for determinisitic case)",
+)
+parser.add_argument(
+    "--pretrain_trajectories",
+    type=int,
+    default=10,
+    help="number of trajectories sampled per envs",
 )
 parser.add_argument(
     "--pretrain_epochs",
