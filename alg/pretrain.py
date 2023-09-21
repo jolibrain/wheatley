@@ -57,8 +57,16 @@ class Pretrainer:
         self.prob = prob
 
         self.vis = visdom.Visdom(env=self.training_specification.display_env)
-        self.train_losses = []
-        self.eval_losses = []
+        self.train_losses = {
+            "actor": [],
+            "critic": [],
+            "total": [],
+        }
+        self.eval_losses = {
+            "actor": [],
+            "critic": [],
+            "total": [],
+        }
 
     def get_target_probs(self, all_masks, all_past_actions, pa_to_a, mb_inds):
         masks = all_masks[mb_inds]
@@ -91,10 +99,13 @@ class Pretrainer:
         all_masks = []
         all_actions = []
         all_past_actions = []
+        all_makespans = []
         env = self.env_cls(self.problem_description, self.env_specification, 0)
 
         for e in tqdm(range(num_envs), desc="Generating pretraining dataset"):
             env.reset()
+            max_completion_time = np.max(env.state.durations)
+
             for _ in tqdm(range(trajectories), desc="Trajectories", leave=False):
                 if self.problem_description.deterministic:
                     env.reset(soft=True)
@@ -107,15 +118,23 @@ class Pretrainer:
                     masks,
                     actions,
                     past_actions,
+                    makespan,
                 ) = get_ortools_trajectory_and_past_actions(env)
                 all_obs.extend(obs)
                 all_masks.extend(masks)
                 all_actions.extend(actions)
                 all_past_actions.extend(past_actions)
+                all_makespans.extend(
+                    [
+                        makespan.item() / (max_completion_time * 2)
+                        for _ in range(len(obs))
+                    ]
+                )
 
         all_obs = rebatch_obs(all_obs)
         all_masks = torch.tensor(np.array(all_masks))
         all_actions = torch.tensor(all_actions)
+        all_makespans = torch.tensor(all_makespans)
 
         pa_to_a = {}
         for pa, a in zip(all_past_actions, all_actions):
@@ -125,7 +144,7 @@ class Pretrainer:
             else:
                 pa_to_a[key] = set([a.long().item()])
 
-        return all_obs, all_masks, all_actions, all_past_actions, pa_to_a
+        return all_obs, all_masks, all_actions, all_past_actions, pa_to_a, all_makespans
 
     def pretrain(self, agent, num_epochs, minibatch_size, lr=0.0002):
         (
@@ -134,6 +153,7 @@ class Pretrainer:
             train_actions,
             train_past_actions,
             train_pa_to_a,
+            train_makespans,
         ) = self.generate_dataset_(self.num_envs, self.trajectories)
 
         (
@@ -142,6 +162,7 @@ class Pretrainer:
             eval_actions,
             eval_past_actions,
             eval_pa_to_a,
+            eval_makespans,
         ) = self.generate_dataset_(self.num_eval_envs, max(self.trajectories // 10, 1))
 
         b_inds = np.arange(len(train_actions))
@@ -152,7 +173,9 @@ class Pretrainer:
         for _ in tqdm(range(num_epochs), desc="Pretrain"):
             np.random.shuffle(b_inds)
 
-            eloss = 0
+            a_loss = 0
+            c_loss = 0
+            t_loss = 0
             for start in tqdm(
                 range(0, len(train_actions), minibatch_size),
                 desc="Batches",
@@ -161,15 +184,20 @@ class Pretrainer:
                 end = min(start + minibatch_size, len(train_actions))
                 mb_inds = b_inds[start:end]
 
-                action_probs = agent.get_action_probs(
+                action_probs, values = agent.get_action_probs_and_value(
                     get_obs(train_obs, mb_inds), train_masks[mb_inds]
                 )
                 target_probs = self.get_target_probs(
                     train_masks, train_past_actions, train_pa_to_a, mb_inds
                 ).to(action_probs.device)
-                loss = torch.nn.functional.mse_loss(
+                loss_actor = torch.nn.functional.huber_loss(
                     action_probs,
                     target_probs,
+                    reduction="none",
+                )
+                loss_critic = torch.nn.functional.huber_loss(
+                    values.flatten(),
+                    train_makespans[mb_inds].to(values.device).float(),
                     reduction="none",
                 )
                 # loss = torch.nn.functional.kl_div(
@@ -178,26 +206,41 @@ class Pretrainer:
                 #     log_target=False,
                 #     reduction="none",
                 # )
-                eloss += loss.sum().item()
-                loss.mean().backward()
+
+                # loss = loss_actor.mean() + 1.0 * loss_critic.mean()
+                loss = loss_critic.mean()
+                loss.backward()
                 optimizer.step()
 
-            self.train_losses.append(eloss / len(train_actions))
+                a_loss += loss_actor.sum().item()
+                c_loss += loss_critic.sum().item()
+                t_loss += loss_actor.sum().item() + 1.0 * loss_critic.sum().item()
 
-            eloss = 0
+            self.train_losses["actor"].append(a_loss / len(train_actions))
+            self.train_losses["critic"].append(c_loss / len(train_actions))
+            self.train_losses["total"].append(t_loss / len(train_actions))
+
+            a_loss = 0
+            c_loss = 0
+            t_loss = 0
             with torch.inference_mode():
                 for start in range(0, len(eval_actions), minibatch_size):
                     end = min(start + minibatch_size, len(eval_actions))
                     mb_inds = np.arange(start, end)
 
-                    action_probs = agent.get_action_probs(
+                    action_probs, values = agent.get_action_probs_and_value(
                         get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
                     )
                     target_probs = self.get_target_probs(
                         eval_masks, eval_past_actions, eval_pa_to_a, mb_inds
                     ).to(action_probs.device)
-                    loss = torch.nn.functional.mse_loss(
+                    loss_actor = torch.nn.functional.huber_loss(
                         action_probs, target_probs, reduction="sum"
+                    )
+                    loss_critic = torch.nn.functional.huber_loss(
+                        values.flatten(),
+                        eval_makespans[mb_inds].to(values.device).float(),
+                        reduction="sum",
                     )
                     # loss = torch.nn.functional.kl_div(
                     #     action_probs,
@@ -205,20 +248,30 @@ class Pretrainer:
                     #     log_target=False,
                     #     reduction="sum",
                     # )
-                    eloss += loss.item()
+                    a_loss += loss_actor.item()
+                    c_loss += loss_critic.item()
+                    t_loss += loss_actor.item() + 1.0 * loss_critic.item()
 
-            if self.eval_losses == [] or (
-                min(self.eval_losses) > eloss / len(eval_actions)
+            if self.eval_losses["actor"] == [] or (
+                min(self.eval_losses["actor"]) > a_loss / len(eval_actions)
             ):
                 pretrain_model_path = self.training_specification.path + "pretrain.pkl"
                 agent.save(pretrain_model_path)
 
-            self.eval_losses.append(eloss / len(eval_actions))
+            self.eval_losses["actor"].append(a_loss / len(eval_actions))
+            self.eval_losses["critic"].append(c_loss / len(eval_actions))
+            self.eval_losses["total"].append(t_loss / len(eval_actions))
 
-            Y = np.array([self.train_losses, self.eval_losses])
-            self.vis.line(
-                Y=Y.T,
-                X=np.arange(len(self.train_losses)),
-                win="pretrain-loss",
-                opts={"title": "Pretrain Loss", "legend": ["train", "eval"]},
-            )
+            for loss_name in self.train_losses.keys():
+                train_loss = self.train_losses[loss_name]
+                eval_loss = self.eval_losses[loss_name]
+                Y = np.array([train_loss, eval_loss])
+                self.vis.line(
+                    Y=Y.T,
+                    X=np.arange(len(train_loss)),
+                    win=f"pretrain-loss-{loss_name}",
+                    opts={
+                        "title": f"Pretrain Loss - {loss_name}",
+                        "legend": ["train", "eval"],
+                    },
+                )
