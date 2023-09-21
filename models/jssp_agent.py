@@ -135,7 +135,9 @@ class JSSPAgent(Agent):
     @classmethod
     def load(cls, path):
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
-        save_data = torch.load(path + "agent.pkl")
+        if not path.endswith(".pkl"):
+            path = path + "agent.pkl"
+        save_data = torch.load(path)
         agent_specification = save_data["agent_specification"]
         env_specification = save_data["env_specification"]
         if agent_specification.fe_type == "dgl":
