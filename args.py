@@ -601,6 +601,12 @@ parser.add_argument(
     default=2e-4,
     help="learning rate for pretrain",
 )
+parser.add_argument(
+    "--pretrain_vf_coef",
+    type=float,
+    default=1e-2,
+    help="value function loss weight",
+)
 
 
 # =================================================OTHER====================================================================
