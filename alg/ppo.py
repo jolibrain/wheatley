@@ -382,7 +382,9 @@ class PPO:
                     pg_loss1 = -mb_advantages * ratio
                     if self.clip_coef is not None:
                         pg_loss2 = -mb_advantages * torch.clamp(
-                            ratio, 1 - self.clip_coef, 1 + self.clip_coef
+                            ratio,
+                            1 - self.clip_coef,
+                            1 + self.clip_coef,
                         )
                         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
                     else:
@@ -415,9 +417,9 @@ class PPO:
                     entropy_losses.append(entropy_loss.item())
 
                     loss.backward()
-                    nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
                     iter_it += 1
                     if iter_it == self.iter_size:
+                        nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
                         self.optimizer.step()
                         self.optimizer.zero_grad()
                         iter_it = 0
@@ -542,7 +544,9 @@ class PPO:
                     self.logger.record(
                         f"validation/{name}_ratio_to_ortools",
                         self.validator.custom_makespans[name][-1]
-                        / self.validator.ortools_makespans[self.validator.default_ortools_strategy][-1],
+                        / self.validator.ortools_makespans[
+                            self.validator.default_ortools_strategy
+                        ][-1],
                     )
 
             self.logger.dump(step=self.global_step)
