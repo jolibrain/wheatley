@@ -84,6 +84,7 @@ def generate_deterministic_problem(n_jobs, n_machines, high):
     Note that durations is of shape[n_jobs, n_machines, 4], but its only 4 repetitions of an array of shape
     [n_jobs, n_machines]
     """
+    assert high is not None, "High is None"
     durations = np.random.randint(low=1, high=high, size=(n_jobs, n_machines, 1))
     durations = np.repeat(durations, repeats=4, axis=2)
     affectations = np.expand_dims(np.arange(0, n_machines), axis=0)
