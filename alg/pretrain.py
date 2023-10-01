@@ -149,10 +149,18 @@ class Pretrainer:
         return all_obs, all_masks, all_actions, all_past_actions, pa_to_a, all_makespans
 
     def pretrain(
-        self, agent, num_epochs, minibatch_size, lr=0.0002, vf_coeff: float = 0.01
+        self,
+        agent,
+        num_epochs,
+        minibatch_size,
+        lr=0.0002,
+        vf_coeff: float = 0.01,
+        weight_decay: float = 1e-1,
     ):
         optimizer = self.training_specification.optimizer_class(
-            agent.parameters(), lr=lr
+            agent.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
         )
 
         (

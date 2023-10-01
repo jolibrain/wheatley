@@ -229,6 +229,7 @@ class PPO:
         problem_description,
         env_specification,
         lr,
+        weight_decay,
         log_interval=1,
         rollout_data_device=torch.device("cpu"),
         rollout_agent_device=torch.device("cpu"),
@@ -273,8 +274,7 @@ class PPO:
         print("... done creating environments")
 
         self.optimizer = self.optimizer_class(
-            agent.parameters(),
-            lr=lr,
+            agent.parameters(), lr=lr, weight_decay=weight_decay
         )
         if opt_state_dict is not None:
             self.optimizer.load_state_dict(opt_state_dict)
@@ -542,7 +542,9 @@ class PPO:
                     self.logger.record(
                         f"validation/{name}_ratio_to_ortools",
                         self.validator.custom_makespans[name][-1]
-                        / self.validator.ortools_makespans[self.validator.default_ortools_strategy][-1],
+                        / self.validator.ortools_makespans[
+                            self.validator.default_ortools_strategy
+                        ][-1],
                     )
 
             self.logger.dump(step=self.global_step)

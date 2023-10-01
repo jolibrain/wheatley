@@ -134,6 +134,12 @@ parser.add_argument(
     help="Which optimizer to use",
 )
 parser.add_argument(
+    "--weight_decay",
+    type=float,
+    default=1e-1,
+    help="PPO weight decay",
+)
+parser.add_argument(
     "--freeze_graph",
     default=False,
     action="store_true",
@@ -564,7 +570,12 @@ parser.add_argument(
 parser.add_argument(
     "--pretrain_prob", type=float, default=0.9, help="target prob for or tools action"
 )
-
+parser.add_argument(
+    "--pretrain_weight_decay",
+    type=float,
+    default=1e-1,
+    help="pretrain weight decay",
+)
 parser.add_argument(
     "--pretrain_num_envs",
     type=int,

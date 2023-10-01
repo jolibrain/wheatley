@@ -244,6 +244,7 @@ def main(args, exp_name, path):
             args.pretrain_batch_size,
             lr=args.pretrain_lr,
             vf_coeff=args.pretrain_vf_coef,
+            weight_decay=args.pretrain_weight_decay,
         )
 
     # And finally, we train the model on the specified training mode
@@ -272,6 +273,7 @@ def main(args, exp_name, path):
         problem_description,
         env_specification,
         lr=args.lr,
+        weight_decay=args.weight_decay,
         log_interval=1,
         train_device=args.device,
         rollout_agent_device=args.device,
