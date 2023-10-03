@@ -571,6 +571,11 @@ parser.add_argument(
     "--pretrain_prob", type=float, default=0.9, help="target prob for or tools action"
 )
 parser.add_argument(
+    "--pretrain_dataset_generation",
+    default="online",
+    choices=["online", "offline"],
+)
+parser.add_argument(
     "--pretrain_weight_decay",
     type=float,
     default=1e-1,
@@ -615,8 +620,8 @@ parser.add_argument(
 parser.add_argument(
     "--pretrain_vf_coef",
     type=float,
-    default=1e-2,
-    help="value function loss weight",
+    default=0,
+    help="value function loss weight (set to 0 to deactivate)",
 )
 
 

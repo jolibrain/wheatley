@@ -360,25 +360,18 @@ def get_ortools_actions(env, ortools_schedule):
 
 
 def get_ortools_trajectory_and_past_actions(env):
-    # print("OR-Tools")
-    # print(env.state.affectations)
-    # print(env.state.durations)
-
     makespan, schedule, optimal = get_ortools_schedule(
-        env, ortools_strategy="realistic"
+        env, ortools_strategy="averagistic"
     )
-    # if optimal:
-    #     print("using optimal solution from or-tools")
+
     trajectory = []
     past_actions = []
     obs = []
     masks = []
-    # TODO: Make sure the reset is not sampling new durations, as the schedule would be
-    # based on wrong features for the model. Edit: Looks OK.
+
+    # Reset the env but do not sample a new problem.
     o, info = env.reset(soft=True)
-    # print("Trajectory")
-    # print(env.state.affectations)
-    # print(env.state.durations, "\n")
+
     next_obs = obs_as_tensor_add_batch_dim(o)
     action_mask = decode_mask(info["mask"])
     while not env.done():
@@ -386,7 +379,6 @@ def get_ortools_trajectory_and_past_actions(env):
         masks.append(action_mask)
         actions = get_ortools_actions(env, schedule)
         action = np.random.choice(actions)
-        # action = actions[0]
         next_obs, reward, done, _, info = env.step(action)
         action_mask = decode_mask(info["mask"])
         next_obs = obs_as_tensor_add_batch_dim(next_obs)
