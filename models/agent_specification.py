@@ -63,6 +63,7 @@ class AgentSpecification:
         update_edge_features,
         ortho_embed,
         no_tct,
+        mid_in_edges,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -98,6 +99,7 @@ class AgentSpecification:
         self.update_edge_features = update_edge_features
         self.ortho_embed = ortho_embed
         self.no_tct = no_tct
+        self.mid_in_edges = mid_in_edges
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -175,6 +177,7 @@ class AgentSpecification:
                 f"Activation function of agent:     {self.mlp_act.title()}\n"
                 f"Activation function of graph:     {self.mlp_act_graph.title()}\n"
                 f"Use VNode:                        {self.vnode}\n"
+                f"Machine id in edges:              {self.mid_in_edges}\n"
                 f"Update edge features:             {self.update_edge_features}\n"
                 f"Net shapes:"
             )

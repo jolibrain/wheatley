@@ -52,6 +52,7 @@ class JSSPGnnDGL(torch.nn.Module):
         normalize=False,
         conflicts="att",
         no_tct=False,
+        mid_in_edges=False,
     ):
         super().__init__()
         self.conflicts = conflicts
@@ -72,6 +73,7 @@ class JSSPGnnDGL(torch.nn.Module):
         self.n_layers_features_extractor = n_layers_features_extractor
         self.features_extractors = torch.nn.ModuleList()
         self.no_tct = no_tct
+        self.mid_in_edges = mid_in_edges
 
         self.edge_embedder = torch.nn.ModuleList()
         # self_loops 0
@@ -96,13 +98,21 @@ class JSSPGnnDGL(torch.nn.Module):
             #     else:
             #         self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, hidden_dim_features_extractor))
             if self.gconv_type in ["gcn2"]:
-                self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
+                if self.mid_in_edges:
+                    self.edge_embedder.append(torch.nn.Embedding(5 + nmachineid + 1, 1))
+                else:
+                    self.edge_embedder.append(torch.nn.Embedding(5 + 1, 1))
             else:
-                self.edge_embedder.append(
-                    torch.nn.Embedding(
-                        5 + nmachineid + 1, hidden_dim_features_extractor
+                if self.mid_in_edges:
+                    self.edge_embedder.append(
+                        torch.nn.Embedding(
+                            5 + nmachineid + 1, hidden_dim_features_extractor
+                        )
                     )
-                )
+                else:
+                    self.edge_embedder.append(
+                        torch.nn.Embedding(5 + 1, hidden_dim_features_extractor)
+                    )
 
         else:
             # for layer in range(self.n_layers_features_extractor):
@@ -239,6 +249,7 @@ class JSSPGnnDGL(torch.nn.Module):
             conflicts=self.conflicts,
             max_n_machines=self.max_n_machines,
             no_tct=self.no_tct,
+            mid_in_edges=self.mid_in_edges,
         )
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()

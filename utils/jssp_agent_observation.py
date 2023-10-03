@@ -75,8 +75,13 @@ class JSSPAgentObservation:
         return torch.max(machine_one_hot, dim=1)
 
     @classmethod
-    def add_conflicts_cliques2(cls, g, cedges, mid):
-        g.add_edges(cedges[0], cedges[1], data={"type": mid[0] + 5})
+    def add_conflicts_cliques2(cls, g, cedges, mid, mid_in_edges):
+        if mid_in_edges:
+            g.add_edges(cedges[0], cedges[1], data={"type": mid[0] + 5})
+        else:
+            g.add_edges(
+                cedges[0], cedges[1], data={"type": torch.zeros_like(mid[0]) + 5}
+            )
         return g
 
     @classmethod
@@ -112,8 +117,8 @@ class JSSPAgentObservation:
         n_laplacian_eigv=50,
         bidir=True,
         no_tct=False,
+        mid_in_edges=False,
     ):
-
         # batching on CPU for performance reasons...
         n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
         n_edges = gym_observation["n_edges"].long().to(torch.device("cpu"))
@@ -195,6 +200,7 @@ class JSSPAgentObservation:
                     gnew,
                     conflicts_edges[i][:, : n_conflict_edges[i].item()],
                     conflicts_edges_machineid[i][:, : n_conflict_edges[i].item()],
+                    mid_in_edges,
                 )
                 # gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
 
