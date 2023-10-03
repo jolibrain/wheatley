@@ -364,6 +364,13 @@ parser.add_argument(
     action="store_true",
     help="do not explicitly compute/use tct before gnn",
 )
+
+parser.add_argument(
+    "--mid_in_edges",
+    default=False,
+    action="store_true",
+    help="add machine id in edge type",
+)
 parser.add_argument(
     "--add_rp_edges",
     default="all",

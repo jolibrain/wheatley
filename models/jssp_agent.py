@@ -81,6 +81,7 @@ class JSSPAgent(Agent):
                 residual=agent_specification.residual_gnn,
                 normalize=agent_specification.normalize_gnn,
                 conflicts=agent_specification.conflicts,
+                mid_in_edges=agent_specification.mid_in_edges,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -154,6 +155,7 @@ class JSSPAgent(Agent):
                 residual=agent_specification.residual_gnn,
                 normalize=agent_specification.normalize_gnn,
                 conflicts=agent_specification.conflicts,
+                mid_in_edges=agent_specification.mid_in_edges,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(
