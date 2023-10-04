@@ -45,8 +45,14 @@ class Pretrainer:
         num_envs=1,
         num_eval_envs=1,
         trajectories=10,
+        dataset_generation_strategy: str = "online",
         prob=0.9,
     ):
+        assert dataset_generation_strategy in [
+            "offline",
+            "online",
+        ], f"Unknown strategy {dataset_generation_strategy}."
+
         self.problem_description = problem_description
         self.env_specification = env_specification
         self.training_specification = training_specification
@@ -54,6 +60,7 @@ class Pretrainer:
         self.num_envs = num_envs
         self.num_eval_envs = num_eval_envs
         self.trajectories = trajectories
+        self.dataset_generation_strategy = dataset_generation_strategy
         self.prob = prob
 
         self.vis = visdom.Visdom(env=self.training_specification.display_env)
@@ -95,6 +102,12 @@ class Pretrainer:
         return l
 
     def generate_dataset_(self, num_envs: int, trajectories: int) -> tuple:
+        """Generate new dataset by using OR-Tools to solve the envs.
+
+        From each env we generate differents trajectories to account for the fact
+        that a single solution can be derived by many differents decisions.
+        OR-Tools is set to solve with the "averagistic" strategy.
+        """
         all_obs = []
         all_masks = []
         all_actions = []
@@ -109,12 +122,7 @@ class Pretrainer:
             max_completion_time = np.max(env.state.durations)
 
             for _ in tqdm(range(trajectories), desc="Trajectories", leave=False):
-                if self.problem_description.deterministic:
-                    env.reset(soft=True)
-                else:
-                    # WARNING: This works only for fixed problems. There should be
-                    # a way to do this with non-fixed problems.
-                    env.reset()  # Sample new durations within the bounds.
+                env.reset(soft=True)
                 (
                     obs,
                     masks,
@@ -149,10 +157,18 @@ class Pretrainer:
         return all_obs, all_masks, all_actions, all_past_actions, pa_to_a, all_makespans
 
     def pretrain(
-        self, agent, num_epochs, minibatch_size, lr=0.0002, vf_coeff: float = 0.01
+        self,
+        agent,
+        num_epochs,
+        minibatch_size,
+        lr=0.0002,
+        vf_coeff: float = 0.01,
+        weight_decay: float = 1e-1,
     ):
         optimizer = self.training_specification.optimizer_class(
-            agent.parameters(), lr=lr
+            agent.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
         )
 
         (
@@ -164,7 +180,7 @@ class Pretrainer:
             eval_makespans,
         ) = self.generate_dataset_(self.num_eval_envs, max(self.trajectories // 10, 1))
 
-        for _ in tqdm(range(num_epochs), desc="Pretrain"):
+        if self.dataset_generation_strategy == "offline":
             (
                 train_obs,
                 train_masks,
@@ -174,47 +190,55 @@ class Pretrainer:
                 train_makespans,
             ) = self.generate_dataset_(self.num_envs, self.trajectories)
 
+        for _ in tqdm(range(num_epochs), desc="Pretrain"):
+            if self.dataset_generation_strategy == "online":
+                (
+                    train_obs,
+                    train_masks,
+                    train_actions,
+                    train_past_actions,
+                    train_pa_to_a,
+                    train_makespans,
+                ) = self.generate_dataset_(self.num_envs, self.trajectories)
+
             b_inds = np.arange(len(train_actions))
             np.random.shuffle(b_inds)
 
-            for _ in tqdm(range(3), desc="Sub-epochs", leave=False):
-                a_loss = 0
-                c_loss = 0
-                t_loss = 0
-                for start in tqdm(
-                    range(0, len(train_actions), minibatch_size),
-                    desc="Batches",
-                    leave=False,
-                ):
-                    end = min(start + minibatch_size, len(train_actions))
-                    mb_inds = b_inds[start:end]
+            a_loss = 0
+            c_loss = 0
+            t_loss = 0
+            for start in tqdm(
+                range(0, len(train_actions), minibatch_size),
+                desc="Batches",
+                leave=False,
+            ):
+                end = min(start + minibatch_size, len(train_actions))
+                mb_inds = b_inds[start:end]
 
-                    action_probs, values = agent.get_action_probs_and_value(
-                        get_obs(train_obs, mb_inds), train_masks[mb_inds]
-                    )
-                    target_probs = self.get_target_probs(
-                        train_masks, train_past_actions, train_pa_to_a, mb_inds
-                    ).to(action_probs.device)
-                    loss_actor = torch.nn.functional.mse_loss(
-                        action_probs,
-                        target_probs,
-                        reduction="none",
-                    )
-                    loss_critic = torch.nn.functional.mse_loss(
-                        values.flatten(),
-                        train_makespans[mb_inds].to(values.device).float(),
-                        reduction="none",
-                    )
+                action_probs, values = agent.get_action_probs_and_value(
+                    get_obs(train_obs, mb_inds), train_masks[mb_inds]
+                )
+                target_probs = self.get_target_probs(
+                    train_masks, train_past_actions, train_pa_to_a, mb_inds
+                ).to(action_probs.device)
+                loss_actor = torch.nn.functional.mse_loss(
+                    action_probs,
+                    target_probs,
+                    reduction="none",
+                )
+                loss_critic = torch.nn.functional.mse_loss(
+                    values.flatten(),
+                    train_makespans[mb_inds].to(values.device).float(),
+                    reduction="none",
+                )
 
-                    loss = loss_actor.mean() + vf_coeff * loss_critic.mean()
-                    loss.backward()
-                    optimizer.step()
+                loss = loss_actor.mean() + vf_coeff * loss_critic.mean()
+                loss.backward()
+                optimizer.step()
 
-                    a_loss += loss_actor.sum().item()
-                    c_loss += loss_critic.sum().item()
-                    t_loss += (
-                        loss_actor.sum().item() + vf_coeff * loss_critic.sum().item()
-                    )
+                a_loss += loss_actor.sum().item()
+                c_loss += loss_critic.sum().item()
+                t_loss += loss_actor.sum().item() + vf_coeff * loss_critic.sum().item()
 
             self.train_losses["actor"].append(a_loss / len(train_actions))
             if vf_coeff != 0:

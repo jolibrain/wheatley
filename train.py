@@ -203,6 +203,7 @@ def main(args, exp_name, path):
         update_edge_features=not args.dont_update_edge_features,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
+        mid_in_edges=args.mid_in_edges,
     )
     agent_specification.print_self()
     # If we want to use a pretrained Agent, we only have to load it (if it exists)
@@ -244,6 +245,7 @@ def main(args, exp_name, path):
             args.pretrain_batch_size,
             lr=args.pretrain_lr,
             vf_coeff=args.pretrain_vf_coef,
+            weight_decay=args.pretrain_weight_decay,
         )
 
     # And finally, we train the model on the specified training mode
@@ -272,6 +274,7 @@ def main(args, exp_name, path):
         problem_description,
         env_specification,
         lr=args.lr,
+        weight_decay=args.weight_decay,
         log_interval=1,
         train_device=args.device,
         rollout_agent_device=args.device,
