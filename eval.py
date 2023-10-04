@@ -62,6 +62,7 @@ def load_agent(args: argparse.Namespace, path: str) -> JSSPAgent:
         update_edge_features=not args.dont_update_edge_features,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
+        mid_in_edges=args.mid_in_edges,
     )
     agent = JSSPAgent.load(path)
     agent.env_specification = env_specification
