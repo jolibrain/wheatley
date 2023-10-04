@@ -40,6 +40,7 @@ class JSSPDescription:
         reward_model_config,
         deterministic,
         fixed,
+        seed: int,
         affectations=None,
         durations=None,
         n_jobs=None,
@@ -57,6 +58,7 @@ class JSSPDescription:
          - Any problem, deterministic: specify n_jobs, n_machines, max_duration
          - Any problem, stochastic: Specify n_jobs, n_machines, duration_mode_bound, duration_delta
         """
+        rng = np.random.default_rng(seed)
 
         # Checking the consistency of the inputs
         self.check_consistency(affectations, durations, n_jobs, n_machines)
@@ -84,7 +86,7 @@ class JSSPDescription:
                         "Please provide max_duration to generate a deterministic problem"
                     )
                 self.affectations, self.durations = generate_deterministic_problem(
-                    self.n_jobs, self.n_machines, max_duration
+                    self.n_jobs, self.n_machines, max_duration, rng
                 )
             self.deterministic = True
             self.fixed = True
@@ -112,10 +114,10 @@ class JSSPDescription:
                         "Please provide duration_mode_bounds and duration_delta to generate a stochastic problem"
                     )
                 self.affectations, self.durations = generate_problem_distrib(
-                    self.n_jobs, self.n_machines, duration_mode_bounds, duration_delta
+                    self.n_jobs, self.n_machines, duration_mode_bounds, duration_delta, rng
                 )
             # Generate a first version of the durations, to have a totally instantiated duration
-            self.durations = generate_problem_durations(self.durations)
+            self.durations = generate_problem_durations(self.durations, rng)
             # But we still want to regenerate durations at each sampling. This can be deactivated for totally fixed problem
             self.regenerate_durations = True
 
@@ -202,20 +204,20 @@ class JSSPDescription:
                 "Please provide n_jobs and n_machines or affectations and durations"
             )
 
-    def sample_problem(self):
+    def sample_problem(self, rng: np.random.Generator):
         """Returns an instance of a problem corresponding to the problem description"""
         if self.fixed:
             if self.deterministic:
                 return self.affectations, self.durations
             else:
                 if self.regenerate_durations:
-                    return self.affectations, generate_problem_durations(self.durations)
+                    return self.affectations, generate_problem_durations(self.durations, rng)
                 else:
                     return self.affectations, self.durations
         else:
             if self.deterministic:
                 return generate_deterministic_problem(
-                    self.n_jobs, self.n_machines, self.max_duration
+                    self.n_jobs, self.n_machines, self.max_duration, rng
                 )
             else:
                 affectations, durations = generate_problem_distrib(
@@ -223,8 +225,9 @@ class JSSPDescription:
                     self.n_machines,
                     self.duration_mode_bounds,
                     self.duration_delta,
+                    rng,
                 )
-                return affectations, generate_problem_durations(durations)
+                return affectations, generate_problem_durations(durations, rng)
 
     def get_frozen_version(self):
         """

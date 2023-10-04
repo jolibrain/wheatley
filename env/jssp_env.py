@@ -42,9 +42,11 @@ from env.jssp_state import JSSPState as State
 
 
 class JSSPEnv(gym.Env):
-    def __init__(self, problem_description, env_specification, i, validate=False):
+    def __init__(self, problem_description, env_specification, seed: int, validate=False):
         self.problem_description = problem_description
         self.env_specification = env_specification
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self.sum_reward = 0
 
         self.transition_model_config = problem_description.transition_model_config
@@ -236,7 +238,7 @@ class JSSPEnv(gym.Env):
         if chunk == -1:
             return input_affectations, input_durations
         assert chunk <= self.problem_description.n_jobs
-        start = np.random.randint(self.problem_description.n_jobs - chunk + 1)
+        start = self.rng.integers(self.problem_description.n_jobs - chunk + 1)
         affectations = input_affectations[start : start + chunk]
         durations = input_durations[start : start + chunk]
         return affectations, durations
@@ -248,14 +250,14 @@ class JSSPEnv(gym.Env):
             return input_affectations, input_durations
         assert sample <= self.problem_description.n_jobs
         ids = list(range(len(input_durations)))
-        samples = np.random.choice(ids, sample, replace=False)
+        samples = self.rng.choice(ids, sample, replace=False)
         self.sampled_jobs = samples
         affectations = np.array([input_affectations[i] for i in samples])
         durations = np.array([input_durations[i] for i in samples])
         return affectations, durations
 
     def _create_state(self):
-        affectations, durations = self.problem_description.sample_problem()
+        affectations, durations = self.problem_description.sample_problem(self.rng)
         affectations, durations = self.sample_jobs(affectations, durations)
         affectations, durations = self.chunk_jobs(affectations, durations)
         self.state = State(

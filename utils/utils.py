@@ -77,7 +77,7 @@ def get_path(arg_path, exp_name):
     return path
 
 
-def generate_deterministic_problem(n_jobs, n_machines, high):
+def generate_deterministic_problem(n_jobs, n_machines, high, rng: np.random.Generator):
     """
     Generate a random intance of a JSS problem, of size (n_jobs, n_machines), with times comprised between specified
     lower and higher bound.
@@ -85,15 +85,17 @@ def generate_deterministic_problem(n_jobs, n_machines, high):
     [n_jobs, n_machines]
     """
     assert high is not None, "High is None"
-    durations = np.random.randint(low=1, high=high, size=(n_jobs, n_machines, 1))
+    durations = rng.integers(low=1, high=high, size=(n_jobs, n_machines, 1))
     durations = np.repeat(durations, repeats=4, axis=2)
     affectations = np.expand_dims(np.arange(0, n_machines), axis=0)
     affectations = affectations.repeat(repeats=n_jobs, axis=0)
-    affectations = _permute_rows(affectations)
+    affectations = _permute_rows(affectations, rng)
     return affectations, durations
 
 
-def generate_problem_distrib(n_jobs, n_machines, duration_mode_bounds, duration_delta):
+def generate_problem_distrib(
+    n_jobs, n_machines, duration_mode_bounds, duration_delta, rng: np.random.Generator
+):
     """
     Generate a problem distribution, using duration_mode_bounds = [v1, v2] and duration_delta=[d1, d2].
 
@@ -109,26 +111,26 @@ def generate_problem_distrib(n_jobs, n_machines, duration_mode_bounds, duration_
     durations = np.empty((n_jobs, n_machines, 4), dtype=np.int32)
 
     # Sampling the modes, using duration_mode_bounds
-    durations[:, :, 3] = np.random.randint(
+    durations[:, :, 3] = rng.integers(
         duration_mode_bounds[0], duration_mode_bounds[1], size=(n_jobs, n_machines)
     )
     for j in range(n_jobs):
         for m in range(n_machines):
             # Sampling the left
-            dd = np.random.randint(1, duration_delta[0])
+            dd = rng.integers(1, duration_delta[0])
             durations[j, m][1] = max(1, durations[j, m][3] - dd)
             # Sampling the right
-            dd = np.random.randint(1, duration_delta[1])
+            dd = rng.integers(1, duration_delta[1])
             durations[j, m][2] = durations[j, m][3] + dd
 
     # Each row of the affectations array is a permutation of [0, n_machines[
     affectations = np.expand_dims(np.arange(0, n_machines), axis=0)
     affectations = affectations.repeat(repeats=n_jobs, axis=0)
-    affectations = _permute_rows(affectations)
+    affectations = _permute_rows(affectations, rng)
     return affectations, durations
 
 
-def generate_problem_durations(durations):
+def generate_problem_durations(durations, rng: np.random.Generator):
     """
     Generate the problem real durations, using a triangular distribution.
     durations[:, :, 0] with a triangular distribution using (durations[:, :, 1], durations[:, :, 3], durations[:, :, 2])
@@ -146,26 +148,26 @@ def generate_problem_durations(durations):
             else:
                 if durations[j, m][1] > durations[j, m][3]:
                     print(durations[j, m][1], durations[j, m][3])
-                ret_durations[j, m, 0] = np.random.triangular(
+                ret_durations[j, m, 0] = rng.triangular(
                     durations[j, m][1], durations[j, m][3], durations[j, m][2]
                 )
     return ret_durations
 
 
-def _permute_rows(x):
+def _permute_rows(x, rng: np.random.Generator):
     """
     x is a bidimensional numpy array
     """
     ix_i = np.tile(np.arange(x.shape[0]), (x.shape[1], 1)).transpose()
-    ix_j = np.random.sample(x.shape).argsort(axis=1)
+    ix_j = rng.random(x.shape).argsort(axis=1)
     return x[ix_i, ix_j]
 
 
 def generate_data(n_j, n_m, max_duration, seed=200, n_problems=100):
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
     data = np.array(
         [
-            generate_deterministic_problem(n_j, n_m, max_duration)
+            generate_deterministic_problem(n_j, n_m, max_duration, rng)
             for _ in range(n_problems)
         ]
     )
