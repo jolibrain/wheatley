@@ -121,8 +121,9 @@ class Agent(torch.nn.Module):
             entropy = distrib.entropy()
         return action, distrib.log_prob(action), entropy, value
 
-    def get_action_probs(self, x, action_masks):
+    def get_action_probs_and_value(self, x, action_masks):
         features = self.gnn(x)
+        value = self.value_net(features[:, 0, features.shape[2] // 2 :])
         action_logits = self.action_net(features).squeeze(-1)
         if action_masks is not None:
             mask = torch.as_tensor(
@@ -133,11 +134,11 @@ class Agent(torch.nn.Module):
             )
             logits = torch.where(mask, action_logits, HUGE_NEG)
             probs = torch.nn.functional.softmax(logits, dim=-1)
-            return probs
+            return probs, value
         # distrib = Categorical(logits=action_logits)
         # return distrib.probs
         probs = torch.nn.functional.softmax(action_logits, dim=-1)
-        return probs
+        return probs, value
 
     def predict(self, observation, deterministic, action_masks):
         with torch.no_grad():

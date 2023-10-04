@@ -21,15 +21,18 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from problem.jssp_description import JSSPDescription as ProblemDescription
-from env.jssp_env_specification import JSSPEnvSpecification
-from models.training_specification import TrainingSpecification
-from models.jssp_agent import JSSPAgent as Agent
-from utils.utils import rebatch_obs, get_obs
-from utils.ortools import *
 import numpy as np
 import torch
+import visdom
 from torch.distributions.categorical import Categorical
+from tqdm import tqdm
+
+from env.jssp_env_specification import JSSPEnvSpecification
+from models.jssp_agent import JSSPAgent as Agent
+from models.training_specification import TrainingSpecification
+from problem.jssp_description import JSSPDescription as ProblemDescription
+from utils.ortools import *
+from utils.utils import get_obs, rebatch_obs
 
 
 class Pretrainer:
@@ -40,13 +43,37 @@ class Pretrainer:
         training_specification,
         env_cls,
         num_envs=1,
+        num_eval_envs=1,
+        trajectories=10,
+        dataset_generation_strategy: str = "online",
         prob=0.9,
     ):
+        assert dataset_generation_strategy in [
+            "offline",
+            "online",
+        ], f"Unknown strategy {dataset_generation_strategy}."
+
         self.problem_description = problem_description
         self.env_specification = env_specification
         self.training_specification = training_specification
+        self.env_cls = env_cls
         self.num_envs = num_envs
+        self.num_eval_envs = num_eval_envs
+        self.trajectories = trajectories
+        self.dataset_generation_strategy = dataset_generation_strategy
         self.prob = prob
+
+        self.vis = visdom.Visdom(env=self.training_specification.display_env)
+        self.train_losses = {
+            "actor": [],
+            "critic": [],
+            "total": [],
+        }
+        self.eval_losses = {
+            "actor": [],
+            "critic": [],
+            "total": [],
+        }
 
     def get_target_probs(self, all_masks, all_past_actions, pa_to_a, mb_inds):
         masks = all_masks[mb_inds]
@@ -58,7 +85,7 @@ class Pretrainer:
         p = torch.where(masks, 1, 0)
         l = torch.empty(masks.shape)
         for n, i in enumerate(mb_inds):
-            sum_non_masked = p[i].sum()
+            sum_non_masked = p[n].sum()
             pa = all_past_actions[i]
             actions = pa_to_a[tuple(pa)]
             nactions = len(actions)
@@ -68,34 +95,57 @@ class Pretrainer:
             else:
                 rest = (1 - self.prob) / (sum_non_masked - nactions)
                 real_prob = self.prob / nactions
-            r = torch.where(p[i] == 1, rest, 0)
+            r = torch.where(p[n] == 1, rest, 0)
             for a in actions:
                 r[a] = real_prob
             l[n] = r
         return l
 
-    def pretrain(self, agent, num_epochs, minibatch_size, n_traj, lr=0.0002):
+    def generate_dataset_(self, num_envs: int, trajectories: int) -> tuple:
+        """Generate new dataset by using OR-Tools to solve the envs.
 
+        From each env we generate differents trajectories to account for the fact
+        that a single solution can be derived by many differents decisions.
+        OR-Tools is set to solve with the "averagistic" strategy.
+        """
         all_obs = []
         all_masks = []
         all_actions = []
         all_past_actions = []
-        for e in range(self.num_envs):
-            env = self.env_cls(self.problem_description, self.env_specification)
-            for i in range(n_traj):
+        all_makespans = []
+        env = self.env_cls(self.problem_description, self.env_specification, 0)
+
+        for e in tqdm(
+            range(num_envs), desc="Generating pretraining dataset", leave=False
+        ):
+            env.reset()
+            max_completion_time = np.max(env.state.durations)
+
+            for _ in tqdm(range(trajectories), desc="Trajectories", leave=False):
+                env.reset(soft=True)
                 (
                     obs,
                     masks,
                     actions,
                     past_actions,
+                    makespan,
                 ) = get_ortools_trajectory_and_past_actions(env)
                 all_obs.extend(obs)
                 all_masks.extend(masks)
                 all_actions.extend(actions)
                 all_past_actions.extend(past_actions)
+                all_makespans.extend(
+                    [
+                        -makespan.item() / (max_completion_time * 2)
+                        for _ in range(len(obs))
+                    ]
+                )
+
         all_obs = rebatch_obs(all_obs)
         all_masks = torch.tensor(np.array(all_masks))
         all_actions = torch.tensor(all_actions)
+        all_makespans = torch.tensor(all_makespans)
+
         pa_to_a = {}
         for pa, a in zip(all_past_actions, all_actions):
             key = tuple(pa)
@@ -104,28 +154,148 @@ class Pretrainer:
             else:
                 pa_to_a[key] = set([a.long().item()])
 
-        b_inds = np.arange(len(actions))
+        return all_obs, all_masks, all_actions, all_past_actions, pa_to_a, all_makespans
 
+    def pretrain(
+        self,
+        agent,
+        num_epochs,
+        minibatch_size,
+        lr=0.0002,
+        vf_coeff: float = 0.01,
+        weight_decay: float = 1e-1,
+    ):
         optimizer = self.training_specification.optimizer_class(
-            agent.parameters(), lr=lr
+            agent.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
         )
-        for epoch in range(num_epochs):
-            # np.random.shuffle(b_inds)
-            eloss = 0
-            for start in range(0, len(actions), minibatch_size):
-                end = start + minibatch_size
+
+        (
+            eval_obs,
+            eval_masks,
+            eval_actions,
+            eval_past_actions,
+            eval_pa_to_a,
+            eval_makespans,
+        ) = self.generate_dataset_(self.num_eval_envs, max(self.trajectories // 10, 1))
+
+        if self.dataset_generation_strategy == "offline":
+            (
+                train_obs,
+                train_masks,
+                train_actions,
+                train_past_actions,
+                train_pa_to_a,
+                train_makespans,
+            ) = self.generate_dataset_(self.num_envs, self.trajectories)
+
+        for _ in tqdm(range(num_epochs), desc="Pretrain"):
+            if self.dataset_generation_strategy == "online":
+                (
+                    train_obs,
+                    train_masks,
+                    train_actions,
+                    train_past_actions,
+                    train_pa_to_a,
+                    train_makespans,
+                ) = self.generate_dataset_(self.num_envs, self.trajectories)
+
+            b_inds = np.arange(len(train_actions))
+            np.random.shuffle(b_inds)
+
+            a_loss = 0
+            c_loss = 0
+            t_loss = 0
+            for start in tqdm(
+                range(0, len(train_actions), minibatch_size),
+                desc="Batches",
+                leave=False,
+            ):
+                end = min(start + minibatch_size, len(train_actions))
                 mb_inds = b_inds[start:end]
 
-                action_probs = agent.get_action_probs(
-                    get_obs(all_obs, mb_inds), all_masks[mb_inds]
+                action_probs, values = agent.get_action_probs_and_value(
+                    get_obs(train_obs, mb_inds), train_masks[mb_inds]
                 )
                 target_probs = self.get_target_probs(
-                    all_masks, all_past_actions, pa_to_a, mb_inds
+                    train_masks, train_past_actions, train_pa_to_a, mb_inds
                 ).to(action_probs.device)
-                loss = torch.nn.functional.mse_loss(
-                    action_probs, target_probs, reduction="sum"
+                loss_actor = torch.nn.functional.mse_loss(
+                    action_probs,
+                    target_probs,
+                    reduction="none",
                 )
-                eloss += loss.item()
+                loss_critic = torch.nn.functional.mse_loss(
+                    values.flatten(),
+                    train_makespans[mb_inds].to(values.device).float(),
+                    reduction="none",
+                )
+
+                loss = loss_actor.mean() + vf_coeff * loss_critic.mean()
                 loss.backward()
                 optimizer.step()
-            print("pretrain loss:", eloss / len(actions))
+
+                a_loss += loss_actor.sum().item()
+                c_loss += loss_critic.sum().item()
+                t_loss += loss_actor.sum().item() + vf_coeff * loss_critic.sum().item()
+
+            self.train_losses["actor"].append(a_loss / len(train_actions))
+            if vf_coeff != 0:
+                self.train_losses["critic"].append(c_loss / len(train_actions))
+                self.train_losses["total"].append(t_loss / len(train_actions))
+
+            a_loss = 0
+            c_loss = 0
+            t_loss = 0
+            with torch.inference_mode():
+                for start in range(0, len(eval_actions), minibatch_size):
+                    end = min(start + minibatch_size, len(eval_actions))
+                    mb_inds = np.arange(start, end)
+
+                    action_probs, values = agent.get_action_probs_and_value(
+                        get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
+                    )
+                    target_probs = self.get_target_probs(
+                        eval_masks, eval_past_actions, eval_pa_to_a, mb_inds
+                    ).to(action_probs.device)
+                    loss_actor = torch.nn.functional.mse_loss(
+                        action_probs, target_probs, reduction="sum"
+                    )
+                    loss_critic = torch.nn.functional.mse_loss(
+                        values.flatten(),
+                        eval_makespans[mb_inds].to(values.device).float(),
+                        reduction="sum",
+                    )
+                    a_loss += loss_actor.item()
+                    c_loss += loss_critic.item()
+                    t_loss += loss_actor.item() + vf_coeff * loss_critic.item()
+
+            if self.eval_losses["actor"] == [] or (
+                min(self.eval_losses["actor"]) > a_loss / len(eval_actions)
+            ):
+                pretrain_model_path = self.training_specification.path + "pretrain.pkl"
+                agent.save(pretrain_model_path)
+
+            self.eval_losses["actor"].append(a_loss / len(eval_actions))
+            if vf_coeff != 0:
+                self.eval_losses["critic"].append(c_loss / len(eval_actions))
+                self.eval_losses["total"].append(t_loss / len(eval_actions))
+
+            for loss_name in self.train_losses.keys():
+                train_loss = self.train_losses[loss_name]
+                eval_loss = self.eval_losses[loss_name]
+
+                if train_loss == []:
+                    continue
+
+                Y = np.array([train_loss, eval_loss])
+                self.vis.line(
+                    Y=Y.T,
+                    X=np.arange(len(train_loss)),
+                    win=f"pretrain-loss-{loss_name}",
+                    opts={
+                        "title": f"Pretrain Loss - {loss_name}",
+                        "legend": ["train", "eval"],
+                    },
+                )

@@ -207,9 +207,9 @@ def main(args, exp_name, path):
     )
     agent_specification.print_self()
     # If we want to use a pretrained Agent, we only have to load it (if it exists)
-    if args.retrain and os.path.exists(path + "/agent.pkl"):
+    if args.retrain:
         print("Retraining an already existing agent\n")
-        agent = Agent.load(path)
+        agent = Agent.load(args.retrain)
         agent.env_specification = env_specification
         agent.agent_specification = agent_specification
     elif (
@@ -233,15 +233,19 @@ def main(args, exp_name, path):
             problem_description,
             env_specification,
             training_specification,
+            JSSPEnv,
             num_envs=args.pretrain_num_envs,
+            num_eval_envs=args.pretrain_num_eval_envs,
+            trajectories=args.pretrain_trajectories,
             prob=args.pretrain_prob,
         )
         pretrainer.pretrain(
             agent,
             args.pretrain_epochs,
             args.pretrain_batch_size,
-            args.pretrain_n_steps_episode,
             lr=args.pretrain_lr,
+            vf_coeff=args.pretrain_vf_coef,
+            weight_decay=args.pretrain_weight_decay,
         )
 
     # And finally, we train the model on the specified training mode
@@ -270,6 +274,7 @@ def main(args, exp_name, path):
         problem_description,
         env_specification,
         lr=args.lr,
+        weight_decay=args.weight_decay,
         log_interval=1,
         train_device=args.device,
         rollout_agent_device=args.device,
