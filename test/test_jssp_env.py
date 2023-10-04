@@ -47,7 +47,7 @@ def test_resets():
     # Test the soft scenarios.
     for deterministic, fixed in product([True, False], [True, False]):
         env_specification, problem_description = init_specs(deterministic, fixed)
-        env = JSSPEnv(problem_description, env_specification, 0)
+        env = JSSPEnv(problem_description, env_specification)
         affectations = env.state.affectations.copy()
         durations = env.state.original_durations.copy()
 
@@ -58,7 +58,7 @@ def test_resets():
     # Not fixed problems & hard resets.
     for deterministic in [True, False]:
         env_specification, problem_description = init_specs(deterministic, False)
-        env = JSSPEnv(problem_description, env_specification, 0)
+        env = JSSPEnv(problem_description, env_specification)
         affectations = env.state.affectations.copy()
         durations = env.state.original_durations.copy()
 
@@ -74,7 +74,7 @@ def test_resets():
     # Fixed problems and hard resets.
     for deterministic in [True, False]:
         env_specification, problem_description = init_specs(deterministic, True)
-        env = JSSPEnv(problem_description, env_specification, 0)
+        env = JSSPEnv(problem_description, env_specification)
         affectations = env.state.affectations.copy()
         durations = env.state.original_durations.copy()
 
@@ -127,16 +127,16 @@ def test_problem_generation(seed: int):
 
     for deterministic, fixed in product([False, True], [False, True]):
         env_specification, problem_description = init_specs(deterministic, fixed, seed)
-        env = JSSPEnv(problem_description, env_specification, seed)
+        env = JSSPEnv(problem_description, env_specification)
         affectations = env.state.affectations.copy()
         durations = env.state.original_durations.copy()
 
         env_specification, problem_description = init_specs(deterministic, fixed, seed)
-        env = JSSPEnv(problem_description, env_specification, seed)
+        env = JSSPEnv(problem_description, env_specification)
         assert np.all(env.state.affectations == affectations), "Affectations changed"
         assert np.all(env.state.original_durations == durations), "Durations changed"
 
         env_specification, problem_description = init_specs(deterministic, fixed, seed + 1)
-        env = JSSPEnv(problem_description, env_specification, seed + 1)
+        env = JSSPEnv(problem_description, env_specification)
         assert np.any(env.state.affectations != affectations), "Affectations unchanged"
         assert np.any(env.state.original_durations != durations), "Durations unchanged"

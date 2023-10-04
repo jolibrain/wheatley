@@ -22,31 +22,30 @@
 #
 
 import gymnasium as gym
-from gymnasium.spaces import Discrete, Dict, Box
 import numpy as np
+from gymnasium.spaces import Box, Dict, Discrete
 
+from env.jssp_state import JSSPState as State
+from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
+from env.reward_models.l2d_estim_reward_model import L2DEstimRewardModel
+from env.reward_models.l2d_reward_model import L2DRewardModel
+from env.reward_models.meta_reward_model import MetaRewardModel
+from env.reward_models.sparse_reward_model import SparseRewardModel
+from env.reward_models.tassel_reward_model import TasselRewardModel
+from env.reward_models.uncertain_reward_model import UncertainRewardModel
 from env.transition_models.l2d_transition_model import L2DTransitionModel
 from env.transition_models.simple_transition_model import SimpleTransitionModel
 from env.transition_models.slot_locking_transition_model import (
     SlotLockingTransitionModel,
 )
-from env.reward_models.intrinsic_reward_model import IntrinsicRewardModel
-from env.reward_models.l2d_reward_model import L2DRewardModel
-from env.reward_models.l2d_estim_reward_model import L2DEstimRewardModel
-from env.reward_models.meta_reward_model import MetaRewardModel
-from env.reward_models.sparse_reward_model import SparseRewardModel
-from env.reward_models.tassel_reward_model import TasselRewardModel
-from env.reward_models.uncertain_reward_model import UncertainRewardModel
 from utils.jssp_env_observation import JSSPEnvObservation as EnvObservation
-from env.jssp_state import JSSPState as State
 
 
 class JSSPEnv(gym.Env):
-    def __init__(self, problem_description, env_specification, seed: int, validate=False):
+    def __init__(self, problem_description, env_specification, i=0, validate=False):
         self.problem_description = problem_description
         self.env_specification = env_specification
-        self.seed = seed
-        self.rng = np.random.default_rng(seed)
+        self.rng = problem_description.rng
         self.sum_reward = 0
 
         self.transition_model_config = problem_description.transition_model_config

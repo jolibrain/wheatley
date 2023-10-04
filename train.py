@@ -74,6 +74,7 @@ def main(args, exp_name, path):
         max_duration=args.max_duration,
         duration_mode_bounds=args.duration_mode_bounds,
         duration_delta=args.duration_delta,
+        seed=args.seed,
     )
     problem_description.print_self()
 
@@ -99,6 +100,7 @@ def main(args, exp_name, path):
             max_duration=args.max_duration,
             duration_mode_bounds=args.duration_mode_bounds,
             duration_delta=args.duration_delta,
+            seed=args.seed,
         )
 
     # Then specify the variables used for the training

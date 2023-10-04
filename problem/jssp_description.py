@@ -58,7 +58,8 @@ class JSSPDescription:
          - Any problem, deterministic: specify n_jobs, n_machines, max_duration
          - Any problem, stochastic: Specify n_jobs, n_machines, duration_mode_bound, duration_delta
         """
-        rng = np.random.default_rng(seed)
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
 
         # Checking the consistency of the inputs
         self.check_consistency(affectations, durations, n_jobs, n_machines)
@@ -86,7 +87,7 @@ class JSSPDescription:
                         "Please provide max_duration to generate a deterministic problem"
                     )
                 self.affectations, self.durations = generate_deterministic_problem(
-                    self.n_jobs, self.n_machines, max_duration, rng
+                    self.n_jobs, self.n_machines, max_duration, self.rng
                 )
             self.deterministic = True
             self.fixed = True
@@ -114,10 +115,14 @@ class JSSPDescription:
                         "Please provide duration_mode_bounds and duration_delta to generate a stochastic problem"
                     )
                 self.affectations, self.durations = generate_problem_distrib(
-                    self.n_jobs, self.n_machines, duration_mode_bounds, duration_delta, rng
+                    self.n_jobs,
+                    self.n_machines,
+                    duration_mode_bounds,
+                    duration_delta,
+                    self.rng,
                 )
             # Generate a first version of the durations, to have a totally instantiated duration
-            self.durations = generate_problem_durations(self.durations, rng)
+            self.durations = generate_problem_durations(self.durations, self.rng)
             # But we still want to regenerate durations at each sampling. This can be deactivated for totally fixed problem
             self.regenerate_durations = True
 
@@ -211,7 +216,9 @@ class JSSPDescription:
                 return self.affectations, self.durations
             else:
                 if self.regenerate_durations:
-                    return self.affectations, generate_problem_durations(self.durations, rng)
+                    return self.affectations, generate_problem_durations(
+                        self.durations, rng
+                    )
                 else:
                     return self.affectations, self.durations
         else:
