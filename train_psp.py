@@ -183,9 +183,13 @@ def main():
         performer_auto_check_redraw=args.performer_auto_check_redraw,
         vnode=args.vnode,
         update_edge_features=not args.dont_update_edge_features,
+        update_edge_features_pe=not args.dont_update_edge_features_pe,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
         mid_in_edges=args.mid_in_edges,
+        rwpe_k=args.rwpe_k,
+        rwpe_h=args.rwpe_h,
+        cache_rwpe=args.cache_rwpe,
     )
     agent_specification.print_self()
 

@@ -80,6 +80,10 @@ class PSPAgent(Agent):
                 add_self_loops=env_specification.remove_past_prec,
                 vnode=agent_specification.vnode,
                 update_edge_features=agent_specification.update_edge_features,
+                update_edge_features_pe=agent_specification.update_edge_features_pe,
+                rwpe_k=agent_specification.rwpe_k,
+                rwpe_h=agent_specification.rwpe_h,
+                cache_rwpe=agent_specification.cache_rwpe,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -140,6 +144,10 @@ class PSPAgent(Agent):
                 add_self_loops=env_specification.remove_old_nodes,
                 vnode=agent_specification.vnode,
                 update_edge_features=agent_specification.update_edge_features,
+                update_edge_features_pe=agent_specification.update_edge_features_pe,
+                rwpe_k=agent_specification.rwpe_k,
+                rwpe_h=agent_specification.rwpe_h,
+                cache_rwpe=agent_specification.cache_rwpe,
             )
         elif agent_specification.fe_type == "tokengt":
             gnn = GnnTokenGT(
