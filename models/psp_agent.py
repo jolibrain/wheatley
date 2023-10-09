@@ -110,38 +110,7 @@ class PSPAgent(Agent):
         else:
             print("unknown fe_type: ", agent_specification.fe_type)
 
-        self.value_net = MLP(
-            len(self.agent_specification.net_arch["vf"]),
-            self.gnn.features_dim // 2,
-            self.agent_specification.net_arch["vf"][0],
-            1,
-            False,
-            self.agent_specification.activation_fn,
-        )
-        # # action
-        self.action_net = MLP(
-            len(self.agent_specification.net_arch["pi"]),
-            self.gnn.features_dim,
-            self.agent_specification.net_arch["pi"][0],
-            1,
-            False,
-            self.agent_specification.activation_fn,
-        )
-        # usually ppo use gain = np.sqrt(2) here
-        # best so far below
-        self.gnn.apply(
-            partial(
-                self.init_weights,
-                gain=1.0,
-                zero_bias=False,
-                ortho_embed=agent_specification.ortho_embed,
-            )
-        )
-        # self.gnn.reset_egat()
-        # usually ppo use gain = 0.01 here
-        self.action_net.apply(partial(self.init_weights, gain=1.0, zero_bias=True))
-        # usually ppo use gain = 1 here
-        self.value_net.apply(partial(self.init_weights, gain=1.0, zero_bias=True))
+        self.init_heads()
 
     @classmethod
     def load(cls, path):
@@ -223,6 +192,49 @@ class PSPAgent(Agent):
         agent.action_net.load_state_dict(save_data["action_net"])
         agent.value_net.load_state_dict(save_data["value_net"])
         return agent
+
+    def init_heads(self):
+        """Initialize new heads, removing old heads if existing."""
+        if hasattr(self, "value_net") and self.value_net is not None:
+            device = next(self.value_net.parameters())
+        else:
+            device = "cpu"
+
+        self.value_net = MLP(
+            len(self.agent_specification.net_arch["vf"]),
+            self.gnn.features_dim // 2,
+            self.agent_specification.net_arch["vf"][0],
+            1,
+            False,
+            self.agent_specification.activation_fn,
+        )
+        # # action
+        self.action_net = MLP(
+            len(self.agent_specification.net_arch["pi"]),
+            self.gnn.features_dim,
+            self.agent_specification.net_arch["pi"][0],
+            1,
+            False,
+            self.agent_specification.activation_fn,
+        )
+        # usually ppo use gain = np.sqrt(2) here
+        # best so far below
+        self.gnn.apply(
+            partial(
+                self.init_weights,
+                gain=1.0,
+                zero_bias=False,
+                ortho_embed=self.agent_specification.ortho_embed,
+            )
+        )
+        # self.gnn.reset_egat()
+        # usually ppo use gain = 0.01 here
+        self.action_net.apply(partial(self.init_weights, gain=1.0, zero_bias=True))
+        # usually ppo use gain = 1 here
+        self.value_net.apply(partial(self.init_weights, gain=1.0, zero_bias=True))
+
+        self.value_net.to(device)
+        self.action_net.to(device)
 
     def obs_as_tensor_add_batch_dim(self, obs):
         return PSPAgentObservation.np_to_torch(obs)

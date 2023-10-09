@@ -248,6 +248,7 @@ def main():
         problem_description,
         env_specification,
         lr=args.lr,
+        weight_decay=args.weight_decay,
         log_interval=1,
         train_device=args.device,
         rollout_agent_device=args.device,
