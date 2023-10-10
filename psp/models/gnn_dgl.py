@@ -29,6 +29,7 @@ from dgl.nn import EGATConv
 
 from dgl import LaplacianPE
 from .agent_observation import AgentObservation
+from .edge_embedder import PspEdgeEmbedder
 
 
 class GnnDGL(torch.nn.Module):
@@ -99,119 +100,30 @@ class GnnDGL(torch.nn.Module):
         else:
             self.rwpe_cache = None
 
-        # EDGES
-        # types:
-        # self_loops 0
-        # precedencies 1
-        # rev recedenceies 2
-        # static ressource conflicts 3
-        # resource priority 4
-        # reverse resource priority 5
-        # graph_pooling 6
-        # reverse graph pooling 7
-        # to/from vnode 8 , 9
-        # resource node self-loop : 10 .. 10 + rnres
-        # resrouce node edges 10+nres .. 10+2*nres
-        # we also have attributes
-        # for resource conflicts : rid, rval (normalized)
-        # for resource prioiries : rid, level, critical, timetype
-        # type , rid, rval, timetype
-        # for prec edges : only type
-        # for rc edges : type,  rid, rval
-        # for rp edges : type, rid , level, criticial, timetype
-
-        n_edge_type = 11 + self.max_n_resources * 3
-
         if self.rwpe_k != 0:
-            # self.rwpe_global_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
-            # self.rwpe_pr_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
-            # self.rwpe_rp_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
-            # self.rwpe_rc_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
             self.rwpe_embedder = torch.nn.Linear(self.rwpe_k * 4, self.rwpe_h)
-
-        self.edge_embedding_flavor = edge_embedding_flavor
-        if self.edge_embedding_flavor == "sum":
-            self.resource_id_embedder = torch.nn.Embedding(
-                self.max_n_resources + 1, self.hidden_dim
-            )
-            self.edge_type_embedder = torch.nn.Embedding(n_edge_type, self.hidden_dim)
-
-            self.rc_att_embedder = torch.nn.Linear(2, self.hidden_dim)
-            if self.add_rp_edges != "none":
-                if self.factored_rp:
-                    self.rp_att_embedder = torch.nn.Linear(
-                        3 * self.max_n_resources, self.hidden_dim
-                    )
-                else:
-                    self.rp_att_embedder = torch.nn.Linear(3, self.hidden_dim)
-
-            if self.rwpe_k != 0:
-                self.resource_id_embedder_pe = torch.nn.Embedding(
-                    self.max_n_resources + 1, self.hidden_dim
-                )
-                self.edge_type_embedder_pe = torch.nn.Embedding(
-                    n_edge_type, self.hidden_dim
-                )
-
-                self.rc_att_embedder_pe = torch.nn.Linear(2, self.hidden_dim)
-                if self.add_rp_edges != "none":
-                    if self.factored_rp:
-                        self.rp_att_embedder_pe = torch.nn.Linear(
-                            3 * self.max_n_resources, self.hidden_dim
-                        )
-                    else:
-                        self.rp_att_embedder_pe = torch.nn.Linear(3, self.hidden_dim)
-
-        elif self.edge_embedding_flavor == "cat":
-            self.edge_type_embedder = torch.nn.Embedding(n_edge_type, n_edge_type)
-            self.resource_id_embedder = torch.nn.Embedding(
-                self.max_n_resources + 1, self.max_n_resources + 1
-            )
-            rest = self.hidden_dim - 12 - self.max_n_resources - 1
-            if rest < 4:
-                raise ValueError(
-                    f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
-                )
-            self.rc_att_hidden_dim = int(rest / 2)
-            self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            if self.add_rp_edges != "none":
-                self.rp_att_hidden_dim = rest - self.rc_att_hidden_dim
-                if self.factored_rp:
-                    self.rp_att_embedder = torch.nn.Linear(
-                        3 * self.max_n_resources, self.rp_att_hidden_dim
-                    )
-                else:
-                    self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
-        elif self.edge_embedding_flavor == "cartesian":
-            self.type_rid_hidden_dim = int(self.hidden_dim / 2)
-            self.type_rid_embedder = torch.nn.Embedding(
-                8 * (self.max_n_resources + 1), self.type_rid_hidden_dim
-            )
-            self.rc_att_hidden_dim = int(
-                (self.hidden_dim - self.type_rid_hidden_dim) / 2
-            )
-            self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            if self.add_rp_edges != "none":
-                self.rp_att_hidden_dim = (
-                    self.hidden_dim - self.type_rid_hidden_dim - self.rc_att_hidden_dim
-                )
-
-                if self.factored_rp:
-                    self.rp_att_embedder = torch.nn.Linear(
-                        3 * max_n_resources, self.rp_att_hidden_dim
-                    )
-                else:
-                    self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
-        else:
-            raise ValueError(
-                "unknown edge embedding flavor " + self.edge_embedding_flavor
-            )
 
         self.pool_node_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
         self.vnode_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
         self.resource_node_embedder = torch.nn.Embedding(
             max_n_resources, input_dim_features_extractor
         )
+
+        self.edge_embedder = PspEdgeEmbedder(
+            edge_embedding_flavor,
+            self.max_n_resources,
+            self.hidden_dim,
+            self.add_rp_edges,
+            self.factored_rp,
+        )
+        if self.rwpe_k != 0:
+            self.edge_embedder_pe = PspEdgeEmbedder(
+                edge_embedding_flavor,
+                self.max_n_resources,
+                self.hidden_dim,
+                self.add_rp_edges,
+                self.factored_rp,
+            )
 
         self.features_embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
@@ -309,73 +221,6 @@ class GnnDGL(torch.nn.Module):
     def reset_egat(self):
         for egat in self.features_extractors:
             egat.reset_parameters()
-
-    def embed_edges_pe(
-        self,
-        g,
-    ):
-        ret = self.edge_type_embedder_pe(g.edata["type"])
-        ret += self.resource_id_embedder_pe(g.edata["rid"])
-        try:
-            ret += self.rc_att_embedder_pe(g.edata["att_rc"])
-        except KeyError:
-            pass
-        if self.add_rp_edges != "none":
-            try:  # if no ressource priory info in graph (ie at start state), key is absent
-                ret += self.rp_att_embedder_pe(g.edata["att_rp"].float())
-            except KeyError:
-                pass
-            return ret
-        exit()
-
-    def embed_edges(
-        self,
-        g,
-    ):
-        if self.edge_embedding_flavor == "sum":
-            ret = self.edge_type_embedder(g.edata["type"])
-            ret += self.resource_id_embedder(g.edata["rid"])
-            try:
-                ret += self.rc_att_embedder(g.edata["att_rc"])
-            except KeyError:
-                pass
-            if self.add_rp_edges != "none":
-                try:  # if no ressource priory info in graph (ie at start state), key is absent
-                    ret += self.rp_att_embedder(g.edata["att_rp"].float())
-                except KeyError:
-                    pass
-            return ret
-
-        if self.edge_embedding_flavor == "cat":
-            et = self.edge_type_embedder(g.edata["type"])
-            ei = self.resource_id_embedder(g.edata["rid"])
-            try:
-                ec = self.rc_att_embedder(g.edata["att_rc"])
-            except KeyError:
-                ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
-            if self.add_rp_edges != "none":
-                try:
-                    ep = self.rp_att_embedder(g.edata["att_rp"])
-                except KeyError:
-                    ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
-                return torch.cat([et, ei, ec, ep], dim=-1)
-            return torch.cat([et, ei, ec], dim=-1)
-
-        if self.edge_embedding_flavor == "cartesian":
-            eit = self.type_rid_embedder(
-                g.edata["type"] * (self.max_n_resources + 1) + g.edata["rid"]
-            )
-            try:
-                ec = self.rc_att_embedder(g.edata["att_rc"])
-            except KeyError:
-                ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
-            if self.add_rp_edges != "none":
-                try:
-                    ep = self.rp_att_embedder(g.edata["att_rp"])
-                except KeyError:
-                    ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
-                return torch.cat([eit, ec, ep], dim=-1)
-            return torch.cat([eit, ec], dim=-1)
 
     def forward(self, obs):
         observation = AgentObservation(
@@ -526,12 +371,6 @@ class GnnDGL(torch.nn.Module):
         features = g.ndata["feat"]
 
         if self.rwpe_k != 0:
-            # fpe_global = self.rwpe_global_embedder(g.ndata["rwpe_global"])
-            # fpe_pr = self.rwpe_pr_embedder(g.ndata["rwpe_pr"])
-            # fpe_rp = self.rwpe_rp_embedder(g.ndata["rwpe_rp"])
-            # fpe_rc = self.rwpe_rc_embedder(g.ndata["rwpe_rc"])
-            # fpe = torch.cat([fpe_global, fpe_pr, fpe_rp, fpe_rc], 1)
-            # g.ndata["pe"] = fpe
             g.ndata["pe"] = self.rwpe_embedder(
                 torch.cat(
                     [
@@ -581,9 +420,9 @@ class GnnDGL(torch.nn.Module):
             else:
                 features_list.append(features)
 
-        edge_features = self.embed_edges(g)
+        edge_features = self.edge_embedder(g)
         if self.rwpe_k != 0:
-            edge_features_pe = self.embed_edges_pe(g)
+            edge_features_pe = self.edge_embedder_pe(g)
 
         if self.layer_pooling == "last":
             previous_feat = features
