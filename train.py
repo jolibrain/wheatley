@@ -248,6 +248,9 @@ def main(args, exp_name, path):
             weight_decay=args.pretrain_weight_decay,
         )
 
+    if args.reinit_head_before_ppo:
+        agent.init_heads()
+
     # And finally, we train the model on the specified training mode
     # Note: The saving of the best model is handled in the agent.train method.
     # We save every time we hit a min RL / OR-Tools ratio

@@ -161,7 +161,13 @@ parser.add_argument(
     "--resume",
     default=False,
     action="store_true",
-    help="Resume a previous training. The script will look for trained model named \"agent.pkl\" in the directory experiment.",
+    help='Resume a previous training. The script will look for trained model named "agent.pkl" in the directory experiment.',
+)
+parser.add_argument(
+    "--reinit_head_before_ppo",
+    default=False,
+    action="store_true",
+    help="Remove existing head (from a pretrain, resume or retrain) and initialize a new head before starting PPO",
 )
 
 # =================================================VALIDATION SPECIFICATION=================================================
