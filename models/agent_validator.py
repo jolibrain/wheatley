@@ -127,15 +127,21 @@ class AgentValidator:
         else:
             aff = [[0]] * self.n_validation_env
 
-        self.validation_envs = [
-            self.env_cls(
-                self.problem_description,
-                self.env_specification,
-                aff[i],
-                validate=True,
+        self.validation_envs = []
+        for i in range(self.n_validation_env):
+            problem_description = copy.deepcopy(self.problem_description)
+            problem_description.rng = np.random.default_rng(
+                self.problem_description.seed + i
             )
-            for i in range(self.n_validation_env)
-        ]
+            self.validation_envs.append(
+                self.env_cls(
+                    problem_description,
+                    self.env_specification,
+                    aff[i],
+                    validate=True,
+                )
+            )
+
         self.makespan_ratio = 1000
         self.makespans = []
         self.ortools_makespans = {
