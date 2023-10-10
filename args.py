@@ -27,8 +27,8 @@
 import argparse
 import os
 
-from dispatching_rules.heuristics import HEURISTICS
-from utils.utils import get_exp_name, get_path
+from jssp.dispatching_rules.heuristics import HEURISTICS
+from generic.utils import get_exp_name, get_path
 
 parser = argparse.ArgumentParser(
     description="These args can be used with train.py, test.py and benchmark/run_taillard.py. They specify how the training"

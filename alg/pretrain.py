@@ -27,12 +27,9 @@ import visdom
 from torch.distributions.categorical import Categorical
 from tqdm import tqdm
 
-from env.jssp_env_specification import JSSPEnvSpecification
-from models.jssp_agent import JSSPAgent as Agent
-from models.training_specification import TrainingSpecification
-from problem.jssp_description import JSSPDescription as ProblemDescription
-from utils.ortools import *
-from utils.utils import get_obs, rebatch_obs
+from generic.training_specification import TrainingSpecification
+from generic.utils import get_obs
+from jssp.utils.utils import rebatch_obs
 
 
 class Pretrainer:
