@@ -41,6 +41,7 @@ class PSPDescription:
         deterministic,
         train_psps,
         test_psps,
+        seed,
     ):
         """ """
 
@@ -49,6 +50,7 @@ class PSPDescription:
         self.deterministic = deterministic
         self.train_psps = train_psps
         self.test_psps = test_psps
+        self.seed = seed
 
         self.max_n_jobs = max([psp["n_jobs"] for psp in train_psps + test_psps])
         self.max_n_modes = max([psp["n_modes"] for psp in train_psps + test_psps])

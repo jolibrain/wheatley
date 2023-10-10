@@ -77,6 +77,7 @@ def main():
         deterministic=(args.duration_type == "deterministic"),
         train_psps=train_psps,
         test_psps=test_psps,
+        seed=args.seed,
     )
     problem_description.print_self()
 
