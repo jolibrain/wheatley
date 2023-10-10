@@ -30,6 +30,7 @@ from dgl.nn import EGATConv
 from dgl import LaplacianPE
 from .agent_observation import AgentObservation
 from .edge_embedder import PspEdgeEmbedder
+from .rewiring import rewire
 
 
 class GnnDGL(torch.nn.Module):
@@ -239,133 +240,22 @@ class GnnDGL(torch.nn.Module):
         g = observation.to_graph()
 
         num_nodes = g.num_nodes()
-        node_offset = num_nodes
 
-        origbnn = g.batch_num_nodes()
-
-        if self.graph_pooling == "learn":
-            poolnodes = list(range(node_offset, node_offset + batch_size))
-            g.add_nodes(
-                batch_size,
-                data={
-                    "feat": torch.zeros((batch_size, self.input_dim_features_extractor))
-                },
-            )
-            ei0 = []
-            ei1 = []
-            startnode = 0
-            for i in range(batch_size):
-                ei0 += [node_offset + i] * origbnn[i]
-                ei1 += list(range(startnode, startnode + origbnn[i]))
-                startnode += origbnn[i]
-
-            g.add_edges(
-                list(range(node_offset, node_offset + batch_size)),
-                list(range(node_offset, node_offset + batch_size)),
-                data={"type": torch.LongTensor([0] * batch_size)},
-            )
-
-            g.add_edges(ei1, ei0, data={"type": torch.LongTensor([6] * len(ei0))})
-            # INVERSE POOLING BELOW !
-            # g.add_edges(ei0, ei1, data={"type": torch.LongTensor([7] * len(ei0))})
-            node_offset += batch_size
-
-        if self.conflicts == "node":
-            resources_used = g.ndata["feat"][:, 10:]
-            num_resources = resources_used.shape[1]
-            resource_nodes = list(
-                range(node_offset, node_offset + num_resources * batch_size)
-            )
-            batch_id = []
-            for i, nn in enumerate(origbnn):
-                batch_id.extend([i] * nn)
-            batch_id = torch.IntTensor(batch_id)
-            g.add_nodes(
-                num_resources * batch_size,
-                data={
-                    "feat": torch.zeros(
-                        (
-                            batch_size * self.max_n_resources,
-                            self.input_dim_features_extractor,
-                        )
-                    )
-                },
-            )
-            idxaffected = torch.where(resources_used != 0)
-            consumers = idxaffected[0]
-            nconsumers = consumers.shape[0]
-            resource_start_per_batch = []
-            for i in range(batch_size):
-                resource_start_per_batch.append(node_offset + num_resources * i)
-            resource_start_per_batch = torch.IntTensor(resource_start_per_batch)
-            resource_index = (
-                idxaffected[1] + resource_start_per_batch[batch_id[consumers]]
-            )
-
-            rntype = torch.LongTensor(
-                list(range(num_resources)) * batch_size
-            ) + torch.LongTensor([10] * len(resource_nodes))
-
-            g.add_edges(
-                resource_nodes,
-                resource_nodes,
-                # we could use different self loop type per resource
-                data={"type": rntype},
-                # data={"type": torch.LongTensor([10] * len(resource_nodes))},
-            )
-            rc = torch.gather(
-                resources_used[consumers], 1, idxaffected[1].unsqueeze(1)
-            ).expand(nconsumers, 2)
-
-            g.add_edges(
-                consumers,
-                resource_index,
-                data={
-                    # "type": torch.LongTensor([10] * nconsumers),
-                    "type": torch.LongTensor([10 + num_resources] * nconsumers)
-                    + idxaffected[1].long(),
-                    "rid": idxaffected[1].int(),
-                    "att_rc": rc,
-                },
-            )
-            g.add_edges(
-                resource_index,
-                consumers,
-                data={
-                    # "type": torch.LongTensor([11] * nconsumers),
-                    "type": torch.LongTensor([10 + 2 * num_resources] * nconsumers)
-                    + idxaffected[1].long(),
-                    "rid": idxaffected[1].int(),
-                    "att_rc": rc,
-                },
-            )
-            node_offset += num_resources * batch_size
-
-        if self.vnode:
-            vnodes = list(range(node_offset, node_offset + batch_size))
-            g.add_nodes(
-                batch_size,
-                data={
-                    "feat": torch.zeros((batch_size, self.input_dim_features_extractor))
-                },
-            )
-            ei0 = []
-            ei1 = []
-            startnode = 0
-            for i in range(batch_size):
-                ei0 += [node_offset + i] * origbnn[i]
-                ei1 += list(range(startnode, startnode + origbnn[i]))
-                startnode += origbnn[i]
-
-            # g.add_edges(
-            #     list(range(node_offset, node_offset + batch_size)),
-            #     list(range(node_offset, node_offset + batch_size)),
-            #     data={"type": torch.LongTensor([0] * batch_size)},
-            # )
-
-            g.add_edges(ei1, ei0, data={"type": torch.LongTensor([8] * len(ei0))})
-            g.add_edges(ei0, ei1, data={"type": torch.LongTensor([9] * len(ei0))})
-            node_offset += batch_size
+        g, poolnodes, resource_nodes, vnodes = rewire(
+            g,
+            self.graph_pooling == "learn",
+            self.conflicts == "node",
+            self.vnode,
+            batch_size,
+            self.input_dim_features_extractor,
+            self.max_n_resources,
+            6,
+            7,
+            10,
+            10,
+            8,
+            9,
+        )
 
         g = g.to(next(self.parameters()).device)
         features = g.ndata["feat"]
@@ -402,18 +292,21 @@ class GnnDGL(torch.nn.Module):
         if self.rwpe_k != 0:
             pe = g.ndata["pe"]
 
-        if self.layer_pooling == "all":
-            features_list = []
         if self.normalize:
             features = self.norm0(features)
+
         if self.layer_pooling == "all":
+            features_list = []
             if self.rwpe_k != 0:
                 features_list.append(torch.cat([features, pe], dim=-1))
             else:
                 features_list.append(features)
+
         features = self.features_embedder(features)
+
         if self.normalize:
             features = self.norm1(features)
+
         if self.layer_pooling == "all":
             if self.rwpe_k != 0:
                 features_list.append(torch.cat([features, pe], dim=-1))
@@ -432,9 +325,13 @@ class GnnDGL(torch.nn.Module):
         for layer in range(self.n_layers_features_extractor):
             if self.rwpe_k != 0:
                 features = torch.cat([features, pe], dim=-1)
+
             if self.update_edge_features:
                 features, new_e_attr = self.features_extractors[layer](
                     g, features, edge_features.clone()
+                )
+                edge_features += self.mlps_edges[layer](
+                    new_e_attr.flatten(start_dim=-2, end_dim=-1)
                 )
             else:
                 features, _ = self.features_extractors[layer](
@@ -448,22 +345,18 @@ class GnnDGL(torch.nn.Module):
                     pe, new_e_pe_attr = self.pe_conv[layer](
                         g, pe, edge_features_pe.clone()
                     )
+                    edge_features_pe += self.mlps_edges_pe[layer](
+                        new_e_pe_attr.flatten(start_dim=-2, end_dim=-1)
+                    )
                 else:
                     pe, _ = self.pe_conv[layer](g, pe, edge_features_pe)
                 pe = self.pe_mlp[layer](pe.flatten(start_dim=-2, end_dim=-1))
-            # update edge features below
-            if self.update_edge_features:
-                edge_features += self.mlps_edges[layer](
-                    new_e_attr.flatten(start_dim=-2, end_dim=-1)
-                )
-            if self.update_edge_features_pe and self.rwpe_k != 0:
-                edge_features_pe += self.mlps_edges_pe[layer](
-                    new_e_pe_attr.flatten(start_dim=-2, end_dim=-1)
-                )
+
             # if self.layer_pooling == "all":
             #     features_list.append(features)
             if self.normalize:
                 features = self.norms[layer](features)
+
             if self.residual:
                 if self.layer_pooling == "all":
                     features += features_list[-1][:, : self.hidden_dim]
