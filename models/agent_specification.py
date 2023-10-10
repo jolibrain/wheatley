@@ -61,9 +61,13 @@ class AgentSpecification:
         performer_auto_check_redraw,
         vnode,
         update_edge_features,
+        update_edge_features_pe,
         ortho_embed,
         no_tct,
         mid_in_edges,
+        rwpe_k,
+        rwpe_h,
+        cache_rwpe,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -97,9 +101,13 @@ class AgentSpecification:
         self.performer_auto_check_redraw = performer_auto_check_redraw
         self.vnode = vnode
         self.update_edge_features = update_edge_features
+        self.update_edge_features_pe = update_edge_features_pe
         self.ortho_embed = ortho_embed
         self.no_tct = no_tct
         self.mid_in_edges = mid_in_edges
+        self.rwpe_k = rwpe_k
+        self.rwpe_h = rwpe_h
+        self.cache_rwpe = cache_rwpe
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -179,6 +187,10 @@ class AgentSpecification:
                 f"Use VNode:                        {self.vnode}\n"
                 f"Machine id in edges:              {self.mid_in_edges}\n"
                 f"Update edge features:             {self.update_edge_features}\n"
+                f"Update edge features (PE):        {self.update_edge_features_pe}\n"
+                f"RWPE k:                           {self.rwpe_k}\n"
+                f"RWPE h:                           {self.rwpe_h}\n"
+                f"RWPE cache:                       {self.cache_rwpe}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (

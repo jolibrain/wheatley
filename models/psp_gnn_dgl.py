@@ -53,6 +53,10 @@ class PSPGnnDGL(torch.nn.Module):
         add_self_loops=False,
         vnode=False,
         update_edge_features=False,
+        update_edge_features_pe=False,
+        rwpe_k=16,
+        rwpe_h=16,
+        cache_rwpe=False,
     ):
         super().__init__()
         self.conflicts = conflicts
@@ -61,13 +65,20 @@ class PSPGnnDGL(torch.nn.Module):
         self.max_n_nodes = max_n_nodes
         self.input_dim_features_extractor = input_dim_features_extractor
         self.layer_pooling = layer_pooling
+        self.rwpe_k = rwpe_k
+        if self.rwpe_k == 0:
+            self.rwpe_h = 0
+        else:
+            self.rwpe_h = rwpe_h
         if layer_pooling == "all":
             self.features_dim = (
                 input_dim_features_extractor
-                + hidden_dim_features_extractor * (n_layers_features_extractor + 1)
+                + (hidden_dim_features_extractor + self.rwpe_h)
+                * (n_layers_features_extractor + 1)
+                + self.rwpe_h
             )
         else:
-            self.features_dim = hidden_dim_features_extractor
+            self.features_dim = hidden_dim_features_extractor + self.rwpe_h
 
         self.factored_rp = factored_rp
         self.add_rp_edges = add_rp_edges
@@ -75,12 +86,18 @@ class PSPGnnDGL(torch.nn.Module):
         self.max_n_resources = max_n_resources
         self.add_self_loops = add_self_loops
         self.update_edge_features = update_edge_features
+        self.update_edge_features_pe = update_edge_features_pe
 
         self.hidden_dim = hidden_dim_features_extractor
         self.graph_pooling = graph_pooling
         self.n_layers_features_extractor = n_layers_features_extractor
         self.features_extractors = torch.nn.ModuleList()
         self.vnode = vnode
+
+        if cache_rwpe:
+            self.rwpe_cache = {}
+        else:
+            self.rwpe_cache = None
 
         # EDGES
         # types:
@@ -105,31 +122,52 @@ class PSPGnnDGL(torch.nn.Module):
 
         n_edge_type = 11 + self.max_n_resources * 3
 
+        if self.rwpe_k != 0:
+            # self.rwpe_global_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
+            # self.rwpe_pr_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
+            # self.rwpe_rp_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
+            # self.rwpe_rc_embedder = torch.nn.Linear(self.rwpe_k, self.rwpe_h)
+            self.rwpe_embedder = torch.nn.Linear(self.rwpe_k * 4, self.rwpe_h)
+
         self.edge_embedding_flavor = edge_embedding_flavor
         if self.edge_embedding_flavor == "sum":
             self.resource_id_embedder = torch.nn.Embedding(
-                self.max_n_resources + 1, hidden_dim_features_extractor
+                self.max_n_resources + 1, self.hidden_dim
             )
-            self.edge_type_embedder = torch.nn.Embedding(
-                n_edge_type, hidden_dim_features_extractor
-            )
+            self.edge_type_embedder = torch.nn.Embedding(n_edge_type, self.hidden_dim)
 
-            self.rc_att_embedder = torch.nn.Linear(2, hidden_dim_features_extractor)
+            self.rc_att_embedder = torch.nn.Linear(2, self.hidden_dim)
             if self.add_rp_edges != "none":
                 if self.factored_rp:
                     self.rp_att_embedder = torch.nn.Linear(
-                        3 * self.max_n_resources, hidden_dim_features_extractor
+                        3 * self.max_n_resources, self.hidden_dim
                     )
                 else:
-                    self.rp_att_embedder = torch.nn.Linear(
-                        3, hidden_dim_features_extractor
-                    )
+                    self.rp_att_embedder = torch.nn.Linear(3, self.hidden_dim)
+
+            if self.rwpe_k != 0:
+                self.resource_id_embedder_pe = torch.nn.Embedding(
+                    self.max_n_resources + 1, self.hidden_dim
+                )
+                self.edge_type_embedder_pe = torch.nn.Embedding(
+                    n_edge_type, self.hidden_dim
+                )
+
+                self.rc_att_embedder_pe = torch.nn.Linear(2, self.hidden_dim)
+                if self.add_rp_edges != "none":
+                    if self.factored_rp:
+                        self.rp_att_embedder_pe = torch.nn.Linear(
+                            3 * self.max_n_resources, self.hidden_dim
+                        )
+                    else:
+                        self.rp_att_embedder_pe = torch.nn.Linear(3, self.hidden_dim)
+
         elif self.edge_embedding_flavor == "cat":
             self.edge_type_embedder = torch.nn.Embedding(n_edge_type, n_edge_type)
             self.resource_id_embedder = torch.nn.Embedding(
                 self.max_n_resources + 1, self.max_n_resources + 1
             )
-            rest = hidden_dim_features_extractor - 12 - self.max_n_resources - 1
+            rest = self.hidden_dim - 12 - self.max_n_resources - 1
             if rest < 4:
                 raise ValueError(
                     f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
@@ -145,19 +183,17 @@ class PSPGnnDGL(torch.nn.Module):
                 else:
                     self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
         elif self.edge_embedding_flavor == "cartesian":
-            self.type_rid_hidden_dim = int(hidden_dim_features_extractor / 2)
+            self.type_rid_hidden_dim = int(self.hidden_dim / 2)
             self.type_rid_embedder = torch.nn.Embedding(
                 8 * (self.max_n_resources + 1), self.type_rid_hidden_dim
             )
             self.rc_att_hidden_dim = int(
-                (hidden_dim_features_extractor - self.type_rid_hidden_dim) / 2
+                (self.hidden_dim - self.type_rid_hidden_dim) / 2
             )
             self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
             if self.add_rp_edges != "none":
                 self.rp_att_hidden_dim = (
-                    hidden_dim_features_extractor
-                    - self.type_rid_hidden_dim
-                    - self.rc_att_hidden_dim
+                    self.hidden_dim - self.type_rid_hidden_dim - self.rc_att_hidden_dim
                 )
 
                 if self.factored_rp:
@@ -180,8 +216,8 @@ class PSPGnnDGL(torch.nn.Module):
         self.features_embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
             input_dim=input_dim_features_extractor,
-            hidden_dim=hidden_dim_features_extractor,
-            output_dim=hidden_dim_features_extractor,
+            hidden_dim=self.hidden_dim,
+            output_dim=self.hidden_dim,
             batch_norm=self.normalize,
             activation=activation_features_extractor,
         )
@@ -190,11 +226,17 @@ class PSPGnnDGL(torch.nn.Module):
             self.norms = torch.nn.ModuleList()
             self.normsbis = torch.nn.ModuleList()
             self.norm0 = torch.nn.BatchNorm1d(input_dim_features_extractor)
-            self.norm1 = torch.nn.BatchNorm1d(hidden_dim_features_extractor)
+            self.norm1 = torch.nn.BatchNorm1d(self.hidden_dim)
 
         self.mlps = torch.nn.ModuleList()
         if self.update_edge_features:
             self.mlps_edges = torch.nn.ModuleList()
+        if self.update_edge_features_pe and self.rwpe_k != 0:
+            self.mlps_edges_pe = torch.nn.ModuleList()
+
+        if self.rwpe_k != 0:
+            self.pe_conv = torch.nn.ModuleList()
+            self.pe_mlp = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
             if self.normalize:
@@ -202,11 +244,31 @@ class PSPGnnDGL(torch.nn.Module):
                 if self.residual:
                     self.normsbis.append(torch.nn.BatchNorm1d(self.hidden_dim))
 
+            if self.rwpe_k != 0:
+                self.pe_conv.append(
+                    EGATConv(
+                        self.rwpe_h,
+                        self.hidden_dim,
+                        self.rwpe_h,
+                        self.hidden_dim,
+                        num_heads=n_attention_heads,
+                    )
+                )
+                self.pe_mlp.append(
+                    MLP(
+                        n_layers=n_mlp_layers_features_extractor,
+                        input_dim=self.rwpe_h * n_attention_heads,
+                        hidden_dim=self.rwpe_h * n_attention_heads,
+                        output_dim=self.rwpe_h,
+                        batch_norm=self.normalize,
+                        activation="tanh",
+                    )
+                )
             self.features_extractors.append(
                 EGATConv(
+                    self.hidden_dim + self.rwpe_h,
                     self.hidden_dim,
-                    self.hidden_dim,
-                    self.hidden_dim,
+                    self.hidden_dim + self.rwpe_h,
                     self.hidden_dim,
                     num_heads=n_attention_heads,
                 )
@@ -214,9 +276,9 @@ class PSPGnnDGL(torch.nn.Module):
             self.mlps.append(
                 MLP(
                     n_layers=n_mlp_layers_features_extractor,
-                    input_dim=hidden_dim_features_extractor * n_attention_heads,
-                    hidden_dim=hidden_dim_features_extractor * n_attention_heads,
-                    output_dim=hidden_dim_features_extractor,
+                    input_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
+                    hidden_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
+                    output_dim=self.hidden_dim,
                     batch_norm=self.normalize,
                     activation=activation_features_extractor,
                 )
@@ -225,9 +287,20 @@ class PSPGnnDGL(torch.nn.Module):
                 self.mlps_edges.append(
                     MLP(
                         n_layers=n_mlp_layers_features_extractor,
-                        input_dim=hidden_dim_features_extractor * n_attention_heads,
-                        hidden_dim=hidden_dim_features_extractor * n_attention_heads,
-                        output_dim=hidden_dim_features_extractor,
+                        input_dim=self.hidden_dim * n_attention_heads,
+                        hidden_dim=self.hidden_dim * n_attention_heads,
+                        output_dim=self.hidden_dim,
+                        batch_norm=self.normalize,
+                        activation=activation_features_extractor,
+                    )
+                )
+            if self.update_edge_features_pe and rwpe_k != 0:
+                self.mlps_edges_pe.append(
+                    MLP(
+                        n_layers=n_mlp_layers_features_extractor,
+                        input_dim=self.hidden_dim * n_attention_heads,
+                        hidden_dim=self.hidden_dim * n_attention_heads,
+                        output_dim=self.hidden_dim,
                         batch_norm=self.normalize,
                         activation=activation_features_extractor,
                     )
@@ -237,10 +310,27 @@ class PSPGnnDGL(torch.nn.Module):
         for egat in self.features_extractors:
             egat.reset_parameters()
 
+    def embed_edges_pe(
+        self,
+        g,
+    ):
+        ret = self.edge_type_embedder_pe(g.edata["type"])
+        ret += self.resource_id_embedder_pe(g.edata["rid"])
+        try:
+            ret += self.rc_att_embedder_pe(g.edata["att_rc"])
+        except KeyError:
+            pass
+        if self.add_rp_edges != "none":
+            try:  # if no ressource priory info in graph (ie at start state), key is absent
+                ret += self.rp_att_embedder_pe(g.edata["att_rp"].float())
+            except KeyError:
+                pass
+            return ret
+        exit()
+
     def embed_edges(
         self,
         g,
-        layer,
     ):
         if self.edge_embedding_flavor == "sum":
             ret = self.edge_type_embedder(g.edata["type"])
@@ -288,13 +378,15 @@ class PSPGnnDGL(torch.nn.Module):
             return torch.cat([eit, ec], dim=-1)
 
     def forward(self, obs):
-        observation = AgentObservation.from_gym_observation(
+        observation = AgentObservation(
             obs,
             conflicts=self.conflicts,
             add_self_loops=self.add_self_loops,
             factored_rp=self.factored_rp,
             add_rp_edges=self.add_rp_edges,
             max_n_resources=self.max_n_resources,
+            rwpe_k=self.rwpe_k,
+            rwpe_cache=self.rwpe_cache,
         )
         batch_size = observation.get_batch_size()
         n_nodes = observation.get_n_nodes()
@@ -433,6 +525,25 @@ class PSPGnnDGL(torch.nn.Module):
         g = g.to(next(self.parameters()).device)
         features = g.ndata["feat"]
 
+        if self.rwpe_k != 0:
+            # fpe_global = self.rwpe_global_embedder(g.ndata["rwpe_global"])
+            # fpe_pr = self.rwpe_pr_embedder(g.ndata["rwpe_pr"])
+            # fpe_rp = self.rwpe_rp_embedder(g.ndata["rwpe_rp"])
+            # fpe_rc = self.rwpe_rc_embedder(g.ndata["rwpe_rc"])
+            # fpe = torch.cat([fpe_global, fpe_pr, fpe_rp, fpe_rc], 1)
+            # g.ndata["pe"] = fpe
+            g.ndata["pe"] = self.rwpe_embedder(
+                torch.cat(
+                    [
+                        g.ndata["rwpe_global"],
+                        g.ndata["rwpe_pr"],
+                        g.ndata["rwpe_rp"],
+                        g.ndata["rwpe_rc"],
+                    ],
+                    1,
+                ),
+            )
+
         if self.graph_pooling == "learn":
             features[poolnodes] = self.pool_node_embedder(
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
@@ -449,41 +560,66 @@ class PSPGnnDGL(torch.nn.Module):
                 )
             )
 
+        if self.rwpe_k != 0:
+            pe = g.ndata["pe"]
+
         if self.layer_pooling == "all":
             features_list = []
         if self.normalize:
             features = self.norm0(features)
         if self.layer_pooling == "all":
-            features_list.append(features)
+            if self.rwpe_k != 0:
+                features_list.append(torch.cat([features, pe], dim=-1))
+            else:
+                features_list.append(features)
         features = self.features_embedder(features)
         if self.normalize:
             features = self.norm1(features)
         if self.layer_pooling == "all":
-            features_list.append(features)
+            if self.rwpe_k != 0:
+                features_list.append(torch.cat([features, pe], dim=-1))
+            else:
+                features_list.append(features)
 
-        # update edge feautes below
-        edge_features = self.embed_edges(g, 0)
+        edge_features = self.embed_edges(g)
+        if self.rwpe_k != 0:
+            edge_features_pe = self.embed_edges_pe(g)
 
         if self.layer_pooling == "last":
             previous_feat = features
+            if self.rwpe_k != 0:
+                previous_pe = pe
 
-        torch.autograd.set_detect_anomaly(True)
         for layer in range(self.n_layers_features_extractor):
-            # do not update edge features below
+            if self.rwpe_k != 0:
+                features = torch.cat([features, pe], dim=-1)
             if self.update_edge_features:
                 features, new_e_attr = self.features_extractors[layer](
                     g, features, edge_features.clone()
                 )
             else:
-                features, new_e_attr = self.features_extractors[layer](
+                features, _ = self.features_extractors[layer](
                     g, features, edge_features
                 )
 
             features = self.mlps[layer](features.flatten(start_dim=-2, end_dim=-1))
+
+            if self.rwpe_k != 0:
+                if self.update_edge_features_pe:
+                    pe, new_e_pe_attr = self.pe_conv[layer](
+                        g, pe, edge_features_pe.clone()
+                    )
+                else:
+                    pe, _ = self.pe_conv[layer](g, pe, edge_features_pe)
+                pe = self.pe_mlp[layer](pe.flatten(start_dim=-2, end_dim=-1))
             # update edge features below
             if self.update_edge_features:
                 edge_features += self.mlps_edges[layer](
                     new_e_attr.flatten(start_dim=-2, end_dim=-1)
+                )
+            if self.update_edge_features_pe and self.rwpe_k != 0:
+                edge_features_pe += self.mlps_edges_pe[layer](
+                    new_e_pe_attr.flatten(start_dim=-2, end_dim=-1)
                 )
             # if self.layer_pooling == "all":
             #     features_list.append(features)
@@ -491,16 +627,25 @@ class PSPGnnDGL(torch.nn.Module):
                 features = self.norms[layer](features)
             if self.residual:
                 if self.layer_pooling == "all":
-                    features += features_list[-1]
+                    features += features_list[-1][:, : self.hidden_dim]
+                    if self.rwpe_k != 0:
+                        pe += features_list[-1][:, self.hidden_dim :]
                 else:
-                    features += previous_feat
+                    features += previous_feat[:, : self.hidden_dim]
+                    if self.rwpe_k != 0:
+                        pe += previous_pe
                 if self.normalize:
                     features = self.normsbis[layer](features)
                 if self.layer_pooling == "last":
                     previous_feat = features
+                    if self.rwpe_k != 0:
+                        previous_pe = pe
 
             if self.layer_pooling == "all":
-                features_list.append(features)
+                if self.rwpe_k != 0:
+                    features_list.append(torch.cat([features, pe], dim=-1))
+                else:
+                    features_list.append(features)
 
         if self.layer_pooling == "all":
             features = torch.cat(

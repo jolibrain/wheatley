@@ -414,6 +414,12 @@ parser.add_argument(
     help="do not update edge features",
 )
 parser.add_argument(
+    "--dont_update_edge_features_pe",
+    default=False,
+    action="store_true",
+    help="do not update edge features of pe part",
+)
+parser.add_argument(
     "--ortho_embed",
     default=False,
     action="store_true",
@@ -450,6 +456,26 @@ parser.add_argument(
     default="sum",
     choices=["sum", "cat", "cartesian"],
     help="edge embedding technique for RCPSP",
+)
+
+parser.add_argument(
+    "--rwpe_k",
+    type=int,
+    default=0,
+    help="number of hops for rwpe (0 for no rwpe)",
+)
+parser.add_argument(
+    "--rwpe_h",
+    type=int,
+    default=16,
+    help="hidden dim of pe (times number of subgraphs)",
+)
+
+parser.add_argument(
+    "--cache_rwpe",
+    default=False,
+    action="store_true",
+    help="enable rwpe cache",
 )
 
 # =================================================ENVIRONMENT SPECIFICATION================================================

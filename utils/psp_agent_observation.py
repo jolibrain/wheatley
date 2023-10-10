@@ -40,9 +40,9 @@ class PSPAgentObservation:
     # resource constraints (already bidir)
     # resource priority , resource priority (reversed)
 
-    def __init__(self, graphs, glist=False):
-        self.graphs = graphs
-        self.glist = glist
+    # def __init__(self, graphs, glist=False):
+    #     self.graphs = graphs
+    #     self.glist = glist
 
     def get_batch_size(self):
         if self.glist:
@@ -55,9 +55,16 @@ class PSPAgentObservation:
         else:
             return int(self.graphs.num_nodes() / self.graphs.batch_size)
 
-    @classmethod
+    def simple_pr_graph(self, nnodes, edges):
+        edges0 = edges[0]
+        edges1 = edges[1]
+        return dgl.graph(
+            (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
+            num_nodes=nnodes,
+        )
+
     def build_graph(
-        cls,
+        self,
         n_edges,
         edges,
         nnodes,
@@ -69,9 +76,9 @@ class PSPAgentObservation:
     ):
         edges0 = edges[0]
         edges1 = edges[1]
-        type0 = [cls.edgeType["prec"]] * n_edges
+        type0 = [PSPAgentObservation.edgeType["prec"]] * n_edges
         if bidir:
-            type1 = [cls.edgeType["rprec"]] * n_edges
+            type1 = [PSPAgentObservation.edgeType["rprec"]] * n_edges
 
             gnew = dgl.graph(
                 (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
@@ -98,12 +105,6 @@ class PSPAgentObservation:
 
         gnew.edata["att_rc"] = torch.zeros((nn_edges, 2), dtype=torch.float32)
         return gnew
-
-    @classmethod
-    def get_machine_id(cls, machine_one_hot):
-        # print("machine_one_hot", machine_one_hot)
-
-        return torch.max(machine_one_hot, dim=1)
 
     @classmethod
     def add_edges(cls, g, t, edges, rid, att, type_offset=True):
@@ -304,9 +305,8 @@ class PSPAgentObservation:
         else:
             raise Exception(f"Unrecognized type of observation {type(obs)}")
 
-    @classmethod
-    def from_gym_observation(
-        cls,
+    def __init__(
+        self,
         gym_observation,
         conflicts="att",
         add_self_loops=True,
@@ -319,7 +319,10 @@ class PSPAgentObservation:
         factored_rp=False,
         add_rp_edges="all",
         max_n_resources=-1,
+        rwpe_k=0,
+        rwpe_cache=None,
     ):
+        self.rwpe_cache = rwpe_cache
         # batching on CPU for performance reasons...
         n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
 
@@ -362,14 +365,21 @@ class PSPAgentObservation:
                 n_rc_edges = torch.cat(all_nce)
                 orig_feat = orig_feat.to(torch.device("cpu"))
 
-        graphs = []
+        global_graphs = []
+        pr_graphs_num_edges = []
+        rp_graphs_num_edges = []
+        rc_graphs_num_edges = []
+        hetero_graphs = []
+
         if do_batch:
             batch_num_nodes = []
             batch_num_edges = []
 
         for i, nnodes in enumerate(n_nodes):
+            hg_dict = {}
+
             features = orig_feat[i, :nnodes, :]
-            gnew = cls.build_graph(
+            gnew = self.build_graph(
                 n_pr_edges[i],
                 pr_edges[i, :, : n_pr_edges[i].item()],
                 nnodes.item(),
@@ -379,6 +389,16 @@ class PSPAgentObservation:
                 add_rp_edges,
                 max_n_resources,
             )
+            # build simple adj graph for problem (prec + revprec)
+            # pr_graph = self.simple_pr_graph(nnodes.item(), pr_edges[i, :,:n_pr_edges[i].item()])
+            e0 = pr_edges[i, 0, : n_pr_edges[i].item()]
+            e1 = pr_edges[i, 1, : n_pr_edges[i].item()]
+            hg_dict[("task", "pr", "task")] = (
+                torch.cat([e0, e1]),
+                torch.cat([e1, e0]),
+            )
+
+            pr_graphs_num_edges.append(n_pr_edges[i] * 2)
 
             # resource priority edges
             if add_rp_edges != "none" and rp_edges.nelement() != 0:
@@ -427,6 +447,15 @@ class PSPAgentObservation:
                             rp_att[i][: n_rp_edges[i].item(), 0],
                             rp_att[i][: n_rp_edges[i].item(), 1:],
                         )
+            if add_rp_edges != "none":
+                # build simple rp graph, factored, bidir
+                e0 = rp_edges[i][0, : n_rp_edges[i].item()]
+                e1 = rp_edges[i][1, : n_rp_edges[i].item()]
+                hg_dict["task", "rp", "task"] = (
+                    torch.cat([e0, e1]),
+                    torch.cat([e1, e0]),
+                )
+                rp_graphs_num_edges.append(n_rp_edges[i].item() * 2)
 
             # resource conflicts edges
             if conflicts == "clique":
@@ -437,34 +466,82 @@ class PSPAgentObservation:
                     rc_att[i][: n_rc_edges[i].item(), 0],
                     rc_att[i][: n_rc_edges[i].item(), 1:],
                 )
+                # TODO build conflict graph, already bidir
+                e0 = rc_edges[i][0, : n_rc_edges[i].item()]
+                e1 = rc_edges[i][1, : n_rc_edges[i].item()]
+                hg_dict["task", "rc", "task"] = (
+                    torch.cat([e0, e1]),
+                    torch.cat([e1, e0]),
+                )
 
+                rc_graphs_num_edges.append(n_rc_edges[i].item() * 2)
+
+            hetero_graphs.append(dgl.heterograph(hg_dict))
             # TODO : add job_id edges, ie link modes that are for same job
 
             if add_self_loops:
                 gnew = dgl.add_self_loop(
-                    gnew, edge_feat_names=["type"], fill_data=cls.edgeType["self"]
+                    gnew,
+                    edge_feat_names=["type"],
+                    fill_data=PSPAgentObservation.edgeType["self"],
                 )
             if compute_laplacian_pe:
                 gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(
                     gnew, laplacian_pe_cache, n_laplacian_eigv
                 )
             gnew = gnew.to(device)
-            graphs.append(gnew)
+            global_graphs.append(gnew)
+
             if do_batch:
                 batch_num_nodes.append(gnew.num_nodes())
                 batch_num_edges.append(gnew.num_edges())
 
         if do_batch:
-            graph = dgl.batch(graphs)
-            graph.set_batch_num_nodes(torch.tensor(batch_num_nodes))
-            graph.set_batch_num_edges(torch.tensor(batch_num_edges))
+            self.glist = False
 
-            return cls(graph, glist=False)
+            if rwpe_k != 0:
+                for i, gg in enumerate(global_graphs):
+                    gg.ndata["rwpe_global"] = self.rwpe(gg, rwpe_k)
+                    hg = hetero_graphs[i]
+                    prg = hg.edge_type_subgraph(["pr"])
+                    gg.ndata["rwpe_pr"] = self.rwpe(prg, rwpe_k)
+                    rpg = hg.edge_type_subgraph(["rp"])
+                    gg.ndata["rwpe_rp"] = self.rwpe(rpg, rwpe_k)
+                    rcg = hg.edge_type_subgraph(["rc"])
+                    gg.ndata["rwpe_rc"] = self.rwpe(rcg, rwpe_k)
+
+            self.graphs = dgl.batch(global_graphs)
+            self.graphs.set_batch_num_nodes(torch.tensor(batch_num_nodes))
+            self.graphs.set_batch_num_edges(torch.tensor(batch_num_edges))
+
         else:
-            return cls(graphs, glist=True)
+            # TODO
+            self.graphs = global_graphs
+            self.glist = True
+            if rwpe != 0:
+                for n, g in enumerate(self.graphs):
+                    g.ndata["rwpe_pr"] = self.rwpe(pr_graphs[n], rwpe_k)
+                    g.ndata["rwpe_global"] = self.rwpe(g, rwpe_k)
+                    g.ndata["rwpe_rp"] = self.rwpe(rp_graphs[n], rwpe_k)
+                    g.ndata["rwpe_rc"] = self.rwpe(rc_graphs[n], rwpe_k)
 
     def to_graph(self):
         """
         Returns the batched graph associated with the observation.
         """
         return self.graphs
+
+    def rwpe(self, g, k):
+        if self.rwpe_cache is not None:
+            edges = g.edges(order="srcdst")
+            key = (
+                g.num_nodes(),
+                *(edges[0].tolist() + edges[1].tolist()),
+            )
+            if key in self.rwpe_cache:
+                return self.rwpe_cache[key]
+            else:
+                pe = dgl.random_walk_pe(g, k)
+                self.rwpe_cache[key] = pe
+                return pe
+        return dgl.random_walk_pe(g, k)
