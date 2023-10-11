@@ -1,8 +1,12 @@
 # Introduction
 
-Lauching : 
-```
+Launch the visdom logging server:
+```sh
 python -m visdom.server
+```
+
+Launch a training run:
+```sh
 python ./train.py
 ```
 
@@ -12,12 +16,12 @@ Status is displayed  on [localhost](http://localhost:8097).
 Commmon options:
 
 - `--n_j` : number of jobs
-- `--n_m` : maximum number of  machines
+- `--n_m` : number of  machines
 - `--total_timesteps` : total number of training timesteps
-- `--n_validation_env` : number of validation environment for averaging
-- `--n_steps_episode`: number of action per sequence (generally k *\times*  n_j $\times$ n_m)
-- `--batch_size 360` : batch size for optimisation
-- `--fe_type` :  feature extractor type dgl[default] ou pyg[deprecated] or tokengt
+- `--n_validation_env` : number of validation environment for model evaluation
+- `--n_steps_episode`: number of action per sequence (generally $k \times  n_j \times n_m$)
+- `--batch_size` : batch size for PPO
+- `--fe_type` :  feature extractor type dgl[default] ou pyg[deprecated] or tokengt[deprecated]
 - `--gconv_type` :  convolution type  (for dgl and pyg default: gatv2)
 - `--lr` : learning rate
 - `--device` : device id  `cpu`, `cuda:0` ...
@@ -40,8 +44,17 @@ See `jssp/solve.py` to see how to load and use the model in your own python scri
 
 # Small fixed random problem without uncertainty
 
-```
-python train.py --n_j 4 --n_m 4 --total_timesteps 1000000 --n_validation_env 1 --n_steps_episode 1600 --batch_size 160 --exp_name_appendix EXAMPLE1 --fixed_problem --seed 1
+```sh
+python train.py\
+    --n_j 4\
+    --n_m 4\
+    --total_timesteps 1000000\
+    --n_validation_env 1\
+    --n_steps_episode 1600\
+    --batch_size 160\
+    --exp_name_appendix EXAMPLE1\
+    --fixed_problem\
+    --seed 1
 ```
 
 - `--fixed_problem` : force use of same problem along all training
@@ -102,43 +115,58 @@ python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_
 ```
 
 
-- `--sample_n_jobs 10`: number of jobs to sample from total problem
-- `--validate_on_total_data` : force evaluation on global problem
 
-# Other options
+# All options
 
+## JSSP environment
+- `--n_j` : number of jobs
+- `--n_m` : number of  machines
+- `--max_n_j` : max number of jobs (default is  n_j) [deprecated]
+- `--max_n_m` : max number of  machines (default is  n_m) [deprecated]
 - `--max_duration` : max duration of tasks for deterministic problem generation
-- `--max_n_j` : max number of jobs default is  n_j [deprecated]
-- `--max_n_m` : max number of  machines, default is  n_m [deprecated]
-- `--path` : path for saving learned networks
-- `--vecenv_type` : type of threading for data collection
-- `--n_epochs` : number of time a given replay buffer is used during training
-- `--fe_lr` : learning rate of ther feature extreactor, if different from global learning rate
-- `--optimizer`: optimizer to use
-- `--freeze_graph` : freeze graph during learning (for debugging purposes)
-- `--custom_heuristic_name`: custom dispatch rule to compare to 
-- `--retrain` : restart training from former network
+- `--duration_type` : either stochastic or deterministic
+- `--generate_duration_bounds X Y` : real durations are sampled within the bounds ($-X\%$, $+Y\%$)
+- `--load_problem` :  forces to read a problem definition instead of generating one
+- `--first_machine_id_is_one` : in pure taillard format, machine numbering start at 1
+- `--load_from_job` : index of first job to use
+- `--load_max_jobs` : max number of jobs to use
 
-## Test and validation options
-
-- `--fixed_validation`: use same problems for agent evaluation and or-tools
-- `--fixed_random_validation`: number of fixed problem to generate for validation
-- `--validation_freq`: number of steps between evaluations
-- `--max_time_ortools`: or-tools timeout
-- `--n_test_problems`: number of problems to generate for validation (in case they are not pre-generated with fixed_validation and fixed_random_validation
-- `--test_print_every`: print frequency of evaluations
-
-##  PPO Options
-
+## PPO training
+- `--lr` : learning rate
 - `--gamma` : discount factor, default 1 for finite horizon
 - `--clip_range`: clip gradients
 - `--target_kl`: target kl for PPO
 - `--ent_coef`: entropy coefficient in PPO loss
 - `--vf_coef`: value function coefficient in PPO loss
 - `--dont_normalize_advantage`: do not normlize advantage function
+- `--fe_lr` : learning rate of ther feature extreactor, if different from global learning rate
+- `--n_epochs` : number of time a given replay buffer is used during training
+- `--optimizer`: optimizer to use
+- `--freeze_graph` : freeze graph during learning (for debugging purposes)
+- `--total_timesteps` : total number of training timesteps
+- `--n_steps_episode`: number of action per sequence (generally $k \times  n_j \times n_m$)
+- `--batch_size` : batch size for PPO
+- `--fixed_problem` : force use of same problem along all training
 
-## GNN options:
+## Computation efficiency
+- `--device` : device id  `cpu`, `cuda:0` ...
+- `--n_workers` : number of data collecting threads (size of data buffer is n_steps_episode $\times$ n_workers)
+- `--vecenv_type` : type of threading for data collection
 
+## Test and validation options
+- `--n_validation_env` : number of validation environment for model evaluation
+- `--fixed_validation`: fix and use same problems for agent evaluation and or-tools
+- `--fixed_random_validation`: number of fixed problem to generate for validation
+- `--validation_freq`: number of steps between evaluations
+- `--max_time_ortools`: or-tools timeout
+- `--n_test_problems`: number of problems to generate for validation (in case they are not pre-generated with fixed_validation and fixed_random_validation
+- `--test_print_every`: print frequency of evaluations
+
+## Baseline comparisons
+- `--ortools_strategy` : any number of strategies to use for the OR-Tools solver (`realistic`, `averagistic`)
+- `--custom_heuristic_names` : heuristics to use as a comparison (`SPT`, `MWKR`, `MOPNR`, `FDD/MWKR`)
+
+## GNN model
 - `--graph_pooling`:  global pooling mode default is learn (ie pool node)
 - `--mlp_act`: activation function in MLP in GNN (if any, default to gelu)
 - `--graph_has_relu`: add (r)elu in GNN
@@ -165,10 +193,63 @@ python train.py --n_j 100 --n_m 20 --n_steps_episode 4000 --n_workers 2 --total_
 - `--observe_duration_when_affect` : with this option, real durations are observed at affectation time and used to tighten task completion time bounds. 
 - `--do_not_observe_updated_bounds`: task completion time (tct) bounds are computed on-the-fly during trial (necessary for L2D reward model), with this option updated tct bounds are not given to the agent (not observed)
 
-## Sub problem sampling:
+## Sub problem sampling
 - `--load_from_job` : start index for sub problem sampling
 - `--load_max_jobs` : max number of jobs for sampling
-- `--sample_n_jobs` : number of  jobs to sample
+- `--sample_n_jobs` : number of jobs to sample
 - `--chunk_n_jobs` : sliding window size
+- `--validate_on_total_data` : force evaluation on global problem
 
+## Model weights loading
+- `--resume` : use the experiment exact name to load the weight of the previous saved model
+- `--retrain PATH` : load the model pointed by the PATH
+- `--reinit_head_before_ppo` : replace the actor and policy heads by newly initialized weights just before starting PPO (and after all model's weights), useful after a pretraining for example
 
+## Others
+- `--path` : directory where training logs are saved, a subdirectory is created for each new training
+
+# Real example
+
+Training a GNN on 10x10 random stochastic instances from scratch :
+```sh
+python3 train.py\
+    --n_j 10\
+    --n_m 10\
+    --max_n_j 20\
+    --max_n_m 20\
+    --lr 1e-5\
+    --ent_coef 0.01\
+    --vf_coef 2.0\
+    --target_kl 0.04\
+    --clip_range 0.20\
+    --gamma 0.99\
+    --gae_lambda 0.95\
+    --optimizer adamw\
+    --fe_type dgl\
+    --residual_gnn\
+    --graph_has_relu\
+    --graph_pooling learn\
+    --hidden_dim_features_extractor 64\
+    --n_layers_features_extractor 10\
+    --mlp_act gelu\
+    --layer_pooling last\
+    --n_mlp_layers_features_extractor 1\
+    --n_mlp_layers_actor 1\
+    --n_mlp_layers_critic 1\
+    --hidden_dim_actor 32\
+    --hidden_dim_critic 32\
+    --total_timesteps 10000000\
+    --n_validation_env 100\
+    --n_steps_episode 4900\
+    --batch_size 245\
+    --n_epochs 3\
+    --fixed_validation\
+    --custom_heuristic_names SPT MWKR MOPNR FDD/MWKR\
+    --seed 0\
+    --duration_type stochastic\
+    --generate_duration_bounds 0.05 0.1\
+    --ortools_strategy averagistic realistic\
+    --device cuda:3\
+    --n_workers 10\
+    --exp_name_appendix random-instances_from-scratch
+```

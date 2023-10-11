@@ -1,4 +1,4 @@
-# Wheatley 
+# Wheatley
 
 A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems, and more.
 
@@ -23,9 +23,9 @@ A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, tar
 
 Note: for windows users, we strongly recommend to use [anaconda](https://www.anaconda.com/)
 
-## Run Model:
+## How to use
 
-See [docs/USAGE.md](docs/USAGE.md)
+See [JSSP](docs/JSSP.md), [PSP](/docs/PSP.md) and [ADVICE](/docs/ADVICE.md) for more information.
 
 ## Contribute
 If you want to contribute to wheatley, make sure to install the pre-commit hooks:
