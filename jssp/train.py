@@ -22,11 +22,6 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import sys
-
-sys.path.append("..")
-
-
 import os
 
 import numpy as np
@@ -34,17 +29,17 @@ import torch
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from jssp.env.env import Env
-from jssp.env.env_specification import EnvSpecification
 from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
-from jssp.models.agent import Agent
 from generic.training_specification import TrainingSpecification
 from jssp.description import Description as ProblemDescription
+from jssp.env.env import Env
+from jssp.env.env_specification import EnvSpecification
+from jssp.models.agent import Agent
 from jssp.utils.utils import load_problem
 
 
-def main(args, exp_name, path):
+def main(args, exp_name, path) -> float:
     torch.distributions.Distribution.set_default_validate_args(False)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -280,7 +275,7 @@ def main(args, exp_name, path):
         Env,
         validator,
     )
-    ppo.train(
+    return ppo.train(
         agent,
         problem_description,
         env_specification,
@@ -296,6 +291,8 @@ def main(args, exp_name, path):
 
 
 if __name__ == "__main__":
-    from args import args, exp_name, path
+    from args import argument_parser, parse_args
 
+    parser = argument_parser()
+    args, exp_name, path = parse_args(parser)
     main(args, exp_name, path)

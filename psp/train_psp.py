@@ -34,18 +34,21 @@ import torch
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from args import args, exp_name, get_path, path
-from psp.env.env import Env
-from psp.env.env_specification import EnvSpecification
+from args import argument_parser, get_path, parse_args
 from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
-from psp.models.agent import Agent
 from generic.training_specification import TrainingSpecification
 from psp.description import Description
+from psp.env.env import Env
+from psp.env.env_specification import EnvSpecification
+from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
 
 
 def main():
+    parser = argument_parser()
+    args, exp_name, path = parse_args(parser)
+
     exp_name = args.exp_name_appendix
     path = get_path(args.path, exp_name)
     torch.distributions.Distribution.set_default_validate_args(False)

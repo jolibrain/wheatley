@@ -237,7 +237,7 @@ class PPO:
         opt_state_dict=None,
         skip_initial_eval=False,
         skip_model_trace=False,
-    ):
+    ) -> float:
         # env setup
         batch_size = self.num_envs * self.num_steps
         classVecEnv = gym.vector.AsyncVectorEnv
@@ -552,3 +552,10 @@ class PPO:
             self.logger.dump(step=self.global_step)
 
         envs.close()
+
+        ppo_makespans = np.array(self.validator.makespans)
+        ortools_makespans = np.array(
+            self.validator.ortools_makespans[self.validator.default_ortools_strategy]
+        )
+        ratios = ppo_makespans / ortools_makespans
+        return np.min(ratios)
