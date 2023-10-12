@@ -35,7 +35,7 @@ import torch.optim as optim
 import torchinfo
 import tqdm
 
-from utils.utils import decode_mask, get_obs, safe_mean
+from generic.utils import decode_mask, get_obs, safe_mean
 
 from .logger import Logger, configure_logger, monotony, stability
 
