@@ -53,11 +53,11 @@ class Solution:
     def __init__(
         self, job_schedule=None, modes=None, mode_schedule=None, real_durations=None
     ):
-        self.job_schedule = job_schedule
-        self.modes = modes
-        self.mode_schedule = mode_schedule
-        self.real_durations = real_durations
+        self.job_schedule = np.array(job_schedule)
+        self.modes = np.array(modes)
+        self.mode_schedule = np.array(mode_schedule)
+        self.real_durations = np.array(real_durations)
         self.schedule = (self.job_schedule, self.modes)
 
-    def get_makespan(self):  # return start of sink
-        return self.job_schedule[-1]
+    def get_makespan(self):
+        return max(self.job_schedule + self.real_durations)

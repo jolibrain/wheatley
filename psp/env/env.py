@@ -99,7 +99,7 @@ class Env(gym.Env):
         # if needed, remove tct from obs (reward is computed on tct on obs ... )
         if self.env_specification.do_not_observe_updated_bounds:
             next_obs.features = next_obs.features.clone()
-            next_obs.features[:, 2:6] = -1
+            next_obs.features[:, 7:10] = -1
 
         # Getting final necessary information
         done = self.done()
