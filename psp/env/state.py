@@ -79,7 +79,9 @@ class State:
                 for orig_mode in self.job_modes[n]:
                     for dest_mode in self.job_modes[succ_job - 1]:
                         self.problem_edges.append((orig_mode, dest_mode))
-        self.problem_graph = nx.DiGraph(self.problem_edges)
+        self.problem_graph = nx.DiGraph()
+        self.problem_graph.add_nodes_from(range(0, problem["n_modes"]))
+        self.problem_graph.add_edges_from(self.problem_edges)
         # nx.draw_networkx(self.graph)
         # plt.show()
         self.numpy_problem_graph = np.transpose(np.array(self.problem_edges))
@@ -219,7 +221,6 @@ class State:
 
         no_parents_pos = np.where(in_deg[:, 1] == 0)[0]
         no_parents = in_deg[no_parents_pos][:, 0]
-        # print('no_parents', no_parents)
 
         self.features[no_parents, 3] = -1  # source
 
@@ -234,7 +235,6 @@ class State:
 
         no_parents_pos = np.where(in_deg[:, 1] == 0)[0]
         no_parents = in_deg[no_parents_pos][:, 0]
-        # print('no_parents', no_parents)
 
         self.features[no_parents, 1] = 1
 

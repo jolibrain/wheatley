@@ -27,7 +27,7 @@
 import collections
 from ortools.sat.python import cp_model
 from copy import deepcopy
-
+import numpy as np
 from psp.solution import Solution
 
 
@@ -105,9 +105,10 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
 
     return (
         Solution(
-            [e / scaling_constant_ortools for e in assignment[0]],
-            assignment[1],
-            [d / scaling_constant_ortools for d in durations],
+            np.array([e / scaling_constant_ortools for e in assignment[0]]),
+            np.array(assignment[1]),
+            None,
+            np.array([d / scaling_constant_ortools for d in durations]),
         ),
         optimal,
     )
