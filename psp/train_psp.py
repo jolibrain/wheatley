@@ -21,11 +21,6 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import sys
-
-sys.path.append("..")
-
-
 import os
 import random
 
@@ -34,7 +29,7 @@ import torch
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from args import argument_parser, get_path, parse_args
+from args import get_path
 from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
@@ -45,10 +40,7 @@ from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
 
 
-def main():
-    parser = argument_parser()
-    args, exp_name, path = parse_args(parser)
-
+def main(args, exp_name, path):
     exp_name = args.exp_name_appendix
     path = get_path(args.path, exp_name)
     torch.distributions.Distribution.set_default_validate_args(False)
@@ -61,9 +53,10 @@ def main():
 
     if args.load_problem is None:
         if args.train_dir is None:
-            print("--load_problem or --train_dir is mandatory")
+            raise RuntimeError("--train_dir is mandatory")
         else:
             train_psps = loader.load_directory(args.train_dir)
+
         if args.test_dir is not None:
             test_psps = loader.load_directory(args.test_dir)
         else:
@@ -271,5 +264,8 @@ def main():
 
 
 if __name__ == "__main__":
-    exp_name = "JSSP"
-    main()
+    from args import argument_parser, parse_args
+
+    parser = argument_parser()
+    args, exp_name, path = parse_args(parser)
+    main(args, exp_name, path)
