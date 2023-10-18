@@ -29,6 +29,7 @@ from tqdm import tqdm
 
 from generic.training_specification import TrainingSpecification
 from generic.utils import get_obs
+from jssp.utils.ortools import get_ortools_trajectory_and_past_actions
 from jssp.utils.utils import rebatch_obs
 
 

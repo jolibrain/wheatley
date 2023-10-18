@@ -4,16 +4,16 @@ import json
 
 import torch
 
-from env.jssp_env_specification import JSSPEnvSpecification
-from models.agent_specification import AgentSpecification
-from models.agent_validator import AgentValidator
-from models.jssp_agent import JSSPAgent
-from models.training_specification import TrainingSpecification
-from problem.jssp_description import JSSPDescription
+from generic.agent_specification import AgentSpecification
+from generic.agent_validator import AgentValidator
+from generic.training_specification import TrainingSpecification
+from jssp.description import Description
+from jssp.env.env_specification import EnvSpecification
+from jssp.models.agent import Agent
 
 
-def load_agent(args: argparse.Namespace, path: str) -> JSSPAgent:
-    env_specification = JSSPEnvSpecification(
+def load_agent(args: argparse.Namespace, path: str) -> Agent:
+    env_specification = EnvSpecification(
         max_n_jobs=args.max_n_j,
         max_n_machines=args.max_n_m,
         normalize_input=not args.dont_normalize_input,
@@ -60,11 +60,15 @@ def load_agent(args: argparse.Namespace, path: str) -> JSSPAgent:
         performer_auto_check_redraw=args.performer_auto_check_redraw,
         vnode=args.vnode,
         update_edge_features=not args.dont_update_edge_features,
+        update_edge_features_pe=not args.dont_update_edge_features_pe,
+        rwpe_h=args.rwpe_h,
+        rwpe_k=args.rwpe_k,
+        cache_rwpe=args.cache_rwpe,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
         mid_in_edges=args.mid_in_edges,
     )
-    agent = JSSPAgent.load(path)
+    agent = Agent.load(path)
     agent.env_specification = env_specification
     agent.agent_specification = agent_specification
     agent.to(agent_specification.device)
@@ -72,15 +76,16 @@ def load_agent(args: argparse.Namespace, path: str) -> JSSPAgent:
 
 
 def load_validator(
-    n_j: int, n_m: int, agent: JSSPAgent, args: argparse.Namespace
+    n_j: int, n_m: int, agent: Agent, args: argparse.Namespace
 ) -> AgentValidator:
     """Evaluate the model on random instances of all sizes."""
     affectations, durations = None, None
-    eval_problem_description = JSSPDescription(
+    eval_problem_description = Description(
         transition_model_config=args.transition_model_config,
         reward_model_config=args.reward_model_config,
         deterministic=(args.duration_type == "deterministic"),
         fixed=args.fixed_problem,
+        seed=args.seed,
         affectations=affectations,
         durations=durations,
         n_jobs=n_j,
@@ -134,9 +139,7 @@ def load_validator(
     return validator
 
 
-def eval_on_instances(
-    agent: JSSPAgent, instances: list, args: argparse.Namespace
-) -> dict:
+def eval_on_instances(agent: Agent, instances: list, args: argparse.Namespace) -> dict:
     perfs = dict()
 
     for n_j, n_m in instances:
@@ -172,7 +175,10 @@ def save_perfs(perfs: dict, path: str):
 
 
 if __name__ == "__main__":
-    from args import args
+    from args import argument_parser, parse_args
+
+    parser = argument_parser()
+    args, _, _ = parse_args(parser)
 
     instances = [
         (6, 6),
