@@ -54,7 +54,7 @@ possible_args = {
     "generate_duration_bounds": ["0.05 0.1"],
     "ortools_strategy": ["averagistic realistic", "pessimistic"],
     "device": ["cuda:0"],
-    "n_workers": [1, 2],
+    "n_workers": [2],
     "skip_initial_eval": [True, False],
 }
 
