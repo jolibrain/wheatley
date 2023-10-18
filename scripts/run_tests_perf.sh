@@ -11,7 +11,7 @@ echo "Specified output directory: $OUT_DIR."
 mkdir -p "$OUT_DIR"
 
 echo "Running pytests."
-for test_file in $(find tests/ -type f -name "*.py" ! -name "*_perf.py"); do
+for test_file in tests/*_perf.py; do
     # Run the test and save the output to a file.
     echo "Running $test_file."
     python3 -m pytest "$test_file" "$OUT_DIR"
