@@ -24,7 +24,7 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import torch
+import numpy as np
 
 
 class TerminalRewardModel:
@@ -36,8 +36,10 @@ class TerminalRewardModel:
         Reward is 0 for every time steps, except for the last one, where it is the opposite of the Makespan
         """
         if state.succeeded():
-            makespan = state.tct(-1)[0].item() / len(state.job_modes)
-            return -makespan
+            sinks = np.where(state.types() == 1)[0]
+            sinks_makespans = state.tct(sinks)
+            max_makespan = np.max(sinks_makespans)
+            return -max_makespan / len(state.job_modes)
         if state.finished():
             return -state.undoable_makespan / len(state.job_modes)
         return 0
