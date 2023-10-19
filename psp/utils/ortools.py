@@ -48,7 +48,7 @@ def compute_ortools_makespan_on_real_duration(solution, state):
 
         datemin = np.where(aff == aff.min(), True, False)
         selectables = np.where(state.selectables() == 1, True, False)
-        dateminAndSelectable = np.logical_and(m, s)
+        dateminAndSelectable = np.logical_and(datemin, selectables)
         index = np.argmax(dateminAndSelectable)  # get first
         modeid = solution.modes[index]
         aff[index] = float("inf")
