@@ -28,8 +28,30 @@ import collections
 from ortools.sat.python import cp_model
 from copy import deepcopy
 import numpy as np
+from operator import itemgetter
 from psp.solution import Solution
 
+def node_from_job_mode(problem, jobid, modeid):
+    nid = 0
+    for i in range(jobid):
+        nid += problem["job_info"][i][0]
+    return nid + modeid
+
+def compute_ortools_makespan_on_real_duration(solution, state):
+    state.reset()  # reset do not redraw real durations
+
+    aff = solution.job_schedule
+    mid = solution.modes
+    while True:
+        index, element = min(enumerate(aff), key=itemgetter(1))
+        if element == float("inf"):
+            break
+        modeid = mid[index]
+        aff[index] = float("inf")
+        nid = node_from_job_mode(state.problem, index, modeid)
+        state.affect_job(node_from_job_mode(state.problem, index, modeid))
+
+    return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
 
 def get_ortools_makespan_psp(
     env,
