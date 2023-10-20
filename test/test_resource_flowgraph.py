@@ -3,7 +3,7 @@ import sys
 sys.path.append(".")
 
 # import pytest
-from utils.resource_flowgraph import ResourceFlowGraph
+from psp.utils.resource_flowgraph import ResourceFlowGraph
 
 
 def test_resource_flowgraph():

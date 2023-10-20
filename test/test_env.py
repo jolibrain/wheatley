@@ -1,4 +1,6 @@
-from env.psp_env import PSPEnv
+import sys
+
+from psp.env.env import Env
 import numpy as np
 
 

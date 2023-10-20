@@ -113,11 +113,14 @@ class AgentObservation:
             tt = t
         if tt == "rp" and type_offset:
             # offset for timetype to make it different from fill value (which is zero)
-            att[:, -1] = att[:, -1] + 1
+            new_att = att.clone()
+            new_att[:, -1] = new_att[:, -1] + 1
+        else:
+            new_att = att
         g.add_edges(
             edges[0],
             edges[1],
-            data={"type": t_type, "rid": rid.int() + 1, "att_" + tt: att},
+            data={"type": t_type, "rid": rid.int() + 1, "att_" + tt: new_att},
         )
         return g
 
@@ -326,6 +329,7 @@ class AgentObservation:
 
         n_pr_edges = gym_observation["n_pr_edges"].long().to(torch.device("cpu"))
         pr_edges = gym_observation["pr_edges"].long().to(torch.device("cpu"))
+
         if add_rp_edges != "none":
             n_rp_edges = gym_observation["n_rp_edges"].long().to(torch.device("cpu"))
             rp_edges = gym_observation["rp_edges"].long().to(torch.device("cpu"))
@@ -341,7 +345,6 @@ class AgentObservation:
                 n_rc_edges = (
                     gym_observation["n_rc_edges"].long().to(torch.device("cpu"))
                 )
-
                 rc_edges = gym_observation["rc_edges"].long().to(torch.device("cpu"))
                 rc_att = gym_observation["rc_att"].to(torch.device("cpu"))
                 orig_feat = orig_feat.to(torch.device("cpu"))

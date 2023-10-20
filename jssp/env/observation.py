@@ -89,7 +89,7 @@ class EnvObservation:
 
         features = torch.empty((self.max_n_nodes, self.features.shape[1]))
         features[0 : self.get_n_nodes(), :] = self.features
-        edge_index = np.empty((2, self.max_n_edges))
+        edge_index = np.zeros((2, self.max_n_edges))
         edge_index[:, 0 : self.get_n_edges()] = self.edge_index
 
         if self.observe_conflicts_as_cliques:

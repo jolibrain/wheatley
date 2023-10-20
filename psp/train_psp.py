@@ -22,6 +22,10 @@
 #
 
 import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 import random
 
 import numpy as np
@@ -35,6 +39,7 @@ from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
 from psp.description import Description
 from psp.env.env import Env
+from psp.env.genv import GEnv
 from psp.env.env_specification import EnvSpecification
 from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
@@ -211,7 +216,9 @@ def main(args, exp_name, path):
         agent.agent_specification = agent_specification
     else:
         agent = Agent(
-            env_specification=env_specification, agent_specification=agent_specification
+            env_specification=env_specification,
+            agent_specification=agent_specification,
+            graphobs=args.vecenv_type == "graphgym",
         )
 
     if args.pretrain:
@@ -243,10 +250,15 @@ def main(args, exp_name, path):
         args.device,
         training_specification,
         args.disable_visdom,
+        graphobs=args.vecenv_type == "graphgym",
     )
+    if args.vecenv_type == "graphgym":
+        env_cls = GEnv
+    else:
+        env_cls = Env
     ppo = PPO(
         training_specification,
-        Env,
+        env_cls,
         validator,
     )
     ppo.train(

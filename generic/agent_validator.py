@@ -39,12 +39,13 @@ import visdom
 from PIL import Image
 
 from generic.random_agent import RandomAgent
-from generic.utils import decode_mask, get_obs, safe_mean
+from generic.utils import decode_mask, safe_mean
 from jssp.description import Description as JSSPDescription
 from jssp.env.env import Env as JSSPEnv
 from jssp.models.custom_agent import CustomAgent
 from jssp.utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
 from psp.env.env import Env as PSPEnv
+from psp.env.genv import GEnv
 from psp.utils.ortools import get_ortools_makespan_psp
 
 
@@ -56,8 +57,9 @@ class AgentValidator:
         device,
         training_specification,
         disable_visdom,
-        validation_envs = None,
+        validation_envs=None,
         verbose=2,
+        graphobs=False,
     ):
         super().__init__()
 
@@ -68,8 +70,13 @@ class AgentValidator:
         else:
             self.psp = True
 
+        self.graphobs = graphobs
+
         if self.psp:
-            self.env_cls = PSPEnv
+            if self.graphobs:
+                self.env_cls = GEnv
+            else:
+                self.env_cls = PSPEnv
         else:
             self.env_cls = JSSPEnv
         if training_specification.validate_on_total_data:
@@ -371,12 +378,6 @@ class AgentValidator:
                 writer.writerow(line)
         f.close()
 
-    def rebatch_obs(self, obs_list):
-        obs = {}
-        for key in obs_list[0]:
-            obs[key] = torch.cat([_obs[key] for _obs in obs_list])
-        return obs
-
     def _evaluate_agent(self, agent):
         mean_makespan = 0
         ortools_mean_makespan = {
@@ -396,12 +397,12 @@ class AgentValidator:
             ]
             all_masks = decode_mask([rdata[1]["mask"] for rdata in all_rdata])
             while envs:
-                all_obs = self.rebatch_obs(all_obs)
+                all_obs = agent.rebatch_obs(all_obs)
                 all_actions = []
                 for i in range(0, len(envs), self.batch_size):
                     bs = min(self.batch_size, len(envs) - i)
                     actions = agent.predict(
-                        get_obs(all_obs, list(range(i, i + bs))),
+                        agent.get_obs(all_obs, list(range(i, i + bs))),
                         action_masks=all_masks[i : i + bs],
                         deterministic=True,
                     )

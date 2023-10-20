@@ -2,7 +2,7 @@ import sys
 
 sys.path.append(".")
 
-from utils.loaders import PSPLoader
+from psp.utils.loaders import PSPLoader
 
 
 def test_psp_loader_rcp():

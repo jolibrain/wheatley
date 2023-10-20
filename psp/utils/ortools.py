@@ -32,6 +32,25 @@ from ortools.sat.python import cp_model
 
 from psp.solution import Solution
 
+from psp.env.genv import GEnv
+
+
+def compute_ortools_makespan_on_real_duration(solution, state):
+    state.reset()  # reset do not redraw real durations
+
+    aff = solution.job_schedule
+    mid = solution.modes
+    while True:
+        index, element = min(enumerate(aff), key=itemgetter(1))
+        if element == float("inf"):
+            break
+        modeid = mid[index]
+        aff[index] = float("inf")
+        nid = node_from_job_mode(state.problem, index, modeid)
+        state.affect_job(node_from_job_mode(state.problem, index, modeid))
+
+    return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
+
 
 def node_from_job_mode(problem, jobid, modeid):
     nid = 0
@@ -78,6 +97,8 @@ def get_ortools_makespan_psp(
         print("unknow ortools strategy ", ortools_strategy)
         exit()
 
+    if isinstance(env, GEnv):
+        durations = durations.numpy()
     solution, optimal = solve_psp(
         env.problem, durations, max_time_ortools, scaling_constant_ortools
     )

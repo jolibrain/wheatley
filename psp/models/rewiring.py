@@ -32,6 +32,7 @@ def learned_graph_pool(
     typeid,
     revtypeid,
     inverse_pooling=False,
+    graphobs=False,
 ):
     poolnodes = list(range(node_offset, node_offset + batch_size))
     g.add_nodes(
@@ -46,15 +47,22 @@ def learned_graph_pool(
         ei1 += list(range(startnode, startnode + origbnn[i]))
         startnode += origbnn[i]
 
-    g.add_edges(
-        list(range(node_offset, node_offset + batch_size)),
-        list(range(node_offset, node_offset + batch_size)),
-        data={"type": torch.LongTensor([0] * batch_size)},
-    )
-
-    g.add_edges(ei1, ei0, data={"type": torch.LongTensor([typeid] * len(ei0))})
+    # g.add_edges(
+    #     list(range(node_offset, node_offset + batch_size)),
+    #     list(range(node_offset, node_offset + batch_size)),
+    #     data={"type": torch.LongTensor([0] * batch_size)},
+    # )
+    if graphobs:
+        g.add_edges(ei1, ei0, etype="pool")
+    else:
+        g.add_edges(ei1, ei0, data={"type": torch.LongTensor([typeid] * len(ei0))})
     if inverse_pooling:
-        g.add_edges(ei0, ei1, data={"type": torch.LongTensor([revtypeid] * len(ei0))})
+        if graphobs:
+            g.add_edges(ei0, ei1, etype="rpool")
+        else:
+            g.add_edges(
+                ei0, ei1, data={"type": torch.LongTensor([revtypeid] * len(ei0))}
+            )
 
     return g, poolnodes, node_offset + batch_size
 
@@ -68,8 +76,12 @@ def node_conflicts(
     max_n_resources,
     input_dim_features_extractor,
     edge_type_offset,
+    graphobs,
 ):
-    resources_used = g.ndata["feat"][:, first_res_index:]
+    if graphobs:
+        resources_used = g.ndata["resources"]
+    else:
+        resources_used = g.ndata["feat"][:, first_res_index:]
     num_resources = resources_used.shape[1]
     resource_nodes = list(range(node_offset, node_offset + num_resources * batch_size))
     batch_id = []
@@ -100,47 +112,80 @@ def node_conflicts(
         list(range(num_resources)) * batch_size
     ) + torch.LongTensor([edge_type_offset] * len(resource_nodes))
 
-    g.add_edges(
-        resource_nodes,
-        resource_nodes,
-        # we could use different self loop type per resource
-        data={"type": rntype},
-        # data={"type": torch.LongTensor([10] * len(resource_nodes))},
-    )
     rc = torch.gather(resources_used[consumers], 1, idxaffected[1].unsqueeze(1)).expand(
         nconsumers, 2
     )
 
-    g.add_edges(
-        consumers,
-        resource_index,
-        data={
-            # "type": torch.LongTensor([10] * nconsumers),
-            "type": torch.LongTensor([edge_type_offset + num_resources] * nconsumers)
-            + idxaffected[1].long(),
-            "rid": idxaffected[1].int(),
-            "att_rc": rc,
-        },
-    )
-    g.add_edges(
-        resource_index,
-        consumers,
-        data={
-            # "type": torch.LongTensor([11] * nconsumers),
-            "type": torch.LongTensor(
-                [edge_type_offset + 2 * num_resources] * nconsumers
-            )
-            + idxaffected[1].long(),
-            "rid": idxaffected[1].int(),
-            "att_rc": rc,
-        },
-    )
+    if graphobs:
+        g.add_edges(
+            consumers,
+            resource_index,
+            etype="nodeconf",
+            data={
+                # "type": torch.LongTensor([10] * nconsumers),
+                "type": torch.LongTensor(
+                    [edge_type_offset + num_resources] * nconsumers
+                )
+                + idxaffected[1].long(),
+                "rid": idxaffected[1].int(),
+                "att_rc": rc,
+            },
+        )
+        g.add_edges(
+            resource_index,
+            consumers,
+            etype="rnodeconf",
+            data={
+                # "type": torch.LongTensor([11] * nconsumers),
+                "type": torch.LongTensor(
+                    [edge_type_offset + 2 * num_resources] * nconsumers
+                )
+                + idxaffected[1].long(),
+                "rid": idxaffected[1].int(),
+                "att_rc": rc,
+            },
+        )
+
+    else:
+        g.add_edges(
+            consumers,
+            resource_index,
+            data={
+                # "type": torch.LongTensor([10] * nconsumers),
+                "type": torch.LongTensor(
+                    [edge_type_offset + num_resources] * nconsumers
+                )
+                + idxaffected[1].long(),
+                "rid": idxaffected[1].int(),
+                "att_rc": rc,
+            },
+        )
+        g.add_edges(
+            resource_index,
+            consumers,
+            data={
+                # "type": torch.LongTensor([11] * nconsumers),
+                "type": torch.LongTensor(
+                    [edge_type_offset + 2 * num_resources] * nconsumers
+                )
+                + idxaffected[1].long(),
+                "rid": idxaffected[1].int(),
+                "att_rc": rc,
+            },
+        )
     node_offset += num_resources * batch_size
     return g, resource_nodes, node_offset + num_resources * batch_size
 
 
 def vnode(
-    g, node_offset, batch_size, input_dim_features_extractor, origbnn, etype, revetype
+    g,
+    node_offset,
+    batch_size,
+    input_dim_features_extractor,
+    origbnn,
+    etype,
+    revetype,
+    graphobs,
 ):
     vnodes = list(range(node_offset, node_offset + batch_size))
     g.add_nodes(
@@ -161,8 +206,12 @@ def vnode(
     #     data={"type": torch.LongTensor([0] * batch_size)},
     # )
 
-    g.add_edges(ei1, ei0, data={"type": torch.LongTensor([etype] * len(ei0))})
-    g.add_edges(ei0, ei1, data={"type": torch.LongTensor([revetype] * len(ei0))})
+    if graphobs:
+        g.add_edges(ei1, ei0, etype="vnode")
+        g.add_edges(ei0, ei1, etype="rvnode")
+    else:
+        g.add_edges(ei1, ei0, data={"type": torch.LongTensor([etype] * len(ei0))})
+        g.add_edges(ei0, ei1, data={"type": torch.LongTensor([revetype] * len(ei0))})
 
     return g, vnodes, node_offset + batch_size
 
@@ -181,6 +230,7 @@ def rewire(
     resource_edge_type_offset,
     vnodeetype,
     vnoderevetype,
+    graphobs,
 ):
     node_offset = g.num_nodes()
     origbnn = g.batch_num_nodes()
@@ -194,6 +244,8 @@ def rewire(
             input_dim_features_extractor,
             poolnodeetype,
             poolnoderevetype,
+            inverse_pooling=False,
+            graphobs=graphobs,
         )
     else:
         poolnodes = None
@@ -208,6 +260,7 @@ def rewire(
             max_n_resources,
             input_dim_features_extractor,
             resource_edge_type_offset,
+            graphobs,
         )
     else:
         resource_nodes = None
@@ -221,8 +274,72 @@ def rewire(
             origbnn,
             vnodeetype,
             vnoderevetype,
+            graphobs,
         )
     else:
         vnodes = None
 
     return g, poolnodes, resource_nodes, vnodes
+
+
+def homogeneous_edges(g, edgetypes, factored_rp, max_n_resources):
+    # TODO create homogeneous features for all edges of interest
+    # edge type :
+    #    prec
+    #   rprec
+    #    rc
+    #   rrc [same type as rc]
+    #    rp
+    #   rrp
+    #    pool
+    #   rpool
+    #  nodeconf
+    #  rnodeconf
+    #    self
+    # vnode
+    # rvnode
+    #
+    # actual features:
+    # type : int
+    # rid : int
+    # att_rp    : factorred: 3*max_res    nonfact: 3
+    # att_rc   : 2
+    for t in edgetypes.keys():
+        g.edges[t].data["type"] = (
+            torch.zeros((g.num_edges(etype=t)), dtype=torch.long) + edgetypes[t]
+        )
+
+        if t not in ["rc", "nodeconf", "rnodeconf"] or g.num_edges(etype=t) == 0:
+            g.edges[t].data["rid"] = torch.zeros(
+                (g.num_edges(etype=t)), dtype=torch.int
+            )
+
+        if t not in ["nodeconf", "rcondeconf"]:
+            g.edges[t].data["att_rc"] = torch.zeros(
+                (g.num_edges(etype=t), 2), dtype=torch.float
+            )
+
+        if factored_rp:
+            g.edges[t].data["att_rp"] = torch.zeros(
+                (g.num_edges(etype=t), 3 * max_n_resources), dtype=torch.float
+            )
+        else:
+            g.edges[t].data["att_rp"] = torch.zeros(
+                (g.num_edges(etype=t), 3), dtype=torch.float
+            )
+
+    if g.num_edges(etype="rp") != 0:
+        if factored_rp:
+            g.edges["rp"].data["att_rp"] = g.edges["rp"].data["r"]
+            g.edges["rrp"].data["att_rp"] = g.edges["rrp"].data["r"]
+        else:
+            g.edges["rp"].data["rid"] = (g.edges["rp"].data["r"][:, 0] + 1).int()
+            g.edges["rrp"].data["rid"] = (g.edges["rrp"].data["r"][:, 0] + 1).int()
+            g.edges["rp"].data["att_rp"] = g.edges["rp"].data["r"][:, 1:]
+            g.edges["rrp"].data["att_rp"] = g.edges["rrp"].data["r"][:, 1:]
+
+    g.edges["rc"].data["rid"] = (g.edges["rc"].data["rid"] + 1).int()
+    g.edges["rc"].data["att_rc"][:, 0] = g.edges["rc"].data["val"]
+    g.edges["rc"].data["att_rc"][:, 1] = g.edges["rc"].data["valr"]
+
+    return g, ["type", "rid", "att_rc", "att_rp"]

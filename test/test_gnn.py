@@ -1,6 +1,6 @@
-from models.psp_gnn_dgl import PSPGnnDGL
-from utils.psp_env_observation import PSPEnvObservation as EnvObservation
-from utils.psp_agent_observation import PSPAgentObservation as AgentObservation
+from psp.models.gnn_dgl import GnnDGL
+from psp.env.observation import EnvObservation
+from psp.models.agent_observation import AgentObservation
 
 
 def test_gnn_dgl(env_specification_small, agent_specification, state_small):

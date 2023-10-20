@@ -57,6 +57,7 @@ class Agent(Agent):
         self.obs_as_tensor = obs_as_tensor
 
         self.rebatch_obs = rebatch_obs
+        self.graphobs = False
 
         # If a model is provided, we simply load the existing model.
         if gnn is not None and value_net is not None and action_net is not None:
@@ -183,6 +184,12 @@ class Agent(Agent):
         agent.action_net.load_state_dict(save_data["action_net"])
         agent.value_net.load_state_dict(save_data["value_net"])
         return agent
+
+    def get_obs(self, b_obs, mb_ind):
+        minibatched_obs = {}
+        for key in b_obs:
+            minibatched_obs[key] = b_obs[key][mb_ind]
+        return minibatched_obs
 
     def init_heads(self):
         """Initialize new heads, removing old heads if existing."""
