@@ -1,5 +1,6 @@
 import sys
 from itertools import product
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -8,6 +9,7 @@ from args import argument_parser, parse_args
 from jssp.description import Description
 from jssp.env.env import Env
 from jssp.env.env_specification import EnvSpecification
+from jssp.env.state import State
 from jssp.train import main
 
 # This is the list of all experiments we want to try.
@@ -202,7 +204,7 @@ def test_resets():
 
 
 @pytest.mark.parametrize("seed", [0, 1, 2, 3, 4, 5])
-def test_problem_generation(seed: int):
+def test_seed(seed: int):
     """Make sure the seed is completely defining the generated problem."""
 
     def init_specs(deterministic: bool, fixed: bool, seed: int):
@@ -250,3 +252,56 @@ def test_problem_generation(seed: int):
         env = Env(problem_description, env_specification)
         assert np.any(env.state.affectations != affectations), "Affectations unchanged"
         assert np.any(env.state.original_durations != durations), "Durations unchanged"
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2, 3, 4, 5])
+def test_state_instance_file(seed: int):
+    """
+    - Generate a random problem.
+    - Save the state on disk.
+    - Instantiate a new state from the instance file on disk.
+    - Compare the two states to make sure they're the same.
+    """
+
+    def init_specs(deterministic: bool, fixed: bool, seed: int):
+        env_specification = EnvSpecification(
+            max_n_jobs=10,
+            max_n_machines=10,
+            normalize_input=True,
+            input_list=["duration"],
+            insertion_mode="no_forced_insertion",
+            max_edges_factor=4,
+            sample_n_jobs=-1,
+            chunk_n_jobs=-1,
+            observe_conflicts_as_cliques=True,
+            observe_real_duration_when_affect=False,
+            do_not_observe_updated_bounds=False,
+        )
+        problem_description = Description(
+            deterministic=deterministic,
+            fixed=fixed,
+            transition_model_config="simple",
+            reward_model_config="Sparse",
+            duration_mode_bounds=(10, 50),
+            duration_delta=(10, 200),
+            n_jobs=10,
+            n_machines=10,
+            max_duration=99,
+            seed=seed,
+        )
+        return env_specification, problem_description
+
+    for deterministic, fixed in product([False, True], [False, True]):
+        env_specification, problem_description = init_specs(deterministic, fixed, seed)
+        state_1 = Env(problem_description, env_specification).state
+        state_1.save_instance_file(Path(sys.argv[2]) / "state.npz")
+        state_2 = State.from_instance_file(
+            Path(sys.argv[2]) / "state.npz",
+            max_n_jobs=10,
+            max_n_machines=10,
+            n_features=state_1.features.shape[1],
+            deterministic=deterministic,
+        )
+
+        assert np.all(state_1.original_durations == state_2.original_durations)
+        assert np.all(state_1.affectations == state_2.affectations)
