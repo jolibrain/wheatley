@@ -220,6 +220,7 @@ def main(args, exp_name, path):
             problem_description,
             env_specification,
             training_specification,
+            Env,
             num_envs=args.pretrain_num_envs,
             prob=args.pretrain_prob,
         )

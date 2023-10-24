@@ -25,9 +25,11 @@
 # which comes with Copyright 2010-2022 Google LLC under Apache License, Version 2.0
 
 import collections
-from ortools.sat.python import cp_model
 from copy import deepcopy
+
 import numpy as np
+from ortools.sat.python import cp_model
+
 from psp.solution import Solution
 
 

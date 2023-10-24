@@ -26,6 +26,7 @@
 
 import copy
 import csv
+import os
 import pickle
 import sys
 import time
@@ -37,18 +38,14 @@ import tqdm
 import visdom
 from PIL import Image
 
-from jssp.env.env import Env as JSSPEnv
-from psp.env.env import Env as PSPEnv
-from jssp.models.custom_agent import CustomAgent
 from generic.random_agent import RandomAgent
+from generic.utils import decode_mask, get_obs, safe_mean
 from jssp.description import Description as JSSPDescription
+from jssp.env.env import Env as JSSPEnv
+from jssp.models.custom_agent import CustomAgent
 from jssp.utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
+from psp.env.env import Env as PSPEnv
 from psp.utils.ortools import get_ortools_makespan_psp
-from generic.utils import (
-    decode_mask,
-    get_obs,
-    safe_mean,
-)
 
 
 class AgentValidator:
@@ -261,15 +258,25 @@ class AgentValidator:
             self.current_scatter_fig.savefig(self.path + "best-ortools-ppo-cactus.png")
 
     def _get_ortools_makespan(self, i: int, ortools_strategy: str):
+        save_path = self._ortools_solution_path(i, ortools_strategy)
         if self.psp:
-            return get_ortools_makespan_psp(
+            problem = self.validation_envs[i].problem
+        else:
+            problem = self.validation_envs[i].state
+
+        previous_ortools_solution = self._ortools_read_solution(save_path, problem)
+        if previous_ortools_solution is not None:
+            return previous_ortools_solution
+
+        if self.psp:
+            makespan, schedule, optimal = get_ortools_makespan_psp(
                 self.validation_envs[i],
                 self.max_time_ortools,
                 self.scaling_constant_ortools,
                 ortools_strategy,
             )
         else:
-            return get_ortools_makespan_jssp(
+            makespan, schedule, optimal = get_ortools_makespan_jssp(
                 self.validation_envs[i].state.affectations,
                 self.validation_envs[i].state.original_durations,
                 self.env_specification.n_features,
@@ -277,6 +284,39 @@ class AgentValidator:
                 self.scaling_constant_ortools,
                 ortools_strategy,
             )
+
+        self._ortools_save_solution(save_path, problem, (makespan, schedule, optimal))
+        return makespan, schedule, optimal
+
+    def _ortools_solution_path(self, i: int, ortools_strategy: str) -> str:
+        return os.path.join(self.path, f"ortools_{ortools_strategy}_{i}.pkl")
+
+    def _ortools_save_solution(self, file_path, problem, ortools_solution):
+        with open(file_path, "wb") as f:
+            pickle.dump((problem, ortools_solution), f)
+
+    def _ortools_read_solution(self, file_path, current_problem):
+        """Returns the solution if the file exists and if the instance is the same
+        as the current problem. Returns None otherwise.
+        """
+        if not os.path.exists(file_path):
+            return
+
+        with open(file_path, "rb") as f:
+            saved_problem, ortools_solution = pickle.load(f)
+
+        if self.psp and current_problem == saved_problem:
+            return ortools_solution
+
+        if (
+            not self.psp
+            and np.all(current_problem.affectations == current_problem.affectations)
+            and np.all(current_problem.durations == saved_problem.durations)
+            and np.all(
+                current_problem.original_durations == saved_problem.original_durations
+            )
+        ):
+            return ortools_solution
 
     def _get_random_makespan(self, i):
         sol = self.random_agent.predict(self.validation_envs[i])
