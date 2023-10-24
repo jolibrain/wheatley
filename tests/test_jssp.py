@@ -1,4 +1,5 @@
 import sys
+from collections import defaultdict
 from itertools import product
 from pathlib import Path
 
@@ -10,6 +11,8 @@ from jssp.description import Description
 from jssp.env.env import Env
 from jssp.env.env_specification import EnvSpecification
 from jssp.env.state import State
+from jssp.eval import list_instances
+from jssp.models.custom_agent import CustomAgent
 from jssp.train import main
 
 # This is the list of all experiments we want to try.
@@ -305,3 +308,58 @@ def test_state_instance_file(seed: int):
 
         assert np.all(state_1.original_durations == state_2.original_durations)
         assert np.all(state_1.affectations == state_2.affectations)
+
+
+@pytest.mark.parametrize(
+    "n_j,n_m,duration_type,expected_results",
+    [
+        (
+            6,
+            6,
+            "stochastic",
+            {
+                "SPT": 742.84,
+                "MWKR": 699.7,
+                "MOPNR": 699.16,
+                "FDD/MWKR": 705.88,
+            },
+        ),
+        (
+            6,
+            6,
+            "deterministic",
+            {
+                "SPT": 551.63,
+                "MWKR": 544.79,
+                "MOPNR": 545.89,
+                "FDD/MWKR": 550.06,
+            },
+        ),
+    ],
+)
+def test_validation_results(
+    n_j: int, n_m: int, duration_type: str, expected_results: dict
+):
+    instance_dir = Path(f"./instances/jssp/{duration_type}/{n_j}x{n_m}")
+    assert instance_dir.is_dir(), f"Validation instances {instance_dir} does not exists"
+
+    instances = list_instances(Path(f"./instances/jssp/{duration_type}"))[(n_j, n_m)]
+    agents_solutions = defaultdict(list)
+    for instance_file in instances:
+        state = State.from_instance_file(
+            instance_file,
+            n_j,
+            n_m,
+            n_features=6 + n_m,
+            deterministic=duration_type == "deterministic",
+        )
+
+        for rule in expected_results.keys():
+            agent = CustomAgent(rule, "averagistic")
+            solution = agent.predict(state.original_durations, state.affectations)
+            agents_solutions[rule].append(solution.get_makespan())
+
+    for rule, solutions in agents_solutions.items():
+        assert expected_results[rule] == np.mean(
+            solutions
+        ), f"Different solutions found ({expected_results[rule]} vs {np.mean(solutions)})"
