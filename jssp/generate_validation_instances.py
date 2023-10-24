@@ -45,8 +45,8 @@ def load_env(args: argparse.Namespace, n_j: int, n_m: int) -> Env:
 
 
 def generate_instances(instances: list, args: argparse.Namespace) -> dict:
-    root_dir = Path("./instances/jssp/")
-    root_dir.mkdir(exist_ok=True)
+    root_dir = Path(f"./instances/jssp/{args.duration_type}")
+    root_dir.mkdir(parents=True, exist_ok=True)
 
     for n_j, n_m in instances:
         env = load_env(args, n_j, n_m)
@@ -71,6 +71,14 @@ if __name__ == "__main__":
         (10, 10),
         (15, 15),
         (20, 20),
+        (30, 10),
+        (60, 10),
+        (20, 15),
+        (30, 15),
+        (30, 20),
+        (50, 15),
+        (50, 20),
+        (100, 20),
     ]
 
     generate_instances(instances, args)
