@@ -26,6 +26,7 @@
 
 import datetime
 from copy import deepcopy
+from pathlib import Path
 from queue import PriorityQueue
 
 import cv2
@@ -1042,3 +1043,41 @@ class State:
         # nx.draw_networkx(self.graph, pos, with_labels=True)
         # # nx.draw_planar(self.graph, with_labels=True)
         # plt.savefig(fname)
+
+    def save_instance_file(self, instance_path: Path):
+        """Save the instance represented by the state as a numpy file (.npz).
+        The instance is represented by the tuple (affectations, original_durations).
+        """
+        np.savez(
+            instance_path,
+            affectations=self.affectations,
+            durations=self.original_durations,
+        )
+
+    @classmethod
+    def from_instance_file(
+        cls,
+        instance_path: Path,
+        max_n_jobs,
+        max_n_machines,
+        n_features,
+        deterministic=True,
+        feature_list=[],
+        observe_conflicts_as_cliques=False,
+    ) -> "State":
+        """Create a state from an instance file.
+        The instance file must be a numpy file (.npz) containing the tuple
+        (affectations, original_durations).
+        """
+        with np.load(instance_path) as instance:
+            state = cls(
+                instance["affectations"],
+                instance["durations"],
+                max_n_jobs,
+                max_n_machines,
+                n_features,
+                deterministic,
+                feature_list,
+                observe_conflicts_as_cliques,
+            )
+        return state

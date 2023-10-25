@@ -56,6 +56,7 @@ class AgentValidator:
         device,
         training_specification,
         disable_visdom,
+        validation_envs = None,
         verbose=2,
     ):
         super().__init__()
@@ -122,20 +123,23 @@ class AgentValidator:
         else:
             aff = [[0]] * self.n_validation_env
 
-        self.validation_envs = []
-        for i in range(self.n_validation_env):
-            problem_description = copy.deepcopy(self.problem_description)
-            problem_description.rng = np.random.default_rng(
-                self.problem_description.seed + i
-            )
-            self.validation_envs.append(
-                self.env_cls(
-                    problem_description,
-                    self.env_specification,
-                    aff[i],
-                    validate=True,
+        if validation_envs is not None:
+            self.validation_envs = validation_envs
+        else:
+            self.validation_envs = []
+            for i in range(self.n_validation_env):
+                problem_description = copy.deepcopy(self.problem_description)
+                problem_description.rng = np.random.default_rng(
+                    self.problem_description.seed + i
                 )
-            )
+                self.validation_envs.append(
+                    self.env_cls(
+                        problem_description,
+                        self.env_specification,
+                        aff[i],
+                        validate=True,
+                    )
+                )
 
         self.makespan_ratio = 1000
         self.makespans = []

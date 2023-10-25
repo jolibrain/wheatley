@@ -1,6 +1,8 @@
 """Evaluate trained model on all instances size."""
 import argparse
 import json
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 import torch
 
@@ -8,7 +10,9 @@ from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
 from jssp.description import Description
+from jssp.env.env import Env
 from jssp.env.env_specification import EnvSpecification
+from jssp.env.state import State
 from jssp.models.agent import Agent
 
 
@@ -76,7 +80,11 @@ def load_agent(args: argparse.Namespace, path: str) -> Agent:
 
 
 def load_validator(
-    n_j: int, n_m: int, agent: Agent, args: argparse.Namespace
+    n_j: int,
+    n_m: int,
+    agent: Agent,
+    args: argparse.Namespace,
+    validation_envs: list,
 ) -> AgentValidator:
     """Evaluate the model on random instances of all sizes."""
     affectations, durations = None, None
@@ -135,16 +143,57 @@ def load_validator(
         args.device,
         training_specification,
         args.disable_visdom,
+        validation_envs=validation_envs,
     )
     return validator
 
 
-def eval_on_instances(agent: Agent, instances: list, args: argparse.Namespace) -> dict:
+def eval_on_instances(agent: Agent, instances: dict, args: argparse.Namespace) -> dict:
     perfs = dict()
+    env_specification = agent.env_specification
 
-    for n_j, n_m in instances:
+    for (n_j, n_m), subdir_instances in instances.items():
+        if (
+            agent.env_specification.max_n_jobs < n_j
+            or agent.env_specification.max_n_machines < n_m
+        ):
+            continue
+
         print(f"\nBenchmarking {n_j}x{n_m} instances")
-        validator = load_validator(n_j, n_m, agent, args)
+        args.n_validation_env = len(subdir_instances)
+        args.fixed_validation = True
+        problem_description = Description(
+            transition_model_config=args.transition_model_config,
+            reward_model_config=args.reward_model_config,
+            deterministic=(args.duration_type == "deterministic"),
+            fixed=args.fixed_problem,
+            seed=args.seed,
+            affectations=None,
+            durations=None,
+            n_jobs=n_j,
+            n_machines=n_m,
+            max_duration=args.max_duration,
+            duration_mode_bounds=args.duration_mode_bounds,
+            duration_delta=args.duration_delta,
+        )
+
+        # Load the validation instances.
+        validation_envs = []
+        for instance_path in subdir_instances:
+            env = Env(problem_description, env_specification)
+            env.reset()
+            env.state = State.from_instance_file(
+                instance_path,
+                env_specification.max_n_jobs,
+                env_specification.max_n_machines,
+                env_specification.n_features,
+                deterministic=problem_description.deterministic,
+                feature_list=env_specification.input_list,
+                observe_conflicts_as_cliques=env_specification.observe_conflicts_as_cliques,
+            )
+            validation_envs.append(env)
+
+        validator = load_validator(n_j, n_m, agent, args, validation_envs)
         validator._evaluate_agent(agent)
 
         perfs[f"{n_j}x{n_m}"] = {
@@ -161,6 +210,25 @@ def eval_on_instances(agent: Agent, instances: list, args: argparse.Namespace) -
             ][-1]
 
     return perfs
+
+
+def list_instances(root_dir: Path) -> Dict[Tuple[int, int], List[Path]]:
+    instances = dict()
+    for instance_dir in root_dir.iterdir():
+        if not instance_dir.is_dir():
+            continue
+
+        subdir_instances = []
+        for instance_name in instance_dir.iterdir():
+            if not str(instance_name).endswith(".npz"):
+                continue
+
+            subdir_instances.append(instance_name)
+
+        n_j, n_m = instance_dir.name.split("x")
+        instances[(int(n_j), int(n_m))] = subdir_instances
+
+    return instances
 
 
 def save_perfs(perfs: dict, path: str):
@@ -180,12 +248,7 @@ if __name__ == "__main__":
     parser = argument_parser()
     args, _, _ = parse_args(parser)
 
-    instances = [
-        (6, 6),
-        (10, 10),
-        (15, 15),
-        (20, 20),
-    ]
+    instances = list_instances(Path(f"./instances/jssp/{args.duration_type}"))
 
     agent = load_agent(args, args.path)
     perfs = eval_on_instances(agent, instances, args)
