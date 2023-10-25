@@ -7,13 +7,17 @@ import numpy as np
 import pytest
 
 from args import argument_parser, parse_args
+from generic.agent_specification import AgentSpecification
 from jssp.description import Description
 from jssp.env.env import Env
 from jssp.env.env_specification import EnvSpecification
 from jssp.env.state import State
 from jssp.eval import list_instances
+from jssp.models.agent import Agent
 from jssp.models.custom_agent import CustomAgent
+from jssp.solve import solve_instance
 from jssp.train import main
+from jssp.utils.loaders import load_problem
 
 # This is the list of all experiments we want to try.
 # Each entry should be read as "argument_name: [value_experiment_1, value_experiment_2, ...]"
@@ -363,3 +367,76 @@ def test_validation_results(
         assert expected_results[rule] == np.mean(
             solutions
         ), f"Different solutions found ({expected_results[rule]} vs {np.mean(solutions)})"
+
+
+@pytest.mark.parametrize(
+    "instance_file,taillard_offset",
+    [
+        ("./instances/taillard/ta01.txt", True),
+        ("./instances/test/4x4_sparse.txt", False),
+    ],
+)
+def test_solve_api(instance_file: str, taillard_offset: bool):
+    n_j, n_m, affectations, durations = load_problem(
+        instance_file,
+        taillard_offset,
+        deterministic=True,
+    )
+    env_specification = EnvSpecification(
+        max_n_jobs=n_j,
+        max_n_machines=n_m,
+        normalize_input=True,
+        input_list=["duration"],
+        insertion_mode="no_forced_insertion",
+        max_edges_factor=4,
+        sample_n_jobs=-1,
+        chunk_n_jobs=-1,
+        observe_conflicts_as_cliques=True,
+        observe_real_duration_when_affect=False,
+        do_not_observe_updated_bounds=False,
+    )
+    agent_specification = AgentSpecification(
+        env_specification.n_features,
+        gconv_type="gatv2",
+        graph_has_relu=True,
+        graph_pooling="max",
+        layer_pooling="last",
+        mlp_act="gelu",
+        mlp_act_graph="gelu",
+        device="cuda",
+        n_mlp_layers_features_extractor=1,
+        n_layers_features_extractor=1,
+        hidden_dim_features_extractor=32,
+        n_attention_heads=1,
+        reverse_adj=False,
+        residual_gnn=True,
+        normalize_gnn=True,
+        conflicts="clique",
+        n_mlp_layers_actor=1,
+        hidden_dim_actor=16,
+        n_mlp_layers_critic=1,
+        hidden_dim_critic=16,
+        fe_type="dgl",
+        transformer_flavor="linear",
+        dropout=0.1,
+        cache_lap_node_id=True,
+        lap_node_id_k=10,
+        edge_embedding_flavor="sum",
+        performer_nb_features=None,
+        performer_feature_redraw_interval=1000,
+        performer_generalized_attention=False,
+        performer_auto_check_redraw=False,
+        vnode=False,
+        update_edge_features=True,
+        update_edge_features_pe=True,
+        ortho_embed=False,
+        no_tct=False,
+        mid_in_edges=False,
+        rwpe_k=0,
+        rwpe_h=16,
+        cache_rwpe=False,
+    )
+
+    agent = Agent(env_specification, agent_specification=agent_specification)
+    solution = solve_instance(agent, affectations, durations, deterministic=True)
+    assert solution is not None

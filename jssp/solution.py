@@ -25,6 +25,8 @@
 #
 
 import numpy as np
+from pathlib import Path
+from typing import Union
 
 
 class Solution:
@@ -34,3 +36,6 @@ class Solution:
 
     def get_makespan(self):
         return np.max(self.schedule + self.real_durations)
+
+    def save(self, path: Union[Path, str]):
+        np.savetxt(path, self.schedule, fmt="%d")

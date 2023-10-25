@@ -25,6 +25,7 @@
 import numpy as np
 import pathlib
 import glob
+from jssp.utils.utils import check_sanity
 
 
 def load_problem(
