@@ -26,6 +26,17 @@ Commmon options:
 - `--exp_name_appendix` : print suffix for  visdom
 
 
+Once a model is trained, you can use it to solve new problems using:
+```sh
+python3 -m jssp.solve\
+    --path "./PATH/TO/EXPERIMENT/"\
+    --load_problem "./PATH/TO/INSTANCE.TXT"\
+    [--first_machine_id_is_one]  # Optional, if you load taillard problems, you should tell that the index starts at one.
+```
+
+See `jssp/solve.py` to see how to load and use the model in your own python scripts.
+
+
 
 # Small fixed random problem without uncertainty
 
