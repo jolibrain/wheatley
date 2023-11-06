@@ -3,8 +3,8 @@ import os
 import torch
 
 from alg.ppo import PPO
-from env.psp_env import PSPEnv
-from models.agent_validator import AgentValidator
+from psp.env.env import Env
+from generic.agent_validator import AgentValidator
 
 
 def test_validator_psp(

@@ -3,7 +3,7 @@ import sys
 sys.path.append(".")
 
 import pytest
-from utils.resource_timeline import ResourceTimeline
+from psp.utils.resource_timeline import ResourceTimeline
 
 
 def test_resource_timeline():

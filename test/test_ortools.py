@@ -1,5 +1,5 @@
-from utils.loaders import PSPLoader
-from utils.ortools import solve_psp, compute_ortools_makespan_on_real_duration
+from psp.utils.loaders import PSPLoader
+from psp.utils.ortools import solve_psp, compute_ortools_makespan_on_real_duration
 import numpy as np
 
 

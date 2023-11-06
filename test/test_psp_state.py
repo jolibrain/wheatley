@@ -4,12 +4,11 @@ sys.path.append(".")
 
 import pytest
 import numpy as np
-from env.psp_state import PSPState
-from problem.psp_description import PSPDescription
+from psp.env.state import State
+from psp.description import Description
 
-from env.psp_env_specification import PSPEnvSpecification
-from utils.psp_env_observation import PSPEnvObservation as EnvObservation
-from utils.psp_agent_observation import PSPAgentObservation as AgentObservation
+from psp.env.observation import EnvObservation
+from psp.models.agent_observation import AgentObservation
 
 import torch
 
@@ -136,7 +135,6 @@ def test_rcatt(state_small_preclique):
 
 
 def test_obs(state_small, state_small_preclique):
-
     sp = state_small_preclique
     (
         features,

@@ -1,24 +1,26 @@
 import sys
 
+sys.path.append("..")
 sys.path.append(".")
 import pytest
 import numpy as np
-from env.psp_state import PSPState
-from problem.psp_description import PSPDescription
-from models.agent_specification import AgentSpecification
-from models.psp_agent import PSPAgent
-from models.training_specification import TrainingSpecification
+from psp.env.state import State
+from psp.env.gstate import GState
+from psp.description import Description
+from generic.agent_specification import AgentSpecification
+from psp.models.agent import Agent
+from generic.training_specification import TrainingSpecification
 
-from env.psp_env_specification import PSPEnvSpecification
-from utils.loaders import PSPLoader
-from utils.psp_env_observation import PSPEnvObservation as EnvObservation
-from utils.psp_agent_observation import PSPAgentObservation as AgentObservation
+from psp.env.env_specification import EnvSpecification
+from psp.utils.loaders import PSPLoader
+from psp.env.observation import EnvObservation
+from psp.models.agent_observation import AgentObservation
 
 
 @pytest.fixture
 def small_pb():
     loader = PSPLoader()
-    return loader.load_single("instances/psp/small/small.sm")
+    return loader.load_single("../instances/psp/small/small.sm")
 
 
 @pytest.fixture
@@ -30,34 +32,36 @@ def small_nonren():
 @pytest.fixture
 def large_pb():
     loader = PSPLoader()
-    return loader.load_single("instances/psp/sm/j3010_1.sm")
+    return loader.load_single("../instances/psp/sm/j3010_1.sm")
 
 
 @pytest.fixture
 def problem_description_small(small_pb):
-    return PSPDescription(
+    return Description(
         transition_model_config="simple",
         reward_model_config="Sparse",
         deterministic=True,
         train_psps=[small_pb],
         test_psps=[small_pb],
+        seed=0,
     )
 
 
 @pytest.fixture
 def problem_description_nonren(small_nonren):
-    return PSPDescription(
+    return Description(
         transition_model_config="simple",
         reward_model_config="Sparse",
         deterministic=True,
         train_psps=[small_nonren],
         test_psps=[small_nonren],
+        seed=0,
     )
 
 
 @pytest.fixture
 def problem_description_large(large_pb):
-    return PSPDescription(
+    return Description(
         transition_model_config="simple",
         reward_model_config="Sparse",
         deterministic=True,
@@ -68,7 +72,7 @@ def problem_description_large(large_pb):
 
 @pytest.fixture
 def env_specification_small(problem_description_small):
-    return PSPEnvSpecification(
+    return EnvSpecification(
         problems=problem_description_small,
         normalize_input=True,
         input_list=["duration"],
@@ -76,15 +80,18 @@ def env_specification_small(problem_description_small):
         sample_n_jobs=-1,
         chunk_n_jobs=-1,
         observe_conflicts_as_cliques=True,
+        add_rp_edges=True,
         observe_real_duration_when_affect=False,
         do_not_observe_updated_bounds=False,
         factored_rp=False,
+        remove_old_resource_info=True,
+        remove_past_prec=True,
     )
 
 
 @pytest.fixture
 def env_specification_nonren(problem_description_nonren):
-    return PSPEnvSpecification(
+    return EnvSpecification(
         problems=problem_description_nonren,
         normalize_input=True,
         input_list=["duration"],
@@ -92,9 +99,12 @@ def env_specification_nonren(problem_description_nonren):
         sample_n_jobs=-1,
         chunk_n_jobs=-1,
         observe_conflicts_as_cliques=True,
+        add_rp_edges=True,
         observe_real_duration_when_affect=False,
         do_not_observe_updated_bounds=False,
         factored_rp=False,
+        remove_old_resource_info=True,
+        remove_past_prec=True,
     )
 
 
@@ -147,7 +157,7 @@ def agent_specification(env_specification_small):
 
 @pytest.fixture
 def state_small(problem_description_small, env_specification_small):
-    return PSPState(
+    return State(
         env_specification_small,
         problem_description_small,
         problem_description_small.train_psps[0],
@@ -157,8 +167,19 @@ def state_small(problem_description_small, env_specification_small):
 
 
 @pytest.fixture
+def gstate_small(problem_description_small, env_specification_small):
+    return GState(
+        env_specification_small,
+        problem_description_small,
+        problem_description_small.train_psps[0],
+        deterministic=True,
+        observe_conflicts_as_cliques=True,
+    )
+
+
+@pytest.fixture
 def state_nonren(problem_description_nonren, env_specification_nonren):
-    return PSPState(
+    return State(
         env_specification_nonren,
         problem_description_nonren,
         problem_description_nonren.train_psps[0],
@@ -169,7 +190,7 @@ def state_nonren(problem_description_nonren, env_specification_nonren):
 
 @pytest.fixture
 def state_large(problem_description_large, env_specification_large):
-    return PSPState(
+    return State(
         env_specification_large,
         problem_description_large,
         problem_description_large.train_psps[0],
@@ -180,7 +201,7 @@ def state_large(problem_description_large, env_specification_large):
 
 @pytest.fixture
 def state_small_preclique(problem_description_small, env_specification_small):
-    return PSPState(
+    return State(
         env_specification_small,
         problem_description_small,
         problem_description_small.train_psps[0],
@@ -191,7 +212,7 @@ def state_small_preclique(problem_description_small, env_specification_small):
 
 @pytest.fixture
 def psp_agent(env_specification_small, agent_specification):
-    return PSPAgent(
+    return Agent(
         env_specification=env_specification_small,
         agent_specification=agent_specification,
     )

@@ -87,7 +87,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--vecenv_type",
         type=str,
         default="subproc",
-        choices=["subproc", "dummy"],
+        choices=["subproc", "dummy", "graphgym"],
         help="Use SubprocEnv or DummyVecEnv in SB3",
     )
 

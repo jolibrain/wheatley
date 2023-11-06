@@ -28,7 +28,6 @@ from torch.distributions.categorical import Categorical
 from tqdm import tqdm
 
 from generic.training_specification import TrainingSpecification
-from generic.utils import get_obs
 from jssp.utils.ortools import get_ortools_trajectory_and_past_actions
 from jssp.utils.utils import rebatch_obs
 
@@ -214,7 +213,7 @@ class Pretrainer:
                 mb_inds = b_inds[start:end]
 
                 action_probs, values = agent.get_action_probs_and_value(
-                    get_obs(train_obs, mb_inds), train_masks[mb_inds]
+                    agent.get_obs(train_obs, mb_inds), train_masks[mb_inds]
                 )
                 target_probs = self.get_target_probs(
                     train_masks, train_past_actions, train_pa_to_a, mb_inds
@@ -252,7 +251,7 @@ class Pretrainer:
                     mb_inds = np.arange(start, end)
 
                     action_probs, values = agent.get_action_probs_and_value(
-                        get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
+                        agent.get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
                     )
                     target_probs = self.get_target_probs(
                         eval_masks, eval_past_actions, eval_pa_to_a, mb_inds

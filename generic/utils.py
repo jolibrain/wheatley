@@ -38,13 +38,6 @@ def decode_mask(info_mask):
     return np.stack(info_mask)
 
 
-def get_obs(b_obs, mb_ind):
-    minibatched_obs = {}
-    for key in b_obs:
-        minibatched_obs[key] = b_obs[key][mb_ind]
-    return minibatched_obs
-
-
 def safe_mean(arr):
     """
     Compute the mean of an array if there is at least one element.

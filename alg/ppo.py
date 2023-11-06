@@ -28,6 +28,7 @@ from collections import deque
 from functools import partial
 
 import gymnasium as gym
+from psp.env.graphgym.async_vector_env import AsyncGraphVectorEnv
 import numpy as np
 import torch
 import torch.nn as nn
@@ -35,7 +36,7 @@ import torch.optim as optim
 import torchinfo
 import tqdm
 
-from generic.utils import decode_mask, get_obs, safe_mean
+from generic.utils import decode_mask, safe_mean
 
 from .logger import Logger, configure_logger, monotony, stability
 
@@ -97,9 +98,7 @@ class PPO:
     def collect_rollouts(self, agent, envs, env_specification, data_device):
         # ALGO Logic: Storage setup
         obs = []
-        actions = torch.empty(
-            (self.num_steps, self.num_envs) + envs.single_action_space.shape
-        ).to(data_device)
+        actions = torch.empty((self.num_steps, self.num_envs)).to(data_device)
         logprobs = torch.empty((self.num_steps, self.num_envs)).to(data_device)
         rewards = torch.empty((self.num_steps, self.num_envs)).to(data_device)
         dones = torch.empty((self.num_steps, self.num_envs)).to(data_device)
@@ -187,7 +186,10 @@ class PPO:
         # flatten the batch
         b_obs = agent.rebatch_obs(obs)
         b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
+        if agent.graphobs:
+            b_actions = actions.reshape((-1))
+        else:
+            b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
         b_advantages = advantages.reshape(-1)
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
@@ -198,8 +200,12 @@ class PPO:
         ]
 
         if self.discard_incomplete_trials:
+            if agent.graphobs:
+                bobs_tokeep = list(b_obs[i] for i in to_keep_b)
+            else:
+                bobs_tokeep = self.keep_only(b_obs, to_keep_b)
             return (
-                self.keep_only(b_obs, to_keep_b),
+                bobs_tokeep,
                 b_logprobs[to_keep_b],
                 b_actions[to_keep_b],
                 b_advantages[to_keep_b],
@@ -255,7 +261,8 @@ class PPO:
                     for i in range(self.num_envs)
                 ],
             )
-        else:
+        elif self.vecenv_type == "subproc":
+            print("self.env_cls", self.env_cls)
             envs = gym.vector.AsyncVectorEnv(
                 [
                     create_env(
@@ -269,6 +276,22 @@ class PPO:
                 # spwan helps when observation space is huge
                 # context="spawn",
                 copy=False,
+            )
+        elif self.vecenv_type == "graphgym":
+            envs = AsyncGraphVectorEnv(
+                [
+                    create_env(
+                        self.env_cls,
+                        problem_description,
+                        env_specification,
+                        pbs_per_env[i],
+                    )
+                    for i in range(self.num_envs)
+                ],
+                # spwan helps when observation space is huge
+                # context="spawn",
+                copy=False,
+                shared_memory=True,
             )
 
         print("... done creating environments")
@@ -288,7 +311,10 @@ class PPO:
         if not skip_model_trace:
             obs, info = self.validator.validation_envs[0].reset(soft=True)
             obs = agent.obs_as_tensor_add_batch_dim(obs)
-            torchinfo.summary(agent, input_data=(obs,), depth=3, verbose=1)
+            if agent.graphobs:
+                torchinfo.summary(agent, depth=3, verbose=1)
+            else:
+                torchinfo.summary(agent, input_data=(obs,), depth=3, verbose=1)
 
         self.global_step = 0
         if not skip_initial_eval:
@@ -351,7 +377,7 @@ class PPO:
                     mb_inds = b_inds[start:end]
 
                     _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                        get_obs(b_obs, mb_inds),
+                        agent.get_obs(b_obs, mb_inds),
                         action=b_actions.long()[mb_inds].to(train_device),
                         action_masks=b_action_masks[mb_inds],
                     )

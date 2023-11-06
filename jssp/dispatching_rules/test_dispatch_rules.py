@@ -5,8 +5,12 @@ import pytest
 
 from instances.generate_taillard import generate_taillard
 
-from .solver import Solver, _occupancy, reschedule
-from .validate import validate_job_tasks, validate_machine_tasks, validate_solution
+from jssp.dispatching_rules.solver import Solver, _occupancy, reschedule
+from jssp.dispatching_rules.validate import (
+    validate_job_tasks,
+    validate_machine_tasks,
+    validate_solution,
+)
 
 
 @pytest.mark.parametrize(
