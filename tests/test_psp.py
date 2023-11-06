@@ -1,4 +1,8 @@
 import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 import random
 import sys
 from typing import Tuple
@@ -265,7 +269,8 @@ possible_args = {
     "n_workers": [1, 2],
     "skip_initial_eval": [True, False],
     "exp_name_appendix": ["test"],
-    "train_dir": ["./instances/psp/test/", "./instances/psp/test/"],
+    "train_dir": ["./instances/psp/test/"],
+    "vecenv_type": ["subproc", "graphgym"],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
