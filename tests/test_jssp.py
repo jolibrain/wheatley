@@ -65,6 +65,7 @@ possible_args = {
     "device": ["cuda:0"],
     "n_workers": [2],
     "skip_initial_eval": [True, False],
+    "vecenv_type": ["subproc", "graphgym"],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
