@@ -166,7 +166,9 @@ class GEnv:
         self.transition_model = TransitionModel(self.env_specification)
 
     def _create_reward_model(self):
-        self.reward_model = GraphTerminalRewardModel()
+        self.reward_model = GraphTerminalRewardModel(
+            self.env_specification.symlog_reward
+        )
 
     def observe(self):
         return self.state.observe()

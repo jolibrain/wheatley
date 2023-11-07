@@ -139,6 +139,7 @@ def instantiate_training_objects(
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
         remove_old_resource_info=not args.use_old_resource_info,
         remove_past_prec=not args.keep_past_prec,
+        symlog_reward=args.symlog_reward,
     )
 
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -273,6 +274,7 @@ possible_args = {
     "train_dir": ["./instances/psp/test/"],
     "vecenv_type": ["subproc", "graphgym"],
     "return_based_scaling": [True, False],
+    "symlog_reward": [True, False],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.

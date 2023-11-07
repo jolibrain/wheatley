@@ -140,6 +140,8 @@ class PPO:
                     next_obs, action_masks=action_mask
                 )
 
+                # BELOW SYMEXP STUFF
+                value = torch.sign(value) * (torch.exp(torch.abs(value)) - 1)
             values[step] = value.flatten()
             actions[step] = action
             logprobs[step] = logprob
@@ -167,6 +169,8 @@ class PPO:
 
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1).to(data_device)
+            # BELOW SYMEXP STUFF
+            next_value = torch.sign(next_value) * (torch.exp(torch.abs(next_value)) - 1)
 
         if sigma is None:
             # compute return-based scaling as 2105.05347
@@ -474,8 +478,16 @@ class PPO:
                         v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                         v_loss = 0.5 * v_loss_max.mean()
                     else:
+                        # v_loss = torch.nn.functional.mse_loss(
+                        #     newvalue, b_returns[mb_inds].to(train_device)
+                        # )
+                        # v_loss = torch.nn.functional.l1_loss(
+                        #     newvalue, b_returns[mb_inds].to(train_device)
+                        # )
+                        # BELOW SYMEXP STUF
                         v_loss = torch.nn.functional.mse_loss(
-                            newvalue, b_returns[mb_inds].to(train_device)
+                            torch.sign(newvalue) * (torch.exp(torch.abs(newvalue)) - 1),
+                            b_returns[mb_inds].to(train_device),
                         )
                     entropy_loss = entropy.mean()
                     loss = (

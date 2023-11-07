@@ -559,6 +559,14 @@ def argument_parser() -> argparse.ArgumentParser:
         help="Which reward model to use, from L2D|Sparse|Tassel|Intrinsic in the deterministic case; "
         "for uncertainty (stochastic), you can use pessimistic|optimistic|realistic|averagistic|Sparse",
     )
+
+    parser.add_argument(
+        "--symlog_reward",
+        default=False,
+        action="store_true",
+        help="scale reward using symlog",
+    )
+
     parser.add_argument(
         "--duration_mode_bounds",
         type=int,

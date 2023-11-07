@@ -149,6 +149,7 @@ def main(args, exp_name, path):
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
         remove_old_resource_info=not args.use_old_resource_info,
         remove_past_prec=not args.keep_past_prec,
+        symlog_reward=args.symlog_reward,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:

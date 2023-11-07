@@ -25,11 +25,12 @@
 #
 
 import torch
+import math
 
 
 class GraphTerminalRewardModel:
-    def __init__(self):
-        pass
+    def __init__(self, symlog_reward):
+        self.symlog_reward = symlog_reward
 
     def evaluate(self, state):
         """
@@ -41,7 +42,11 @@ class GraphTerminalRewardModel:
             max_makespan = torch.max(sinks_makespans)
             makespan = max_makespan.item()
             # makespan = state.tct(-1)[0].item() / len(state.job_modes)
+            if self.symlog_reward:
+                return -math.log1p(makespan)
             return -makespan / len(state.job_modes)
         if state.finished():
+            if self.symlog_reward:
+                return -math.log1p(state.undoable_makespan)
             return -state.undoable_makespan / len(state.job_modes)
         return 0

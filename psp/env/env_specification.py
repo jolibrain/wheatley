@@ -44,6 +44,7 @@ class EnvSpecification:
         factored_rp,
         remove_old_resource_info,
         remove_past_prec,
+        symlog_reward,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -72,6 +73,7 @@ class EnvSpecification:
         self.action_space = Discrete(self.max_n_nodes)
         self.remove_old_resource_info = remove_old_resource_info
         self.remove_past_prec = remove_past_prec
+        self.symlog_reward = symlog_reward
 
         if self.max_edges_factor > 0:
             self.shape_pr = (
@@ -205,6 +207,7 @@ class EnvSpecification:
             f"==========Env Description     ==========\n"
             f"Max size:                           {self.max_n_modes}\n"
             f"Input normalization:                {'Yes' if self.normalize_input else 'No'}\n"
+            f"Symlog reward normalization:        {'Yes' if self.symlog_reward else 'No'}\n"
             f"Observe real duration when affect:  {self.observe_real_duration_when_affect}\n"
             f"Do not observe tct:                 {self.do_not_observe_updated_bounds}\n"
             f"add resource prcedence edges:       {self.add_rp_edges}\n"

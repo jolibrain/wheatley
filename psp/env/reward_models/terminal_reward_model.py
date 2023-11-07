@@ -25,11 +25,12 @@
 #
 
 import numpy as np
+import math
 
 
 class TerminalRewardModel:
-    def __init__(self):
-        pass
+    def __init__(self, symlog_reward):
+        self.symlog_reward = symlog_reward
 
     def evaluate(self, state):
         """
@@ -39,7 +40,13 @@ class TerminalRewardModel:
             sinks = np.where(state.types() == 1)[0]
             sinks_makespans = state.tct(sinks)
             max_makespan = np.max(sinks_makespans)
+            if self.symlog_reward:
+                # return -math.log1p(max_makespan)
+                return -max_makespan  # / len(state.job_modes)
             return -max_makespan / len(state.job_modes)
         if state.finished():
+            if self.symlog_reward:
+                # return -math.log1p(state.undoable_makespan)
+                return -max_makespan  # / len(state.job_modes)
             return -state.undoable_makespan / len(state.job_modes)
         return 0

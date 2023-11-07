@@ -26,7 +26,6 @@ class State:
         deterministic=True,
         observe_conflicts_as_cliques=True,
         resource_model="flowGraph",  # or timeline
-        normalize_features=True,
     ):
         self.problem = problem
         self.problem_description = problem_description
@@ -42,7 +41,7 @@ class State:
         else:
             self.resourceModel = ResourceTimeline
 
-        self.normalize = normalize_features
+        self.normalize = self.env_specification.normalize_input
 
         self.add_rp_edges = env_specification.add_rp_edges
         self.factored_rp = env_specification.factored_rp

@@ -165,7 +165,7 @@ class Env(gym.Env):
         self.transition_model = TransitionModel(self.env_specification)
 
     def _create_reward_model(self):
-        self.reward_model = TerminalRewardModel()
+        self.reward_model = TerminalRewardModel(self.env_specification.symlog_reward)
 
     def observe(self):
         if self.env_specification.add_rp_edges != "none":
