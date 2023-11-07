@@ -35,6 +35,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchinfo
 import tqdm
+import math
 
 from generic.utils import decode_mask, safe_mean
 
@@ -82,6 +83,7 @@ class PPO:
         self.vecenv_type = training_specification.vecenv_type
         self.total_timesteps = training_specification.total_timesteps
         self.validation_freq = training_specification.validation_freq
+        self.return_based_scaling = training_specification.return_based_scaling
 
         self.discard_incomplete_trials = discard_incomplete_trials
 
@@ -95,7 +97,7 @@ class PPO:
             kobs[key] = obs[key][to_keep]
         return kobs
 
-    def collect_rollouts(self, agent, envs, env_specification, data_device):
+    def collect_rollouts(self, agent, envs, env_specification, data_device, sigma=1.0):
         # ALGO Logic: Storage setup
         obs = []
         actions = torch.empty((self.num_steps, self.num_envs)).to(data_device)
@@ -162,9 +164,48 @@ class PPO:
             for i in range(self.num_envs):
                 if next_done[i] == 1:
                     to_keep[i].extend(to_keep_candidate[i])
-        # compute returns and advantages
+
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1).to(data_device)
+
+        if sigma is None:
+            # compute return-based scaling as 2105.05347
+            with torch.no_grad():
+                advantages = torch.empty_like(rewards)
+                lastgaelam = 0
+
+                for t in reversed(range(self.num_steps)):
+                    if t == self.num_steps - 1:
+                        nextnonterminal = 1.0 - next_done
+                        nextvalues = next_value
+                    else:
+                        nextnonterminal = 1.0 - dones[t + 1]
+                        nextvalues = values[t + 1]
+
+                    delta = (
+                        rewards[t]
+                        + self.gamma * nextvalues * nextnonterminal
+                        - values[t]
+                    )
+                    advantages[t] = lastgaelam = (
+                        delta
+                        + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
+                    )
+                returns = advantages + values
+                n_dones = int(torch.sum(dones).item())
+                gamma = torch.tensor(
+                    [self.gamma] * (self.num_steps * self.num_envs - n_dones)
+                    + [0.0] * n_dones,
+                    dtype=torch.float,
+                )
+                v_gamma = torch.var(gamma, dim=None).item()
+                sigma = math.sqrt(
+                    torch.var(rewards, dim=None).item()
+                    + v_gamma * torch.mean(returns * returns).item()
+                )
+
+        # compute returns and advantages
+        with torch.no_grad():
             advantages = torch.empty_like(rewards)
             lastgaelam = 0
             for t in reversed(range(self.num_steps)):
@@ -177,7 +218,7 @@ class PPO:
 
                 delta = (
                     rewards[t] + self.gamma * nextvalues * nextnonterminal - values[t]
-                )
+                ) / sigma
                 advantages[t] = lastgaelam = (
                     delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
                 )
@@ -212,6 +253,7 @@ class PPO:
                 b_returns[to_keep_b],
                 b_values[to_keep_b],
                 b_action_masks[to_keep_b],
+                sigma,
             )
         return (
             b_obs,
@@ -221,6 +263,7 @@ class PPO:
             b_returns,
             b_values,
             b_action_masks,
+            sigma,
         )
 
     def pb_ids(self, problem_description):
@@ -327,6 +370,10 @@ class PPO:
 
         self.n_epochs = 0
         self.start_time = time.time()
+        if self.return_based_scaling:
+            sigma = None
+        else:
+            sigma = 1.0
         for update in range(1, num_updates + 1):
             print("UPDATE ", update)
 
@@ -340,11 +387,9 @@ class PPO:
                 b_returns,
                 b_values,
                 b_action_masks,
+                sigma,
             ) = self.collect_rollouts(
-                agent,
-                envs,
-                env_specification,
-                rollout_data_device,
+                agent, envs, env_specification, rollout_data_device, sigma
             )
 
             batch_size = b_logprobs.shape[0]

@@ -65,6 +65,7 @@ possible_args = {
     "device": ["cuda:0"],
     "n_workers": [2],
     "skip_initial_eval": [True, False],
+    "return_based_scaling": [True, False],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.

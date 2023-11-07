@@ -135,6 +135,12 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--gae_lambda", type=float, default=0.95, help="GAE lambda param"
     )
+    parser.add_argument(
+        "--return_based_scaling",
+        default=False,
+        action="store_true",
+        help="use return based scaling 2105.05347",
+    )
 
     parser.add_argument(
         "--optimizer",
@@ -229,7 +235,7 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     # =================================================AGENT SPECIFICATION======================================================
-    parser.add_argument("--gamma", type=float, default=1, help="Discount factor")
+    parser.add_argument("--gamma", type=float, default=1.0, help="Discount factor")
     parser.add_argument(
         "--clip_range", type=float, default=0.25, help="Clipping parameter"
     )
