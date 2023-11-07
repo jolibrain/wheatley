@@ -65,6 +65,7 @@ class TrainingSpecification:
         rpo,
         rpo_smoothing_param,
         gae_lambda,
+        return_based_scaling,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -93,6 +94,7 @@ class TrainingSpecification:
         self.rpo = rpo
         self.rpo_smoothing_param = rpo_smoothing_param
         self.gae_lambda = gae_lambda
+        self.return_based_scaling = return_based_scaling
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -138,4 +140,5 @@ class TrainingSpecification:
             f"GAE Lambda:                       {self.gae_lambda}\n"
             f"RPO:                              {self.rpo}\n"
             f"RPO smoothing:                    {self.rpo_smoothing_param}\n"
+            f"Return-based scaling:             {self.return_based_scaling}\n"
         )

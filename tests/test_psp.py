@@ -114,6 +114,7 @@ def instantiate_training_objects(
         rpo=args.rpo,
         rpo_smoothing_param=args.rpo_smoothing_param,
         gae_lambda=args.gae_lambda,
+        return_based_scaling=args.return_based_scaling,
     )
 
     if args.conflicts == "clique" and args.precompute_cliques:
@@ -271,6 +272,7 @@ possible_args = {
     "exp_name_appendix": ["test"],
     "train_dir": ["./instances/psp/test/"],
     "vecenv_type": ["subproc", "graphgym"],
+    "return_based_scaling": [True, False],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
