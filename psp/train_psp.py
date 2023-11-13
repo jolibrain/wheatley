@@ -45,7 +45,7 @@ from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
 
 
-def main(args, exp_name, path):
+def main(args, exp_name, path) -> float:
     exp_name = args.exp_name_appendix
     path = get_path(args.path, exp_name)
     torch.distributions.Distribution.set_default_validate_args(False)
@@ -262,7 +262,7 @@ def main(args, exp_name, path):
         env_cls,
         validator,
     )
-    ppo.train(
+    return ppo.train(
         agent,
         problem_description,
         env_specification,

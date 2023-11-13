@@ -14,6 +14,10 @@ echo "Running pytests."
 for test_file in tests/*_perf.py; do
     # Run the test and save the output to a file.
     echo "Running $test_file."
+
+    # $OUT_DIR must exists!
+    # Pytest will look for tests scripts inside.
+    # This is a little hack to pass "$OUT_DIR" as an arg to the test scripts.
     python3 -m pytest "$test_file" "$OUT_DIR"
 
     if [ $? -ne 0 ]; then
