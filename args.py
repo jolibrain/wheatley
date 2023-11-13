@@ -133,7 +133,7 @@ def argument_parser() -> argparse.ArgumentParser:
         help="RPO-style smoothing param",
     )
     parser.add_argument(
-        "--gae_lambda", type=float, default=0.95, help="GAE lambda param"
+        "--gae_lambda", type=float, default=1.0, help="GAE lambda parameter, GAE off by default"
     )
     parser.add_argument(
         "--return_based_scaling",
