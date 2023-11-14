@@ -66,9 +66,15 @@ class GEnv:
                 self.pb_ids[self.pb_index]
             ]
 
-        self.n_jobs = self.problem["n_jobs"]
-        self.n_modes = self.problem["n_modes"]
-        self.n_resources = self.problem["n_resources"]
+        if isinstance(self.problem, dict):
+            self.n_jobs = self.problem["n_jobs"]
+            self.n_modes = self.problem["n_modes"]
+            self.n_resources = self.problem["n_resources"]
+        else:
+            self.n_jobs = self.problem.n_jobs
+            self.n_modes = self.problem.n_modes
+            self.n_resources = self.problem.n_resources
+
         # adjust n_jobs if we are going to sample or chunk
         self.sampled_jobs = None
         if self.env_specification.sample_n_jobs != -1:

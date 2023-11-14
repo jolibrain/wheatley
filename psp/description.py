@@ -44,17 +44,32 @@ class Description:
         self.test_psps = test_psps
         self.seed = seed
 
-        self.max_n_jobs = max([psp["n_jobs"] for psp in train_psps + test_psps])
-        self.max_n_modes = max([psp["n_modes"] for psp in train_psps + test_psps])
-        self.max_n_resources = max(
-            [psp["n_resources"] for psp in train_psps + test_psps]
-        )
-        self.max_resource_request = max(
-            [psp["max_resource_request"] for psp in train_psps + test_psps]
-        )
-        self.max_resource_availability = max(
-            [psp["max_resource_availability"] for psp in train_psps + test_psps]
-        )
+        if isinstance(train_psps[0], dict):
+            self.max_n_jobs = max([psp["n_jobs"] for psp in train_psps + test_psps])
+            self.max_n_modes = max([psp["n_modes"] for psp in train_psps + test_psps])
+
+            self.max_n_resources = max(
+                [psp["n_resources"] for psp in train_psps + test_psps]
+            )
+            self.max_resource_request = max(
+                [psp["max_resource_request"] for psp in train_psps + test_psps]
+            )
+            self.max_resource_availability = max(
+                [psp["max_resource_availability"] for psp in train_psps + test_psps]
+            )
+        else:
+            self.max_n_jobs = max([psp.n_jobs for psp in train_psps + test_psps])
+            self.max_n_modes = max([psp.n_modes for psp in train_psps + test_psps])
+
+            self.max_n_resources = max(
+                [psp.n_resources for psp in train_psps + test_psps]
+            )
+            self.max_resource_request = max(
+                [psp.max_resource_consumption for psp in train_psps + test_psps]
+            )
+            self.max_resource_availability = max(
+                [psp.max_resource_availability for psp in train_psps + test_psps]
+            )
 
     def print_self(self):
         print(

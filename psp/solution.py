@@ -33,10 +33,18 @@ class Solution:
     def from_mode_schedule(
         cls, mode_schedule, problem, affected, jobids, real_durations
     ):
-        nmodes_per_job = [nj[0] for nj in problem["job_info"]]
+        if isinstance(problem, dict):
+            nmodes_per_job = [nj[0] for nj in problem["job_info"]]
+        else:
+            nmodes_per_job = problem.n_modes_per_job
         nmodes_per_job_cum = [0] + list(accumulate(nmodes_per_job))
-        job_schedule = np.empty((problem["n_jobs"]), dtype=np.float32)
-        modes = np.empty((problem["n_jobs"]), dtype=int)
+        if isinstance(problem, dict):
+            job_schedule = np.empty((problem["n_jobs"]), dtype=np.float32)
+            modes = np.empty((problem["n_jobs"]), dtype=int)
+        else:
+            job_schedule = np.empty((problem.n_jobs), dtype=np.float32)
+            modes = np.empty((problem.n_jobs), dtype=int)
+
         mode_offset = 0
         for m in range(mode_schedule.shape[0]):
             if affected[m]:

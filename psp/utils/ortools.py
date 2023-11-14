@@ -54,8 +54,12 @@ def compute_ortools_makespan_on_real_duration(solution, state):
 
 def node_from_job_mode(problem, jobid, modeid):
     nid = 0
-    for i in range(jobid):
-        nid += problem["job_info"][i][0]
+    if isinstance(problem, dict):
+        for i in range(jobid):
+            nid += problem["job_info"][i][0]
+    else:
+        for i in range(jobid):
+            nid += problem.n_modes_per_job[i]
     return nid + modeid
 
 
@@ -122,19 +126,26 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
     durations = (durations * scaling_constant_ortools).astype(int)
 
     # update problem durations with real_durations
+
     problem = deepcopy(problem)
     i = 0
-    for j in range(len(problem["durations"][0])):
-        for m in range(len(problem["durations"][0][j])):
-            problem["durations"][0][j][m] = durations[i]
-            i += 1
+    if isinstance(problem, dict):
+        for j in range(len(problem["durations"][0])):
+            for m in range(len(problem["durations"][0][j])):
+                problem["durations"][0][j][m] = durations[i]
+                i += 1
+    else:
+        for j in range(len(problem.durations[0])):
+            for m in range(len(problem.durations[0][j])):
+                problem.durations[0][j][m] = durations[i]
+                i += 1
 
     # return solution, is_Optimal
     intervals_of_tasks, after = AnalyseDependencyGraph(problem)
     delays, initial_solution, optimal_found = ComputeDelaysBetweenNodes(
         problem, intervals_of_tasks
     )
-    last_task = problem["n_jobs"]
+    last_task = problem["n_jobs"] if isinstance(problem, dict) else problem.n_jobs
     key = (0, last_task)
     lower_bound = delays[key][0] if key in delays else 0
 
@@ -174,7 +185,10 @@ def AnalyseDependencyGraph(problem):
       before task2.
     """
 
-    num_nodes = len(problem["job_info"])
+    if isinstance(problem, dict):
+        num_nodes = len(problem["job_info"])
+    else:
+        num_nodes = problem.n_jobs
 
     ins = collections.defaultdict(list)
     outs = collections.defaultdict(list)
@@ -184,15 +198,26 @@ def AnalyseDependencyGraph(problem):
     # Build the transitive closure of the precedences.
     # This algorithm has the wrong complexity (n^4), but is OK for the psplib
     # as the biggest example has 120 nodes.
-    for n in range(num_nodes):
-        for s in problem["job_info"][n][1]:
-            ins[s].append(n + 1)
-            outs[n + 1].append(s)
+    if isinstance(problem, dict):
+        for n in range(num_nodes):
+            for s in problem["job_info"][n][1]:
+                ins[s].append(n + 1)
+                outs[n + 1].append(s)
 
-            for a in list(after[s]) + [s]:
-                for b in list(before[n + 1]) + [n + 1]:
-                    after[b].add(a)
-                    before[a].add(b)
+                for a in list(after[s]) + [s]:
+                    for b in list(before[n + 1]) + [n + 1]:
+                        after[b].add(a)
+                        before[a].add(b)
+    else:
+        for n in range(num_nodes):
+            for s in problem.successors[n]:
+                ins[s].append(n + 1)
+                outs[n + 1].append(s)
+
+                for a in list(after[s]) + [s]:
+                    for b in list(before[n + 1]) + [n + 1]:
+                        after[b].add(a)
+                        before[a].add(b)
 
     # Search for pair of tasks, containing at least two parallel branch between
     # them in the precedence graph.
@@ -276,7 +301,10 @@ def SolveRcpsp(
     # Create the model.
     model = cp_model.CpModel()
 
-    num_resources = problem["n_resources"]
+    if isinstance(problem, dict):
+        num_resources = problem["n_resources"]
+    else:
+        num_resources = problem.n_resources
 
     all_active_tasks = list(active_tasks)
     all_active_tasks.sort()
@@ -287,7 +315,10 @@ def SolveRcpsp(
         horizon = delays[(source, sink)][1]
     elif horizon == -1:  # Naive computation.
         # horizon = sum(max(r.duration for r in t.recipes) for t in problem.tasks)
-        horizon = sum([max(t) for t in problem["durations"][0]])
+        if isinstance(problem, dict):
+            horizon = sum([max(t) for t in problem["durations"][0]])
+        else:
+            horizon = sum([max(t) for t in problem.durations[0]])
     # if in_main_solve:
     # print(f"Horizon = {horizon}", flush=True)
 
@@ -310,7 +341,10 @@ def SolveRcpsp(
     for t in all_active_tasks:
         # task = problem.tasks[t]
         # num_recipes = len(task.recipes)
-        num_recipes = len(problem["durations"][0][t - 1])
+        if isinstance(problem, dict):
+            num_recipes = len(problem["durations"][0][t - 1])
+        else:
+            num_recipes = len(problem.durations[0][t - 1])
         all_recipes = range(num_recipes)
 
         start_var = model.NewIntVar(0, horizon, f"start_of_task_{t}")
@@ -335,11 +369,18 @@ def SolveRcpsp(
         #     task_to_recipe_durations[t].append(recipe.duration)
         #     for demand, resource in zip(recipe.demands, recipe.resources):
         #         demand_matrix[(resource, recipe_index)] = demand
-        for m in range(len(problem["durations"][0][t - 1])):
-            task_to_recipe_durations[t].append(problem["durations"][0][t - 1][m])
-            for r in range(problem["n_resources"]):
-                if problem["resources"][t - 1][m][r] != 0:
-                    demand_matrix[(r, m)] = problem["resources"][t - 1][m][r]
+        if isinstance(problem, dict):
+            for m in range(len(problem["durations"][0][t - 1])):
+                task_to_recipe_durations[t].append(problem["durations"][0][t - 1][m])
+                for r in range(problem["n_resources"]):
+                    if problem["resources"][t - 1][m][r] != 0:
+                        demand_matrix[(r, m)] = problem["resources"][t - 1][m][r]
+        else:
+            for m in range(len(problem.durations[0][t - 1])):
+                task_to_recipe_durations[t].append(problem.durations[0][t - 1][m])
+                for r in range(problem.n_resources):
+                    if problem.resource_cons[t - 1][m][r] != 0:
+                        demand_matrix[(r, m)] = problem.resource_cons[t - 1][m][r]
 
         # Create the duration variable from the accumulated durations.
         duration_var = model.NewIntVarFromDomain(
@@ -404,13 +445,22 @@ def SolveRcpsp(
     )
 
     # Normal dependencies (task ends before the start of successors).
-    for t in all_active_tasks:
-        # for n in problem.tasks[t].successors:
-        for n in problem["job_info"][t - 1][1]:
-            if n == sink:
-                model.Add(task_ends[t] <= makespan)
-            elif n in active_tasks:
-                model.Add(task_ends[t] <= task_starts[n])
+    if isinstance(problem, dict):
+        for t in all_active_tasks:
+            # for n in problem.tasks[t].successors:
+            for n in problem["job_info"][t - 1][1]:
+                if n == sink:
+                    model.Add(task_ends[t] <= makespan)
+                elif n in active_tasks:
+                    model.Add(task_ends[t] <= task_starts[n])
+    else:
+        for t in all_active_tasks:
+            # for n in problem.tasks[t].successors:
+            for n in problem.successors[t - 1]:
+                if n == sink:
+                    model.Add(task_ends[t] <= makespan)
+                elif n in active_tasks:
+                    model.Add(task_ends[t] <= task_starts[n])
 
     # Containers for resource investment problems.
     capacities = []  # Capacity variables for all resources.
@@ -420,14 +470,21 @@ def SolveRcpsp(
     for res in all_resources:
         # resource = problem.resources[res]
         # c = resource.max_capacity
-        c = problem["resource_availability"][res]
+        if isinstance(problem, dict):
+            c = problem["resource_availability"][res]
+        else:
+            c = problem.resource_availabilities[res]
         if c == -1:
             print(f"No capacity: {resource}")
             c = resource_to_sum_of_demand_max[res]
 
         # RIP problems have only renewable resources, and no makespan.
         # if problem.is_resource_investment or resource.renewable:
-        if res < problem["n_renewable_resources"]:
+        if isinstance(problem, dict):
+            nren = problem["n_renewable_resources"]
+        else:
+            nren = problem.n_renewable_resources
+        if res < nren:
             intervals = [task_intervals[t] for t in all_active_tasks]
             demands = [task_to_resource_demands[t][res] for t in all_active_tasks]
 
@@ -503,7 +560,11 @@ def SolveRcpsp(
         assignment_start = []
         assignment_mode = []
         # for t in range(len(problem.tasks)):
-        for t in range(1, len(problem["job_info"]) + 1):
+        if isinstance(problem, dict):
+            ntasks = len(problem["job_info"])
+        else:
+            ntasks = problem.n_modes
+        for t in range(1, ntasks + 1):
             if t in task_starts:
                 # assignment.start_of_task.append(solver.Value(task_starts[t]))
                 assignment_start.append(solver.Value(task_starts[t]))

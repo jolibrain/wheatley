@@ -83,7 +83,8 @@ class PSPLoader:
         # print("loading ", problem_file)
         suffix = pathlib.Path(problem_file).suffix
         if suffix in [".sm", ".mm"]:
-            return self.load_sm(problem_file)
+            # return self.load_sm(problem_file)
+            return self.load_single_rcpsp(problem_file)
         elif suffix == ".rcp":
             return self.load_rcp(problem_file)
         else:
@@ -236,6 +237,7 @@ class PSPLoader:
                 self.nextline()
             for i in range(3):
                 durations[i].append(job_durations[i])
+
             resources.append(job_resources)
         self.firstchar("*")
         self.firstword("RESOURCEAVAILABILITIES:")
@@ -293,7 +295,7 @@ class PSPLoader:
         # Number of doubly constrained resources
         n_doubly_constrained_resources = 0
         # Durations for each job and for each mode. Durations are expressed through an array [MIN, MAX, MOD]
-        durations = []
+        durations = [[], [], []]
         # Consumption for each job and for each mode of jobs
         resources_cons = []
 
@@ -343,18 +345,38 @@ class PSPLoader:
         self.firstword("jobnr.")
         self.firstchar("-")
         for j in range(n_jobs):
-            job_durations = []
+            job_durations = [[], [], []]
             job_resources = []
-            job_durations.append([int(self.sline[2])])
-            req = [int(d) for d in self.sline[3:]]
+            job_durations[0].append(int(self.sline[2]))
+            if len(self.sline) == (n_resources + 5):
+                job_durations[1].append(int(self.sline[3]))
+                job_durations[2].append(int(self.sline[4]))
+                startr = 5
+            else:
+                dmin, dmax = self.do_generate_bounds(job_durations[0][-1])
+                job_durations[1].append(dmin)
+                job_durations[2].append(dmax)
+                startr = 3
+
+            req = [int(d) for d in self.sline[startr:]]
             job_resources.append(req)
             self.nextline()
             # Starts at 1 so that the code is only executed for jobs that have more than 1 mode
             for m in range(1, n_modes_per_job[j]):
-                job_durations.append([int(self.sline[1])])
-                job_resources.append([int(d) for d in self.sline[2:]])
+                job_durations[0].append(int(self.sline[1]))
+                if len(self.sline) == (n_resources + 4):
+                    job_durations[1].append(int(self.sline[3]))
+                    job_durations[2].append(int(self.sline[4]))
+                    startr = 4
+                else:
+                    dmin, dmax = self.do_generate_bounds(job_durations[0][-1])
+                    job_durations[1].append(dmin)
+                    job_durations[2].append(dmax)
+                    startr = 2
+                job_resources.append([int(d) for d in self.sline[startr:]])
                 self.nextline()
-            durations.append(job_durations)
+            for i in range(3):
+                durations[i].append(job_durations[i])
             resources_cons.append(job_resources)
         self.firstchar("*")
         self.firstword("RESOURCEAVAILABILITIES:")
