@@ -29,7 +29,11 @@ class GState:
         self.problem = problem
         self.problem_description = problem_description
         self.n_features = env_specification.n_features
-        self.n_nodes = self.problem["n_modes"]
+        if isinstance(self.problem, dict):
+            self.n_nodes = self.problem["n_modes"]
+        else:
+            self.n_nodes = self.problem.n_modes
+
         # self.features = np.zeros((self.n_nodes, self.n_features), dtype=float)
         self.deterministic = deterministic
         self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
@@ -56,19 +60,32 @@ class GState:
         # 7,8,9 : tct (min max mode)
         # 10.. 9+max_n_resources : level of resource i used by this mode (normalized)
 
-        job_info = problem["job_info"]
         self.job_modes = []
-        m = 0
-        for n, j in enumerate(job_info):
-            self.job_modes.append(list(range(m, m + j[0])))
-            m += j[0]
+        if isinstance(problem, dict):
+            job_info = problem["job_info"]
+            m = 0
+            for n, j in enumerate(job_info):
+                self.job_modes.append(list(range(m, m + j[0])))
+                m += j[0]
+        else:
+            m = 0
+            for n, j in enumerate(problem.n_modes_per_job):
+                self.job_modes.append(list(range(m, m + j)))
+                m += j
 
         self.problem_edges = []
-        for n, j in enumerate(job_info):
-            for succ_job in j[1]:
-                for orig_mode in self.job_modes[n]:
-                    for dest_mode in self.job_modes[succ_job - 1]:
-                        self.problem_edges.append((orig_mode, dest_mode))
+        if isinstance(problem, dict):
+            for n, j in enumerate(job_info):
+                for succ_job in j[1]:
+                    for orig_mode in self.job_modes[n]:
+                        for dest_mode in self.job_modes[succ_job - 1]:
+                            self.problem_edges.append((orig_mode, dest_mode))
+        else:
+            for n, j in enumerate(problem.successors):
+                for succ_job in j:
+                    for orig_mode in self.job_modes[n]:
+                        for dest_mode in self.job_modes[succ_job - 1]:
+                            self.problem_edges.append((orig_mode, dest_mode))
 
         # self.problem_graph = nx.DiGraph(self.problem_edges)
         # nx.draw_networkx(self.graph)
@@ -145,19 +162,33 @@ class GState:
         )
 
         m = 0
-        for n, j in enumerate(self.problem["job_info"]):
-            for mi in range(m, m + j[0]):
-                self.graph.ndata["job"][mi] = n
-            m += j[0]
+        if isinstance(self.problem, dict):
+            for n, j in enumerate(self.problem["job_info"]):
+                for mi in range(m, m + j[0]):
+                    self.graph.ndata["job"][mi] = n
+                m += j[0]
+        else:
+            for n, j in enumerate(self.problem.n_modes_per_job):
+                for mi in range(m, m + j):
+                    self.graph.ndata["job"][mi] = n
+                m += j
 
     def reset_durations(self, redraw_real=True):
         # at init, draw real durations from distrib if not deterministic
-        for i in range(3):
-            flat_dur = [
-                item for sublist in self.problem["durations"][i] for item in sublist
-            ]
-            # self.features[:, 4 + i] = np.array(flat_dur)
-            self.graph.ndata["durations"][:, i] = torch.tensor(flat_dur)
+        if isinstance(self.problem, dict):
+            for i in range(3):
+                flat_dur = [
+                    item for sublist in self.problem["durations"][i] for item in sublist
+                ]
+                # self.features[:, 4 + i] = np.array(flat_dur)
+                self.graph.ndata["durations"][:, i] = torch.tensor(flat_dur)
+        else:
+            for i in range(3):
+                flat_dur = [
+                    item for sublist in self.problem.durations[i] for item in sublist
+                ]
+                self.graph.ndata["durations"][:, i] = torch.tensor(flat_dur)
+
         if redraw_real:
             # self.real_durations = self.draw_real_durations(self.features[:, 4:7])
             self.real_durations = self.draw_real_durations(
@@ -195,48 +226,93 @@ class GState:
                     self.nodes_in_frontier.add(fe[1])
 
     def reset_resources(self):
-        self.n_resources = self.problem["n_resources"]
-        self.graph.ndata["resources"] = torch.zeros(
-            (self.n_nodes, self.n_resources), dtype=torch.float
-        )
-        flat_res = torch.tensor(
-            [item for sublist in self.problem["resources"] for item in sublist],
-            dtype=torch.float,
-        )
-        # normalize resource usage
-        for i in range(self.problem["n_resources"]):
-            flat_res[:, i] /= self.problem["resource_availability"][i]
-        self.resource_levels = torch.tensor(self.problem["resource_availability"])
+        if isinstance(self.problem, dict):
+            self.n_resources = self.problem["n_resources"]
+            self.graph.ndata["resources"] = torch.zeros(
+                (self.n_nodes, self.n_resources), dtype=torch.float
+            )
+            flat_res = torch.tensor(
+                [item for sublist in self.problem["resources"] for item in sublist],
+                dtype=torch.float,
+            )
+            # normalize resource usage
+            for i in range(self.problem["n_resources"]):
+                flat_res[:, i] /= self.problem["resource_availability"][i]
+            self.resource_levels = torch.tensor(self.problem["resource_availability"])
 
-        # self.features[:, 10 : 10 + self.n_resources] = flat_res
-        self.graph.ndata["resources"][:] = flat_res
+            # self.features[:, 10 : 10 + self.n_resources] = flat_res
+            self.graph.ndata["resources"][:] = flat_res
 
-        self.resources = []
-        for r in range(self.problem["n_renewable_resources"]):
-            self.resources.append([])
-            for i in range(4):
-                self.resources[r].append(
-                    self.resourceModel(
-                        max_level=1.0,
-                        unit_val=1.0 / self.resource_levels[r],
-                        renewable=True,
+            self.resources = []
+            for r in range(self.problem["n_renewable_resources"]):
+                self.resources.append([])
+                for i in range(4):
+                    self.resources[r].append(
+                        self.resourceModel(
+                            max_level=1.0,
+                            unit_val=1.0 / self.resource_levels[r],
+                            renewable=True,
+                        )
                     )
-                )
 
-        for r in range(
-            self.problem["n_renewable_resources"],
-            self.problem["n_renewable_resources"]
-            + self.problem["n_nonrenewable_resources"],
-        ):
-            self.resources.append([])
-            for i in range(4):
-                self.resources[r].append(
-                    self.resourceModel(
-                        max_level=1.0,
-                        unit_val=1.0 / self.resource_levels[r],
-                        renewable=False,
+            for r in range(
+                self.problem["n_renewable_resources"],
+                self.problem["n_renewable_resources"]
+                + self.problem["n_nonrenewable_resources"],
+            ):
+                self.resources.append([])
+                for i in range(4):
+                    self.resources[r].append(
+                        self.resourceModel(
+                            max_level=1.0,
+                            unit_val=1.0 / self.resource_levels[r],
+                            renewable=False,
+                        )
                     )
-                )
+        else:
+            self.n_resources = self.problem.n_resources
+            self.graph.ndata["resources"] = torch.zeros(
+                (self.n_nodes, self.n_resources), dtype=torch.float
+            )
+            flat_res = torch.tensor(
+                [item for sublist in self.problem.resource_cons for item in sublist],
+                dtype=torch.float,
+            )
+            # normalize resource usage
+            for i in range(self.problem.n_resources):
+                flat_res[:, i] /= self.problem.resource_availabilities[i]
+            self.resource_levels = torch.tensor(self.problem.resource_availabilities)
+
+            # self.features[:, 10 : 10 + self.n_resources] = flat_res
+            self.graph.ndata["resources"][:] = flat_res
+
+            self.resources = []
+            for r in range(self.problem.n_renewable_resources):
+                self.resources.append([])
+                for i in range(4):
+                    self.resources[r].append(
+                        self.resourceModel(
+                            max_level=1.0,
+                            unit_val=1.0 / self.resource_levels[r],
+                            renewable=True,
+                        )
+                    )
+
+            for r in range(
+                self.problem.n_renewable_resources,
+                self.problem.n_renewable_resources
+                + self.problem.n_nonrenewable_resources,
+            ):
+                self.resources.append([])
+                for i in range(4):
+                    self.resources[r].append(
+                        self.resourceModel(
+                            max_level=1.0,
+                            unit_val=1.0 / self.resource_levels[r],
+                            renewable=False,
+                        )
+                    )
+
         assert len(self.resources) == self.n_resources
         self.reset_frontier()
 
@@ -463,18 +539,25 @@ class GState:
         return torchimg
 
     def render_solution(self, schedule, scaling=1.0):
-        n_jobs = self.problem["n_jobs"]
         starts = [int(i * scaling) for i in schedule[0]]
         modes = schedule[1]
-        nres = self.problem["n_resources"]
-        maxres = self.problem["resource_availability"]
+        if isinstance(self.problem, dict):
+            n_jobs = self.problem["n_jobs"]
+            nres = self.problem["n_resources"]
+            maxres = self.problem["resource_availability"]
+            rusage = [self.problem["resources"][j][modes[j]] for j in range(n_jobs)]
+        else:
+            n_jobs = self.problem.n_jobs
+            nres = self.problem.n_resources
+            maxres = self.problem.resource_availabilities
+            rusage = [self.problem.resource_cons[j][modes[j]] for j in range(n_jobs)]
+
         ends = [
             # starts[j] + self.problem["durations"][0][j][modes[j]] for j in range(n_jobs)
             starts[j] + int(self.duration_real(self.job_modes[j][modes[j]]))
             for j in range(n_jobs)
         ]
 
-        rusage = [self.problem["resources"][j][modes[j]] for j in range(n_jobs)]
         levels = []
         for r in range(nres):
             levels.append([0] * int((max(ends) + 1)))

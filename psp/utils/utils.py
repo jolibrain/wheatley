@@ -71,7 +71,11 @@ def compute_resources_graph_torch(r_info):
     # c1 = torch.logical_and(m1, m2)
     # c2 = torch.logical_and(c1, notdiag)
     c2 = torch.logical_and(
-        torch.logical_and(r_info.unsqueeze(0) != 0, r_info.unsqueeze(1) != 0), notdiag
+        torch.logical_and(
+            r_info.unsqueeze(0).expand(r_info.shape[0], -1, -1) != 0,
+            r_info.unsqueeze(1).expand(-1, r_info.shape[0], -1) != 0,
+        ),
+        notdiag,
     )
     conflicts = torch.where(c2)
     # conflicts[0] is source of edge

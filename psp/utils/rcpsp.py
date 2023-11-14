@@ -108,7 +108,7 @@ class Rcpsp:
                         self.precGraph.add_edge(
                             self.__job_id_to_mode_id_2_node[j][mode_j],
                             self.__job_id_to_mode_id_2_node[succ][mode_succ],
-                            weight=self.durations[j][mode_j][0],
+                            weight=self.durations[0][j][mode_j],
                         )
                         # print("add_edge", self.__job_id_to_mode_id_2_node[j][mode_j]+1,
                         # self.__job_id_to_mode_id_2_node[succ][mode_succ]+1,
@@ -116,49 +116,49 @@ class Rcpsp:
 
         # If only one source, use it as source for the graph. Otherwise add one source in the graph
         assert len(sources_id) > 0
-        source_id0 = sources_id[0]
+        # source_id0 = sources_id[0]
 
-        if (
-            len(sources_id) == 1
-            and self.n_modes_per_job[source_id0] == 1
-            and self.durations[source_id0][0][0] == 0
-        ):
-            self.source_id = source_id0
-        else:
-            self.source_id = node_idx
-            node_idx += 1
-            for s in sources_id:
-                for m in range(self.n_modes_per_job[s]):
-                    self.precGraph.add_edge(
-                        self.source_id, self.__job_id_to_mode_id_2_node[s][m], weight=0
-                    )
-            self.successors_id.append(sources_id)
-            self.successors.append([self.id_to_job(id) for id in sources_id])
+        # if (
+        #     len(sources_id) == 1
+        #     and self.n_modes_per_job[source_id0] == 1
+        #     and self.durations[source_id0][0][0] == 0
+        # ):
+        #     self.source_id = source_id0
+        # else:
+        #     self.source_id = node_idx
+        #     node_idx += 1
+        #     for s in sources_id:
+        #         for m in range(self.n_modes_per_job[s]):
+        #             self.precGraph.add_edge(
+        #                 self.source_id, self.__job_id_to_mode_id_2_node[s][m], weight=0
+        #             )
+        #     self.successors_id.append(sources_id)
+        #     self.successors.append([self.id_to_job(id) for id in sources_id])
 
         # If only one sink, use it as sink for the graph. Otherwise add one sink in the graph
         assert len(sinks_id) > 0
-        sink_id0 = sinks_id[0]
-        if (
-            len(sinks_id) == 1
-            and self.n_modes_per_job[sink_id0] == 1
-            and self.durations[sink_id0][0][0] == 0
-            and sinks_id[0] != self.source_id
-        ):
-            self.sink_id = sink_id0
-        else:
-            self.sink_id = node_idx
-            node_idx += 1
-            for s in sinks_id:
-                for m in range(self.n_modes_per_job[s]):
-                    self.precGraph.add_edge(
-                        self.__job_id_to_mode_id_2_node[s][m],
-                        self.sink_id,
-                        weight=self.durations[s][m][0],
-                    )
-                self.successors_id[s].append(self.sink_id)
-                self.successors[self.id_to_job(s)].append(self.id_to_job(self.sink_id))
-            self.successors_id.append([])
-            self.successors.append([])
+        # sink_id0 = sinks_id[0]
+        # if (
+        #     len(sinks_id) == 1
+        #     and self.n_modes_per_job[sink_id0] == 1
+        #     and self.durations[sink_id0][0][0] == 0
+        #     and sinks_id[0] != self.source_id
+        # ):
+        #     self.sink_id = sink_id0
+        # else:
+        #     self.sink_id = node_idx
+        #     node_idx += 1
+        #     for s in sinks_id:
+        #         for m in range(self.n_modes_per_job[s]):
+        #             self.precGraph.add_edge(
+        #                 self.__job_id_to_mode_id_2_node[s][m],
+        #                 self.sink_id,
+        #                 weight=self.durations[s][m][0],
+        #             )
+        #         self.successors_id[s].append(self.sink_id)
+        #         self.successors[self.id_to_job(s)].append(self.id_to_job(self.sink_id))
+        #     self.successors_id.append([])
+        #     self.successors.append([])
 
     def computeDistSourceStart(self):
         dist_source = all_longest_distances(self.precGraph, self.source_id)
@@ -289,3 +289,42 @@ class Rcpsp:
     # TODO
     def sample_n_jobs(self, n_jobs):
         return self
+
+    def __eq__(self, obj):
+        if isinstance(obj, dict):
+            return False
+        if self.n_jobs != obj.n_jobs:
+            return False
+        if self.n_modes_per_job != obj.n_modes_per_job:
+            return False
+        if self.n_modes != obj.n_modes:
+            return False
+        if self.successors != obj.successors:
+            return False
+        if self.resource_availabilities != obj.resource_availabilities:
+            return False
+        if self.n_renewable_resources != obj.n_renewable_resources:
+            return False
+        if self.n_nonrenewable_resources != obj.n_nonrenewable_resources:
+            return False
+        if self.n_doubly_constrained_resources != obj.n_doubly_constrained_resources:
+            return False
+        if self.n_resources != obj.n_resources:
+            return False
+        if self.durations != obj.durations:
+            return False
+        if self.resource_cons != obj.resource_cons:
+            return False
+        if self.max_resource_availability != obj.max_resource_availability:
+            return False
+        if self.successors_id != obj.successors_id:
+            return False
+        if self.max_resource_consumption != obj.max_resource_consumption:
+            return False
+        if self.use_index_from_zero != obj.use_index_from_zero:
+            return False
+        if self.predecessors != obj.predecessors:
+            return False
+        if self.predecessors_id != obj.predecessors_id:
+            return False
+        return True
