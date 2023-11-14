@@ -240,7 +240,7 @@ possible_args = {
     "vf_coef": [1.0],
     "clip_range": [0.25],
     "gamma": [1.0],
-    "gae_lambda": [0.99],
+    "gae_lambda": [1.0],
     "optimizer": ["adamw"],
     "fe_type": ["dgl"],
     "residual_gnn": [True],
