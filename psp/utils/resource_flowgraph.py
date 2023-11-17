@@ -85,9 +85,20 @@ class ResourceFlowGraph:
             pos = pos + 1
         return pos - 1
 
+    def find_max_pos2(self, date):
+        if len(self.frontier) == 0:
+            return 0
+        # assert date >= self.frontier[0][0]
+        if date < self.frontier[0][0]:
+            return -1
+        pos = len(self.frontier) - 1
+        while (pos > 0) and (self.frontier[pos][0] > date):
+            pos = pos - 1
+        return pos
+
     # inserts after the last position pos such that frontier[pos][0] <= date
     def insert_in_frontier(self, date, consumer_id, level):
-        max_pos = self.find_max_pos(date)
+        max_pos = self.find_max_pos2(date)
         for i in range(int(level / self.unit_val)):
             self.frontier.insert(max_pos + 1, [date, consumer_id, self.unit_val])
 
@@ -96,7 +107,7 @@ class ResourceFlowGraph:
         if not self.renewable:
             assert level <= self.remaining_level + self.unit_val / 2
             self.remaining_level -= level
-        cur_pos = self.find_max_pos(start)
+        cur_pos = self.find_max_pos2(start)
         available_capa = 0
         to_add_in_frontier = []
         flow_dict = {}
