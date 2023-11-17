@@ -1,8 +1,5 @@
 import os
 
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-
 import random
 import sys
 from typing import Tuple

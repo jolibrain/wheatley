@@ -7,6 +7,8 @@ from psp.utils.resource_timeline import ResourceTimeline
 from psp.utils.resource_flowgraph import ResourceFlowGraph
 from psp.solution import Solution
 
+from concurrent.futures import ThreadPoolExecutor
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.pyplot import cm
@@ -785,7 +787,14 @@ class GState:
         for n in self.graph.successors(node_id, etype="prec"):
             self.update_completion_times(n)
 
+    def max_thread_safe(self, cur_node_id):
+        return torch.max(
+            self.tct(self.graph.predecessors(cur_node_id, etype="prec")), 0, True
+        )
+
     def update_completion_times(self, node_id):
+        self.tpe = ThreadPoolExecutor(max_workers=1)
+
         if node_id is None:
             indeg = self.graph.in_degrees(etype="prec")
             open_nodes = torch.where(indeg == 0)[0].tolist()
@@ -798,11 +807,14 @@ class GState:
                 max_tct_predecessors = torch.zeros((3), dtype=torch.float)
                 max_tct_predecessors_real = torch.zeros((1), dtype=torch.float)
             else:
-                max_tct_predecessors = torch.max(
-                    self.tct(self.graph.predecessors(cur_node_id, etype="prec")),
-                    0,
-                    keepdim=True,
-                )[0]
+                # max_tct_predecessors = torch.max(
+                #     self.tct(self.graph.predecessors(cur_node_id, etype="prec")),
+                #     0,
+                #     keepdim=True,
+                # )[0]
+                max_tct_predecessors = self.tpe.submit(
+                    self.max_thread_safe, cur_node_id
+                ).result()[0]
                 max_tct_predecessors_real = torch.max(
                     self.tct_real(self.graph.predecessors(cur_node_id, etype="prec"))
                 )
