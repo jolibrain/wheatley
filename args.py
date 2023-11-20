@@ -77,7 +77,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--device",
         type=str,
         default="cuda",
-        choices=["cpu", "cuda", "cuda:0", "cuda:1", "cuda:2", "cuda:3"],
+        choices=["cpu", "cuda", "cuda:0", "cuda:1", "cuda:2", "cuda:3", "mps:0"],
         help="Which device to use (cpu, cuda:0, cuda:1...)",
     )
     parser.add_argument(
