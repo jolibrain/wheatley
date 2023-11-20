@@ -25,6 +25,7 @@ import numpy as np
 import pathlib
 from .rcpsp import Rcpsp
 import glob
+import re
 
 
 class PSPLoader:
@@ -42,7 +43,11 @@ class PSPLoader:
     def nextline(self):
         while True:
             self.line = self.f.readline()
-            self.sline = self.line.split()
+            temp = re.split("\s|,|\(|\)|\n", self.line)
+            self.sline = []
+            for t in temp:
+                if t != "":
+                    self.sline.append(t)
             if len(self.sline) != 0:
                 break
         self.fc = self.line[0]
@@ -87,6 +92,8 @@ class PSPLoader:
             return self.load_single_rcpsp(problem_file)
         elif suffix == ".rcp":
             return self.load_rcp(problem_file)
+        elif suffix == ".ag1":
+            return self.load_ag1(problem_file)
         else:
             raise ValueError("unkown file format" + problem_file)
 
@@ -143,6 +150,104 @@ class PSPLoader:
             "max_resource_request": max_resource_request,
         }
 
+    def load_ag1(self, problem_file):
+        self.f = open(problem_file, "r")
+        self.nextline()
+        for i in range(18):
+            self.firstchar("#")
+        n_renew_r = int(self.sline[2])
+        print("n_renew_r", n_renew_r)
+        self.nextline()
+        n_nonrenew_r = int(self.sline[2])
+        print("n_nonrenew_r", n_nonrenew_r)
+        for i in range(n_renew_r + n_nonrenew_r + 1):
+            self.nextline()
+        resource_availabilities = [int(self.sline[2])]
+        for i in range(n_renew_r + n_nonrenew_r - 1):
+            self.nextline()
+            resource_availabilities.append(int(self.sline[0]))
+        self.nextline()
+        if self.sline[3] == "1":
+            use_index_from_zero = False
+            print("index starting at 1")
+        else:
+            use_index_from_zero = True
+            print("index starting at 0")
+        self.nextline()
+        n_jobs = 1
+        while self.sline[0] != "N_modes_per_job":
+            n_jobs += 1
+            self.nextline()
+        print("n_jobs", n_jobs)
+
+        n_modes_per_job = [int(self.sline[2])]
+        self.nextline()
+        for i in range(n_jobs - 1):
+            n_modes_per_job.append(int(self.sline[0]))
+            self.nextline()
+
+        suc = int(self.sline[2])
+        if suc == -1:
+            successors = [[]]
+        else:
+            if use_index_from_zero:
+                successors = [[suc + 1]]
+            else:
+                successors = [[suc]]
+        self.nextline()
+
+        for i in range(n_jobs - 1):
+            suc = int(self.sline[0])
+            if suc == -1:
+                successors.append([])
+            else:
+                if use_index_from_zero:
+                    successors.append([suc + 1])
+                else:
+                    successors.append([suc])
+            self.nextline()
+        due_dates = [int(self.sline[2])]
+        self.nextline()
+        for i in range(n_jobs - 1):
+            due_dates.append(self.sline[0])
+            self.nextline()
+
+        resource_cons = []
+        resource_cons.append(
+            [[int(c) for c in self.sline[2 : 2 + n_renew_r + n_nonrenew_r]]]
+        )
+        self.nextline()
+        for i in range(n_jobs - 1):
+            resource_cons.append(
+                [[int(c) for c in self.sline[0 : n_renew_r + n_nonrenew_r]]]
+            )
+            self.nextline()
+        durations = [[], [], []]
+        for j in range(3):
+            durations[j].append([float(self.sline[2 + j])])
+        self.nextline()
+        for i in range(n_jobs - 2):
+            for j in range(3):
+                durations[j].append([float(self.sline[j])])
+            self.nextline()
+
+        for j in range(3):
+            durations[j].append([float(self.sline[j])])
+
+        return Rcpsp(
+            n_jobs=n_jobs,
+            n_modes_per_job=n_modes_per_job,
+            successors=successors,
+            durations=durations,
+            resource_cons=resource_cons,
+            resource_availabilities=resource_availabilities,
+            n_renewable_resources=n_renew_r,
+            n_nonrenewable_resources=n_nonrenew_r,
+            n_doubly_constrained_resources=0,
+            use_index_from_zero=use_index_from_zero,
+            due_dates=due_dates,
+        )
+
     def load_sm(self, problem_file):
         self.f = open(problem_file, "r")
         self.nextline()
@@ -167,7 +272,6 @@ class PSPLoader:
         self.firstword("projects")
         self.firstword("jobs", True)
         n_jobs = int(self.sline[4])
-
         self.nextline()
         self.firstword("horizon")
         self.firstword("RESOURCES")
