@@ -242,7 +242,7 @@ possible_args = {
     "fe_type": ["dgl"],
     "residual_gnn": [True],
     "graph_has_relu": [True],
-    "graph_pooling": ["learn"],
+    "graph_pooling": ["learn", "learninv"],
     "hidden_dim_features_extractor": [32],
     "n_layers_features_extractor": [3],
     "mlp_act": ["gelu"],
