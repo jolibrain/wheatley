@@ -262,7 +262,7 @@ class GnnDGL(torch.nn.Module):
         node_offset = num_nodes
 
         origbnn = g.batch_num_nodes()
-        if self.graph_pooling == "learn":
+        if self.graph_pooling in ["learn", "learninv"]:
             poolnodes = list(range(num_nodes, num_nodes + batch_size))
             g.add_nodes(
                 batch_size, data={"feat": torch.zeros((batch_size, features.shape[1]))}
@@ -274,8 +274,6 @@ class GnnDGL(torch.nn.Module):
                 ei0 += [num_nodes + i] * origbnn[i]
                 ei1 += list(range(startnode, startnode + origbnn[i]))
                 startnode += origbnn[i]
-            # REMOVE INVERSE POOLING !
-            # g.add_edges(ei0, ei1, data={"type": torch.LongTensor([3] * len(ei0)).to(features.device)})
 
             g.add_edges(
                 list(range(num_nodes, num_nodes + batch_size)),
@@ -283,6 +281,8 @@ class GnnDGL(torch.nn.Module):
                 data={"type": torch.LongTensor([0] * batch_size)},
             )
 
+            if self.graph_pooling == "learninv":
+                g.add_edges(ei0, ei1, data={"type": torch.LongTensor([3] * len(ei0))})
             g.add_edges(ei1, ei0, data={"type": torch.LongTensor([4] * len(ei0))})
             node_offset += batch_size
 
@@ -411,7 +411,7 @@ class GnnDGL(torch.nn.Module):
         elif self.graph_pooling == "avg":
             graph_pooling = torch.ones(n_nodes, device=features.device) / n_nodes
             graph_embedding = torch.matmul(graph_pooling, node_features)
-        elif self.graph_pooling == "learn":
+        elif self.graph_pooling in ["learn", "learninv"]:
             graph_embedding = features[num_nodes : num_nodes + batch_size, :]
         else:
             raise Exception(

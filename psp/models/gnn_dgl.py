@@ -261,7 +261,7 @@ class GnnDGL(torch.nn.Module):
 
         g, poolnodes, resource_nodes, vnodes = rewire(
             g,
-            self.graph_pooling == "learn",
+            self.graph_pooling,
             self.conflicts == "node",
             self.vnode,
             batch_size,
@@ -434,7 +434,7 @@ class GnnDGL(torch.nn.Module):
         elif self.graph_pooling == "avg":
             graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
             graph_embedding = torch.matmul(graph_pooling, node_features)
-        elif self.graph_pooling == "learn":
+        elif self.graph_pooling in ["learn", "learninv"]:
             graph_embedding = features[num_nodes : num_nodes + batch_size, :]
         else:
             raise Exception(

@@ -270,7 +270,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--graph_pooling",
         type=str,
         default="learn",
-        choices=["max", "avg", "learn"],
+        choices=["max", "avg", "learn", "learninv"],
         help="which pooling to use (avg , max or learn)",
     )
     parser.add_argument(

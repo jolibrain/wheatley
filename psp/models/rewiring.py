@@ -235,7 +235,8 @@ def rewire(
     node_offset = g.num_nodes()
     origbnn = g.batch_num_nodes()
 
-    if learned_graph_pooling:
+    if learned_graph_pooling in ["learn", "learninv"]:
+        inverse_pooling = learned_graph_pooling == "learninv"
         g, poolnodes, node_offset = learned_graph_pool(
             g,
             node_offset,
@@ -244,7 +245,7 @@ def rewire(
             input_dim_features_extractor,
             poolnodeetype,
             poolnoderevetype,
-            inverse_pooling=False,
+            inverse_pooling=inverse_pooling,
             graphobs=graphobs,
         )
     else:
