@@ -24,10 +24,12 @@
 # import numpy as np
 import random
 import torch
+import dgl
 from .transition_models.transition_model import TransitionModel
 from .reward_models.graph_terminal_reward_model import GraphTerminalRewardModel
 from .observation import EnvObservation
 from .gstate import GState as State
+from concurrent.futures import ThreadPoolExecutor
 
 
 class GEnv:
@@ -42,6 +44,7 @@ class GEnv:
         self.observe_conflicts_as_cliques = (
             env_specification.observe_conflicts_as_cliques
         )
+        self.observe_subgraph = env_specification.observe_subgraph
         self.deterministic = problem_description.deterministic
         self.n_features = self.env_specification.n_features
         self.observation_space = self.env_specification.observation_space
@@ -88,25 +91,18 @@ class GEnv:
         pass
 
     def step(self, action):
-        # Getting current observation
-        obs = self.observe()
-
         # Running the transition model on the current action
-        node_id = action
-        self.transition_model.run(self.state, node_id)
+        node_id = self.action_to_node_id(action)
+        n_actions = self.transition_model.run(self.state, node_id)
 
         # Getting next observation
-        next_obs = self.observe()
+        full_observation = self.observe()
+        self.current_observation = self.process_obs(full_observation)
 
         # Getting the reward associated with the current action
         reward = self.reward_model.evaluate(self.state)
 
         self.sum_reward += reward
-
-        # if needed, remove tct from obs (reward is computed on tct on obs ... )
-        # if self.env_specification.do_not_observe_updated_bounds:
-        #     next_obs.features = next_obs.features.clone()
-        #     next_obs.features[:, 7:10] = -1
 
         # Getting final necessary information
         done = self.done()
@@ -115,9 +111,9 @@ class GEnv:
             "episode": {"r": self.sum_reward, "l": 1 + self.n_steps},
             "mask": self.action_masks(),
         }
-        self.n_steps += 1
+        self.n_steps += n_actions
 
-        return next_obs, reward, done, False, info
+        return self.current_observation, reward, done, False, info
 
     def reset(self, soft=False):
         # Reset the internal state, but do not sample a new problem
@@ -131,7 +127,8 @@ class GEnv:
             self._create_state()
 
         # Get the new observation
-        observation = self.observe()
+        full_observation = self.observe()
+        self.current_observation = self.process_obs(full_observation)
 
         self.n_steps = 0
         self.sum_reward = 0
@@ -140,7 +137,83 @@ class GEnv:
             "mask": self.action_masks(),
         }
 
-        return observation, info
+        return self.current_observation, info
+
+    def khop_thread_safe(self, graph, source_nodes, k):
+        return dgl.khop_out_subgraph(graph, source_nodes, k=k, relabel_nodes=True)[0]
+
+    def process_obs(self, full_observation):
+        if not self.observe_subgraph:
+            return full_observation
+        frontier_nodes = torch.tensor(list(self.state.nodes_in_frontier))
+        present_nodes = torch.where(self.state.selectables() == 1)[0]
+        if self.env_specification.observation_horizon_step != 0:
+            khopsub = dgl.khop_out_subgraph(
+                full_observation.edge_type_subgraph(["prec"]),
+                present_nodes,
+                k=self.env_specification.observation_horizon_step,
+                relabel_nodes=True,
+            )[0]
+            future_nodes_step = set(khopsub.ndata[dgl.NID].tolist())
+        else:
+            future_nodes_step = set()
+
+        if (
+            self.env_specification.observation_horizon_time != 0
+            and present_nodes.shape[0] != 0
+        ):
+            present_date = torch.max(self.state.tct(present_nodes))
+            earlier_start_times = (
+                self.state.all_tct()[:, 1] - self.state.all_durations()[:, 1]
+            )
+            future_nodes_time = torch.where(
+                torch.logical_and(
+                    earlier_start_times > present_date,
+                    earlier_start_times
+                    < present_date + self.env_specification.observation_horizon_time,
+                )
+            )[0]
+            future_nodes_time = set(future_nodes_time.tolist())
+        else:
+            future_nodes_time = set()
+
+        future_nodes = future_nodes_step.union(future_nodes_time)
+        if len(future_nodes) == 0:
+            past_nodes = torch.where(self.state.get_pasts())[0]
+            future_nodes = set(range(full_observation.num_nodes())) - set(
+                past_nodes.tolist()
+            )
+        nodes_to_keep = torch.tensor(
+            list(
+                (
+                    future_nodes.union(set(present_nodes.tolist())).union(
+                        set(frontier_nodes.tolist())
+                    )
+                )
+            )
+        )
+        # print(
+        #     "future nodes removed ",
+        #     full_observation.num_nodes()
+        #     - torch.where(self.state.get_pasts())[0].shape[0]
+        #     - nodes_to_keep.shape[0],
+        # )
+        subgraph = dgl.node_subgraph(
+            full_observation,
+            nodes_to_keep.to(self.state.device),
+            output_device=torch.device("cpu"),
+        )
+        return subgraph
+
+    def action_to_node_id(self, action):
+        if not self.observe_subgraph:
+            return action
+        return self.current_observation.ndata[dgl.NID][action].item()
+
+    def process_mask(self, full_mask):
+        if not self.observe_subgraph:
+            return full_mask
+        return full_mask[self.current_observation.ndata[dgl.NID]]
 
     def get_solution(self):
         return self.state.get_solution()
@@ -181,17 +254,16 @@ class GEnv:
         return self.state.done()
 
     def action_masks(self):
-        mask = self.transition_model.get_mask(self.state)
+        full_mask = self.transition_model.get_mask(self.state)
 
-        # pad = np.full(
-        #     (self.env_specification.max_n_modes - len(mask),),
-        #     False,
-        #     dtype=bool,
-        # )
+        mask = self.process_mask(full_mask)
+
         pad = torch.zeros(
-            (self.env_specification.max_n_modes - len(mask)), dtype=torch.bool
+            (self.env_specification.max_n_modes - len(mask)),
+            dtype=torch.bool,
+            device=self.state.device,
         )
-        return torch.cat([mask, pad])
+        return torch.cat([mask, pad]).to(torch.device("cpu"))
 
     def get_solution(self):
         return self.state.get_solution()

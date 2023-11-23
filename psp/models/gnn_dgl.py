@@ -238,9 +238,10 @@ class GnnDGL(torch.nn.Module):
             ).graphs
             batch_size = g.batch_size
             num_nodes = g.num_nodes()
-            # TODO : n_nodes can vary !!!
-            n_nodes = g.batch_num_nodes()[0].item()
-
+            if batch_size == 1:
+                n_nodes = g.batch_num_nodes()[0].item()
+            else:
+                n_nodes = g.batch_num_nodes()
         else:
             observation = AgentObservation(
                 obs,
@@ -426,27 +427,67 @@ class GnnDGL(torch.nn.Module):
             )  # The final embedding is concatenation of all layers embeddings
 
         node_features = features[:num_nodes, :]
-        node_features = node_features.reshape(batch_size, n_nodes, -1)
 
-        if self.graph_pooling == "max":
-            max_elts, max_ind = torch.max(node_features, dim=1)
-            graph_embedding = max_elts
-        elif self.graph_pooling == "avg":
-            graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
-            graph_embedding = torch.matmul(graph_pooling, node_features)
-        elif self.graph_pooling in ["learn", "learninv"]:
-            graph_embedding = features[num_nodes : num_nodes + batch_size, :]
+        if self.graphobs and batch_size != 1:
+            if self.graph_pooling == "max":
+                graph_embedding = []
+                startelt = 0
+                for i in range(batch_size):
+                    nn = n_nodes[i]
+                    graph_embedding.append(
+                        torch.max(node_features[startelt : startelt + nn], dim=0)[0]
+                    )
+                    startelt += nn
+            elif self.graph_pooling == "avg":
+                graph_embedding = []
+                strtelt = 0
+                for i in range(batch_size):
+                    nn = n_nodes[i]
+                    gp = torch.ones(nn, device=self.device) / nn
+                    graph_embedding.append(
+                        torch.matmul(gp, node_features[startelt : startelt + nn])
+                    )
+                    startelt += nn
+            elif self.graph_pooling in ["learn", "learninv"]:
+                graph_embedding = features[num_nodes : num_nodes + batch_size, :]
+
+            nnf = []
+            startelt = 0
+            for i in range(batch_size):
+                nn = n_nodes[i]
+                nnf.append(
+                    torch.nn.functional.pad(
+                        node_features[startelt : startelt + nn],
+                        (0, 0, 0, self.max_n_nodes - nn),
+                        mode="constant",
+                        value=0.0,
+                    )
+                )
+                startelt += nn
+            node_features = torch.stack(nnf)
+
         else:
-            raise Exception(
-                f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg"
-            )
+            node_features = node_features.reshape(batch_size, n_nodes, -1)
 
-        node_features = torch.nn.functional.pad(
-            node_features,
-            (0, 0, 0, self.max_n_nodes - node_features.shape[1]),
-            mode="constant",
-            value=0.0,
-        )
+            if self.graph_pooling == "max":
+                max_elts, _ = torch.max(node_features, dim=1)
+                graph_embedding = max_elts
+            elif self.graph_pooling == "avg":
+                graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
+                graph_embedding = torch.matmul(graph_pooling, node_features)
+            elif self.graph_pooling in ["learn", "learninv"]:
+                graph_embedding = features[num_nodes : num_nodes + batch_size, :]
+            else:
+                raise Exception(
+                    f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg"
+                )
+
+            node_features = torch.nn.functional.pad(
+                node_features,
+                (0, 0, 0, self.max_n_nodes - node_features.shape[1]),
+                mode="constant",
+                value=0.0,
+            )
 
         graph_embedding = graph_embedding.reshape(batch_size, 1, -1)
         # repeat the graph embedding to match the nodes embedding size

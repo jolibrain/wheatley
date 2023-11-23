@@ -451,6 +451,13 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--observe_subgraph",
+        default=False,
+        action="store_true",
+        help="extract subgraph (graphgym only ATM)",
+    )
+
+    parser.add_argument(
         "--vnode", default=False, action="store_true", help="add vnode to MP-graph"
     )
 
