@@ -503,9 +503,20 @@ class State:
                         self.nodes_in_frontier.add(fe[1])
 
     def mask_wrt_non_renewable_resources(self):
+        if isinstance(self.problem, dict):
+            if self.problem["n_nonrenewable_resources"] == 0:
+                return
+        else:
+            if self.problem.n_nonrenewable_resources == 0:
+                return
         selectables = np.where(self.features[:, 1] == 1)[0]
+        # TODO rewrite
         for n in selectables:
-            for r, level in enumerate(self.resources_usage(n)):
+            for r, level in enumerate(
+                self.resources_usage(n)[self.problem["n_renewable_resources"], :]
+            ):
+                if level == 0:
+                    continue
                 if not self.resources[r][0].still_available(level):
                     self.set_unselectable(n)
                     break
