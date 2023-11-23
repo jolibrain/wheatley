@@ -146,6 +146,9 @@ def main(args, exp_name, path) -> float:
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
         remove_old_resource_info=not args.use_old_resource_info,
         remove_past_prec=not args.keep_past_prec,
+        observation_horizon_step=args.observation_horizon_step,
+        observation_horizon_time=args.observation_horizon_time,
+        fast_forward=not args.no_fast_forward,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:

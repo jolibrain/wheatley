@@ -37,6 +37,19 @@ class TransitionModel:
 
     def run(self, state, node_id):  # noqa
         state.affect_job(node_id)
+        if self.env_specification.fast_forward:
+            while True:
+                unmasked_action = state.unmasked_actions()
+                if unmasked_action.shape[0] == 1:
+                    print("fast forwarding only action", unmasked_action[0])
+                    state.affect_job(unmasked_action[0])
+                    continue
+                trivial_actions = state.trivial_actions()
+                if trivial_actions.shape[0] > 0:
+                    print("fast trivial action", trivial_actions[0])
+                    state.affect_job(trivial_actions[0])
+                    continue
+                break
 
     def get_mask(self, state):
         return state.selectables() == 1

@@ -44,6 +44,9 @@ class EnvSpecification:
         factored_rp,
         remove_old_resource_info,
         remove_past_prec,
+        observation_horizon_step,
+        observation_horizon_time,
+        fast_forward,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -72,6 +75,9 @@ class EnvSpecification:
         self.action_space = Discrete(self.max_n_nodes)
         self.remove_old_resource_info = remove_old_resource_info
         self.remove_past_prec = remove_past_prec
+        self.observation_horizon_step = observation_horizon_step
+        self.observation_horizon_time = observation_horizon_time
+        self.fast_forward = fast_forward
 
         if self.max_edges_factor > 0:
             self.shape_pr = (
@@ -210,6 +216,9 @@ class EnvSpecification:
             f"add resource prcedence edges:       {self.add_rp_edges}\n"
             f"remove old resource info:           {self.remove_old_resource_info}\n"
             f"remove past prec:                   {self.remove_past_prec}\n"
+            f"observation horizon step:           {self.observation_horizon_step}\n"
+            f"observation horizon time:           {self.observation_horizon_time}\n"
+            f"fast forward:                       {self.fast_forward}\n"
             f"List of features:\n - Task Completion Times\n - selectable\n - duration"
         )
 

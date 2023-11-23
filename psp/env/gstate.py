@@ -369,6 +369,9 @@ class GState:
     def resources_usage(self, node_id):
         return self.graph.ndata["resources"][node_id]
 
+    def all_resources_usage(self, node_id):
+        return self.graph.ndata["resources"]
+
     def resource_usage(self, node_id, r):
         return self.graph.ndata["resources"][node_id][r]
 
@@ -410,6 +413,17 @@ class GState:
 
     def all_not_affected(self):
         return self.graph.ndata["affected"] == 0
+
+    def trivial_actions(self):
+        return torch.where(
+            torch.logical_and(
+                self.selectables() == 1,
+                torch.all(self.all_resources_usage() == 0, 1),
+            )
+        )[0]
+
+    def unmasked_actions(self):
+        return torch.where(self.selectables() == 1)[0]
 
     ############################### EXTERNAL API ############################
 
