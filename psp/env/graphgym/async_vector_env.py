@@ -119,7 +119,6 @@ def read_from_shared_memory(shared_memory, n, disk):
 
 
 def write_to_shared_memory(index, obs, shared_memory, disk):
-    # TODO : noop
     if disk:
         dgl.save_graphs(shared_memory[index], [obs])
     else:
@@ -413,7 +412,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                 if not self.shared_memory:
                     observations_list.append(obs)
                 rewards.append(rew)
-                terminateds.append(terminated)
+                terminateds.append(terminated.item())
                 truncateds.append(truncated)
                 infos = self._add_info(infos, info, i)
 
@@ -611,6 +610,13 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
 
     def __del__(self):
         """On deleting the object, checks that the vector environment is closed."""
+        if self.shared_memory and self.disk:
+            for b in self._obs_buffer:
+                try:
+                    os.remove(b)
+                except:
+                    pass
+
         if not getattr(self, "closed", True) and hasattr(self, "_state"):
             self.close(terminate=True)
 
