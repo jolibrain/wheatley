@@ -444,7 +444,7 @@ class PPO:
                         approx_kl_divs_on_epoch.append(approx_kl.item())
 
                     mb_advantages = b_advantages[mb_inds].to(train_device)
-                    if self.norm_adv:
+                    if self.norm_adv and mb_advantages.shape[0] > 1:
                         mb_advantages = (mb_advantages - mb_advantages.mean()) / (
                             mb_advantages.std() + 1e-8
                         )
