@@ -281,8 +281,12 @@ class Agent(Agent):
         return AgentObservation.rebatch_obs(obs)
 
     def _obs_as_tensor_add_batch_dim_graph(self, obs):
+        if self.env_specification.observe_subgraph:
+            cobs = obs
+        else:
+            cobs = copy.deepcopy(obs)
         return AgentGraphObservation.rewire_internal(
-            copy.deepcopy(obs),
+            cobs,
             conflicts=self.agent_specification.conflicts,
             bidir=True,
             compute_laplacian_pe=False,

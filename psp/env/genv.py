@@ -52,6 +52,8 @@ class GEnv:
         self.pb_ids = pb_ids
         random.shuffle(self.pb_ids)
         self.pb_index = -1
+        self.succ_cache = {}
+
         self.reset()
 
     def _problem_init(self):
@@ -142,19 +144,40 @@ class GEnv:
     def khop_thread_safe(self, graph, source_nodes, k):
         return dgl.khop_out_subgraph(graph, source_nodes, k=k, relabel_nodes=True)[0]
 
+    def succ_cached(self, graph, n):
+        if n in self.succ_cache.keys():
+            return self.succ_cache[n]
+        # normal version
+        # suc = set(graph.successors(n, etype="prec").tolist())
+        # skip dgl inernal test
+        suc = set(graph._graph.successors(graph.get_etype_id("prec"), n).tolist())
+        self.succ_cache[n] = suc
+        return suc
+
     def process_obs(self, full_observation):
         if not self.observe_subgraph:
             return full_observation
         frontier_nodes = torch.tensor(list(self.state.nodes_in_frontier))
         present_nodes = torch.where(self.state.selectables() == 1)[0]
         if self.env_specification.observation_horizon_step != 0:
-            khopsub = dgl.khop_out_subgraph(
-                full_observation.edge_type_subgraph(["prec"]),
-                present_nodes,
-                k=self.env_specification.observation_horizon_step,
-                relabel_nodes=True,
-            )[0]
-            future_nodes_step = set(khopsub.ndata[dgl.NID].tolist())
+            local_present_nodes = present_nodes
+            future_nodes_step = set()
+            for i in range(self.env_specification.observation_horizon_step):
+                succs = set()
+                for n in local_present_nodes:
+                    # vanilla version
+                    # outs = set(full_observation.successors(n, etype="prec").tolist())
+                    # cached version
+                    outs = self.succ_cached(full_observation, n)
+                    # nocheck version
+                    # outs = set(
+                    #     full_observation._graph.successors(
+                    #         full_observation.get_etype_id("prec"), n
+                    #     ).tolist()
+                    # )
+                    succs = succs.union(outs)
+                local_present_nodes = succs
+                future_nodes_step = future_nodes_step.union(local_present_nodes)
         else:
             future_nodes_step = set()
 
@@ -178,11 +201,13 @@ class GEnv:
             future_nodes_time = set()
 
         future_nodes = future_nodes_step.union(future_nodes_time)
+
         if len(future_nodes) == 0:
             past_nodes = torch.where(self.state.get_pasts())[0]
             future_nodes = set(range(full_observation.num_nodes())) - set(
                 past_nodes.tolist()
             )
+
         nodes_to_keep = torch.tensor(
             list(
                 (
@@ -192,12 +217,7 @@ class GEnv:
                 )
             )
         )
-        # print(
-        #     "future nodes removed ",
-        #     full_observation.num_nodes()
-        #     - torch.where(self.state.get_pasts())[0].shape[0]
-        #     - nodes_to_keep.shape[0],
-        # )
+
         subgraph = dgl.node_subgraph(
             full_observation,
             nodes_to_keep.to(self.state.device),

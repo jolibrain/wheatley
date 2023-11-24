@@ -163,8 +163,18 @@ class GState:
         self.graph = dgl.heterograph(gd, device=self.device)
 
         self.pred_cache = {}
+        self.suc_cache = {}
+        self.indeg_cache = {}
         for n in range(self.graph.num_nodes()):
-            self.pred_cache[n] = self.graph.predecessors(n, etype="prec")
+            # self.pred_cache[n] = self.graph.predecessors(n, etype="prec")
+            self.pred_cache[n] = self.graph._graph.predecessors(
+                self.graph.get_etype_id("prec"), n
+            )
+            # self.suc_cache[n] = self.graph.successors(n, etype="prec")
+            self.suc_cache[n] = self.graph._graph.successors(
+                self.graph.get_etype_id("prec"), n
+            )
+            self.indeg_cache[n] = self.graph.in_degrees(n, etype="prec")
 
         self.graph.ndata["job"] = torch.zeros(
             self.n_nodes, dtype=torch.int, device=self.device
@@ -642,11 +652,13 @@ class GState:
         # mark as affected
         self.set_affected(nodeid)
         # make sucessor selectable, if other parents *jobs* are affected
-        for successor in self.graph.successors(nodeid, etype="prec"):
+        # for successor in self.graph.successors(nodeid, etype="prec"):
+        for successor in self.cached_suc(nodeid):
             parents_jobs = set(
                 [
                     self.jobid(pm).item()
-                    for pm in self.graph.predecessors(successor, etype="prec")
+                    # for pm in self.graph.predecessors(successor, etype="prec")
+                    for pm in self.cached_pred(successor.item())
                 ]
             )
             # no need to test job from currently affected node
@@ -786,12 +798,16 @@ class GState:
             )
 
     def update_completion_times_after(self, node_id):
-        for n in self.graph.successors(node_id, etype="prec"):
+        # for n in self.graph.successors(node_id, etype="prec"):
+        for n in self.cached_suc(node_id):
             self.update_completion_times(n)
 
     def max_thread_safe(self, cur_node_id):
         return torch.max(
-            self.tct(self.graph.predecessors(cur_node_id, etype="prec")), 0, True
+            # self.tct(self.graph.predecessors(cur_node_id, etype="prec")), 0, True
+            self.tct(self.cached_pred(cur_node_id)),
+            0,
+            True,
         )
 
     def cached_pred(self, node_id):
@@ -801,6 +817,12 @@ class GState:
         # preds = self.graph.predecessors(node_id, etype="prec")
         # self.pred_cache[node_id] = preds
         # return preds
+
+    def cached_suc(self, node_id):
+        return self.suc_cache[node_id]
+
+    def cached_indeg(self, node_id):
+        return self.indeg_cache[node_id]
 
     def update_completion_times(self, node_id):
         initial_tct = False
@@ -813,7 +835,8 @@ class GState:
         while open_nodes:
             cur_node_id = open_nodes.pop(0)
 
-            if self.graph.in_degrees(cur_node_id, etype="prec") == 0:
+            # if self.graph.in_degrees(cur_node_id, etype="prec") == 0:
+            if self.cached_indeg(cur_node_id) == 0:
                 max_tct_predecessors = torch.zeros(
                     (3), dtype=torch.float, device=self.device
                 )
@@ -867,7 +890,8 @@ class GState:
                 self.set_tct(cur_node_id, new_completion_time)
                 self.set_tct_real(cur_node_id, new_completion_time_real)
 
-                for successor in self.graph.successors(cur_node_id, etype="prec"):
+                # for successor in self.graph.successors(cur_node_id, etype="prec"):
+                for successor in self.cached_suc(cur_node_id):
                     to_open = True
                     # for p in self.graph.predecessors(successor, etype="prec"):
                     for p in self.cached_pred(successor.item()):
