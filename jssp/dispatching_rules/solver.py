@@ -25,7 +25,6 @@ class Solver:
         heuristic: str,
         ignore_unfinished_precedences: bool,
     ):
-        n_jobs, n_machines = durations.shape
         validate_instance(durations, affectations)
         assert heuristic in HEURISTICS, f"Unknown heuristic {heuristic}"
 
@@ -297,3 +296,39 @@ def _occupancy(affectations: np.ndarray, schedule: np.ndarray) -> np.ndarray:
     # Chronological order of the jobs for each machine.
     occupancy = np.argsort(schedule, axis=1)
     return occupancy
+
+
+def missing_tasks_to_fictive(durations: np.ndarray, affectations: np.ndarray):
+    """Replace missing tasks with fictive ones, so that each job has a task on all machines.
+    A fictive task has a duration of 0, so it can be placed as soon as possible
+    and does not impact the final scheduling value.
+
+    A missing task is expected to have its machine id and duration equal to -1.
+    """
+    n_machines, n_tasks = affectations.shape
+    machine_range = np.arange(n_machines)
+    sort_by_machines = np.argsort(affectations, axis=1)
+
+    missing_tasks_ids = np.zeros(n_machines, dtype=int)
+    existing_tasks_ids = np.ones(n_machines, dtype=int) * (n_tasks - 1)
+
+    for rank in range(n_tasks - 1, -1, -1):
+        affectation_ids = sort_by_machines[machine_range, existing_tasks_ids]
+        machine_ids = affectations[machine_range, affectation_ids]
+        valid_tasks = machine_ids == rank
+
+        missing_machine_ids = sort_by_machines[machine_range, missing_tasks_ids]
+        machine_ids = affectations[machine_range, missing_machine_ids]
+        affectations[machine_range, missing_machine_ids] = (
+            machine_ids * valid_tasks
+        ) + (rank * ~valid_tasks)
+
+        missing_tasks_ids[~valid_tasks] += 1
+        existing_tasks_ids[valid_tasks] -= 1
+
+    durations[durations == -1] = 0
+
+    assert np.all(
+        missing_tasks_ids - existing_tasks_ids == np.ones(n_machines, dtype=int)
+    )
+    assert np.all(durations != -1) and np.all(affectations != -1)

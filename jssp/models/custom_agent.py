@@ -26,7 +26,7 @@
 
 import numpy as np
 
-from jssp.dispatching_rules.solver import Solver, reschedule
+from jssp.dispatching_rules.solver import Solver, missing_tasks_to_fictive, reschedule
 from jssp.solution import Solution
 
 
@@ -53,6 +53,9 @@ class CustomAgent:
                 f"Unknown stochasticity strategy {self.stochasticity_strategy}"
             )
 
+        missing_tasks_to_fictive(durations, affectations)
+        real_durations[real_durations == -1] = 0
+        assert np.all(durations != -1) and np.all(affectations != -1)
         solver = Solver(
             durations, affectations, self.rule, ignore_unfinished_precedences=True
         )

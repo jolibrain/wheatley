@@ -22,7 +22,7 @@ def validate_instance(durations: np.ndarray, affectations: np.ndarray):
     assert durations.shape == affectations.shape, "Wrong number of jobs or machines"
     assert (
         affectations.min() == 0 and affectations.max() == n_machines - 1
-    ), "The indices must be in the range [0, n_machines - 1]"
+    ), f"The indices must be in the range [0, n_machines - 1] (found [{affectations.min()}, {affectations.max()}])"
     ordered_index = np.arange(n_machines)
     assert np.all(
         np.sort(affectations, axis=1) == repeat(ordered_index, "m -> n m", n=n_jobs)

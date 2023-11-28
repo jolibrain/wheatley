@@ -58,6 +58,8 @@ if __name__ == "__main__":
         deterministic=args.duration_type == "deterministic",
     )
 
+    agent.to(args.device)
+
     print(f"Solving a {n_j}x{n_m} JSSP instance.")
 
     assert (
