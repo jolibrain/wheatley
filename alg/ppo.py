@@ -332,9 +332,11 @@ class PPO:
                     for i in range(self.num_envs)
                 ],
                 # spwan helps when observation space is huge
-                # context="spawn",
+                # and also with torch in subprocesses
+                context="spawn",
                 copy=False,
                 shared_memory=True,
+                disk=True,
             )
 
         print("... done creating environments")

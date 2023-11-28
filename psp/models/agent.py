@@ -97,7 +97,8 @@ class Agent(Agent):
                 layer_pooling=agent_specification.layer_pooling,
                 factored_rp=env_specification.factored_rp,
                 add_rp_edges=env_specification.add_rp_edges,
-                add_self_loops=env_specification.remove_past_prec,
+                add_self_loops=env_specification.remove_past_prec
+                or env_specification.observe_subgraph,
                 vnode=agent_specification.vnode,
                 update_edge_features=agent_specification.update_edge_features,
                 update_edge_features_pe=agent_specification.update_edge_features_pe,
@@ -280,8 +281,12 @@ class Agent(Agent):
         return AgentObservation.rebatch_obs(obs)
 
     def _obs_as_tensor_add_batch_dim_graph(self, obs):
+        if self.env_specification.observe_subgraph:
+            cobs = obs
+        else:
+            cobs = copy.deepcopy(obs)
         return AgentGraphObservation.rewire_internal(
-            copy.deepcopy(obs),
+            cobs,
             conflicts=self.agent_specification.conflicts,
             bidir=True,
             compute_laplacian_pe=False,

@@ -18,6 +18,7 @@ class Rcpsp:
         n_nonrenewable_resources=0,
         n_doubly_constrained_resources=0,
         use_index_from_zero=False,
+        due_dates=None,
     ):
         # Number of jobs in the graph
         self.n_jobs = n_jobs
@@ -55,6 +56,7 @@ class Rcpsp:
         self.max_resource_consumption = 0
 
         self.use_index_from_zero = use_index_from_zero
+        self.due_dates = due_dates
 
         for j in range(n_jobs):
             for k in range(n_modes_per_job[j]):

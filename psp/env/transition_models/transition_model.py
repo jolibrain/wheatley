@@ -36,7 +36,22 @@ class TransitionModel:
         self.env_specification = env_specification
 
     def run(self, state, node_id):  # noqa
+        steps = 1
         state.affect_job(node_id)
+        if self.env_specification.fast_forward:
+            while True:
+                unmasked_action = state.unmasked_actions()
+                if unmasked_action.shape[0] == 1:
+                    steps += 1
+                    state.affect_job(unmasked_action[0])
+                    continue
+                trivial_actions = state.trivial_actions()
+                if trivial_actions.shape[0] > 0:
+                    steps += 1
+                    state.affect_job(trivial_actions[0].item())
+                    continue
+                break
+        return steps
 
     def get_mask(self, state):
         return state.selectables() == 1

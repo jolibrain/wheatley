@@ -133,7 +133,10 @@ def argument_parser() -> argparse.ArgumentParser:
         help="RPO-style smoothing param",
     )
     parser.add_argument(
-        "--gae_lambda", type=float, default=1.0, help="GAE lambda parameter, GAE off by default"
+        "--gae_lambda",
+        type=float,
+        default=1.0,
+        help="GAE lambda parameter, GAE off by default",
     )
     parser.add_argument(
         "--return_based_scaling",
@@ -428,6 +431,32 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="keep past precedencies",
     )
+    parser.add_argument(
+        "--observation_horizon_step",
+        default=0,
+        type=int,
+        help="observation horizon (steps)",
+    )
+    parser.add_argument(
+        "--observation_horizon_time",
+        default=0,
+        type=float,
+        help="observation horizon (time)",
+    )
+    parser.add_argument(
+        "--no_fast_forward",
+        default=False,
+        action="store_true",
+        help="do not make env auto forward trivial actions",
+    )
+
+    parser.add_argument(
+        "--observe_subgraph",
+        default=False,
+        action="store_true",
+        help="extract subgraph (graphgym only ATM)",
+    )
+
     parser.add_argument(
         "--vnode", default=False, action="store_true", help="add vnode to MP-graph"
     )

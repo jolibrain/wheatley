@@ -134,8 +134,13 @@ def instantiate_training_objects(
         observe_real_duration_when_affect=observe_real_duration_when_affect,
         do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
-        remove_old_resource_info=not args.use_old_resource_info,
-        remove_past_prec=not args.keep_past_prec,
+        remove_old_resource_info=not args.use_old_resource_info
+        and not args.observe_subgraph,
+        remove_past_prec=not args.keep_past_prec and not args.observe_subgraph,
+        observation_horizon_step=args.observation_horizon_step,
+        observation_horizon_time=args.observation_horizon_time,
+        fast_forward=not args.no_fast_forward,
+        observe_subgraph=args.observe_subgraph,
     )
 
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -270,6 +275,10 @@ possible_args = {
     "train_dir": ["./instances/psp/test/"],
     "vecenv_type": ["subproc", "graphgym"],
     "return_based_scaling": [True, False],
+    "observe_subgraph": [True, False],
+    "no_fast_forward": [True, False],
+    "observation_horizon_step": [0, 5],
+    "observation_horizon_time": [0, 5],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.

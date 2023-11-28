@@ -50,6 +50,9 @@ class State:
         self.add_rp_edges = env_specification.add_rp_edges
         self.factored_rp = env_specification.factored_rp
 
+        self.step_horizon = env_specification.observation_horizon_step
+        self.time_horizon = env_specification.observation_horizon_time
+
         self.edge_index = {}
 
         self.resource_prec_edges = []
@@ -104,6 +107,7 @@ class State:
         else:
             self.problem_graph.add_nodes_from(range(0, problem.n_modes))
         self.problem_graph.add_edges_from(self.problem_edges)
+
         # nx.draw_networkx(self.graph)
         # plt.show()
         self.numpy_problem_graph = np.transpose(np.array(self.problem_edges))
@@ -307,6 +311,12 @@ class State:
         no_child = out_deg[no_child_pos][:, 0]
         self.features[no_child, 3] = 1  # sink
 
+    def get_weight(self, source, dest, edge_attr):
+        if source >= self.features.shape[0]:
+            # case of virtual added source
+            return 0
+        return self.features[source, 4]
+
     def reset_selectable(self):
         self.features[:, 1] = 0
         in_deg = np.array(self.problem_graph.in_degree())
@@ -351,6 +361,9 @@ class State:
     def resources_usage(self, node_id):
         return self.features[node_id, 10:]
 
+    def all_resources_usage(self):
+        return self.features[:, 10:]
+
     def resource_usage(self, node_id, r):
         return self.features[node_id, 10 + r]
 
@@ -392,6 +405,16 @@ class State:
 
     def all_not_affected(self):
         return self.features[:, 0] == 0
+
+    def trivial_actions(self):
+        return np.where(
+            np.logical_and(
+                self.selectables() == 1, np.all(self.all_resources_usage() == 0, axis=1)
+            )
+        )[0]
+
+    def unmasked_actions(self):
+        return np.where(self.selectables() == 1)[0]
 
     ############################### EXTERNAL API ############################
 
@@ -439,7 +462,7 @@ class State:
                 rpe = None
                 rpa = None
             return (
-                self.normalize_features(),
+                self.process_features(),
                 self.numpy_problem_graph,
                 rce,
                 rca,
@@ -453,13 +476,13 @@ class State:
             )
 
             return (
-                self.normalize_features(),
+                self.process_features(),
                 self.remove_past_edges(fresh_nodes),
                 rce,
                 rca,
             )
         return (
-            self.normalize_features(),
+            self.process_features(),
             self.numpy_problem_graph,
             rce,
             rca,
@@ -480,9 +503,20 @@ class State:
                         self.nodes_in_frontier.add(fe[1])
 
     def mask_wrt_non_renewable_resources(self):
+        if isinstance(self.problem, dict):
+            if self.problem["n_nonrenewable_resources"] == 0:
+                return
+        else:
+            if self.problem.n_nonrenewable_resources == 0:
+                return
         selectables = np.where(self.features[:, 1] == 1)[0]
+        # TODO rewrite
         for n in selectables:
-            for r, level in enumerate(self.resources_usage(n)):
+            for r, level in enumerate(
+                self.resources_usage(n)[self.problem["n_renewable_resources"], :]
+            ):
+                if level == 0:
+                    continue
                 if not self.resources[r][0].still_available(level):
                     self.set_unselectable(n)
                     break
@@ -640,12 +674,45 @@ class State:
                 # make selectable, at last
                 self.set_selectable(successor)
 
-    def normalize_features(self):
-        if self.normalize:
+    def process_features(self):
+        if self.normalize or self.step_horizon != 0 or self.time_horizon != 0:
             feat = np.copy(self.features)
+        else:
+            feat = self.features
+        if self.normalize:
             feat[:, 4:10] /= self.max_duration
-            return feat
-        return self.features
+        if self.step_horizon != 0 or self.time_horizon != 0:
+            # recompute reachable nodes in step_horizon steps in not_affected ones
+            sources = np.where(self.features[:, 1] == 1)[0]
+            v_source = self.problem_graph.number_of_nodes()
+            self.problem_graph.add_node(v_source)
+            for i in sources:
+                self.problem_graph.add_edge(v_source, i)
+            # not_affected = (np.where(self.features[:, 0] == 0)[0]).tolist()
+            to_remove = []
+            if self.step_horizon != 0:
+                step_depth = nx.shortest_path_length(
+                    self.problem_graph, source=v_source
+                )
+                for i in step_depth.keys():
+                    if i == v_source:
+                        continue
+                    if step_depth[i] > self.step_horizon:
+                        to_remove.append(i)
+            if self.time_horizon != 0:
+                time_depth = nx.shortest_path_length(
+                    self.problem_graph, source=v_source, weight=self.get_weight
+                )
+                for i in time_depth.keys():
+                    if i == v_source:
+                        continue
+                    if time_depth[i] > self.time_horizon:
+                        to_remove.append(i)
+
+            feat[to_remove, 10:] = 0
+            self.problem_graph.remove_node(v_source)
+
+        return feat
 
     def get_last_finishing_dates(self, jobs):
         if len(jobs) == 0:

@@ -1,6 +1,6 @@
 """An async vector environment."""
 import os
-from torch import multiprocessing as mp
+
 import sys
 from copy import deepcopy
 from enum import Enum
@@ -9,30 +9,13 @@ import pickle
 import io
 import contextlib
 import dgl
+from dgl import multiprocessing as mp
 import numpy as np
+import time
 
-# from numpy.typing import NDArray
 
 from psp.env.genv import GEnv as Env
 
-# import gymnasium as gym
-# from gymnasium.core import Env, ObsType
-# from gymnasium.error import (
-#     AlreadyPendingCallError,
-#     ClosedEnvironmentError,
-#     CustomSpaceError,
-#     NoAsyncCallError,
-# )
-# from gymnasium.vector.utils import (
-#     CloudpickleWrapper,
-#     clear_mpi_env_vars,
-#     concatenate,
-#     create_empty_array,
-#     create_shared_memory,
-#     iterate,
-#     read_from_shared_memory,
-#     write_to_shared_memory,
-# )
 from .vector_env import GraphVectorEnv
 
 __all__ = ["AsyncVectorEnv"]
@@ -43,32 +26,6 @@ class AsyncState(Enum):
     WAITING_RESET = "reset"
     WAITING_STEP = "step"
     WAITING_CALL = "call"
-
-
-@contextlib.contextmanager
-def clear_mpi_env_vars():
-    """Clears the MPI of environment variables.
-
-    `from mpi4py import MPI` will call `MPI_Init` by default.
-    If the child process has MPI environment variables, MPI will think that the child process
-    is an MPI process just like the parent and do bad things such as hang.
-
-    This context manager is a hacky way to clear those environment variables
-    temporarily such as when we are starting multiprocessing Processes.
-
-    Yields:
-        Yields for the context manager
-    """
-    removed_environment = {}
-    for k, v in list(os.environ.items()):
-        for prefix in ["OMPI_", "PMI_"]:
-            if k.startswith(prefix):
-                removed_environment[k] = v
-                del os.environ[k]
-    try:
-        yield
-    finally:
-        os.environ.update(removed_environment)
 
 
 class CloudpickleWrapper:
@@ -110,8 +67,6 @@ def create_shared_memory(size, n, ctx, disk):
 
 
 def read_from_shared_memory(shared_memory, n, disk):
-    # TODO return shared_mem[n]
-    # return [pickle.loads(shared_memory[i].get_obj()) for i in range(n)]
     if disk:
         return [dgl.load_graphs(shared_memory[i])[0][0] for i in range(n)]
     else:
@@ -119,7 +74,6 @@ def read_from_shared_memory(shared_memory, n, disk):
 
 
 def write_to_shared_memory(index, obs, shared_memory, disk):
-    # TODO : noop
     if disk:
         dgl.save_graphs(shared_memory[index], [obs])
     else:
@@ -153,36 +107,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         worker: Optional[Callable] = None,
         disk=True,
     ):
-        """Vectorized environment that runs multiple environments in parallel.
-
-        Args:
-            env_fns: Functions that create the environments.
-            observation_space: Observation space of a single environment. If ``None``,
-                then the observation space of the first environment is taken.
-            action_space: Action space of a single environment. If ``None``,
-                then the action space of the first environment is taken.
-            shared_memory: If ``True``, then the observations from the worker processes are communicated back through
-                shared variables. This can improve the efficiency if the observations are large (e.g. images).
-            copy: If ``True``, then the :meth:`~AsyncVectorEnv.reset` and :meth:`~AsyncVectorEnv.step` methods
-                return a copy of the observations.
-            context: Context for `multiprocessing`_. If ``None``, then the default context is used.
-            daemon: If ``True``, then subprocesses have ``daemon`` flag turned on; that is, they will quit if
-                the head process quits. However, ``daemon=True`` prevents subprocesses to spawn children,
-                so for some environments you may want to have it set to ``False``.
-            worker: If set, then use that worker in a subprocess instead of a default one.
-                Can be useful to override some inner vector env logic, for instance, how resets on termination or truncation are handled.
-
-        Warnings:
-            worker is an advanced mode option. It provides a high degree of flexibility and a high chance
-            to shoot yourself in the foot; thus, if you are writing your own worker, it is recommended to start
-            from the code for ``_worker`` (or ``_worker_shared_memory``) method, and add changes.
-
-        Raises:
-            RuntimeError: If the observation space of some sub-environment does not match observation_space
-                (or, by default, the observation space of the first sub-environment).
-            ValueError: If observation_space is a custom space (i.e. not a default space in Gym,
-                such as gymnasium.spaces.Box, gymnasium.spaces.Discrete, or gymnasium.spaces.Dict) and shared_memory is True.
-        """
         ctx = mp.get_context(context)
         self.env_fns = env_fns
         self.shared_memory = shared_memory
@@ -199,43 +123,36 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
             self._obs_buffer = create_shared_memory(
                 2000000, n=self.num_envs, ctx=ctx, disk=self.disk
             )
-            # self.observations = read_from_shared_memory(
-            #     self.single_observation_space, _obs_buffer, n=self.num_envs
-            # )
         else:
             _obs_buffer = None
-            # self.observations = create_empty_array(
-            #     self.single_observation_space, n=self.num_envs, fn=np.zeros
-            # )
         self.observations = []
 
         self.parent_pipes, self.processes = [], []
         self.error_queue = ctx.Queue()
         target = _worker_shared_memory if self.shared_memory else _worker
         target = worker or target
-        with clear_mpi_env_vars():
-            for idx, env_fn in enumerate(self.env_fns):
-                parent_pipe, child_pipe = ctx.Pipe()
-                process = ctx.Process(
-                    target=target,
-                    name=f"Worker<{type(self).__name__}>-{idx}",
-                    args=(
-                        idx,
-                        CloudpickleWrapper(env_fn),
-                        child_pipe,
-                        parent_pipe,
-                        self._obs_buffer,
-                        self.disk,
-                        self.error_queue,
-                    ),
-                )
+        for idx, env_fn in enumerate(self.env_fns):
+            parent_pipe, child_pipe = ctx.Pipe()
+            process = ctx.Process(
+                target=target,
+                name=f"Worker<{type(self).__name__}>-{idx}",
+                args=(
+                    idx,
+                    CloudpickleWrapper(env_fn),
+                    child_pipe,
+                    parent_pipe,
+                    self._obs_buffer,
+                    self.disk,
+                    self.error_queue,
+                ),
+            )
 
-                self.parent_pipes.append(parent_pipe)
-                self.processes.append(process)
+            self.parent_pipes.append(parent_pipe)
+            self.processes.append(process)
 
-                process.daemon = daemon
-                process.start()
-                child_pipe.close()
+            process.daemon = daemon
+            process.start()
+            child_pipe.close()
 
         self._state = AsyncState.DEFAULT
 
@@ -244,20 +161,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         seed: Optional[Union[int, List[int]]] = None,
         options: Optional[dict] = None,
     ):
-        """Send calls to the :obj:`reset` methods of the sub-environments.
-
-        To get the results of these calls, you may invoke :meth:`reset_wait`.
-
-        Args:
-            seed: List of seeds for each environment
-            options: The reset option
-
-        Raises:
-            ClosedEnvironmentError: If the environment was closed (if :meth:`close` was previously called).
-            AlreadyPendingCallError: If the environment is already waiting for a pending call to another
-                method (e.g. :meth:`step_async`). This can be caused by two consecutive
-                calls to :meth:`reset_async`, with no call to :meth:`reset_wait` in between.
-        """
         self._assert_is_running()
 
         if seed is None:
@@ -288,21 +191,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         seed: Optional[int] = None,
         options: Optional[dict] = None,
     ):
-        """Waits for the calls triggered by :meth:`reset_async` to finish and returns the results.
-
-        Args:
-            timeout: Number of seconds before the call to `reset_wait` times out. If `None`, the call to `reset_wait` never times out.
-            seed: ignored
-            options: ignored
-
-        Returns:
-            A tuple of batched observations and list of dictionaries
-
-        Raises:
-            ClosedEnvironmentError: If the environment was closed (if :meth:`close` was previously called).
-            NoAsyncCallError: If :meth:`reset_wait` was called without any prior call to :meth:`reset_async`.
-            TimeoutError: If :meth:`reset_wait` timed out.
-        """
         self._assert_is_running()
         if self._state != AsyncState.WAITING_RESET:
             raise NoAsyncCallError(
@@ -319,7 +207,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         observations_list, infos = [], {}
         successes = []
 
-        #        results, successes = zip(*[pipe.recv() for pipe in self.parent_pipes])
         for i, pipe in enumerate(self.parent_pipes):
             result, success = pipe.recv()
             successes.append(success)
@@ -332,15 +219,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         self._raise_if_errors(successes)
         self._state = AsyncState.DEFAULT
 
-        #        infos = {}
-        # results, info_data = zip(*results)
-        # for i, info in enumerate(info_data):
-        #     infos = self._add_info(infos, info, i)
-
         if not self.shared_memory:
-            # self.observations = concatenate(
-            #     self.single_observation_space, results, self.observations
-            # )
             self.observations = observations_list
         else:
             self.observations = read_from_shared_memory(
@@ -350,18 +229,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         return (deepcopy(self.observations) if self.copy else self.observations), infos
 
     def step_async(self, actions):
-        """Send the calls to :obj:`step` to each sub-environment.
-
-        Args:
-            actions: Batch of actions. element of :attr:`~VectorEnv.action_space`
-
-        Raises:
-            ClosedEnvironmentError: If the environment was closed (if :meth:`close` was previously called).
-            AlreadyPendingCallError: If the environment is already waiting for a pending call to another
-                method (e.g. :meth:`reset_async`). This can be caused by two consecutive
-                calls to :meth:`step_async`, with no call to :meth:`step_wait` in
-                between.
-        """
         self._assert_is_running()
         if self._state != AsyncState.DEFAULT:
             raise AlreadyPendingCallError(
@@ -369,27 +236,11 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                 self._state.value,
             )
 
-        # actions = iterate(self.action_space, actions)
-
-        # for pipe, action in zip(self.parent_pipes, actions):
         for n, pipe in enumerate(self.parent_pipes):
             pipe.send(("step", actions[n]))
         self._state = AsyncState.WAITING_STEP
 
     def step_wait(self, timeout: Optional[Union[int, float]] = None):
-        """Wait for the calls to :obj:`step` in each sub-environment to finish.
-
-        Args:
-            timeout: Number of seconds before the call to :meth:`step_wait` times out. If ``None``, the call to :meth:`step_wait` never times out.
-
-        Returns:
-             The batched environment step information, (obs, reward, terminated, truncated, info)
-
-        Raises:
-            ClosedEnvironmentError: If the environment was closed (if :meth:`close` was previously called).
-            NoAsyncCallError: If :meth:`step_wait` was called without any prior call to :meth:`step_async`.
-            TimeoutError: If :meth:`step_wait` timed out.
-        """
         self._assert_is_running()
         if self._state != AsyncState.WAITING_STEP:
             raise NoAsyncCallError(
@@ -413,7 +264,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                 if not self.shared_memory:
                     observations_list.append(obs)
                 rewards.append(rew)
-                terminateds.append(terminated)
+                terminateds.append(terminated.item())
                 truncateds.append(truncated)
                 infos = self._add_info(infos, info, i)
 
@@ -436,17 +287,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         )
 
     def call_async(self, name: str, *args, **kwargs):
-        """Calls the method with name asynchronously and apply args and kwargs to the method.
-
-        Args:
-            name: Name of the method or property to call.
-            *args: Arguments to apply to the method call.
-            **kwargs: Keyword arguments to apply to the method call.
-
-        Raises:
-            ClosedEnvironmentError: If the environment was closed (if :meth:`close` was previously called).
-            AlreadyPendingCallError: Calling `call_async` while waiting for a pending call to complete
-        """
         self._assert_is_running()
         if self._state != AsyncState.DEFAULT:
             raise AlreadyPendingCallError(
@@ -460,19 +300,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         self._state = AsyncState.WAITING_CALL
 
     def call_wait(self, timeout: Optional[Union[int, float]] = None) -> list:
-        """Calls all parent pipes and waits for the results.
-
-        Args:
-            timeout: Number of seconds before the call to `step_wait` times out.
-                If `None` (default), the call to `step_wait` never times out.
-
-        Returns:
-            List of the results of the individual calls to the method or property for each environment.
-
-        Raises:
-            NoAsyncCallError: Calling `call_wait` without any prior call to `call_async`.
-            TimeoutError: The call to `call_wait` has timed out after timeout second(s).
-        """
         self._assert_is_running()
         if self._state != AsyncState.WAITING_CALL:
             raise NoAsyncCallError(
@@ -493,18 +320,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         return results
 
     def set_attr(self, name: str, values: Union[list, tuple, object]):
-        """Sets an attribute of the sub-environments.
-
-        Args:
-            name: Name of the property to be set in each individual environment.
-            values: Values of the property to be set to. If ``values`` is a list or
-                tuple, then it corresponds to the values for each individual
-                environment, otherwise a single value is set for all environments.
-
-        Raises:
-            ValueError: Values must be a list or tuple with length equal to the number of environments.
-            AlreadyPendingCallError: Calling `set_attr` while waiting for a pending call to complete.
-        """
         self._assert_is_running()
         if not isinstance(values, (list, tuple)):
             values = [values for _ in range(self.num_envs)]
@@ -530,17 +345,6 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
     def close_extras(
         self, timeout: Optional[Union[int, float]] = None, terminate: bool = False
     ):
-        """Close the environments & clean up the extra resources (processes and pipes).
-
-        Args:
-            timeout: Number of seconds before the call to :meth:`close` times out. If ``None``,
-                the call to :meth:`close` never times out. If the call to :meth:`close`
-                times out, then all processes are terminated.
-            terminate: If ``True``, then the :meth:`close` operation is forced and all processes are terminated.
-
-        Raises:
-            TimeoutError: If :meth:`close` timed out.
-        """
         timeout = 0 if terminate else timeout
         try:
             if self._state != AsyncState.DEFAULT:
@@ -611,6 +415,13 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
 
     def __del__(self):
         """On deleting the object, checks that the vector environment is closed."""
+        if self.shared_memory and self.disk:
+            for b in self._obs_buffer:
+                try:
+                    os.remove(b)
+                except:
+                    pass
+
         if not getattr(self, "closed", True) and hasattr(self, "_state"):
             self.close(terminate=True)
 

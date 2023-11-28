@@ -132,6 +132,7 @@ def main(args, exp_name, path) -> float:
         observe_real_duration_when_affect = True
     else:
         observe_real_duration_when_affect = False
+
     env_specification = EnvSpecification(
         problems=problem_description,
         normalize_input=not args.dont_normalize_input,
@@ -144,8 +145,13 @@ def main(args, exp_name, path) -> float:
         observe_real_duration_when_affect=observe_real_duration_when_affect,
         do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
-        remove_old_resource_info=not args.use_old_resource_info,
-        remove_past_prec=not args.keep_past_prec,
+        remove_old_resource_info=not args.use_old_resource_info
+        and not args.observe_subgraph,
+        remove_past_prec=not args.keep_past_prec and not args.observe_subgraph,
+        observation_horizon_step=args.observation_horizon_step,
+        observation_horizon_time=args.observation_horizon_time,
+        fast_forward=not args.no_fast_forward,
+        observe_subgraph=args.observe_subgraph,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:
