@@ -135,6 +135,7 @@ def load_validator(
         rpo=args.rpo,
         rpo_smoothing_param=args.rpo_smoothing_param,
         gae_lambda=args.gae_lambda,
+        return_based_scaling=args.return_based_scaling,
     )
 
     validator = AgentValidator(
@@ -193,6 +194,7 @@ def eval_on_instances(agent: Agent, instances: dict, args: argparse.Namespace) -
             )
             validation_envs.append(env)
 
+        args.n_validation_env = len(validation_envs)
         validator = load_validator(n_j, n_m, agent, args, validation_envs)
         validator._evaluate_agent(agent)
 
