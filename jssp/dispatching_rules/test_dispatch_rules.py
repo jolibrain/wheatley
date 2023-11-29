@@ -4,8 +4,12 @@ import numpy as np
 import pytest
 
 from instances.generate_taillard import generate_taillard
-
-from jssp.dispatching_rules.solver import Solver, _occupancy, reschedule
+from jssp.dispatching_rules.solver import (
+    Solver,
+    _occupancy,
+    missing_tasks_to_fictive,
+    reschedule,
+)
 from jssp.dispatching_rules.validate import (
     validate_job_tasks,
     validate_machine_tasks,
@@ -70,6 +74,51 @@ def test_solver(
     solver = Solver(durations, affectations, heuristic, ignore_unfinished_precedences)
     schedule = solver.solve()
     assert np.all(schedule == expected_schedule)
+
+
+@pytest.mark.parametrize(
+    "durations, affectations, heuristic, ignore_unfinished_precedences, expected_schedule",
+    [
+        (
+            np.array([[12, 20], [5, 13]]),
+            np.array([[1, 0], [0, 1]]),
+            "SPT",
+            True,
+            np.array([[0, 12], [0, 12]]),
+        ),
+        (
+            np.array([[12, -1], [5, 13]]),
+            np.array([[1, -1], [0, 1]]),
+            "SPT",
+            True,
+            np.array([[0, 12], [0, 12]]),
+        ),
+        (
+            np.array([[12, -1, 12], [5, 13, -1]]),
+            np.array([[1, -1, 2], [0, 1, -1]]),
+            "SPT",
+            True,
+            np.array([[0, 12, 12], [0, 12, 25]]),
+        ),
+        (
+            np.array([[12, -1, 12], [5, 13, -1]]),
+            np.array([[2, -1, 0], [0, 1, -1]]),
+            "SPT",
+            True,
+            np.array([[0, 12, 12], [0, 5, 18]]),
+        ),
+    ],
+)
+def test_missing_tasks(
+    durations: np.ndarray,
+    affectations: np.ndarray,
+    heuristic: str,
+    ignore_unfinished_precedences: bool,
+    expected_schedule: np.ndarray,
+):
+    solver = Solver(durations, affectations, heuristic, ignore_unfinished_precedences)
+    schedule = solver.solve()
+    assert np.allclose(schedule, expected_schedule)
 
 
 @pytest.mark.parametrize(

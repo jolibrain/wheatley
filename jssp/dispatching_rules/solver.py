@@ -25,21 +25,39 @@ class Solver:
         heuristic: str,
         ignore_unfinished_precedences: bool,
     ):
-        validate_instance(durations, affectations)
+        if np.any(durations == -1):
+            _, n_machines = affectations.shape
+            # There are fictive tasks.
+
+            # Set the fictive tasks as a task on a fictive machine
+            # with a duration of 0.
+            durations = durations.copy()
+            durations[durations == -1] = 0
+
+            affectations = affectations.copy()
+            affectations[affectations == -1] = n_machines
+            # TODO: Add validation.
+        else:
+            validate_instance(durations, affectations)
+
         assert heuristic in HEURISTICS, f"Unknown heuristic {heuristic}"
 
         self.durations = durations
         self.affectations = affectations
         self.n_jobs, self.n_machines = durations.shape
+        self.fictive_machine_id = self.n_machines
         self.ignore_unfinished_precedences = ignore_unfinished_precedences
         self.heuristic = HEURISTICS[heuristic]
+        self.durations_type = self.durations.dtype
 
         # -1 for unknown starting times.
-        self.schedule = np.ones((self.n_jobs, self.n_machines + 1), dtype=np.int32) * -1
-        self.priority_queue = PriorityQueue(maxsize=self.n_machines)
+        self.schedule = (
+            np.ones((self.n_jobs, self.n_machines + 1), dtype=self.durations_type) * -1
+        )
+        self.priority_queue = PriorityQueue(maxsize=0)
 
         # The first events are empty.
-        self.priority_queue.put((0, list(range(self.n_machines))))
+        self.priority_queue.put((0, np.unique(self.affectations)))
 
     def solve(self) -> np.ndarray:
         while np.any(self.schedule[:, :-1] == -1):
@@ -66,7 +84,7 @@ class Solver:
         )
         return self.schedule[:, :-1]
 
-    def step(self, machine_id: int, current_time: int) -> bool:
+    def step(self, machine_id: int, current_time: float) -> bool:
         """Update the priority queue and the current solution by adding
         a job for the given machine.
         """
@@ -84,7 +102,7 @@ class Solver:
 
         return True
 
-    def candidates(self, machine_id: int, current_time: int) -> np.ndarray:
+    def candidates(self, machine_id: int, current_time: float) -> np.ndarray:
         """Select the valid candidates.
         A candidate is valid if it is the next unplaced task in its job,
         and if that task is to be done on the given `machine_id`.
@@ -104,39 +122,35 @@ class Solver:
                 Shape of [n_valid_candidates,]
         """
         job_ids = np.arange(self.n_jobs)
-        machine_ids = np.arange(self.n_machines)
-        machine_ids = repeat(machine_ids, "m -> n m", n=self.n_jobs)
 
         # If a job is fully done, its frontier candidate will have an id of `n_machines`.
-        # This candidate will thus be ignored as the `machine_candidates` cannot be equal
-        # to `n_machines`.
-        frontier_candidates = self.schedule.argmin(axis=1)  # Shape of [n_jobs,]
+        frontier_candidates = self.schedule.argmin(axis=1)  # Shape of [n_jobs,].
 
-        # Since each machine is only present once per job,
-        # `machine_candidates` is of shape [n_jobs,].
-        machine_candidates = machine_ids[self.affectations == machine_id]
+        affectations = np.concatenate(
+            (self.affectations, np.zeros((self.n_jobs, 1), dtype=int)), axis=1
+        )
+        affectations[:, -1] = -1
+        candidates_machine_id = affectations[job_ids, frontier_candidates]
 
         # Ignore frontier candidates that do not concern the given `machine_id`.
-        filter = machine_candidates == frontier_candidates
+        valid_mask = candidates_machine_id == machine_id
 
         if self.ignore_unfinished_precedences:
             # Find the ending time of each precedent frontier candidate.
             # In case of a starting candidate, its precedent ending time will be 0.
             ending_times = self.schedule[:, :-1] + self.durations
             ending_times = np.concatenate(
-                (np.zeros((self.n_jobs, 1), dtype=np.int32), ending_times),
+                (np.zeros((self.n_jobs, 1), dtype=self.durations_type), ending_times),
                 axis=1,
             )
-            precedences_indices = np.expand_dims(frontier_candidates, axis=1)
-            precedences_ending_times = np.take_along_axis(
-                ending_times, precedences_indices, axis=1
-            )
-            precedences_ending_times = np.squeeze(precedences_ending_times, axis=1)
+            precedences_ending_times = ending_times[job_ids, frontier_candidates]
 
             # Also ignore tasks that have unfinished precedences.
-            filter = filter & (precedences_ending_times <= current_time)
+            # Take into account the limited precision of floating-point comparisons.
+            unfinished_precedences = (precedences_ending_times - current_time) < 1e-5
+            valid_mask = valid_mask & unfinished_precedences
 
-        valid_jobs = job_ids[filter]
+        valid_jobs = job_ids[valid_mask]
         return valid_jobs
 
     def priority_rule(self, candidates: np.ndarray) -> int:
@@ -148,7 +162,7 @@ class Solver:
             candidates,
         )
 
-    def canditate_starting_time(self, job_id: int, current_time: int) -> int:
+    def canditate_starting_time(self, job_id: int, current_time: float) -> float:
         """Determine the candidate starting time, which is either
         the current time or the time it takes for its previous task to finish.
         """
@@ -184,6 +198,7 @@ def reschedule(
         The new schedule.
             Shape of [n_jobs, n_machines].
     """
+    # TODO: missing tasks
     # Save the original tasks order of each machine.
     occupancy = _occupancy(affectations, schedule)
     # Start by a trivial schedule and make sure that each task job is at least
@@ -305,30 +320,30 @@ def missing_tasks_to_fictive(durations: np.ndarray, affectations: np.ndarray):
 
     A missing task is expected to have its machine id and duration equal to -1.
     """
-    n_machines, n_tasks = affectations.shape
-    machine_range = np.arange(n_machines)
+    n_jobs, n_machines = affectations.shape
+    job_range = np.arange(n_jobs)
     sort_by_machines = np.argsort(affectations, axis=1)
 
-    missing_tasks_ids = np.zeros(n_machines, dtype=int)
-    existing_tasks_ids = np.ones(n_machines, dtype=int) * (n_tasks - 1)
+    missing_tasks_ids = np.zeros(n_jobs, dtype=int)
+    existing_tasks_ids = np.ones(n_jobs, dtype=int) * (n_machines - 1)
 
-    for rank in range(n_tasks - 1, -1, -1):
-        affectation_ids = sort_by_machines[machine_range, existing_tasks_ids]
-        machine_ids = affectations[machine_range, affectation_ids]
+    for rank in range(n_machines - 1, -1, -1):
+        affectation_ids = sort_by_machines[job_range, existing_tasks_ids]
+        machine_ids = affectations[job_range, affectation_ids]
         valid_tasks = machine_ids == rank
 
-        missing_machine_ids = sort_by_machines[machine_range, missing_tasks_ids]
-        machine_ids = affectations[machine_range, missing_machine_ids]
-        affectations[machine_range, missing_machine_ids] = (
-            machine_ids * valid_tasks
-        ) + (rank * ~valid_tasks)
+        missing_machine_ids = sort_by_machines[job_range, missing_tasks_ids]
+        machine_ids = affectations[job_range, missing_machine_ids]
+        affectations[job_range, missing_machine_ids] = (machine_ids * valid_tasks) + (
+            rank * ~valid_tasks
+        )
 
         missing_tasks_ids[~valid_tasks] += 1
         existing_tasks_ids[valid_tasks] -= 1
 
     durations[durations == -1] = 0
 
-    assert np.all(
-        missing_tasks_ids - existing_tasks_ids == np.ones(n_machines, dtype=int)
-    )
+    assert np.all(missing_tasks_ids - existing_tasks_ids == np.ones(n_jobs, dtype=int))
     assert np.all(durations != -1) and np.all(affectations != -1)
+    machine_ids = repeat(np.arange(n_machines), "m -> j m", j=n_jobs)
+    assert np.all(np.sort(affectations, axis=1) == machine_ids)
