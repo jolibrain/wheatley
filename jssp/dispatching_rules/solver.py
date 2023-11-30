@@ -4,7 +4,12 @@ import numpy as np
 from einops import repeat
 
 from .heuristics import HEURISTICS
-from .validate import validate_instance, validate_solution
+from .validate import (
+    validate_instance,
+    validate_instance_with_fictive_tasks,
+    validate_solution,
+    validate_solution_with_missing_tasks,
+)
 
 
 class Solver:
@@ -25,18 +30,9 @@ class Solver:
         heuristic: str,
         ignore_unfinished_precedences: bool,
     ):
-        if np.any(durations == -1):
-            _, n_machines = affectations.shape
-            # There are fictive tasks.
-
-            # Set the fictive tasks as a task on a fictive machine
-            # with a duration of 0.
-            durations = durations.copy()
-            durations[durations == -1] = 0
-
-            affectations = affectations.copy()
-            affectations[affectations == -1] = n_machines
-            # TODO: Add validation.
+        n_machines = affectations.shape[1]
+        if np.any(affectations == n_machines):
+            validate_instance_with_fictive_tasks(durations, affectations)
         else:
             validate_instance(durations, affectations)
 
@@ -77,11 +73,18 @@ class Solver:
                 next_machine_ids.extend(failed_steps)
                 self.priority_queue.put((next_ending_time, next_machine_ids))
 
-        validate_solution(
-            self.durations,
-            self.affectations,
-            self.schedule[:, :-1],
-        )
+        if np.any(self.affectations == self.n_machines):
+            validate_solution_with_missing_tasks(
+                self.durations,
+                self.affectations,
+                self.schedule[:, :-1],
+            )
+        else:
+            validate_solution(
+                self.durations,
+                self.affectations,
+                self.schedule[:, :-1],
+            )
         return self.schedule[:, :-1]
 
     def step(self, machine_id: int, current_time: float) -> bool:
@@ -198,7 +201,6 @@ def reschedule(
         The new schedule.
             Shape of [n_jobs, n_machines].
     """
-    # TODO: missing tasks
     # Save the original tasks order of each machine.
     occupancy = _occupancy(affectations, schedule)
     # Start by a trivial schedule and make sure that each task job is at least
@@ -208,7 +210,7 @@ def reschedule(
     # Iterate until we have a fixed point solution.
     # During each iteration, we separately fix the job constraints and the
     # machines constraints.
-    while not np.all(schedule == new_schedule):
+    while not np.allclose(schedule, new_schedule):
         schedule = new_schedule
         new_schedule = _reschedule_jobs(durations, new_schedule)
         new_schedule = _reschedule_machines(
@@ -241,43 +243,39 @@ def _reschedule_jobs(durations: np.ndarray, schedule: np.ndarray) -> np.ndarray:
 def _reschedule_machines(
     durations: np.ndarray,
     affectations: np.ndarray,
-    occupancy: np.ndarray,
+    occupancy: list,
     schedule: np.ndarray,
 ) -> np.ndarray:
     """Modify the schedule to make sure that the machine constraints
     are respected.
     """
+    n_machines = affectations.shape[1]
     schedule = schedule.copy()
 
-    # Order the tasks by the machine they are affected to.
-    sort_by_machines = np.argsort(affectations, axis=1)
-    schedule = np.take_along_axis(schedule, sort_by_machines, axis=1)
-    durations = np.take_along_axis(durations, sort_by_machines, axis=1)
+    for machine_id in range(n_machines):
+        if not np.any(affectations == machine_id):
+            continue
 
-    # Read to [n_machines, n_jobs].
-    schedule = schedule.transpose()
-    durations = durations.transpose()
+        schedule_machine = schedule[affectations == machine_id]
+        durations_machine = durations[affectations == machine_id]
+        occupancy_machine = occupancy[machine_id]
 
-    # Order the tasks by the original occupancy schedule.
-    schedule = np.take_along_axis(schedule, occupancy, axis=1)
-    durations = np.take_along_axis(durations, occupancy, axis=1)
+        schedule_machine = schedule_machine[occupancy_machine]
+        durations_machine = durations_machine[occupancy_machine]
 
-    # Make sure each task starts after the precedent task on each machine.
-    n_tasks = durations.shape[1]
-    for task_id in range(1, n_tasks):
-        starting_times = np.stack(
-            (
-                schedule[:, task_id],
-                schedule[:, task_id - 1] + durations[:, task_id - 1],
-            ),
-            axis=1,
+        ending_times = schedule_machine + durations_machine
+        previous_ending_times = ending_times.copy()
+        previous_ending_times[1:] = ending_times[:-1]
+        previous_ending_times[0] = 0
+
+        starting_times_candidates = np.stack(
+            (schedule_machine, previous_ending_times), axis=1
         )
-        schedule[:, task_id] = np.max(starting_times, axis=1)
+        schedule_machine = np.max(starting_times_candidates, axis=1)
 
-    # Go back to the original schedule format.
-    schedule = np.take_along_axis(schedule, np.argsort(occupancy), axis=1)
-    schedule = schedule.transpose()
-    schedule = np.take_along_axis(schedule, affectations, axis=1)
+        schedule_machine = schedule_machine[np.argsort(occupancy_machine)]
+        schedule[affectations == machine_id] = schedule_machine
+
     return schedule
 
 
@@ -293,57 +291,24 @@ def _init_schedule(durations: np.ndarray) -> np.ndarray:
     return schedule
 
 
-def _occupancy(affectations: np.ndarray, schedule: np.ndarray) -> np.ndarray:
+def _occupancy(affectations: np.ndarray, schedule: np.ndarray) -> list:
     """Compute the occupancy of each machine of the given schedule.
     The occupancy of a machine is the order a machine treat each job.
 
     ---
     Returns:
-        The occupancy of each machine.
-            Shape of [n_machines, n_jobs].
+        The occupancy of each machine. List of `n_machines` elements, where it is either
+        an array containing the order of its scheduled jobs or None if no jobs are
+        scheduled on this machine.
     """
-    # Order the tasks by the machine they are affected to.
-    sort_by_machines = np.argsort(affectations, axis=1)
-    schedule = np.take_along_axis(schedule, sort_by_machines, axis=1)
+    n_machines = affectations.shape[1]
+    occupancy = []
+    for machine_id in range(n_machines):
+        if not np.any(affectations == machine_id):
+            occupancy.append(None)
+            continue
 
-    schedule = schedule.transpose()
+        machine_schedule = schedule[affectations == machine_id]
+        occupancy.append(np.argsort(machine_schedule))
 
-    # Chronological order of the jobs for each machine.
-    occupancy = np.argsort(schedule, axis=1)
     return occupancy
-
-
-def missing_tasks_to_fictive(durations: np.ndarray, affectations: np.ndarray):
-    """Replace missing tasks with fictive ones, so that each job has a task on all machines.
-    A fictive task has a duration of 0, so it can be placed as soon as possible
-    and does not impact the final scheduling value.
-
-    A missing task is expected to have its machine id and duration equal to -1.
-    """
-    n_jobs, n_machines = affectations.shape
-    job_range = np.arange(n_jobs)
-    sort_by_machines = np.argsort(affectations, axis=1)
-
-    missing_tasks_ids = np.zeros(n_jobs, dtype=int)
-    existing_tasks_ids = np.ones(n_jobs, dtype=int) * (n_machines - 1)
-
-    for rank in range(n_machines - 1, -1, -1):
-        affectation_ids = sort_by_machines[job_range, existing_tasks_ids]
-        machine_ids = affectations[job_range, affectation_ids]
-        valid_tasks = machine_ids == rank
-
-        missing_machine_ids = sort_by_machines[job_range, missing_tasks_ids]
-        machine_ids = affectations[job_range, missing_machine_ids]
-        affectations[job_range, missing_machine_ids] = (machine_ids * valid_tasks) + (
-            rank * ~valid_tasks
-        )
-
-        missing_tasks_ids[~valid_tasks] += 1
-        existing_tasks_ids[valid_tasks] -= 1
-
-    durations[durations == -1] = 0
-
-    assert np.all(missing_tasks_ids - existing_tasks_ids == np.ones(n_jobs, dtype=int))
-    assert np.all(durations != -1) and np.all(affectations != -1)
-    machine_ids = repeat(np.arange(n_machines), "m -> j m", j=n_jobs)
-    assert np.all(np.sort(affectations, axis=1) == machine_ids)

@@ -7,7 +7,6 @@ def validate_solution(
     affectations: np.ndarray,
     schedule: np.ndarray,
 ):
-    # TODO: Missing tasks
     # Make sure the given args are valids.
     validate_instance(durations, affectations)
     assert schedule.shape == durations.shape, "Wrong starting_times shape"
@@ -54,24 +53,48 @@ def validate_machine_tasks(
 ):
     _, n_machines = durations.shape
 
-    sort_by_machines = np.argsort(affectations, axis=1)
-    durations = np.take_along_axis(durations, sort_by_machines, axis=1)
-    schedule = np.take_along_axis(schedule, sort_by_machines, axis=1)
+    for machine_id in range(n_machines):
+        if not np.any(affectations == machine_id):
+            continue
 
-    durations = durations.transpose()
-    schedule = schedule.transpose()
+        schedule_machine = schedule[affectations == machine_id]
+        durations_machine = durations[affectations == machine_id]
 
-    sort_by_starting_times = np.argsort(schedule, axis=1)
-    schedule = np.take_along_axis(schedule, sort_by_starting_times, axis=1)
-    durations = np.take_along_axis(durations, sort_by_starting_times, axis=1)
+        sort_by_starting_times = np.argsort(schedule_machine)
+        schedule_machine = schedule_machine[sort_by_starting_times]
+        durations_machine = durations_machine[sort_by_starting_times]
 
-    ending_times = schedule + durations
-    previous_ending_times = np.concatenate(
-        (np.zeros((n_machines, 1), dtype=durations.dtype), ending_times[:, :-1]),
-        axis=1,
-    )
-    a = previous_ending_times - schedule
-    # print(a[a > 0])
-    assert np.all(
-        schedule - previous_ending_times >= -1e-5
-    ), "Some tasks starts before their precedence (machine-wise) is finished"
+        ending_times = schedule_machine + durations_machine
+        previous_ending_times = ending_times.copy()
+        previous_ending_times[1:] = ending_times[:-1]
+        previous_ending_times[0] = 0
+
+        assert np.all(
+            schedule_machine - previous_ending_times >= -1e-5
+        ), "Some tasks starts before their precedence (machine-wise) is finished"
+
+
+def validate_solution_with_missing_tasks(
+    durations: np.ndarray,
+    affectations: np.ndarray,
+    schedule: np.ndarray,
+):
+    # Make sure the given args are valids.
+    validate_instance_with_fictive_tasks(durations, affectations)
+    assert schedule.shape == durations.shape, "Wrong starting_times shape"
+
+    # Validate the solution.
+    assert np.all(schedule != -1), "Not all tasks have been started!"
+    validate_job_tasks(durations, affectations, schedule)
+    validate_machine_tasks(durations, affectations, schedule)
+
+
+def validate_instance_with_fictive_tasks(
+    durations: np.ndarray,
+    affectations: np.ndarray,
+):
+    n_machines = durations.shape[1]
+    assert durations.shape == affectations.shape, "Wrong number of jobs or machines"
+    assert (
+        affectations.min() == 0 and affectations.max() == n_machines
+    ), f"The indices must be in the range [0, n_machines] (found [{affectations.min()}, {affectations.max()}])"
