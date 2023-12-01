@@ -330,7 +330,7 @@ class GnnDGL(torch.nn.Module):
             )
         if self.conflicts == "node":
             features[resource_nodes] = self.resource_node_embedder(
-                torch.LongTensor(list(range(num_resources)) * batch_size).to(
+                torch.LongTensor(list(range(self.max_n_resources)) * batch_size).to(
                     features.device
                 )
             )
@@ -476,7 +476,7 @@ class GnnDGL(torch.nn.Module):
                 graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
                 graph_embedding = torch.matmul(graph_pooling, node_features)
             elif self.graph_pooling in ["learn", "learninv"]:
-                graph_embedding = features[num_nodes : num_nodes + batch_size, :]
+                graph_embedding = features[poolnodes, :]
             else:
                 raise Exception(
                     f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg"
