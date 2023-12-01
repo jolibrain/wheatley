@@ -339,8 +339,9 @@ def homogeneous_edges(g, edgetypes, factored_rp, max_n_resources):
             g.edges["rp"].data["att_rp"] = g.edges["rp"].data["r"][:, 1:]
             g.edges["rrp"].data["att_rp"] = g.edges["rrp"].data["r"][:, 1:]
 
-    g.edges["rc"].data["rid"] = (g.edges["rc"].data["rid"] + 1).int()
-    g.edges["rc"].data["att_rc"][:, 0] = g.edges["rc"].data["val"]
-    g.edges["rc"].data["att_rc"][:, 1] = g.edges["rc"].data["valr"]
+    if g.num_edges(etype="rc") != 0:
+        g.edges["rc"].data["rid"] = (g.edges["rc"].data["rid"] + 1).int()
+        g.edges["rc"].data["att_rc"][:, 0] = g.edges["rc"].data["val"]
+        g.edges["rc"].data["att_rc"][:, 1] = g.edges["rc"].data["valr"]
 
     return g, ["type", "rid", "att_rc", "att_rp"]
