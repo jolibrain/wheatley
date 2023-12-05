@@ -23,6 +23,7 @@
 
 
 import torch
+import dgl
 
 from generic.agent import Agent
 from .gnn_dgl import GnnDGL
@@ -311,9 +312,13 @@ class Agent(Agent):
 
     def _rebatch_obs_graph(self, obs):
         # we need to flatten a list of list into a single list
+        if isinstance(obs[0], str):
+            return obs
         return sum(obs, [])
 
     def _get_obs_graph(self, b_obs, mb_ind):
+        if isinstance(b_obs[0], str):
+            return [dgl.load_graphs(b_obs[i])[0][0] for i in mb_ind]
         return list(b_obs[i] for i in mb_ind)
 
     def _get_obs(self, b_obs, mb_ind):

@@ -13,6 +13,7 @@ from dgl import multiprocessing as mp
 import numpy as np
 import time
 
+# import tracemalloc
 
 from psp.env.genv import GEnv as Env
 
@@ -492,15 +493,23 @@ def _worker_shared_memory(
     assert shared_memory is not None
     env = env_fn()
     parent_pipe.close()
+    # tracemalloc.start()
     try:
         while True:
             command, data = pipe.recv()
             if command == "reset":
+                # snap1 = tracemalloc.take_snapshot()
                 observation, info = env.reset(**data)
                 write_to_shared_memory(index, observation, shared_memory, disk)
                 pipe.send(((None, info), True))
+                # snap2 = tracemalloc.take_snapshot()
+                # top_stats = snap2.compare_to(snap1, "lineno")
+                # for stat in top_stats:
+                #     print("reset stat ", stat)
 
             elif command == "step":
+                # print("getting mem snapshot"n)
+                # snap1 = tracemalloc.take_snapshot()
                 (
                     observation,
                     reward,
@@ -513,8 +522,13 @@ def _worker_shared_memory(
                     observation, info = env.reset()
                     info["final_observation"] = old_observation
                     info["final_info"] = old_info
+
                 write_to_shared_memory(index, observation, shared_memory, disk)
                 pipe.send(((None, reward, terminated, truncated, info), True))
+                # snap2 = tracemalloc.take_snapshot()
+                # top_stats = snap2.compare_to(snap1, "lineno")
+                # for stat in top_stats:
+                #     print("step stat ", stat)
             elif command == "seed":
                 env.seed(data)
                 pipe.send((None, True))
@@ -547,4 +561,5 @@ def _worker_shared_memory(
         error_queue.put((index,) + sys.exc_info()[:2])
         pipe.send((None, False))
     finally:
+        # tracemalloc.stop()
         env.close()

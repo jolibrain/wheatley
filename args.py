@@ -81,6 +81,12 @@ def argument_parser() -> argparse.ArgumentParser:
         help="Which device to use (cpu, cuda:0, cuda:1...)",
     )
     parser.add_argument(
+        "--store_rollouts_on_disk",
+        default=None,
+        type=str,
+        help="location for rollout on disk store rollouts on disk (graphgym only ATM)",
+    )
+    parser.add_argument(
         "--exp_name_appendix", type=str, help="Appendix for the name of the experience"
     )
     parser.add_argument(

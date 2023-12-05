@@ -112,6 +112,9 @@ def instantiate_training_objects(
         rpo_smoothing_param=args.rpo_smoothing_param,
         gae_lambda=args.gae_lambda,
         return_based_scaling=args.return_based_scaling,
+        store_rollouts_on_disk=(
+            args.store_rollouts_on_disk if args.vecenv_type == "graphgym" else None
+        ),
     )
 
     if args.conflicts == "clique" and args.precompute_cliques:
@@ -279,6 +282,7 @@ possible_args = {
     "no_fast_forward": [True, False],
     "observation_horizon_step": [0, 5],
     "observation_horizon_time": [0, 5],
+    "store_rollouts_on_disk": [False, "/tmp/"],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
