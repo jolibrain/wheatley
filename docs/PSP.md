@@ -2,7 +2,7 @@
 
 Sample line for the famous '272' problem
 ```
-python3 -m psp/train_psp.py\
+python3 -m psp.train_psp\
     --load_problem instances/psp/272/272.sm\
     --n_validation_env=1\
     --exp_name_appendix TEST_PSP_272\
@@ -17,7 +17,7 @@ python3 -m psp/train_psp.py\
 
 Sample line for the famous '272' problem with uncertainty
 ```
-python3 -m psp/train_psp.py\
+python3 -m psp.train_psp\
     --load_problem instances/psp/272/272.sm\
     --n_validation_env=10\
     --exp_name_appendix TEST_PSP_272_UNC\
