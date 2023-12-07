@@ -554,7 +554,7 @@ class AgentValidator:
         Y_list = [self.makespans, self.random_makespans]
         opts = {
             "title": "Validation makespan",
-            "legend": ["PPO", "Random"],
+            "legend": ["Wheatley", "Random"],
             "linecolor": [[31, 119, 180], [255, 127, 14]],
         }
         Y2_list = [
@@ -564,7 +564,7 @@ class AgentValidator:
             / np.array(self.ortools_makespans[self.default_ortools_strategy]),
         ]
         opts2 = {
-            "legend": ["PPO / OR-tools", "Random / OR-tools"],
+            "legend": ["Wheatley / OR-tools", "Random / OR-tools"],
             "linecolor": [[31, 119, 180], [255, 127, 14]],
         }
 
@@ -613,13 +613,13 @@ class AgentValidator:
 
         # ratio to OR-tools
         opts = {
-            "title": "PPO / OR-Tools",
+            "title": "Wheatley / OR-Tools",
             "legend": [],
         }
         Y_ratios = []
         for ortools_strategy in self.ortools_strategies:
-            opts["legend"].append(f"PPO/OR-Tools {ortools_strategy}")
-            opts["legend"].append(f"Min PPO/OR-Tools {ortools_strategy}")
+            opts["legend"].append(f"Wheatley/OR-Tools {ortools_strategy}")
+            opts["legend"].append(f"Min Wheatley/OR-Tools {ortools_strategy}")
             ratio_to_ortools = np.array(self.makespans) / np.array(
                 self.ortools_makespans[ortools_strategy]
             )
@@ -655,7 +655,7 @@ class AgentValidator:
             X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts
         )
 
-        # Plot OR-Tools solutions vs PPO solutions.
+        # Plot OR-Tools solutions vs Wheatley solutions.
         # Visdom is a little bit limited so we build the plot ourself using matplotlib
         # and save the image on disk. We can directly plot this image with visdom.
         # This is a bit hacky but it works.
@@ -673,10 +673,10 @@ class AgentValidator:
             [0, max(self.last_ppo_makespans + self.last_ortools_makespans)],
             color="red",
         )
-        ax.set_xlabel("PPO makespan")
+        ax.set_xlabel("Wheatley makespan")
         ax.set_ylabel("OR-Tools makespan")
         ax.set_title(
-            f"OR-Tools {self.averagistic_ortools_strategy} vs PPO - {(ppo_makespans / ortools_makespans).mean():.2f}"
+            f"OR-Tools {self.averagistic_ortools_strategy} vs Wheatley - {(ppo_makespans / ortools_makespans).mean():.2f}"
         )
         fig.savefig(self.path + "ortools-ppo-cactus.png")
 
@@ -691,7 +691,7 @@ class AgentValidator:
         self.vis.image(
             image,
             win="ortools-ppo-cactus",
-            opts={"caption": "OR-Tools vs PPO"},
+            opts={"caption": "OR-Tools vs Wheatley"},
         )
 
         if self.first_callback:
@@ -707,7 +707,7 @@ class AgentValidator:
         self.vis.image(
             image,
             win="best-ortools-ppo-cactus",
-            opts={"caption": "Best OR-Tools vs PPO"},
+            opts={"caption": "Best OR-Tools vs Wheatley"},
         )
 
         self.entropy_losses.append(
