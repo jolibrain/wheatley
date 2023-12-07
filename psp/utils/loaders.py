@@ -72,7 +72,7 @@ class PSPLoader:
             self.nextline()
 
     def load_directory(self, directory):
-        files = glob.glob(directory + "/*")
+        files = sorted(glob.glob(directory + "/*"))
         psps = [self.load_single(f) for f in files]
         print(f"loaded {len(psps)} files in {directory}")
         return psps
