@@ -163,6 +163,11 @@ def main(args, exp_name, path) -> float:
             "batch size 1 and normalize advantage are not compatible\neither set --batch_size to > 1  or append --dont_normalize_advantage"
         )
         exit()
+
+    if args.two_hot is not None:
+        hidden_dim_critic = max(int(args.two_hot[2]), args.hidden_dim_critic)
+    else:
+        hidden_dim_critic = args.hidden_dim_critic
     agent_specification = AgentSpecification(
         n_features=env_specification.n_features,
         gconv_type=args.gconv_type,
@@ -183,7 +188,7 @@ def main(args, exp_name, path) -> float:
         n_mlp_layers_actor=args.n_mlp_layers_actor,
         hidden_dim_actor=args.hidden_dim_actor,
         n_mlp_layers_critic=args.n_mlp_layers_critic,
-        hidden_dim_critic=args.hidden_dim_critic,
+        hidden_dim_critic=hidden_dim_critic,
         fe_type=args.fe_type,
         transformer_flavor=args.transformer_flavor,
         dropout=args.dropout,
@@ -203,6 +208,8 @@ def main(args, exp_name, path) -> float:
         rwpe_k=args.rwpe_k,
         rwpe_h=args.rwpe_h,
         cache_rwpe=args.cache_rwpe,
+        two_hot=args.two_hot,
+        symlog=args.symlog,
     )
     agent_specification.print_self()
 

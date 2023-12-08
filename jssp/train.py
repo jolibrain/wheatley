@@ -209,6 +209,8 @@ def main(args, exp_name, path) -> float:
         rwpe_k=args.rwpe_k,
         rwpe_h=args.rwpe_h,
         cache_rwpe=args.cache_rwpe,
+        two_hot=args.two_hot,
+        symlog=args.symlog,
     )
     agent_specification.print_self()
     # If we want to use a pretrained Agent, we only have to load it (if it exists)

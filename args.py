@@ -538,6 +538,20 @@ def argument_parser() -> argparse.ArgumentParser:
         help="enable rwpe cache",
     )
 
+    parser.add_argument(
+        "--two_hot",
+        default=None,
+        type=float,
+        nargs=3,
+        help="min,max, nbins parameters for value two hot encoding",
+    )
+    parser.add_argument(
+        "--symlog",
+        action="store_true",
+        default=False,
+        help="predict value internally as log of expected sum of reward",
+    )
+
     # =================================================ENVIRONMENT SPECIFICATION================================================
     parser.add_argument(
         "--duration_type",
