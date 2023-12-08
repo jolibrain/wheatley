@@ -188,6 +188,8 @@ def instantiate_training_objects(
         rwpe_k=args.rwpe_k,
         rwpe_h=args.rwpe_h,
         cache_rwpe=args.cache_rwpe,
+        two_hot=args.two_hot,
+        symlog=args.symlog,
     )
     agent = Agent(
         env_specification=env_specification, agent_specification=agent_specification
@@ -279,6 +281,7 @@ possible_args = {
     "no_fast_forward": [True, False],
     "observation_horizon_step": [0, 5],
     "observation_horizon_time": [0, 5],
+    "symlog": [True, False],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
