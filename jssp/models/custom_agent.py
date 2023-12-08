@@ -53,6 +53,18 @@ class CustomAgent:
                 f"Unknown stochasticity strategy {self.stochasticity_strategy}"
             )
 
+        # Handle fictive tasks.
+        _, n_machines = affectations.shape
+        affectations = affectations.copy()
+        durations = durations.copy()
+        real_durations = real_durations.copy()
+
+        # Set the fictive tasks as a task on a fictive machine
+        # with a duration of 0.
+        affectations[affectations == -1] = n_machines
+        durations[durations == -1] = 0
+        real_durations[real_durations == -1] = 0
+
         solver = Solver(
             durations, affectations, self.rule, ignore_unfinished_precedences=True
         )

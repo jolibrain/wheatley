@@ -4,12 +4,12 @@ import numpy as np
 import pytest
 
 from instances.generate_taillard import generate_taillard
-
 from jssp.dispatching_rules.solver import Solver, _occupancy, reschedule
 from jssp.dispatching_rules.validate import (
     validate_job_tasks,
     validate_machine_tasks,
     validate_solution,
+    validate_solution_with_missing_tasks,
 )
 
 
@@ -70,6 +70,85 @@ def test_solver(
     solver = Solver(durations, affectations, heuristic, ignore_unfinished_precedences)
     schedule = solver.solve()
     assert np.all(schedule == expected_schedule)
+
+
+@pytest.mark.parametrize(
+    "durations, affectations, heuristic, ignore_unfinished_precedences, expected_schedule",
+    [
+        (
+            np.array([[12, 20], [5, 13]]),
+            np.array([[1, 0], [0, 1]]),
+            "SPT",
+            True,
+            np.array([[0, 12], [0, 12]]),
+        ),
+        (
+            np.array([[12, -1], [5, 13]]),
+            np.array([[1, -1], [0, 1]]),
+            "SPT",
+            True,
+            np.array([[0, 12], [0, 12]]),
+        ),
+        (
+            np.array([[12, -1, 12], [5, 13, -1]]),
+            np.array([[1, -1, 2], [0, 1, -1]]),
+            "SPT",
+            True,
+            np.array([[0, 12, 12], [0, 12, 25]]),
+        ),
+        (
+            np.array([[12, -1, 12], [5, 13, -1]]),
+            np.array([[2, -1, 0], [0, 1, -1]]),
+            "SPT",
+            True,
+            np.array([[0, 12, 12], [0, 5, 18]]),
+        ),
+    ],
+)
+def test_missing_tasks(
+    durations: np.ndarray,
+    affectations: np.ndarray,
+    heuristic: str,
+    ignore_unfinished_precedences: bool,
+    expected_schedule: np.ndarray,
+):
+    n_machines = affectations.shape[1]
+    durations[affectations == -1] = 0
+    affectations[affectations == -1] = n_machines
+    solver = Solver(durations, affectations, heuristic, ignore_unfinished_precedences)
+    schedule = solver.solve()
+    assert np.allclose(schedule, expected_schedule)
+
+
+@pytest.mark.parametrize(
+    "schedule,real_durations,affectations,expected_schedule",
+    [
+        (
+            np.array([[0, 12, 12], [0, 12, 25]]),
+            np.array([[13, -1, 11], [4, 11, -1]]),
+            np.array([[1, -1, 2], [0, 1, -1]]),
+            np.array([[0, 13, 13], [0, 13, 24]]),
+        ),
+        (
+            np.array([[0, 12, 12], [0, 5, 18]]),
+            np.array([[10, -1, 17], [11, 13, -1]]),
+            np.array([[2, -1, 0], [0, 1, -1]]),
+            np.array([[0, 10, 11], [0, 11, 24]]),
+        ),
+    ],
+)
+def test_reschedule_missing_tasks(
+    schedule: np.ndarray,
+    real_durations: np.ndarray,
+    affectations: np.ndarray,
+    expected_schedule: np.ndarray,
+):
+    n_machines = affectations.shape[1]
+    real_durations[affectations == -1] = 0
+    affectations[affectations == -1] = n_machines
+    new_schedule = reschedule(real_durations, affectations, schedule)
+    validate_solution_with_missing_tasks(real_durations, affectations, new_schedule)
+    assert np.allclose(new_schedule, expected_schedule)
 
 
 @pytest.mark.parametrize(
@@ -151,9 +230,12 @@ def test_reschedule(n_jobs: int, n_machines: int, seed: int):
     new_schedule = reschedule(new_durations, affectations, schedule)
 
     validate_solution(new_durations, affectations, new_schedule)
-    assert np.all(
-        _occupancy(affectations, schedule) == _occupancy(affectations, new_schedule)
-    ), "The new schedule have swapped machine-tasks priorities"
+    occupancy_1 = _occupancy(affectations, schedule)
+    occupancy_2 = _occupancy(affectations, new_schedule)
+    for machine_id in range(len(occupancy_1)):
+        assert np.all(
+            occupancy_1[machine_id] == occupancy_2[machine_id]
+        ), "The new schedule have swapped machine-tasks priorities"
 
 
 @pytest.mark.parametrize(
