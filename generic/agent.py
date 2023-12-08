@@ -50,6 +50,7 @@ def calc_twohot(x, B):
      - calc_twohot(x, B)@B == x # expected value reconstructs x
      - (calc_twohot(x, B)>0).sum(dim=-1) == 2 # only two bins are hot
     """
+
     twohot = torch.zeros((x.shape + B.shape), dtype=x.dtype, device=x.device)
     k1 = (B[None, :] <= x[:, None]).sum(dim=-1) - 1
     k2 = k1 + 1
@@ -100,7 +101,7 @@ class Agent(torch.nn.Module):
                 torch.linspace(
                     self.agent_specification.two_hot[0],
                     self.agent_specification.two_hot[1],
-                    int(self.agent_specification_.two_hot[2]),
+                    int(self.agent_specification.two_hot[2]),
                 )
             )
             self.B.requires_grad = False
@@ -233,3 +234,12 @@ class Agent(torch.nn.Module):
         return self.get_action_and_value(
             observation, action, action_masks, deterministic
         )
+
+    def get_value_from_logits(self, logits):
+        if self.agent_specification.two_hot is not None:
+            val = logits.softmax(dim=-1) @ self.B.to(logits.device)[:, None]
+        else:
+            val = logits
+        if self.agent_specification.symlog:
+            return symexp(val)
+        return val

@@ -239,11 +239,16 @@ class Agent(Agent):
         else:
             device = "cpu"
 
+        if self.agent_specification.two_hot is not None:
+            value_dim = len(self.B)
+        else:
+            value_dim = 1
+
         self.value_net = MLP(
             len(self.agent_specification.net_arch["vf"]),
             self.gnn.features_dim // 2,
             self.agent_specification.net_arch["vf"][0],
-            1,
+            value_dim,
             False,
             self.agent_specification.activation_fn,
         )

@@ -111,6 +111,7 @@ class AgentSpecification:
         self.rwpe_h = rwpe_h
         self.cache_rwpe = cache_rwpe
         self.two_hot = two_hot
+        self.symlog = symlog
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -195,6 +196,7 @@ class AgentSpecification:
                 f"RWPE h:                           {self.rwpe_h}\n"
                 f"RWPE cache:                       {self.cache_rwpe}\n"
                 f"two hot encoding:                 {self.two_hot}\n"
+                f"symlog critic:                     {self.symlog}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (
