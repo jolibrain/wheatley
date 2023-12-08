@@ -29,6 +29,48 @@ import torch
 from torch.distributions.categorical import Categorical
 
 
+def symlog(x):
+    return torch.sign(x) * torch.log(1 + torch.abs(x))
+
+
+def symexp(x):
+    x = torch.clip(
+        x, -20, 20
+    )  # Clipped to prevent extremely rare occurence where critic throws a huge value
+    return torch.sign(x) * (torch.exp(torch.abs(x)) - 1)
+
+
+def calc_twohot(x, B):
+    """
+    x shape:(n_vals, ) is tensor of values
+    B shape:(n_bins, ) is tensor of bin values
+    returns a twohot tensor of shape (n_vals, n_bins)
+
+    can verify this method is correct with:
+     - calc_twohot(x, B)@B == x # expected value reconstructs x
+     - (calc_twohot(x, B)>0).sum(dim=-1) == 2 # only two bins are hot
+    """
+    twohot = torch.zeros((x.shape + B.shape), dtype=x.dtype, device=x.device)
+    k1 = (B[None, :] <= x[:, None]).sum(dim=-1) - 1
+    k2 = k1 + 1
+    k1 = torch.clip(k1, 0, len(B) - 1)
+    k2 = torch.clip(k2, 0, len(B) - 1)
+
+    # Handle k1 == k2 case
+    equal = k1 == k2
+    dist_to_below = torch.where(equal, 1, torch.abs(B[k1] - x))
+    dist_to_above = torch.where(equal, 0, torch.abs(B[k2] - x))
+
+    # Assign values to two-hot tensor
+    total = dist_to_above + dist_to_below
+    weight_below = dist_to_above / total
+    weight_above = dist_to_below / total
+    x_range = np.arange(len(x))
+    twohot[x_range, k1] = weight_below  # assign left
+    twohot[x_range, k2] = weight_above  # assign right
+    return twohot
+
+
 class Agent(torch.nn.Module):
     def __init__(
         self,
@@ -52,6 +94,16 @@ class Agent(torch.nn.Module):
 
         self.env_specification = env_specification
         self.agent_specification = agent_specification
+
+        if self.agent_specification.two_hot is not None:
+            self.B = torch.nn.Parameter(
+                torch.linspace(
+                    self.agent_specification.two_hot[0],
+                    self.agent_specification.two_hot[1],
+                    int(self.agent_specification_.two_hot[2]),
+                )
+            )
+            self.B.requires_grad = False
 
     @staticmethod
     def init_weights(module, gain=1, zero_bias=True, ortho_embed=False) -> None:

@@ -202,11 +202,15 @@ class Agent(Agent):
                 performer_feature_redraw_interval=agent_specification.performer_feature_redraw_interval,
                 performer_redraw_interval=agent_specification.performer_redraw_interval,
             )
+        if self.agent_specification.two_hot is not None:
+            value_dim = len(self.B)
+        else:
+            value_dim = 1
         value_net = MLP(
             len(agent_specification.net_arch["vf"]),
             gnn.features_dim // 2,
             agent_specification.net_arch["vf"][0],
-            1,
+            value_dim,
             False,
             agent_specification.activation_fn,
         )
