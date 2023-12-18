@@ -115,6 +115,7 @@ def instantiate_training_objects(
         store_rollouts_on_disk=(
             args.store_rollouts_on_disk if args.vecenv_type == "graphgym" else None
         ),
+        critic_loss=args.critic_loss,
     )
 
     if args.conflicts == "clique" and args.precompute_cliques:
@@ -286,6 +287,7 @@ possible_args = {
     "observation_horizon_time": [0, 5],
     "symlog": [True, False],
     "store_rollouts_on_disk": [False, "/tmp/"],
+    "critic_loss": ["l2", "l1", "sl1"],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.

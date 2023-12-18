@@ -89,6 +89,7 @@ class PPO:
         self.validation_freq = training_specification.validation_freq
         self.return_based_scaling = training_specification.return_based_scaling
         self.obs_on_disk = training_specification.store_rollouts_on_disk
+        self.critic_loss = training_specification.critic_loss
 
         self.discard_incomplete_trials = discard_incomplete_trials
 
@@ -495,15 +496,17 @@ class PPO:
                     # Value loss
                     if agent.agent_specification.two_hot is None:
                         if agent.agent_specification.symlog:
-                            v_loss_unclipped = (
-                                newvalue.view(-1)
-                                - symlog(b_returns[mb_inds]).to(train_device)
-                            ) ** 2
+                            target = symlog(b_returns[mb_inds]).to(train_device)
                         else:
-                            v_loss_unclipped = (
-                                newvalue.view(-1) - b_returns[mb_inds].to(train_device)
-                            ) ** 2
-
+                            target = b_returns[mb_inds].to(train_device)
+                        if self.critic_loss == "l2":
+                            v_loss_unclipped = (newvalue.view(-1) - target) ** 2
+                        elif self.critic_loss == "l1":
+                            v_loss_unclipped = torch.abs(newvalue.view(-1) - target)
+                        elif self.critic_loss == "sl1":
+                            v_loss_unclipped = torch.nn.functional.smooth_l1_loss(
+                                newvalue.view(-1), target, reduction="none"
+                            )
                     else:
                         with torch.no_grad():
                             if agent.agent_specification.symlog:
@@ -519,20 +522,38 @@ class PPO:
                         )
 
                     if self.clip_vloss:
-                        v_clipped = b_values[mb_inds] + torch.clamp(
-                            newvalue - b_values[mb_inds],
+                        v_clipped = b_values[mb_inds].to(train_device) + torch.clamp(
+                            newvalue - b_values[mb_inds].to(train_device),
                             -self.clip_coef,
                             self.clip_coef,
                         )
-                        v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                        if self.critic_loss == "l2":
+                            v_loss_clipped = (
+                                v_clipped - b_returns[mb_inds].to(train_device)
+                            ) ** 2
+                        elif self.critic_loss == "l1":
+                            v_loss_clipped = torch.abs(
+                                v_clipped - b_returns[mb_inds].to(train_device)
+                            )
+                        elif self.critic_loss == "sl1":
+                            v_loss_clipped = torch.nn.functional.smooth_l1_loss(
+                                v_clipped,
+                                b_returns[mb_inds].to(train_device),
+                                reduction="none",
+                            )
                         v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                        v_loss = 0.5 * v_loss_max.mean()
+                        if self.critic_loss == "l2":
+                            v_loss = 0.5 * v_loss_max.mean()
+                        else:
+                            v_loss = v_loss_max.mean()
                     else:
-                        v_loss = (
-                            0.5 * v_loss_unclipped.mean()
-                            if agent.agent_specification.two_hot is None
-                            else v_loss_unclipped
-                        )
+                        if agent.agent_specification.two_hot is not None:
+                            v_loss = v_loss_unclipped
+                        else:
+                            if self.critic_loss == "l2":
+                                v_loss = 0.5 * v_loss_unclipped.mean()
+                            else:
+                                v_loss = v_loss_unclipped.mean()
                     entropy_loss = entropy.mean()
                     loss = (
                         pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef

@@ -123,6 +123,7 @@ def main(args, exp_name, path) -> float:
         store_rollouts_on_disk=(
             args.store_rollouts_on_disk if args.vecenv_type == "graphgym" else None
         ),
+        critic_loss=args.critic_loss,
     )
     training_specification.print_self()
 

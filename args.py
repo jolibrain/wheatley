@@ -262,6 +262,14 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--vf_coef", type=float, default=0.5, help="Value function coefficient"
     )
+
+    parser.add_argument(
+        "--critic_loss",
+        type=str,
+        choices=["l2", "l1", "sl1"],
+        default="l2",
+        help="critic loss",
+    )
     parser.add_argument(
         "--dont_normalize_advantage",
         action="store_true",
