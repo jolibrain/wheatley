@@ -32,6 +32,7 @@ import glob
 
 import gymnasium as gym
 from psp.env.graphgym.async_vector_env import AsyncGraphVectorEnv
+from generic.agent import calc_twohot, symexp, symlog
 import numpy as np
 import torch
 import torch.nn as nn
@@ -162,6 +163,7 @@ class PPO:
                 action, logprob, _, value = agent.get_action_and_value(
                     next_obs, action_masks=action_mask
                 )
+                value = agent.get_value_from_logits(value)
 
             values[step] = value.flatten()
             actions[step] = action
@@ -189,7 +191,11 @@ class PPO:
                     to_keep[i].extend(to_keep_candidate[i])
 
         with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1).to(data_device)
+            next_value = (
+                agent.get_value_from_logits(agent.get_value(next_obs))
+                .reshape(1, -1)
+                .to(data_device)
+            )
 
         if sigma is None:
             # compute return-based scaling as 2105.05347
@@ -487,9 +493,32 @@ class PPO:
                         pg_loss = pg_loss1.mean()
 
                     # Value loss
-                    newvalue = newvalue.view(-1)
+                    if agent.agent_specification.two_hot is None:
+                        if agent.agent_specification.symlog:
+                            v_loss_unclipped = (
+                                newvalue.view(-1)
+                                - symlog(b_returns[mb_inds]).to(train_device)
+                            ) ** 2
+                        else:
+                            v_loss_unclipped = (
+                                newvalue.view(-1) - b_returns[mb_inds].to(train_device)
+                            ) ** 2
+
+                    else:
+                        with torch.no_grad():
+                            if agent.agent_specification.symlog:
+                                twohot_target = calc_twohot(
+                                    symlog(b_returns[mb_inds]).to(train_device), agent.B
+                                )
+                            else:
+                                twohot_target = calc_twohot(
+                                    b_returns[mb_inds].to(train_device), agent.B
+                                )
+                        v_loss_unclipped = nn.functional.cross_entropy(
+                            newvalue, twohot_target, reduction="mean"
+                        )
+
                     if self.clip_vloss:
-                        v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
                         v_clipped = b_values[mb_inds] + torch.clamp(
                             newvalue - b_values[mb_inds],
                             -self.clip_coef,
@@ -499,8 +528,10 @@ class PPO:
                         v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
                         v_loss = 0.5 * v_loss_max.mean()
                     else:
-                        v_loss = torch.nn.functional.mse_loss(
-                            newvalue, b_returns[mb_inds].to(train_device)
+                        v_loss = (
+                            0.5 * v_loss_unclipped.mean()
+                            if agent.agent_specification.two_hot is None
+                            else v_loss_unclipped
                         )
                     entropy_loss = entropy.mean()
                     loss = (
