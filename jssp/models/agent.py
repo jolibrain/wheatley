@@ -27,6 +27,7 @@ from functools import partial
 import numpy as np
 import torch
 from torch.distributions.categorical import Categorical
+import pickle
 
 from generic.agent import Agent
 from .gnn_dgl import GnnDGL
@@ -186,6 +187,9 @@ class Agent(Agent):
         return agent
 
     def get_obs(self, b_obs, mb_ind):
+        if isinstance(b_obs, list):
+            list_obs = [pickle.load(open(b_obs[i], "rb")) for i in mb_ind]
+            return rebatch_obs(list_obs)
         minibatched_obs = {}
         for key in b_obs:
             minibatched_obs[key] = b_obs[key][mb_ind]

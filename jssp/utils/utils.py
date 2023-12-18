@@ -554,6 +554,8 @@ def obs_as_tensor_add_batch_dim(obs):
 
 
 def rebatch_obs(obs):
+    if isinstance(obs[0], str):
+        return obs
     rebatched_obs = {}
     max_nnodes = 0
     max_nedges = 0
