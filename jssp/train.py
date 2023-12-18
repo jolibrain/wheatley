@@ -137,6 +137,7 @@ def main(args, exp_name, path) -> float:
         gae_lambda=args.gae_lambda,
         return_based_scaling=args.return_based_scaling,
         store_rollouts_on_disk=None,
+        critic_loss=args.critic_loss,
     )
     training_specification.print_self()
 
