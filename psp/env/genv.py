@@ -158,7 +158,7 @@ class GEnv:
         if not self.observe_subgraph:
             return full_observation
         frontier_nodes = torch.tensor(list(self.state.nodes_in_frontier))
-        present_nodes = torch.where(self.state.selectables() == 1)[0]
+        present_nodes = (torch.where(self.state.selectables() == 1)[0]).tolist()
         if self.env_specification.observation_horizon_step != 0:
             local_present_nodes = present_nodes
             future_nodes_step = set()
@@ -183,7 +183,7 @@ class GEnv:
 
         if (
             self.env_specification.observation_horizon_time != 0
-            and present_nodes.shape[0] != 0
+            and len(present_nodes) != 0
         ):
             present_date = torch.max(self.state.tct(present_nodes))
             earlier_start_times = (
@@ -211,7 +211,7 @@ class GEnv:
         nodes_to_keep = torch.tensor(
             list(
                 (
-                    future_nodes.union(set(present_nodes.tolist())).union(
+                    future_nodes.union(set(present_nodes)).union(
                         set(frontier_nodes.tolist())
                     )
                 )

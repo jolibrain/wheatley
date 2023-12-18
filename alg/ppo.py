@@ -26,6 +26,9 @@ import random
 import time
 from collections import deque
 from functools import partial
+import os
+import dgl
+import glob
 
 import gymnasium as gym
 from psp.env.graphgym.async_vector_env import AsyncGraphVectorEnv
@@ -84,6 +87,7 @@ class PPO:
         self.total_timesteps = training_specification.total_timesteps
         self.validation_freq = training_specification.validation_freq
         self.return_based_scaling = training_specification.return_based_scaling
+        self.obs_on_disk = training_specification.store_rollouts_on_disk
 
         self.discard_incomplete_trials = discard_incomplete_trials
 
@@ -123,8 +127,27 @@ class PPO:
         self.ep_info_buffer = deque(maxlen=100)
         self.global_step += self.num_envs * self.num_steps
 
+        if self.obs_on_disk is not None:
+            for f in glob.glob(
+                self.obs_on_disk + "/wheatley_dgl_" + str(os.getpid()) + "_*.obs"
+            ):
+                os.remove(f)
+
         for step in tqdm.tqdm(range(0, self.num_steps), desc="   collecting rollouts"):
-            obs.append(next_obs)
+            if self.obs_on_disk and agent.graphobs:
+                for i, o in enumerate(next_obs):
+                    fname = (
+                        self.obs_on_disk
+                        + "/wheatley_dgl_"
+                        + str(os.getpid())
+                        + "_"
+                        + str(step * self.num_envs + i)
+                        + ".obs"
+                    )
+                    dgl.save_graphs(fname, [o])
+                    obs.append(fname)
+            else:
+                obs.append(next_obs)
             action_masks[step] = torch.tensor(action_mask)
             dones[step] = next_done
 

@@ -162,6 +162,44 @@ class GState:
 
         self.graph = dgl.heterograph(gd, device=self.device)
 
+        # START workaround unset attributes schemes
+        if self.factored_rp:
+            self.graph.add_edges(
+                0,
+                0,
+                etype="rp",
+                data={"r": torch.zeros(self.env_specification.max_n_resources * 3)},
+            )
+        else:
+            self.graph.add_edges(
+                0,
+                0,
+                etype="rp",
+                data={
+                    "r": torch.zeros(
+                        (1, 4),
+                        dtype=torch.float,
+                    )
+                },
+            )
+        eid = self.graph.edge_ids(0, 0, etype="rp")
+        self.graph.remove_edges(eid, etype="rp")
+
+        if self.observe_conflicts_as_cliques:
+            self.graph.add_edges(
+                0,
+                0,
+                etype="rc",
+                data={
+                    "rid": torch.tensor([0]),
+                    "val": torch.tensor([0.5]),
+                    "valr": torch.tensor([0.3]),
+                },
+            )
+            eid = self.graph.edge_ids(0, 0, etype="rc")
+            self.graph.remove_edges(eid, etype="rc")
+        # END of woraround unset attribute schemes
+
         self.pred_cache = {}
         self.suc_cache = {}
         self.indeg_cache = {}
