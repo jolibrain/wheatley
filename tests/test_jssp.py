@@ -438,6 +438,8 @@ def test_solve_api(instance_file: str, taillard_offset: bool):
         cache_rwpe=False,
         two_hot=None,
         symlog=False,
+        reward_weights=[1],
+        sgformer=False,
     )
 
     agent = Agent(env_specification, agent_specification=agent_specification)

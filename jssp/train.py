@@ -212,6 +212,8 @@ def main(args, exp_name, path) -> float:
         cache_rwpe=args.cache_rwpe,
         two_hot=args.two_hot,
         symlog=args.symlog,
+        reward_weights=args.reward_weights,
+        sgformer=args.sgformer,
     )
     agent_specification.print_self()
     # If we want to use a pretrained Agent, we only have to load it (if it exists)
