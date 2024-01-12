@@ -108,9 +108,13 @@ class PPO:
         obs = []
         actions = torch.empty((self.num_steps, self.num_envs)).to(data_device)
         logprobs = torch.empty((self.num_steps, self.num_envs)).to(data_device)
-        rewards = torch.empty((self.num_steps, self.num_envs)).to(data_device)
+        rewards = torch.empty((self.num_steps, self.num_envs, agent.reward_dim)).to(
+            data_device
+        )
         dones = torch.empty((self.num_steps, self.num_envs)).to(data_device)
-        values = torch.empty((self.num_steps, self.num_envs)).to(data_device)
+        values = torch.empty((self.num_steps, self.num_envs, agent.reward_dim)).to(
+            data_device
+        )
         action_masks = torch.empty(
             (self.num_steps, self.num_envs, env_specification.max_n_nodes)
         ).to(data_device)
@@ -166,7 +170,7 @@ class PPO:
                 )
                 value = agent.get_value_from_logits(value)
 
-            values[step] = value.flatten()
+            values[step] = value.view(-1, agent.reward_dim)
             actions[step] = action
             logprobs[step] = logprob
 
@@ -183,7 +187,9 @@ class PPO:
                 # )
 
             next_obs = agent.obs_as_tensor(next_obs)
-            rewards[step] = torch.tensor(reward).view(-1).to(data_device)
+            rewards[step] = (
+                torch.tensor(reward).view(-1, agent.reward_dim).to(data_device)
+            )
             next_done = torch.Tensor(done).to(data_device)
 
         if self.discard_incomplete_trials:
@@ -194,7 +200,7 @@ class PPO:
         with torch.no_grad():
             next_value = (
                 agent.get_value_from_logits(agent.get_value(next_obs))
-                .reshape(1, -1)
+                .reshape(-1, agent.reward_dim)
                 .to(data_device)
             )
 
@@ -214,12 +220,15 @@ class PPO:
 
                     delta = (
                         rewards[t]
-                        + self.gamma * nextvalues * nextnonterminal
+                        + self.gamma * nextvalues * nextnonterminal.unsqueeze(1)
                         - values[t]
                     )
                     advantages[t] = lastgaelam = (
                         delta
-                        + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
+                        + self.gamma
+                        * self.gae_lambda
+                        * nextnonterminal.unsqueeze(1)
+                        * lastgaelam
                     )
                 returns = advantages + values
                 n_dones = int(torch.sum(dones).item())
@@ -247,10 +256,16 @@ class PPO:
                     nextvalues = values[t + 1]
 
                 delta = (
-                    rewards[t] + self.gamma * nextvalues * nextnonterminal - values[t]
+                    rewards[t]
+                    + self.gamma * nextvalues * nextnonterminal.unsqueeze(1)
+                    - values[t]
                 ) / sigma
                 advantages[t] = lastgaelam = (
-                    delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
+                    delta
+                    + self.gamma
+                    * self.gae_lambda
+                    * nextnonterminal.unsqueeze(1)
+                    * lastgaelam
                 )
             returns = advantages + values
 
@@ -261,9 +276,9 @@ class PPO:
             b_actions = actions.reshape((-1))
         else:
             b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
-        b_advantages = advantages.reshape(-1)
-        b_returns = returns.reshape(-1)
-        b_values = values.reshape(-1)
+        b_advantages = advantages.reshape(-1, agent.reward_dim)
+        b_returns = returns.reshape(-1, agent.reward_dim)
+        b_values = values.reshape(-1, agent.reward_dim)
         b_action_masks = action_masks.reshape(-1, env_specification.max_n_nodes)
 
         to_keep_b = [
@@ -475,7 +490,9 @@ class PPO:
                     if self.target_kl is not None:
                         approx_kl_divs_on_epoch.append(approx_kl.item())
 
-                    mb_advantages = b_advantages[mb_inds].to(train_device)
+                    mb_advantages = agent.aggregate_reward(b_advantages[mb_inds]).to(
+                        train_device
+                    )
                     if self.norm_adv and mb_advantages.shape[0] > 1:
                         mb_advantages = (mb_advantages - mb_advantages.mean()) / (
                             mb_advantages.std() + 1e-8
@@ -500,12 +517,18 @@ class PPO:
                         else:
                             target = b_returns[mb_inds].to(train_device)
                         if self.critic_loss == "l2":
-                            v_loss_unclipped = (newvalue.view(-1) - target) ** 2
+                            v_loss_unclipped = (
+                                newvalue.view(-1, agent.reward_dim) - target
+                            ) ** 2
                         elif self.critic_loss == "l1":
-                            v_loss_unclipped = torch.abs(newvalue.view(-1) - target)
+                            v_loss_unclipped = torch.abs(
+                                newvalue.view(-1, agent.reward_dim) - target
+                            )
                         elif self.critic_loss == "sl1":
                             v_loss_unclipped = torch.nn.functional.smooth_l1_loss(
-                                newvalue.view(-1), target, reduction="none"
+                                newvalue.view(-1, agent.reward_dim),
+                                target,
+                                reduction="none",
                             )
                     else:
                         with torch.no_grad():
