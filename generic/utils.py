@@ -35,7 +35,23 @@ import torch
 
 
 def decode_mask(info_mask):
-    return np.stack(info_mask)
+    """Add padding to the given list of masks.
+
+    The padding is set to False, which means that this extra pad
+    is masked as well.
+    """
+    max_size = max(len(mask_) for mask_ in info_mask)
+    info_mask = [
+        np.concatenate(
+            (
+                mask_,
+                np.zeros(max_size - len(mask_), dtype=bool),
+            )
+        )
+        for mask_ in info_mask
+    ]
+    info_mask = np.stack(info_mask)
+    return info_mask
 
 
 def safe_mean(arr):
