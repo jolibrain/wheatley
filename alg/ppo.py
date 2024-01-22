@@ -298,11 +298,10 @@ class PPO:
         b_values = values.reshape(-1, agent.reward_dim)
         b_action_masks = action_masks.reshape(-1, env_specification.max_n_nodes)
 
-        to_keep_b = [
-            j + i * self.num_steps for i in range(self.num_envs) for j in to_keep[i]
-        ]
-
         if self.discard_incomplete_trials:
+            to_keep_b = [
+                j + i * self.num_steps for i in range(self.num_envs) for j in to_keep[i]
+            ]
             if agent.graphobs or self.obs_on_disk:
                 bobs_tokeep = list(b_obs[i] for i in to_keep_b)
             else:

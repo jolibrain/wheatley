@@ -266,7 +266,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--critic_loss",
         type=str,
-        choices=["l2", "l1", "sl1"],
+        choices=["l2", "l1", "sl1", "l1w", "l1ws"],
         default="l2",
         help="critic loss",
     )
