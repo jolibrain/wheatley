@@ -29,6 +29,7 @@ from functools import partial
 import os
 import dgl
 import glob
+import pickle
 
 import gymnasium as gym
 from psp.env.graphgym.async_vector_env import AsyncGraphVectorEnv
@@ -136,22 +137,38 @@ class PPO:
         if self.obs_on_disk is not None:
             for f in glob.glob(
                 self.obs_on_disk + "/wheatley_dgl_" + str(os.getpid()) + "_*.obs"
+            ) + glob.glob(
+                self.obs_on_disk + "/wheatley_pkl_" + str(os.getpid()) + "_*.obs"
             ):
                 os.remove(f)
 
         for step in tqdm.tqdm(range(0, self.num_steps), desc="   collecting rollouts"):
-            if self.obs_on_disk and agent.graphobs:
-                for i, o in enumerate(next_obs):
-                    fname = (
-                        self.obs_on_disk
-                        + "/wheatley_dgl_"
-                        + str(os.getpid())
-                        + "_"
-                        + str(step * self.num_envs + i)
-                        + ".obs"
-                    )
-                    dgl.save_graphs(fname, [o])
-                    obs.append(fname)
+            if self.obs_on_disk:
+                if agent.graphobs:
+                    for i, o in enumerate(next_obs):
+                        fname = (
+                            self.obs_on_disk
+                            + "/wheatley_dgl_"
+                            + str(os.getpid())
+                            + "_"
+                            + str(step * self.num_envs + i)
+                            + ".obs"
+                        )
+                        dgl.save_graphs(fname, [o])
+                        obs.append(fname)
+                else:
+                    list_obs = [dict(zip(next_obs, t)) for t in zip(*next_obs.values())]
+                    for i, o in enumerate(list_obs):
+                        fname = (
+                            self.obs_on_disk
+                            + "/wheatley_pkl_"
+                            + str(os.getpid())
+                            + "_"
+                            + str(step * self.num_envs + i)
+                            + ".obs"
+                        )
+                        pickle.dump(o, open(fname, "wb"))
+                        obs.append(fname)
             else:
                 obs.append(next_obs)
             action_masks[step] = torch.tensor(action_mask)
@@ -286,7 +303,7 @@ class PPO:
         ]
 
         if self.discard_incomplete_trials:
-            if agent.graphobs:
+            if agent.graphobs or self.obs_on_disk:
                 bobs_tokeep = list(b_obs[i] for i in to_keep_b)
             else:
                 bobs_tokeep = self.keep_only(b_obs, to_keep_b)

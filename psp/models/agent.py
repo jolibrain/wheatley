@@ -24,6 +24,7 @@
 
 import torch
 import dgl
+import pickle
 
 from generic.agent import Agent
 from .gnn_dgl import GnnDGL
@@ -288,6 +289,8 @@ class Agent(Agent):
         return AgentObservation.np_to_torch(obs)
 
     def _rebatch_obs(self, obs):
+        if isinstance(obs[0], str):
+            return obs
         return AgentObservation.rebatch_obs(obs)
 
     def _obs_as_tensor_add_batch_dim_graph(self, obs):
@@ -331,6 +334,9 @@ class Agent(Agent):
         return list(b_obs[i] for i in mb_ind)
 
     def _get_obs(self, b_obs, mb_ind):
+        if isinstance(b_obs, list):
+            list_obs = [pickle.load(open(b_obs[i], "rb")) for i in mb_ind]
+            return self.rebatch_obs(list_obs)
         minibatched_obs = {}
         for key in b_obs:
             minibatched_obs[key] = b_obs[key][mb_ind]
