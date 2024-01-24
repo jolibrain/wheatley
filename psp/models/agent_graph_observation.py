@@ -160,6 +160,11 @@ class AgentGraphObservation:
     #     self.graphs = graphs
     #     self.glist = glist
 
+    def compute_res_nodes_tensor(self, g):
+        res = g.ndata["resources"]
+        print("res.shape", res.shape)
+        exit()
+
     def __init__(
         self,
         graph_observation,
@@ -192,6 +197,8 @@ class AgentGraphObservation:
 
         # orig_feat = gym_observation["features"]
         # .to(torch.device("cpu"))
+        if conflicts in ["sgformer", "effatt"]:
+            res_nodes_tensors = []
 
         if do_batch:
             batch_num_nodes = []
@@ -216,6 +223,8 @@ class AgentGraphObservation:
                     rwpe_k,
                     rwpe_cache,
                 )
+            if conflicts in ["sgformer", "effatt"]:
+                self.compute_res_nodes_tensor(g)
 
             if do_batch:
                 batch_num_nodes.append(g.num_nodes())
