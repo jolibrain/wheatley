@@ -266,9 +266,16 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--critic_loss",
         type=str,
-        choices=["l2", "l1", "sl1"],
+        choices=["l2", "l1", "sl1", "l1w", "l1ws"],
         default="l2",
         help="critic loss",
+    )
+    parser.add_argument(
+        "--reward_weights",
+        type=float,
+        nargs="+",
+        default=[1],
+        help="reward weights (default: [1] : unidimensional reward)",
     )
     parser.add_argument(
         "--dont_normalize_advantage",
@@ -280,7 +287,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--gconv_type",
         type=str,
         default="gatv2",
-        choices=["gin", "gatv2", "pna", "dgn", "gcn2"],
+        choices=["gin", "gatv2", "pna", "dgn", "gcn2", "pdf"],
         help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2",
     )
     parser.add_argument(
@@ -310,6 +317,9 @@ def argument_parser() -> argparse.ArgumentParser:
         default="tanh",
         choices=["relu", "tanh", "elu", "gelu", "selu"],
         help="agent mlp extractor activation type",
+    )
+    parser.add_argument(
+        "--sgformer", default=False, action="store_true", help="add sgformer to network"
     )
     parser.add_argument("--dropout", type=float, default=0.0, help="dropout ratio")
     parser.add_argument(

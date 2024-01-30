@@ -120,9 +120,7 @@ def main(args, exp_name, path) -> float:
         rpo_smoothing_param=args.rpo_smoothing_param,
         gae_lambda=args.gae_lambda,
         return_based_scaling=args.return_based_scaling,
-        store_rollouts_on_disk=(
-            args.store_rollouts_on_disk if args.vecenv_type == "graphgym" else None
-        ),
+        store_rollouts_on_disk=args.store_rollouts_on_disk,
         critic_loss=args.critic_loss,
     )
     training_specification.print_self()
@@ -211,6 +209,8 @@ def main(args, exp_name, path) -> float:
         cache_rwpe=args.cache_rwpe,
         two_hot=args.two_hot,
         symlog=args.symlog,
+        reward_weights=args.reward_weights,
+        sgformer=args.sgformer,
     )
     agent_specification.print_self()
 

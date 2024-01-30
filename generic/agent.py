@@ -100,6 +100,9 @@ class Agent(torch.nn.Module):
 
         self.env_specification = env_specification
         self.agent_specification = agent_specification
+        self.reward_weights = torch.tensor(self.agent_specification.reward_weights)
+        self.reward_dim = len(self.agent_specification.reward_weights)
+        self.max_weight = max(self.agent_specification.reward_weights)
 
         if self.agent_specification.two_hot is not None:
             if self.agent_specification.symlog:
@@ -270,3 +273,16 @@ class Agent(torch.nn.Module):
         if self.agent_specification.symlog:
             return symexp(val)
         return val
+
+    def aggregate_reward(self, reward):
+        if self.reward_dim == 1:
+            return reward.squeeze(1) * self.reward_weights[0]
+        return torch.sum(reward * self.reward_weights.unsqueeze(0), 1) / self.max_weight
+
+    def aggregate_reward_info(self, reward):
+        if self.reward_dim == 1:
+            return reward * self.reward_weights[0].item()
+        r = 0
+        for i in range(self.reward_dim):
+            r += reward[i] * self.reward_weights[i].item()
+        return r

@@ -70,6 +70,8 @@ class AgentSpecification:
         cache_rwpe,
         two_hot,
         symlog,
+        reward_weights,
+        sgformer,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -112,6 +114,8 @@ class AgentSpecification:
         self.cache_rwpe = cache_rwpe
         self.two_hot = two_hot
         self.symlog = symlog
+        self.reward_weights = reward_weights
+        self.sgformer = sgformer
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -197,6 +201,8 @@ class AgentSpecification:
                 f"RWPE cache:                       {self.cache_rwpe}\n"
                 f"two hot encoding:                 {self.two_hot}\n"
                 f"symlog critic:                    {self.symlog}\n"
+                f"reward weights:                   {self.reward_weights}\n"
+                f"SGFormer:                         {self.sgformer}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (
