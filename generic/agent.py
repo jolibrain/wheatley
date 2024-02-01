@@ -172,6 +172,12 @@ class Agent(torch.nn.Module):
         value = self.value_net(features[:, 0, features.shape[2] // 2 :])
         logits = self.action_net(features).squeeze(-1)
         if action_masks is not None:
+            # Features are paded to the maximum number of nodes in the actual observation.
+            # `action_masks` can be paded to the maximum number of nodes in the whole rollout,
+            # which can be superior to the number of node in the given batch.
+            current_max_n_nodes = logits.shape[1]
+            action_masks = action_masks[:, :current_max_n_nodes]
+
             mask = torch.as_tensor(
                 action_masks, dtype=torch.bool, device=features.device
             )
@@ -195,7 +201,11 @@ class Agent(torch.nn.Module):
         features = self.gnn(x)
         value = self.value_net(features[:, 0, features.shape[2] // 2 :])
         action_logits = self.action_net(features).squeeze(-1)
+
         if action_masks is not None:
+            current_max_n_nodes = action_logits.shape[1]
+            action_masks = action_masks[:, :current_max_n_nodes]
+
             mask = torch.as_tensor(
                 action_masks, dtype=torch.bool, device=features.device
             )
@@ -215,6 +225,9 @@ class Agent(torch.nn.Module):
             features = self.gnn(observation)
             logits = self.action_net(features)
             if action_masks is not None:
+                current_max_n_nodes = logits.shape[1]
+                action_masks = action_masks[:, :current_max_n_nodes]
+
                 mask = torch.as_tensor(
                     action_masks, dtype=torch.bool, device=features.device
                 ).reshape(logits.shape)

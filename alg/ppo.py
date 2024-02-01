@@ -116,9 +116,7 @@ class PPO:
         values = torch.empty((self.num_steps, self.num_envs, agent.reward_dim)).to(
             data_device
         )
-        action_masks = torch.empty(
-            (self.num_steps, self.num_envs, env_specification.max_n_nodes)
-        ).to(data_device)
+        action_masks = list()
 
         if self.discard_incomplete_trials:
             to_keep = [[] for i in range(self.num_envs)]
@@ -171,7 +169,7 @@ class PPO:
                         obs.append(fname)
             else:
                 obs.append(next_obs)
-            action_masks[step] = torch.tensor(action_mask)
+            action_masks.append(torch.tensor(action_mask))
             dones[step] = next_done
 
             if self.discard_incomplete_trials:
@@ -286,6 +284,24 @@ class PPO:
                 )
             returns = advantages + values
 
+        # Pad the action masks
+        max_n_nodes = max(mask.shape[1] for mask in action_masks)
+        action_masks = [
+            torch.concat(
+                (
+                    mask,
+                    torch.zeros(
+                        (mask.shape[0], max_n_nodes - mask.shape[1]),
+                        dtype=torch.bool,
+                        device=data_device,
+                    ),
+                ),
+                dim=1
+            )
+            for mask in action_masks
+        ]
+        action_masks = torch.stack(action_masks, dim=0)
+
         # flatten the batch
         b_obs = agent.rebatch_obs(obs)
         b_logprobs = logprobs.reshape(-1)
@@ -296,7 +312,7 @@ class PPO:
         b_advantages = advantages.reshape(-1, agent.reward_dim)
         b_returns = returns.reshape(-1, agent.reward_dim)
         b_values = values.reshape(-1, agent.reward_dim)
-        b_action_masks = action_masks.reshape(-1, env_specification.max_n_nodes)
+        b_action_masks = action_masks.reshape(-1, max_n_nodes)
 
         if self.discard_incomplete_trials:
             to_keep_b = [

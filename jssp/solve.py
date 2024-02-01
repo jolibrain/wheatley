@@ -31,7 +31,8 @@ def solve_instance(
     done = False
     obs, info = env.reset(soft=True)
     while not done:
-        action_masks = decode_mask(info["mask"])
+        action_masks = info["mask"].reshape(1, -1)
+        action_masks = decode_mask(action_masks)
         obs = agent.obs_as_tensor_add_batch_dim(obs)
         action = agent.predict(obs, deterministic=True, action_masks=action_masks)
         obs, reward, done, _, info = env.step(action.long().item())
