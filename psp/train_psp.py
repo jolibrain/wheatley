@@ -226,7 +226,7 @@ def main(args, exp_name, path) -> float:
         and os.path.exists(path + "/optimizer.pkl")
     ):
         print("Resuming a training\n")
-        agent = Agent.load(path)
+        agent = Agent.load(path, graphobs=args.vecenv_type == "graphgym")
         opt_state_dict = torch.load(path + "/optimizer.pkl")
         agent.env_specification = env_specification
         agent.agent_specification = agent_specification
