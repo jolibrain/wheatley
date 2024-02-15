@@ -364,7 +364,7 @@ class GState:
                     self.resources[r].append(
                         self.resourceModel(
                             max_level=1.0,
-                            unit_val=1.0 / self.resource_levels[r],
+                            unit_val=1.0 / self.resource_levels[r].item(),
                             renewable=True,
                         )
                     )
@@ -379,7 +379,7 @@ class GState:
                     self.resources[r].append(
                         self.resourceModel(
                             max_level=1.0,
-                            unit_val=1.0 / self.resource_levels[r],
+                            unit_val=1.0 / self.resource_levels[r].item(),
                             renewable=False,
                         )
                     )
@@ -552,7 +552,7 @@ class GState:
         selectables = torch.where(self.selectables())[0]
         for n in selectables:
             for r, level in enumerate(self.resources_usage(n)):
-                if not self.resources[r][0].still_available(level):
+                if not self.resources[r][0].still_available(level.item()):
                     self.set_unselectable(n)
                     break
 
@@ -750,13 +750,13 @@ class GState:
 
         for r in resources_used:
             rad = self.resource_available_date_flowgraph(
-                r, self.resource_usage(node_id, r)
+                r.item(), self.resource_usage(node_id, r)
             )
             # rad is only the date
             for i in range(4):
                 if rad[i] > max_r_date[i]:
                     max_r_date[i] = float(rad[i])
-                    constraining_resource[i] = r
+                    constraining_resource[i] = r.item()
 
         # do a min per coord
         start = torch.maximum(
@@ -819,19 +819,19 @@ class GState:
                     self.resources[r][i + 1].reset_new_cache()
 
     def resource_available_date(self, rid, level):
-        return [self.resources[rid][i].availability(level) for i in range(4)]
+        return [self.resources[rid][i].availability(level.item()) for i in range(4)]
 
     def resource_available_date_flowgraph(self, rid, level):
-        return [self.resources[rid][i].availability(level) for i in range(4)]
+        return [self.resources[rid][i].availability(level.item()) for i in range(4)]
 
     def consume(self, timeindex, node_id, start, end):
         resources_used = torch.where(self.resources_usage(node_id) != 0)[0]
         for r in resources_used:
             self.resources[r][timeindex].consume(
                 node_id,
-                self.resource_usage(node_id, r),
-                start,
-                end,
+                self.resource_usage(node_id, r).item(),
+                start.item(),
+                end.item(),
                 debug=(timeindex == 0),
             )
 

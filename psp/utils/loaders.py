@@ -490,6 +490,7 @@ class PSPLoader:
         self.cleanup()
 
         return Rcpsp(
+            pb_id=problem_file,
             n_jobs=n_jobs,
             n_modes_per_job=n_modes_per_job,
             successors=successors,

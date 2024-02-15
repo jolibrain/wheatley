@@ -8,6 +8,7 @@ from .graph_utils import all_longest_distances
 class Rcpsp:
     def __init__(
         self,
+        pb_id,
         n_jobs,
         n_modes_per_job,
         successors,
@@ -20,6 +21,7 @@ class Rcpsp:
         use_index_from_zero=False,
         due_dates=None,
     ):
+        self.pb_id = pb_id
         # Number of jobs in the graph
         self.n_jobs = n_jobs
         # Number of modes for each job
