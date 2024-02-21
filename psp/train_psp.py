@@ -22,7 +22,6 @@
 #
 
 import os
-
 import random
 
 import numpy as np
@@ -36,10 +35,11 @@ from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
 from psp.description import Description
 from psp.env.env import Env
-from psp.env.genv import GEnv
 from psp.env.env_specification import EnvSpecification
+from psp.env.genv import GEnv
 from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
+from psp.utils.taillard_rcpsp import TaillardRcpsp
 
 
 def main(args, exp_name, path) -> float:
@@ -54,7 +54,32 @@ def main(args, exp_name, path) -> float:
     # Note that this problem can be stochastic or deterministic
     loader = PSPLoader(generate_bounds=args.generate_duration_bounds)
 
-    if args.load_problem is None:
+    assert (
+        args.random_taillard
+        ^ (args.load_problem is not None)
+        ^ (args.train_dir is not None)
+    ), "Only provide either --random_taillard, --load_problem or --train_dir to specify the training instances."
+
+    if args.random_taillard:
+        psp = TaillardRcpsp(
+            pb_id=0, n_jssp_jobs=args.n_j, n_jssp_machines=args.n_m, seed=args.seed
+        )
+        train_psps = [psp]
+
+        if args.test_dir is not None:
+            test_psps = loader.load_directory(args.test_dir)
+        else:
+            test_psps = [
+                TaillardRcpsp(
+                    pb_id=1 + i,
+                    n_jssp_jobs=args.n_j,
+                    n_jssp_machines=args.n_m,
+                    # To make sure the seeds will never be the same.
+                    seed=args.seed + args.total_timesteps * (i + 1),
+                )
+                for i in range(args.n_validation_env)
+            ]
+    elif args.load_problem is None:
         if args.train_dir is None:
             raise RuntimeError("--train_dir is mandatory")
         else:
@@ -72,6 +97,8 @@ def main(args, exp_name, path) -> float:
         psp = loader.load_single(args.load_problem)
         train_psps = [psp]
         test_psps = [psp]
+    # train_psps = [TaillardRcpsp(id, 6, 6, id) for id in range(10)]
+    # test_psps = [TaillardRcpsp(id + 10, 6, 6, id + 10) for id in range(10)]
 
     # Define problem and visualize it
     problem_description = Description(
@@ -155,6 +182,7 @@ def main(args, exp_name, path) -> float:
         observation_horizon_time=args.observation_horizon_time,
         fast_forward=not args.no_fast_forward,
         observe_subgraph=args.observe_subgraph,
+        random_taillard=args.random_taillard,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:

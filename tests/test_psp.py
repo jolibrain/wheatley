@@ -145,6 +145,7 @@ def instantiate_training_objects(
         observation_horizon_time=args.observation_horizon_time,
         fast_forward=not args.no_fast_forward,
         observe_subgraph=args.observe_subgraph,
+        random_taillard=args.random_taillard,
     )
 
     if args.batch_size == 1 and not args.dont_normalize_advantage:

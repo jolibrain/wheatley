@@ -480,6 +480,11 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="extract subgraph (graphgym only ATM)",
     )
+    parser.add_argument(
+        "--random_taillard",
+        action="store_true",
+        help="generate and use random jssp taillard instances for rcpsp training",
+    )
 
     parser.add_argument(
         "--vnode", default=False, action="store_true", help="add vnode to MP-graph"
