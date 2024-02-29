@@ -438,16 +438,18 @@ class GnnDGL(torch.nn.Module):
                         torch.max(node_features[startelt : startelt + nn], dim=0)[0]
                     )
                     startelt += nn
+                graph_embedding = torch.stack(graph_embedding)
             elif self.graph_pooling == "avg":
                 graph_embedding = []
-                strtelt = 0
+                startelt = 0
                 for i in range(batch_size):
                     nn = n_nodes[i]
-                    gp = torch.ones(nn, device=self.device) / nn
+                    gp = torch.ones(nn, device=node_features.device) / nn
                     graph_embedding.append(
                         torch.matmul(gp, node_features[startelt : startelt + nn])
                     )
                     startelt += nn
+                graph_embedding = torch.stack(graph_embedding)
             elif self.graph_pooling in ["learn", "learninv"]:
                 graph_embedding = features[num_nodes : num_nodes + batch_size, :]
 
@@ -473,7 +475,7 @@ class GnnDGL(torch.nn.Module):
                 max_elts, _ = torch.max(node_features, dim=1)
                 graph_embedding = max_elts
             elif self.graph_pooling == "avg":
-                graph_pooling = torch.ones(n_nodes, device=self.device) / n_nodes
+                graph_pooling = torch.ones(n_nodes, device=node_features.device) / n_nodes
                 graph_embedding = torch.matmul(graph_pooling, node_features)
             elif self.graph_pooling in ["learn", "learninv"]:
                 graph_embedding = features[poolnodes, :]
