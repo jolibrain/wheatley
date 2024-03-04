@@ -23,6 +23,8 @@
 
 
 from generic.mlp import MLP
+from generic.efficient_attention import EfficientAttention
+from generic.sgformer import TransConv
 import torch
 import dgl
 from dgl.nn import EGATConv
@@ -152,6 +154,10 @@ class GnnDGL(torch.nn.Module):
             self.pe_conv = torch.nn.ModuleList()
             self.pe_mlp = torch.nn.ModuleList()
 
+        if self.conflicts in ["sgformer", "effatt"]:
+            self.resource_attention = torch.nn.ModuleList()
+            self.resource_attention_mlp = torch.nn.ModuleList()
+
         for layer in range(self.n_layers_features_extractor):
             if self.normalize:
                 self.norms.append(torch.nn.BatchNorm1d(self.hidden_dim))
@@ -210,6 +216,36 @@ class GnnDGL(torch.nn.Module):
                 )
             if self.update_edge_features_pe and rwpe_k != 0:
                 self.mlps_edges_pe.append(
+                    MLP(
+                        n_layers=n_mlp_layers_features_extractor,
+                        input_dim=self.hidden_dim * n_attention_heads,
+                        hidden_dim=self.hidden_dim * n_attention_heads,
+                        output_dim=self.hidden_dim,
+                        batch_norm=self.normalize,
+                        activation=activation_features_extractor,
+                    )
+                )
+            if self.conflicts == "effatt":
+                self.resource_attention.append(
+                    EfficientAttention(
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        n_attention_heads,
+                        self.hidden_dim,
+                    )
+                )
+
+            if self.conflicts == "sgformer":
+                self.resource_attention.append(
+                    TransConv(
+                        self.hidden_dim,
+                        self.hidden_dim,
+                        n_attention_heads,
+                        self.hidden_dim,
+                    )
+                )
+            if self.conflicts in ["sgformer", "effatt"]:
+                self.resource_attention_mlp.append(
                     MLP(
                         n_layers=n_mlp_layers_features_extractor,
                         input_dim=self.hidden_dim * n_attention_heads,

@@ -418,9 +418,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--conflicts",
         type=str,
-        help="machine conflict encoding in [att|clique|node]",
+        help="machine conflict encoding in [att|clique|node|sgformer|effatt]",
         default="clique",
-        choices=["att", "clique", "node"],
+        choices=["att", "clique", "node", "sgformer", "effatt"],
     )
     parser.add_argument(
         "--no_tct",
