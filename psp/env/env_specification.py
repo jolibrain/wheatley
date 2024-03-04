@@ -48,6 +48,7 @@ class EnvSpecification:
         observation_horizon_time,
         fast_forward,
         observe_subgraph,
+        random_taillard,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -80,6 +81,7 @@ class EnvSpecification:
         self.observation_horizon_time = observation_horizon_time
         self.fast_forward = fast_forward
         self.observe_subgraph = observe_subgraph
+        self.random_taillard = random_taillard
 
         if self.max_edges_factor > 0:
             self.shape_pr = (

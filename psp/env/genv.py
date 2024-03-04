@@ -23,13 +23,16 @@
 
 # import numpy as np
 import random
-import torch
-import dgl
-from .transition_models.transition_model import TransitionModel
-from .reward_models.graph_terminal_reward_model import GraphTerminalRewardModel
-from .observation import EnvObservation
-from .gstate import GState as State
 from concurrent.futures import ThreadPoolExecutor
+
+import dgl
+import torch
+
+from ..utils.taillard_rcpsp import TaillardRcpsp
+from .gstate import GState as State
+from .observation import EnvObservation
+from .reward_models.graph_terminal_reward_model import GraphTerminalRewardModel
+from .transition_models.transition_model import TransitionModel
 
 
 class GEnv:
@@ -88,6 +91,12 @@ class GEnv:
         if self.env_specification.chunk_n_jobs != -1:
             self.n_jobs = self.env_specification.chunk_n_jobs
             self.problem, self.n_modes = self.chunk_problem(self.problem, self.n_jobs)
+        if self.env_specification.random_taillard:
+            # The problem instance can be something else than TaillardRcpsp
+            # in case we are validating on non-random rcpsp instances. This
+            # happens if we use `--random_taillard` and `--test_dir`.
+            if isinstance(self.problem, TaillardRcpsp):
+                self.problem = self.problem.sample()
 
     def close(self):
         pass
