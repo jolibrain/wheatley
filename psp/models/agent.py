@@ -141,12 +141,16 @@ class Agent(Agent):
         self.init_heads()
 
     @classmethod
-    def load(cls, path, graphobs = False):
+    def load(cls, path, graphobs=False):
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
         save_data = torch.load(path + "agent.pkl")
         agent_specification = save_data["agent_specification"]
         env_specification = save_data["env_specification"]
-        agent = cls(env_specification, agent_specification=agent_specification, graphobs=graphobs)
+        agent = cls(
+            env_specification,
+            agent_specification=agent_specification,
+            graphobs=graphobs,
+        )
 
         # constructors init weight!!!
         agent.gnn.load_state_dict(save_data["gnn"])

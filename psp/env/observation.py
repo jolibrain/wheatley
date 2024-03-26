@@ -103,11 +103,11 @@ class EnvObservation:
         return self.resource_conf_edges.shape[1]
 
     def to_gym_observation(self):
-        features = np.empty(
+        features = np.zeros(
             (self.max_n_modes, self.features.shape[1]), dtype=np.float32
         )
         features[: self.features.shape[0], :] = self.features
-        pr_edge_index = np.empty(self.env_specification.shape_pr, dtype=np.int64)
+        pr_edge_index = np.zeros(self.env_specification.shape_pr, dtype=np.int64)
         pr_edge_index[:, : self.get_n_pr_edges()] = self.problem_edge_index
 
         ret = {
@@ -121,8 +121,8 @@ class EnvObservation:
         }
 
         if self.add_rp_edges != "none":
-            rp_edge_index = np.empty(self.env_specification.shape_rp, dtype=np.int64)
-            rp_att = np.empty(self.env_specification.shape_rp_att, dtype=np.float32)
+            rp_edge_index = np.zeros(self.env_specification.shape_rp, dtype=np.int64)
+            rp_att = np.zeros(self.env_specification.shape_rp_att, dtype=np.float32)
             if self.resource_prec_edges is not None:
                 rp_edge_index[:, : self.get_n_rp_edges()] = self.resource_prec_edges
                 rp_att[: self.get_n_rp_edges(), :] = self.resource_prec_att
@@ -131,9 +131,9 @@ class EnvObservation:
             ret["rp_att"] = rp_att
 
         if self.observe_conflicts_as_cliques:
-            rc_edge_index = np.empty(self.env_specification.shape_rc, dtype=np.int64)
+            rc_edge_index = np.zeros(self.env_specification.shape_rc, dtype=np.int64)
             rc_edge_index[:, : self.get_n_rc_edges()] = self.resource_conf_edges
-            rc_att = np.empty(self.env_specification.shape_rc_att, dtype=np.float32)
+            rc_att = np.zeros(self.env_specification.shape_rc_att, dtype=np.float32)
             rc_att[: self.get_n_rc_edges(), :] = self.resource_conf_att
 
             ret["n_rc_edges"] = self.get_n_rc_edges()

@@ -25,7 +25,7 @@
 from generic.mlp import MLP
 import torch
 import dgl
-from dgl.nn import EGATConv
+from dgl.nn import EGATConv, GlobalAttentionPooling
 
 from dgl import LaplacianPE
 from .agent_observation import AgentObservation
@@ -76,7 +76,7 @@ class GnnDGL(torch.nn.Module):
             self.rwpe_h = rwpe_h
         if layer_pooling == "all":
             self.features_dim = (
-                input_dim_features_extractor
+                self.input_dim_features_extractor
                 + (hidden_dim_features_extractor + self.rwpe_h)
                 * (n_layers_features_extractor + 1)
                 + self.rwpe_h
@@ -105,11 +105,28 @@ class GnnDGL(torch.nn.Module):
         if self.rwpe_k != 0:
             self.rwpe_embedder = torch.nn.Linear(self.rwpe_k * 4, self.rwpe_h)
 
-        self.pool_node_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
-        self.vnode_embedder = torch.nn.Embedding(1, input_dim_features_extractor)
-        self.resource_node_embedder = torch.nn.Embedding(
-            max_n_resources, input_dim_features_extractor
+        self.pool_node_embedder = torch.nn.Embedding(
+            1, self.input_dim_features_extractor
         )
+
+        if self.graph_pooling == "gap":
+            self.gate_nn = MLP(
+                n_layers=1,
+                input_dim=self.features_dim // 2,
+                hidden_dim=self.features_dim // 2,
+                output_dim=1,
+                batch_norm=self.normalize,
+                activation=activation_features_extractor,
+            )
+            self.gap = GlobalAttentionPooling(self.gate_nn)
+        if self.vnode:
+            self.vnode_embedder = torch.nn.Embedding(
+                1, self.input_dim_features_extractor
+            )
+        if self.conflicts == "node":
+            self.resource_node_embedder = torch.nn.Embedding(
+                max_n_resources, self.input_dim_features_extractor
+            )
 
         self.edge_embedder = PspEdgeEmbedder(
             edge_embedding_flavor,
@@ -129,7 +146,7 @@ class GnnDGL(torch.nn.Module):
 
         self.features_embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
-            input_dim=input_dim_features_extractor,
+            input_dim=self.input_dim_features_extractor,
             hidden_dim=self.hidden_dim,
             output_dim=self.hidden_dim,
             batch_norm=self.normalize,
@@ -139,7 +156,7 @@ class GnnDGL(torch.nn.Module):
         if self.normalize:
             self.norms = torch.nn.ModuleList()
             self.normsbis = torch.nn.ModuleList()
-            self.norm0 = torch.nn.BatchNorm1d(input_dim_features_extractor)
+            self.norm0 = torch.nn.BatchNorm1d(self.input_dim_features_extractor)
             self.norm1 = torch.nn.BatchNorm1d(self.hidden_dim)
 
         self.mlps = torch.nn.ModuleList()
@@ -166,6 +183,7 @@ class GnnDGL(torch.nn.Module):
                         self.rwpe_h,
                         self.hidden_dim,
                         num_heads=n_attention_heads,
+                        bias=False,
                     )
                 )
                 self.pe_mlp.append(
@@ -187,6 +205,7 @@ class GnnDGL(torch.nn.Module):
                     num_heads=n_attention_heads,
                 )
             )
+
             self.mlps.append(
                 MLP(
                     n_layers=n_mlp_layers_features_extractor,
@@ -260,6 +279,19 @@ class GnnDGL(torch.nn.Module):
             n_nodes = observation.get_n_nodes()
             num_nodes = g.num_nodes()
 
+        # if self.add_self_loops:
+        #     if self.graphobs:
+        #         g = dgl.add_self_loop(
+        #             g,
+        #             etype="self",
+        #         )
+        #     else:
+        #         g = dgl.add_self_loop(
+        #             g,
+        #             edge_feat_names=["type"],
+        #             fill_data=AgentObservation.edgeType["self"],
+        #         )
+
         g, poolnodes, resource_nodes, vnodes = rewire(
             g,
             self.graph_pooling,
@@ -277,19 +309,6 @@ class GnnDGL(torch.nn.Module):
             self.graphobs,
         )
 
-        if self.add_self_loops:
-            if self.graphobs:
-                g = dgl.add_self_loop(
-                    g,
-                    etype="self",
-                )
-            else:
-                g = dgl.add_self_loop(
-                    g,
-                    edge_feat_names=["type"],
-                    fill_data=AgentObservation.edgeType["self"],
-                )
-
         if self.graphobs:
             g, felist = homogeneous_edges(
                 g,
@@ -299,14 +318,8 @@ class GnnDGL(torch.nn.Module):
             )
             g = dgl.to_homogeneous(g, ndata=["feat"], edata=felist, store_type=False)
 
-        g = g.to(next(self.parameters()).device)
-        features = g.ndata["feat"]
-
-        edge_features = self.edge_embedder(g)
         if self.rwpe_k != 0:
             edge_features_pe = self.edge_embedder_pe(g)
-
-        if self.rwpe_k != 0:
             g.ndata["pe"] = self.rwpe_embedder(
                 torch.cat(
                     [
@@ -318,25 +331,27 @@ class GnnDGL(torch.nn.Module):
                     1,
                 ),
             )
+            pe = g.ndata["pe"]
+
+        g = g.to(next(self.parameters()).device)
+        edge_features = self.edge_embedder(g)
+        features = g.ndata["feat"]
 
         if self.graph_pooling == "learn":
             features[poolnodes] = self.pool_node_embedder(
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
             )
 
-        if self.vnode:
-            features[vnodes] = self.vnode_embedder(
-                torch.LongTensor([0] * len(vnodes)).to(features.device)
-            )
+        # if self.vnode:
+        #     features[vnodes] = self.vnode_embedder(
+        #         torch.LongTensor([0] * len(vnodes)).to(features.device)
+        #     )
         if self.conflicts == "node":
             features[resource_nodes] = self.resource_node_embedder(
                 torch.LongTensor(list(range(self.max_n_resources)) * batch_size).to(
                     features.device
                 )
             )
-
-        if self.rwpe_k != 0:
-            pe = g.ndata["pe"]
 
         if self.normalize:
             features = self.norm0(features)
@@ -375,12 +390,13 @@ class GnnDGL(torch.nn.Module):
                 edge_features += self.mlps_edges[layer](
                     new_e_attr.flatten(start_dim=-2, end_dim=-1)
                 )
+                features = self.mlps[layer](features.flatten(start_dim=-2, end_dim=-1))
+
             else:
                 features, _ = self.features_extractors[layer](
                     g, features, edge_features
                 )
-
-            features = self.mlps[layer](features.flatten(start_dim=-2, end_dim=-1))
+                features = self.mlps[layer](features.flatten(start_dim=-2, end_dim=-1))
 
             if self.rwpe_k != 0:
                 if self.update_edge_features_pe:
@@ -475,8 +491,12 @@ class GnnDGL(torch.nn.Module):
                 max_elts, _ = torch.max(node_features, dim=1)
                 graph_embedding = max_elts
             elif self.graph_pooling == "avg":
-                graph_pooling = torch.ones(n_nodes, device=node_features.device) / n_nodes
+                graph_pooling = (
+                    torch.ones(n_nodes, device=node_features.device) / n_nodes
+                )
                 graph_embedding = torch.matmul(graph_pooling, node_features)
+            elif self.graph_pooling == "gap":
+                graph_embedding = self.gap(g, features)
             elif self.graph_pooling in ["learn", "learninv"]:
                 graph_embedding = features[poolnodes, :]
             else:
