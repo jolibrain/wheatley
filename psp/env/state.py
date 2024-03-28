@@ -116,11 +116,11 @@ class State:
         self.real_tct = np.zeros((self.n_nodes), dtype=float)
 
         self.reset_durations()
-        self.update_completion_times(None)
+        self.reset_type()
+        self.reset_tct()
         self.reset_is_affected()
         self.reset_resources()
         self.reset_selectable()
-        self.reset_type()
 
         if self.observe_conflicts_as_cliques:
             (
@@ -185,12 +185,11 @@ class State:
         self.features[:, 0] = 0
 
     def reset(self):
+        self.reset_type()
         self.reset_tct()
-        self.update_completion_times(None)
         self.reset_is_affected()
         self.reset_resources()
         self.reset_selectable()
-        self.reset_type()
         self.edge_index = {}
         self.resource_prec_att = []
         self.resource_prec_edges = []
@@ -328,6 +327,9 @@ class State:
 
     def reset_tct(self):
         self.update_completion_times(None)
+        sinks = np.where(self.types() == 1)[0]
+        sinks_makespans = self.tct(sinks)
+        self.init_makespan = np.max(sinks_makespans)
 
     ############################### ACCESSORS ############################
 
@@ -821,19 +823,20 @@ class State:
 
         else:
             for r in range(self.n_resources):
-                for i in range(3):
-                    self.resource_prec_edges.extend(
-                        self.resources[r][i + 1].new_edges_cache
-                    )
-                    rpa = np.empty(
-                        (len(self.resources[r][i + 1].new_edges_att_cache), 4)
-                    )
-                    rpa[:, 0] = r
-                    rpa[:, 1] = self.resources[r][i + 1].new_edges_att_cache
-                    rpa[:, 2] = constraining_resource[i] == r
-                    rpa[:, 3] = i
-                    self.resource_prec_att.append(rpa)
-                    self.resources[r][i + 1].reset_new_cache()
+                if len(self.resources[r][1].new_edges_cache) != 0:
+                    for i in range(3):
+                        self.resource_prec_edges.extend(
+                            self.resources[r][i + 1].new_edges_cache
+                        )
+                        rpa = np.empty(
+                            (len(self.resources[r][i + 1].new_edges_att_cache), 4)
+                        )
+                        rpa[:, 0] = r
+                        rpa[:, 1] = self.resources[r][i + 1].new_edges_att_cache
+                        rpa[:, 2] = constraining_resource[i] == r
+                        rpa[:, 3] = i
+                        self.resource_prec_att.append(rpa)
+                        self.resources[r][i + 1].reset_new_cache()
 
     def add_resource_precedence(self, prec, succ, on_start, critical, timetype, rid):
         self.resource_prec_edges.append((prec, succ))
@@ -879,7 +882,7 @@ class State:
                 task_comp_time_pred = np.stack(
                     [self.tct(p) for p in self.problem_graph.predecessors(cur_node_id)]
                 )
-                max_tct_predecessors = np.max(task_comp_time_pred, 0)[0]
+                max_tct_predecessors = np.max(task_comp_time_pred, 0)
                 max_tct_predecessors_real = max(
                     [
                         self.tct_real(p)
@@ -892,12 +895,13 @@ class State:
                 cur_node_id
             )
 
-            if (new_completion_time_real != self.tct_real(cur_node_id)) or (
-                np.any(np.not_equal(new_completion_time, self.tct(cur_node_id)))
+            if (
+                (node_id is None)
+                or (new_completion_time_real != self.tct_real(cur_node_id))
+                or (np.any(np.not_equal(new_completion_time, self.tct(cur_node_id))))
             ):
                 self.set_tct(cur_node_id, new_completion_time)
                 self.set_tct_real(cur_node_id, new_completion_time_real)
-
                 for successor in self.problem_graph.successors(cur_node_id):
                     to_open = True
                     for p in self.problem_graph.predecessors(successor):

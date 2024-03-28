@@ -138,6 +138,7 @@ def main(args, exp_name, path) -> float:
         return_based_scaling=args.return_based_scaling,
         store_rollouts_on_disk=args.store_rollouts_on_disk,
         critic_loss=args.critic_loss,
+        debug_net=False,
     )
     training_specification.print_self()
 
@@ -202,8 +203,8 @@ def main(args, exp_name, path) -> float:
         performer_generalized_attention=args.performer_generalized_attention,
         performer_auto_check_redraw=args.performer_auto_check_redraw,
         vnode=args.vnode,
-        update_edge_features=not args.dont_update_edge_features,
-        update_edge_features_pe=not args.dont_update_edge_features_pe,
+        update_edge_features=args.update_edge_features,
+        update_edge_features_pe=args.update_edge_features_pe,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
         mid_in_edges=args.mid_in_edges,

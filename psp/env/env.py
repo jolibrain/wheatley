@@ -26,6 +26,7 @@ from gymnasium.spaces import Discrete, Dict, Box
 import numpy as np
 import random
 
+from ..utils.taillard_rcpsp import TaillardRcpsp
 from .transition_models.transition_model import TransitionModel
 from .reward_models.terminal_reward_model import TerminalRewardModel
 from .observation import EnvObservation
@@ -85,6 +86,10 @@ class Env(gym.Env):
         if self.env_specification.chunk_n_jobs != -1:
             self.n_jobs = self.env_specification.chunk_n_jobs
             self.problem, self.n_modes = self.chunk_problem(self.problem, self.n_jobs)
+
+        if self.env_specification.random_taillard:
+            if isinstance(self.problem, TaillardRcpsp):
+                self.problem = self.problem.sample()
 
     def step(self, action):
         # Getting current observation

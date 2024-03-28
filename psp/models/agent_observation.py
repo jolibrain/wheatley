@@ -376,15 +376,15 @@ class AgentObservation:
             batch_num_nodes = []
             batch_num_edges = []
 
+        # TODO : add exclusion link for mm
         for i, nnodes in enumerate(n_nodes):
             hg_dict = {}
 
-            features = orig_feat[i, :nnodes, :]
             gnew = self.build_graph(
                 n_pr_edges[i],
                 pr_edges[i, :, : n_pr_edges[i].item()],
                 nnodes.item(),
-                orig_feat[i, : nnodes.item(), :],
+                orig_feat[i, :nnodes, :],
                 bidir,
                 factored_rp,
                 add_rp_edges,

@@ -91,7 +91,7 @@ class PPO:
         self.return_based_scaling = training_specification.return_based_scaling
         self.obs_on_disk = training_specification.store_rollouts_on_disk
         self.critic_loss = training_specification.critic_loss
-
+        self.debug_net = training_specification.debug_net
         self.discard_incomplete_trials = discard_incomplete_trials
 
         # in case of resume
@@ -107,13 +107,13 @@ class PPO:
     def collect_rollouts(self, agent, envs, env_specification, data_device, sigma=1.0):
         # ALGO Logic: Storage setup
         obs = []
-        actions = torch.empty((self.num_steps, self.num_envs)).to(data_device)
-        logprobs = torch.empty((self.num_steps, self.num_envs)).to(data_device)
-        rewards = torch.empty((self.num_steps, self.num_envs, agent.reward_dim)).to(
+        actions = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
+        logprobs = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
+        rewards = torch.zeros((self.num_steps, self.num_envs, agent.reward_dim)).to(
             data_device
         )
-        dones = torch.empty((self.num_steps, self.num_envs)).to(data_device)
-        values = torch.empty((self.num_steps, self.num_envs, agent.reward_dim)).to(
+        dones = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
+        values = torch.zeros((self.num_steps, self.num_envs, agent.reward_dim)).to(
             data_device
         )
         action_masks = list()
@@ -296,7 +296,7 @@ class PPO:
                         device=data_device,
                     ),
                 ),
-                dim=1
+                dim=1,
             )
             for mask in action_masks
         ]
@@ -481,6 +481,16 @@ class PPO:
             value_losses = []
             approx_kl_divs = []
             losses = []
+            if self.debug_net:
+                variances = {}
+                grad_var = {}
+                grad_mean = {}
+                for n, p in agent.named_parameters():
+                    if "bias" not in n:
+                        variances[n] = []
+                        if p.requires_grad:
+                            grad_var[n] = []
+                            grad_mean[n] = []
 
             agent.to(train_device)
             for epoch in tqdm.tqdm(
@@ -543,24 +553,21 @@ class PPO:
                         pg_loss = pg_loss1.mean()
 
                     # Value loss
+                    newvalue = newvalue.view(-1)
                     if agent.agent_specification.two_hot is None:
                         if agent.agent_specification.symlog:
                             target = symlog(b_returns[mb_inds]).to(train_device)
                         else:
-                            target = b_returns[mb_inds].to(train_device)
+                            target = b_returns[mb_inds].view(-1).to(train_device)
                         if self.critic_loss == "l2":
-                            v_loss_unclipped = (
-                                newvalue.view(-1, agent.reward_dim) - target
-                            ) ** 2
-                        elif self.critic_loss == "l1":
-                            v_loss_unclipped = torch.abs(
-                                newvalue.view(-1, agent.reward_dim) - target
-                            )
-                        elif self.critic_loss == "sl1":
-                            v_loss_unclipped = torch.nn.functional.smooth_l1_loss(
-                                newvalue.view(-1, agent.reward_dim),
+                            v_loss_unclipped = torch.nn.functional.mse_loss(
+                                newvalue,
                                 target,
-                                reduction="none",
+                            )
+
+                        elif self.critic_loss == "l1":
+                            v_loss_unclipped = torch.nn.functional.l1_loss(
+                                newvalue, target
                             )
                     else:
                         with torch.no_grad():
@@ -597,18 +604,12 @@ class PPO:
                                 reduction="none",
                             )
                         v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                        if self.critic_loss == "l2":
-                            v_loss = 0.5 * v_loss_max.mean()
-                        else:
-                            v_loss = v_loss_max.mean()
+                        v_loss = v_loss_max.mean()
                     else:
                         if agent.agent_specification.two_hot is not None:
                             v_loss = v_loss_unclipped
                         else:
-                            if self.critic_loss == "l2":
-                                v_loss = 0.5 * v_loss_unclipped.mean()
-                            else:
-                                v_loss = v_loss_unclipped.mean()
+                            v_loss = v_loss_unclipped
                     entropy_loss = entropy.mean()
                     loss = (
                         pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef
@@ -620,6 +621,16 @@ class PPO:
                     entropy_losses.append(entropy_loss.item())
 
                     loss.backward()
+                    if self.debug_net:
+                        for n, p in agent.named_parameters():
+                            if "bias" not in n:
+                                variances[n].append(p.var().item())
+                                if p.requires_grad:
+                                    grad_var[n].append(p.grad.var().item())
+                                    grad_mean[n].append(p.grad.abs().mean().item())
+                                else:
+                                    print(n + " does not requires grad")
+
                     iter_it += 1
                     if iter_it == self.iter_size:
                         nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
@@ -635,7 +646,6 @@ class PPO:
                             " / ",
                             self.update_epochs,
                         )
-
                         break
 
             y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
@@ -656,6 +666,8 @@ class PPO:
                     self.logger.record("train/clip_fraction", 0.0)
                 self.logger.record("train/loss", np.mean(losses))
                 self.logger.record("train/explained_variance", explained_var)
+                self.logger.record("train/return_variance", np.var(y_true))
+                self.logger.record("train/value_variance", np.var(y_pred))
                 self.logger.record(
                     "train/n_epochs",
                     self.n_epochs,
@@ -702,6 +714,11 @@ class PPO:
                 )
                 self.logger.record("train/ratio_monotony", monotony(ratio_to_ortools))
                 self.logger.record("train/ratio_stability", stability(ratio_to_ortools))
+                if self.debug_net:
+                    for k in variances.keys():
+                        self.logger.record("net/var_" + k, np.mean(variances[k]))
+                        self.logger.record("net/grad_var_" + k, np.mean(grad_var[k]))
+                        self.logger.record("net/grad_mean_" + k, np.mean(grad_mean[k]))
 
             if (
                 self.validation_freq is not None

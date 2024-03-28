@@ -161,7 +161,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--weight_decay",
         type=float,
-        default=1e-1,
+        default=0.0,
         help="PPO weight decay",
     )
     parser.add_argument(
@@ -193,6 +193,12 @@ def argument_parser() -> argparse.ArgumentParser:
         default=False,
         action="store_true",
         help="Remove existing head (from a pretrain, resume or retrain) and initialize a new head before starting PPO",
+    )
+    parser.add_argument(
+        "--debug_net",
+        default=False,
+        action="store_true",
+        help="collect and display statistics about net",
     )
 
     # =================================================VALIDATION SPECIFICATION=================================================
@@ -266,7 +272,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--critic_loss",
         type=str,
-        choices=["l2", "l1", "sl1", "l1w", "l1ws"],
+        choices=["l2", "l1", "l1w", "l1ws"],
         default="l2",
         help="critic loss",
     )
@@ -294,8 +300,8 @@ def argument_parser() -> argparse.ArgumentParser:
         "--graph_pooling",
         type=str,
         default="learn",
-        choices=["max", "avg", "learn", "learninv"],
-        help="which pooling to use (avg , max or learn)",
+        choices=["max", "avg", "learn", "learninv", "gap"],
+        help="which pooling to use (avg , max or learn or gap)",
     )
     parser.add_argument(
         "--layer_pooling",
@@ -491,16 +497,16 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--dont_update_edge_features",
+        "--update_edge_features",
         default=False,
         action="store_true",
-        help="do not update edge features",
+        help="update edge features",
     )
     parser.add_argument(
-        "--dont_update_edge_features_pe",
+        "--update_edge_features_pe",
         default=False,
         action="store_true",
-        help="do not update edge features of pe part",
+        help="update edge features of pe part",
     )
     parser.add_argument(
         "--ortho_embed",

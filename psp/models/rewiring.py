@@ -35,9 +35,10 @@ def learned_graph_pool(
     graphobs=False,
 ):
     poolnodes = list(range(node_offset, node_offset + batch_size))
+    data = torch.zeros((batch_size, input_dim_features_extractor))
     g.add_nodes(
         batch_size,
-        data={"feat": torch.zeros((batch_size, input_dim_features_extractor))},
+        data={"feat": data},
     )
     ei0 = []
     ei1 = []
@@ -88,16 +89,18 @@ def node_conflicts(
     for i, nn in enumerate(origbnn):
         batch_id.extend([i] * nn)
     batch_id = torch.IntTensor(batch_id)
+    data = torch.zeros(
+        (
+            batch_size * max_n_resources,
+            input_dim_features_extractor,
+        )
+    )
+    data[:, :] = torch.LongTensor(list(range(max_n_resources)) * batch_size).unsqueeze(
+        1
+    )
     g.add_nodes(
         num_resources * batch_size,
-        data={
-            "feat": torch.zeros(
-                (
-                    batch_size * max_n_resources,
-                    input_dim_features_extractor,
-                )
-            )
-        },
+        data={"feat": data},
     )
     idxaffected = torch.where(resources_used != 0)
     consumers = idxaffected[0]
@@ -188,9 +191,11 @@ def vnode(
     graphobs,
 ):
     vnodes = list(range(node_offset, node_offset + batch_size))
+    data = torch.zeros((batch_size, input_dim_features_extractor))
+    data[:, :4] = 3
     g.add_nodes(
         batch_size,
-        data={"feat": torch.zeros((batch_size, input_dim_features_extractor))},
+        data={"feat": data},
     )
     ei0 = []
     ei1 = []

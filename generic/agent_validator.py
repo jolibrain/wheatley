@@ -105,6 +105,7 @@ class AgentValidator:
 
         self.max_time_ortools = training_specification.max_time_ortools
         self.scaling_constant_ortools = training_specification.scaling_constant_ortools
+        self.debug_net = training_specification.debug_net
 
         # Comparative agents
         self.random_agent = RandomAgent()
@@ -164,6 +165,8 @@ class AgentValidator:
         self.approx_kls = []
         self.clip_fractions = []
         self.explained_variances = []
+        self.return_variances = []
+        self.value_variances = []
         self.clip_ranges = []
         self.ep_len_means = []
         self.ep_rew_means = []
@@ -183,6 +186,7 @@ class AgentValidator:
         self.best_makespan_wheatley = [float("inf")] * self.n_validation_env
         self.best_makespan_ortools = [float("inf")] * self.n_validation_env
         self.ortools_env_zero_is_optimal = False
+        self.variances = {}
 
         self.batch_size = training_specification.validation_batch_size
 
@@ -726,6 +730,9 @@ class AgentValidator:
         self.explained_variances.append(
             alg.logger.name_to_value["train/explained_variance"]
         )
+        self.return_variances.append(alg.logger.name_to_value["train/return_variance"])
+        self.value_variances.append(alg.logger.name_to_value["train/value_variance"])
+
         self.clip_ranges.append(alg.logger.name_to_value["train/clip_range"])
         # Recreate last features by hand, since they are erased
         self.ep_rew_means.append(
@@ -746,6 +753,12 @@ class AgentValidator:
         self.total_timestepss.append(alg.global_step)
         self.stabilities.append(alg.logger.name_to_value["train/ratio_stability"])
         self.monotonies.append(alg.logger.name_to_value["train/ratio_monotony"])
+        if self.debug_net:
+            for k in alg.logger.name_to_value.keys():
+                if "net/var_" in k:
+                    if k not in self.variances:
+                        self.variances[k] = []
+                    self.variances[k].append(alg.logger.name_to_value[k])
 
         X = list(range(1, len(self.losses) + 1))
         Y_list = [
@@ -778,6 +791,21 @@ class AgentValidator:
         }
         for title, data in charts.items():
             self.vis.line(X=X, Y=data, win=title, opts={"title": title})
+
+        # variances
+        if self.debug_net:
+            X = list(range(1, len(next(iter(self.variances.values()))) + 1))
+            Y_list = list(self.variances.values())
+            opts = {"legend": list(self.variances.keys()), "title": "net variances"}
+            self.vis.line(X=X, Y=np.array(Y_list).T, win="variances", opts=opts)
+
+        X = list(range(1, len(self.return_variances) + 1))
+        Y_list = [self.return_variances, self.value_variances]
+        opts = {
+            "legend": ["return_variances", "value_variances"],
+            "title": "critic variances",
+        }
+        self.vis.line(X=X, Y=np.array(Y_list).T, win="critic_variances", opts=opts)
 
         if self.gantt_rl_img is not None:
             self.vis.image(

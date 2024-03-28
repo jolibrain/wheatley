@@ -60,7 +60,7 @@ class PspEdgeEmbedder(torch.nn.Module):
         # for rc edges : type,  rid, rval
         # for rp edges : type, rid , level, criticial, timetype
 
-        self.n_edge_type = 11 + self.max_n_resources * 3
+        self.n_edge_type = 11 + max_n_resources * 3
 
         if self.edge_embedding_flavor == "sum":
             self.resource_id_embedder = torch.nn.Embedding(
@@ -86,7 +86,7 @@ class PspEdgeEmbedder(torch.nn.Module):
             self.resource_id_embedder = torch.nn.Embedding(
                 self.max_n_resources + 1, self.max_n_resources + 1
             )
-            rest = self.hidden_dim - 12 - self.max_n_resources - 1
+            rest = self.hidden_dim - self.n_edge_type - self.max_n_resources - 1
             if rest < 4:
                 raise ValueError(
                     f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
