@@ -116,6 +116,7 @@ def instantiate_training_objects(
             args.store_rollouts_on_disk if args.vecenv_type == "graphgym" else None
         ),
         critic_loss=args.critic_loss,
+        debug_net=False,
     )
 
     if args.conflicts == "clique" and args.precompute_cliques:
@@ -185,8 +186,8 @@ def instantiate_training_objects(
         performer_generalized_attention=args.performer_generalized_attention,
         performer_auto_check_redraw=args.performer_auto_check_redraw,
         vnode=args.vnode,
-        update_edge_features=not args.dont_update_edge_features,
-        update_edge_features_pe=not args.dont_update_edge_features_pe,
+        update_edge_features=args.update_edge_features,
+        update_edge_features_pe=args.update_edge_features_pe,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
         mid_in_edges=args.mid_in_edges,
@@ -290,7 +291,7 @@ possible_args = {
     "observation_horizon_time": [0, 5],
     "symlog": [True, False],
     "store_rollouts_on_disk": [False, "/tmp/"],
-    "critic_loss": ["l2", "l1", "sl1"],
+    "critic_loss": ["l2", "l1"],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
@@ -331,6 +332,7 @@ def test_args(args: list):
     args.
     """
     original_argv = sys.argv
+    print("ARGS", args)
 
     try:
         # Simulate the arguments passed as input for the argument parser to work seemlessly.
