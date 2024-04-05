@@ -50,8 +50,7 @@ class PspEdgeEmbedder(torch.nn.Module):
         # graph_pooling 6
         # reverse graph pooling 7
         # to/from vnode 8 , 9
-        # resource node self-loop : 10 .. 10 + rnres
-        # resrouce node edges 10+nres .. 10+2*nres
+        # resrouce node edges 10, 11
         # we also have attributes
         # for resource conflicts : rid, rval (normalized)
         # for resource prioiries : rid, level, critical, timetype
@@ -60,7 +59,7 @@ class PspEdgeEmbedder(torch.nn.Module):
         # for rc edges : type,  rid, rval
         # for rp edges : type, rid , level, criticial, timetype
 
-        self.n_edge_type = 11 + max_n_resources * 3
+        self.n_edge_type = 12
 
         if self.edge_embedding_flavor == "sum":
             self.resource_id_embedder = torch.nn.Embedding(
