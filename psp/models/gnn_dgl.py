@@ -336,16 +336,20 @@ class GnnDGL(torch.nn.Module):
         g = g.to(next(self.parameters()).device)
         edge_features = self.edge_embedder(g)
         features = g.ndata["feat"]
+        # remove job_id and node_type
+        features[:, 2:4] = 0
+        # remove resource cons
+        features[:, 10:] = 0
 
         if self.graph_pooling == "learn":
             features[poolnodes] = self.pool_node_embedder(
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
             )
 
-        # if self.vnode:
-        #     features[vnodes] = self.vnode_embedder(
-        #         torch.LongTensor([0] * len(vnodes)).to(features.device)
-        #     )
+        if self.vnode:
+            features[vnodes] = self.vnode_embedder(
+                torch.LongTensor([0] * len(vnodes)).to(features.device)
+            )
         if self.conflicts == "node":
             features[resource_nodes] = self.resource_node_embedder(
                 # one embedding per resnode : not better, nres dependent : DISCARD
@@ -469,7 +473,7 @@ class GnnDGL(torch.nn.Module):
                     startelt += nn
                 graph_embedding = torch.stack(graph_embedding)
             elif self.graph_pooling in ["learn", "learninv"]:
-                graph_embedding = features[num_nodes : num_nodes + batch_size, :]
+                graph_embedding = features[poolnodes, :]
 
             nnf = []
             startelt = 0

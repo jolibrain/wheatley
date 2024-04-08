@@ -186,11 +186,12 @@ def node_conflicts(
         )
 
     # find unused resources
-    unused_resources = torch.tensor(resource_nodes)[
-        torch.where(g.in_degrees(v=resource_nodes) == 0)[0]
-    ]
     # ad local self loops
     if graphobs:
+        unused_resources = torch.tensor(resource_nodes)[
+            torch.where(g.in_degrees(v=resource_nodes, etype="nodeconf") == 0)[0]
+        ]
+
         g.add_edges(
             unused_resources,
             unused_resources,
@@ -204,6 +205,9 @@ def node_conflicts(
             },
         )
     else:
+        unused_resources = torch.tensor(resource_nodes)[
+            torch.where(g.in_degrees(v=resource_nodes) == 0)[0]
+        ]
         g.add_edges(
             unused_resources,
             unused_resources,
@@ -381,7 +385,13 @@ def homogeneous_edges(g, edgetypes, factored_rp, max_n_resources):
             g.edges["rp"].data["rid"] = (g.edges["rp"].data["r"][:, 0] + 1).int()
             g.edges["rrp"].data["rid"] = (g.edges["rrp"].data["r"][:, 0] + 1).int()
             g.edges["rp"].data["att_rp"] = g.edges["rp"].data["r"][:, 1:]
+            g.edges["rp"].data["att_rp"][:, -1] = (
+                g.edges["rp"].data["att_rp"][:, -1] + 1
+            )
             g.edges["rrp"].data["att_rp"] = g.edges["rrp"].data["r"][:, 1:]
+            g.edges["rrp"].data["att_rp"][:, -1] = (
+                g.edges["rrp"].data["att_rp"][:, -1] + 1
+            )
 
     if g.num_edges(etype="rc") != 0:
         g.edges["rc"].data["rid"] = (g.edges["rc"].data["rid"] + 1).int()

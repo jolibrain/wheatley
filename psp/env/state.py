@@ -47,6 +47,8 @@ class State:
 
         self.normalize = normalize_features
 
+        self.ff = env_specification.fast_forward
+
         self.add_rp_edges = env_specification.add_rp_edges
         self.factored_rp = env_specification.factored_rp
 
@@ -138,6 +140,7 @@ class State:
 
         # self.resources_edges.append((prec, succ))
         # self.resources_edges_att.append((on_start, critical))
+        self.fast_forward()
 
     ########################### RESET/ INIT STUFF #############################
 
@@ -207,6 +210,22 @@ class State:
             self.resource_conf_id = None
             self.resource_conf_val = None
             self.resource_conf_val_r = None
+
+        self.fast_forward()
+
+    def fast_forward(self):
+        if not self.ff:
+            return
+        while True:
+            unmasked_action = self.unmasked_actions()
+            if unmasked_action.shape[0] == 1:
+                self.affect_job(unmasked_action[0])
+                continue
+            trivial_actions = self.trivial_actions()
+            if trivial_actions.shape[0] > 0:
+                self.affect_job(trivial_actions[0])
+                continue
+            break
 
     def reset_frontier(self):
         self.nodes_in_frontier = set()

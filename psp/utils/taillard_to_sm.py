@@ -4,7 +4,9 @@ from pathlib import Path
 import numpy as np
 
 
-def convert_to_sm(durations: np.ndarray, affectations: np.ndarray) -> str:
+def convert_to_sm(
+    durations: np.ndarray, affectations: np.ndarray, source=False, sink=False
+) -> str:
     """Convert a JSSP instance to a SM RCPSP file.
 
     The JSSP machines are represented as differents renewable resources with a capacity of 1.
@@ -26,7 +28,13 @@ def convert_to_sm(durations: np.ndarray, affectations: np.ndarray) -> str:
         The content of the SM file as a string.
     """
     n_jobs, n_machines = durations.shape
-    n_tasks = n_jobs * n_machines + 2  # Include source and sink.
+    # SOURCE SINK BELOW
+    # n_tasks = n_jobs * n_machines + 2  # Include source and sink.
+    n_tasks = n_jobs * n_machines  # Include source and sink.
+    if source:
+        n_tasks += 1
+    if sink:
+        n_tasks += 1
 
     assert np.all(affectations != -1), "This script does not support fictive tasks."
 
@@ -53,7 +61,7 @@ def convert_to_sm(durations: np.ndarray, affectations: np.ndarray) -> str:
     filecontent += stars
     filecontent += "PROJECT INFORMATION:\n"
     filecontent += "pronr.  #jobs rel.date duedate tardcost  MPM-Time\n"
-    filecontent += f"    1     {n_tasks - 2}      0       ?       ?       ?\n"
+    filecontent += f"    1     {n_tasks}      0       ?       ?       ?\n"
 
     ### PRECEDENCES ###
     filecontent += stars
@@ -61,20 +69,38 @@ def convert_to_sm(durations: np.ndarray, affectations: np.ndarray) -> str:
     filecontent += "jobnr.    #modes  #successors   successors\n"
     mode = 1
 
+    # SOURCE SINK BELOW
     # Source.
-    source_id, sink_id = 1, n_tasks
-    starting_tasks = "  ".join(f"{i * n_machines + 2}" for i in range(n_jobs))
-    filecontent += f"{source_id}      {mode}      {n_jobs}      {starting_tasks}\n"
+    if source:
+        source_id = 1
+    if sink:
+        sink_id = n_tasks
+    # source_id, sink_id = 1, n_tasks
+    if source:
+        starting_tasks = "  ".join(f"{i * n_machines + 2}" for i in range(n_jobs))
+        filecontent += f"{source_id}      {mode}      {n_jobs}      {starting_tasks}\n"
 
     # Tasks.
     for job_id, machine_id in product(range(n_jobs), range(n_machines)):
         # Tasks id starts at 1, and the first task is taken by the source node.
-        task_id = job_id * n_machines + machine_id + 2
-        successor = sink_id if machine_id == (n_machines - 1) else task_id + 1
-        filecontent += f"{task_id}      {mode}      {1}      {successor}\n"
+        # SOURCE SINK BELOW
+        if source:
+            task_id = job_id * n_machines + machine_id + 2
+        else:
+            task_id = job_id * n_machines + machine_id + 1
+        # SOURCE SINK BELOW
+        if sink:
+            successor = sink_id if machine_id == (n_machines - 1) else task_id + 1
+        else:
+            successor = None if machine_id == (n_machines - 1) else task_id + 1
+        if successor is None:
+            filecontent += f"{task_id}      {mode}      {0}  \n"
+        else:
+            filecontent += f"{task_id}      {mode}      {1}      {successor}\n"
 
     # Sink.
-    filecontent += f"{sink_id}      {mode}      {0}      \n"
+    if sink:
+        filecontent += f"{sink_id}      {mode}      {0}      \n"
 
     ### DURATIONS ###
     filecontent += stars
@@ -86,17 +112,23 @@ def convert_to_sm(durations: np.ndarray, affectations: np.ndarray) -> str:
     )
     filecontent += stars.replace("*", "-")
 
+    # SOURC ESINK BELOW
     # Source.
-    filecontent += (
-        f"{source_id}      {mode}      {0}      "
-        + "   ".join("0" for _ in range(n_machines))
-        + "\n"
-    )
+    if source:
+        filecontent += (
+            f"{source_id}      {mode}      {0}      "
+            + "   ".join("0" for _ in range(n_machines))
+            + "\n"
+        )
 
     # Tasks.
     for job_id, machine_id in product(range(n_jobs), range(n_machines)):
         # Tasks id starts at 1, and the first task is taken by the source node.
-        task_id = job_id * n_machines + machine_id + 2
+        # SOURC ESINK BELOW
+        if source:
+            task_id = job_id * n_machines + machine_id + 2
+        else:
+            task_id = job_id * n_machines + machine_id + 1
         duration = durations[job_id, machine_id]
         resource_id = affectations[job_id, machine_id]
         filecontent += (
@@ -105,12 +137,14 @@ def convert_to_sm(durations: np.ndarray, affectations: np.ndarray) -> str:
             + "\n"
         )
 
+    # SOURC ESINK BELOW
     # Sink.
-    filecontent += (
-        f"{sink_id}      {mode}      {0}      "
-        + "   ".join("0" for _ in range(n_machines))
-        + "\n"
-    )
+    if sink:
+        filecontent += (
+            f"{sink_id}      {mode}      {0}      "
+            + "   ".join("0" for _ in range(n_machines))
+            + "\n"
+        )
 
     ### RESOURCE AVAILABILITIES ###
     filecontent += stars
@@ -148,7 +182,7 @@ def convert_all_taillards(taillard_dir: Path, psp_dir: Path):
             durations = state.original_durations[:, :, 0]
             affectations = state.affectations
 
-            filecontent = convert_to_sm(durations, affectations)
+            filecontent = convert_to_sm(durations, affectations, source=True, sink=True)
 
             filepath = psp_dir / instances_dir.name / instance_path.name
             filepath = filepath.with_suffix(".sm")

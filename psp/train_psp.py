@@ -62,7 +62,7 @@ def main(args, exp_name, path) -> float:
 
     if args.random_taillard:
         psp = TaillardRcpsp(
-            pb_id=0, n_jssp_jobs=args.n_j, n_jssp_machines=args.n_m, seed=args.seed
+            pb_id=0, n_jssp_jobs=args.n_j, n_jssp_machines=args.n_m, seed=None
         )
         train_psps = [psp]
 
