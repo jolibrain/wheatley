@@ -21,11 +21,13 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 import torch
+from .agent_observation import AgentObservation
 
 
 def learned_graph_pool(
     g,
     node_offset,
+    resource_nodes,
     batch_size,
     origbnn,
     input_dim_features_extractor,
@@ -47,6 +49,12 @@ def learned_graph_pool(
         ei0 += [node_offset + i] * origbnn[i]
         ei1 += list(range(startnode, startnode + origbnn[i]))
         startnode += origbnn[i]
+
+    if resource_nodes is not None:
+        num_res = len(resource_nodes) // batch_size
+        for i in range(batch_size):
+            ei1 += resource_nodes[i * num_res : (i + 1) * num_res]
+            ei0 += [node_offset + i] * num_res
 
     # g.add_edges(
     #     list(range(node_offset, node_offset + batch_size)),
@@ -125,11 +133,11 @@ def node_conflicts(
             resource_index,
             etype="nodeconf",
             data={
-                # "type": torch.LongTensor([10] * nconsumers),
-                "type": torch.LongTensor(
-                    [edge_type_offset + num_resources] * nconsumers
-                )
-                + idxaffected[1].long(),
+                "type": torch.LongTensor([edge_type_offset] * nconsumers),
+                # "type": torch.LongTensor(
+                #     [edge_type_offset + num_resources] * nconsumers
+                # )
+                # + idxaffected[1].long(),
                 "rid": idxaffected[1].int(),
                 "att_rc": rc,
             },
@@ -139,11 +147,12 @@ def node_conflicts(
             consumers,
             etype="rnodeconf",
             data={
-                # "type": torch.LongTensor([11] * nconsumers),
-                "type": torch.LongTensor(
-                    [edge_type_offset + 2 * num_resources] * nconsumers
-                )
-                + idxaffected[1].long(),
+                "type": torch.LongTensor([edge_type_offset + 1] * nconsumers),
+                # edge type per resource : not better, nres dependent : DISCARD
+                # "type": torch.LongTensor(
+                #     [edge_type_offset + 2 * num_resources] * nconsumers
+                # )
+                # + idxaffected[1].long(),
                 "rid": idxaffected[1].int(),
                 "att_rc": rc,
             },
@@ -154,11 +163,10 @@ def node_conflicts(
             consumers,
             resource_index,
             data={
-                # "type": torch.LongTensor([10] * nconsumers),
-                "type": torch.LongTensor(
-                    [edge_type_offset + num_resources] * nconsumers
-                )
-                + idxaffected[1].long(),
+                "type": torch.LongTensor([edge_type_offset] * nconsumers),
+                # edge type per resource : not better, nres dependent : DISCARD
+                # "type": torch.LongTensor([edge_type_offset] * nconsumers)
+                # + idxaffected[1].long(),
                 "rid": idxaffected[1].int(),
                 "att_rc": rc,
             },
@@ -167,16 +175,46 @@ def node_conflicts(
             resource_index,
             consumers,
             data={
-                # "type": torch.LongTensor([11] * nconsumers),
-                "type": torch.LongTensor(
-                    [edge_type_offset + 2 * num_resources] * nconsumers
-                )
-                + idxaffected[1].long(),
+                "type": torch.LongTensor([edge_type_offset + 1] * nconsumers),
+                # "type": torch.LongTensor(
+                #     [edge_type_offset + num_resources] * nconsumers
+                # )
+                # + idxaffected[1].long(),
                 "rid": idxaffected[1].int(),
                 "att_rc": rc,
             },
         )
-    node_offset += num_resources * batch_size
+
+    # find unused resources
+    unused_resources = torch.tensor(resource_nodes)[
+        torch.where(g.in_degrees(v=resource_nodes) == 0)[0]
+    ]
+    # ad local self loops
+    if graphobs:
+        g.add_edges(
+            unused_resources,
+            unused_resources,
+            etype="self",
+            data={
+                "type": torch.LongTensor(
+                    [AgentObservation.edgeType["self"]] * unused_resources.shape[0]
+                ),
+                "rid": torch.zeros_like(unused_resources, dtype=torch.int),
+                "att_rc": torch.zeros(unused_resources.shape[0], 2),
+            },
+        )
+    else:
+        g.add_edges(
+            unused_resources,
+            unused_resources,
+            data={
+                "type": torch.LongTensor(
+                    [AgentObservation.edgeType["self"]] * unused_resources.shape[0]
+                ),
+                "rid": torch.zeros_like(unused_resources, dtype=torch.int),
+                "att_rc": torch.zeros(unused_resources.shape[0], 2),
+            },
+        )
     return g, resource_nodes, node_offset + num_resources * batch_size
 
 
@@ -240,22 +278,6 @@ def rewire(
     node_offset = g.num_nodes()
     origbnn = g.batch_num_nodes()
 
-    if learned_graph_pooling in ["learn", "learninv"]:
-        inverse_pooling = learned_graph_pooling == "learninv"
-        g, poolnodes, node_offset = learned_graph_pool(
-            g,
-            node_offset,
-            batch_size,
-            origbnn,
-            input_dim_features_extractor,
-            poolnodeetype,
-            poolnoderevetype,
-            inverse_pooling=inverse_pooling,
-            graphobs=graphobs,
-        )
-    else:
-        poolnodes = None
-
     if node_conflicting:
         g, resource_nodes, node_offset = node_conflicts(
             g,
@@ -270,6 +292,23 @@ def rewire(
         )
     else:
         resource_nodes = None
+
+    if learned_graph_pooling in ["learn", "learninv"]:
+        inverse_pooling = learned_graph_pooling == "learninv"
+        g, poolnodes, node_offset = learned_graph_pool(
+            g,
+            node_offset,
+            resource_nodes,
+            batch_size,
+            origbnn,
+            input_dim_features_extractor,
+            poolnodeetype,
+            poolnoderevetype,
+            inverse_pooling=inverse_pooling,
+            graphobs=graphobs,
+        )
+    else:
+        poolnodes = None
 
     if vnoding:
         g, vnodes, node_offset = vnode(

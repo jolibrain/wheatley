@@ -348,7 +348,9 @@ class GnnDGL(torch.nn.Module):
         #     )
         if self.conflicts == "node":
             features[resource_nodes] = self.resource_node_embedder(
-                torch.LongTensor(list(range(self.max_n_resources)) * batch_size).to(
+                # one embedding per resnode : not better, nres dependent : DISCARD
+                # torch.LongTensor(list(range(self.max_n_resources)) * batch_size).to(
+                torch.LongTensor([0] * batch_size * self.max_n_resources).to(
                     features.device
                 )
             )

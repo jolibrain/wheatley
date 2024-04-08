@@ -449,17 +449,17 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--use_old_resource_info",
+        "--remove_old_resource_info",
         default=False,
         action="store_true",
-        help="take into account already affected task resource info",
+        help="do not take into account already affected task resource info",
     )
 
     parser.add_argument(
-        "--keep_past_prec",
+        "--remove_past_prec",
         default=False,
         action="store_true",
-        help="keep past precedencies",
+        help="remove past precedencies",
     )
     parser.add_argument(
         "--observation_horizon_step",
@@ -474,10 +474,10 @@ def argument_parser() -> argparse.ArgumentParser:
         help="observation horizon (time)",
     )
     parser.add_argument(
-        "--no_fast_forward",
+        "--fast_forward",
         default=False,
         action="store_true",
-        help="do not make env auto forward trivial actions",
+        help="make env auto forward trivial actions",
     )
 
     parser.add_argument(
