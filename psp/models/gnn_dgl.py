@@ -245,7 +245,7 @@ class GnnDGL(torch.nn.Module):
 
     def forward(self, obs):
         if self.graphobs:
-            g = AgentGraphObservation(
+            observation = AgentGraphObservation(
                 obs,
                 conflicts=self.conflicts,
                 factored_rp=self.factored_rp,
@@ -254,13 +254,16 @@ class GnnDGL(torch.nn.Module):
                 rwpe_k=self.rwpe_k,
                 rwpe_cache=self.rwpe_cache,
                 rewire_internal=False,
-            ).graphs
-            batch_size = g.batch_size
+            )
+            g = observation.graphs
+            res_cal_id = torch.cat(observation.res_cal_id)
+            batch_size = observation.n_graphs
             num_nodes = g.num_nodes()
             if batch_size == 1:
-                n_nodes = g.batch_num_nodes()[0].item()
+                n_nodes = g.batch_num_nodes("n")[0].item()
             else:
-                n_nodes = g.batch_num_nodes()
+                n_nodes = g.batch_num_nodes("n")
+
         else:
             observation = AgentObservation(
                 obs,
@@ -275,6 +278,7 @@ class GnnDGL(torch.nn.Module):
             batch_size = observation.get_batch_size()
 
             g = observation.to_graph()
+            res_cal_id = observation.res_cal_id.flatten()
 
             n_nodes = observation.get_n_nodes()
             num_nodes = g.num_nodes()
@@ -354,9 +358,12 @@ class GnnDGL(torch.nn.Module):
             features[resource_nodes] = self.resource_node_embedder(
                 # one embedding per resnode : not better, nres dependent : DISCARD
                 # torch.LongTensor(list(range(self.max_n_resources)) * batch_size).to(
-                torch.LongTensor([0] * batch_size * self.max_n_resources).to(
-                    features.device
-                )
+                # same embedding
+                # torch.LongTensor([0] * batch_size * self.max_n_resources).to(
+                #     features.device
+                # )
+                # embedding depending on calendar type
+                res_cal_id.to(features.device)
             )
 
         if self.normalize:

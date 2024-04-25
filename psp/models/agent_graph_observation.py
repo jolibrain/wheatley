@@ -59,18 +59,21 @@ class AgentGraphObservation:
         rwpe_k=0,
         rwpe_cache=None,
     ):
-        g.ndata["feat"] = torch.cat(
-            [
-                g.ndata["affected"].unsqueeze(1),
-                g.ndata["selectable"].unsqueeze(1),
-                g.ndata["job"].unsqueeze(1),
-                g.ndata["type"].unsqueeze(1),
-                g.ndata["normalized_durations"],
-                g.ndata["normalized_tct"],
-                g.ndata["resources"],
-            ],
-            dim=1,
-        )
+        g.ndata["feat"] = {
+            "n": torch.cat(
+                [
+                    g.ndata["affected"]["n"].unsqueeze(1),
+                    g.ndata["selectable"]["n"].unsqueeze(1),
+                    g.ndata["job"]["n"].unsqueeze(1),
+                    g.ndata["type"]["n"].unsqueeze(1),
+                    g.ndata["normalized_durations"]["n"],
+                    g.ndata["normalized_tct"]["n"],
+                    g.ndata["resources"]["n"],
+                ],
+                dim=1,
+            )
+        }
+
         if conflicts == "clique":
             if g.num_edges(etype="rc") == 0:
                 (
@@ -78,7 +81,7 @@ class AgentGraphObservation:
                     resource_conf_id,
                     resource_conf_val,
                     resource_conf_val_r,
-                ) = compute_resources_graph_torch(g.ndata["resources"])
+                ) = compute_resources_graph_torch(g.ndata["resources"]["n"])
                 g.add_edges(
                     resource_conf_edges[0],
                     resource_conf_edges[1],
@@ -204,6 +207,9 @@ class AgentGraphObservation:
             }
 
         self.graphs = []
+        self.res_cal_id = []
+
+        self.n_graphs = len(graph_observation)
 
         for g in graph_observation:
             if rewire_internal:
@@ -216,6 +222,8 @@ class AgentGraphObservation:
                     rwpe_k,
                     rwpe_cache,
                 )
+            self.res_cal_id.append(g.ndata["res_cal"]["global_data"][0])
+            g = dgl.node_type_subgraph(g, ["n"])
 
             if do_batch:
                 batch_num_nodes.append(g.num_nodes())
@@ -224,7 +232,6 @@ class AgentGraphObservation:
                 batch_num_edges["rp"].append(g.num_edges(etype="rp"))
                 batch_num_edges["rrp"].append(g.num_edges(etype="rrp"))
                 batch_num_edges["rc"].append(g.num_edges(etype="rc"))
-
             self.graphs.append(g)
 
         if do_batch:

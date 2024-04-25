@@ -326,7 +326,7 @@ class AgentObservation:
         self.rwpe_cache = rwpe_cache
         # batching on CPU for performance reasons...
         n_nodes = gym_observation["n_nodes"].long().to(torch.device("cpu"))
-
+        self.res_cal_id = gym_observation["res_cal_id"]
         n_pr_edges = gym_observation["n_pr_edges"].long().to(torch.device("cpu"))
         pr_edges = gym_observation["pr_edges"].long().to(torch.device("cpu"))
 

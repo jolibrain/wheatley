@@ -35,6 +35,7 @@ class EnvObservation:
         n_jobs,
         n_modes,
         n_resources,
+        res_cal_id,
         max_n_jobs,
         max_n_modes,
         max_n_resources,
@@ -60,6 +61,7 @@ class EnvObservation:
         self.max_n_jobs = max_n_jobs
         self.max_n_modes = max_n_modes
         self.max_n_resources = max_n_resources
+        self.res_cal_id = res_cal_id
         # if max_edges_factor > 0:
         #     self.max_n_pb_edges = self.max_n_modes * max_edges_factor
         #     self.max_n_rc_edges = (
@@ -119,6 +121,10 @@ class EnvObservation:
             "features": features,
             "pr_edges": pr_edge_index,
         }
+
+        rci = np.zeros(self.max_n_resources, dtype=np.int64)
+        rci[: len(self.res_cal_id)] = np.array(self.res_cal_id)
+        ret["res_cal_id"] = rci
 
         if self.add_rp_edges != "none":
             rp_edge_index = np.zeros(self.env_specification.shape_rp, dtype=np.int64)

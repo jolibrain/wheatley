@@ -14,6 +14,7 @@ from matplotlib.pyplot import cm
 import io
 import cv2
 import torch
+import bisect
 
 
 class State:
@@ -97,10 +98,10 @@ class State:
                         for dest_mode in self.job_modes[succ_job - 1]:
                             self.problem_edges.append((orig_mode, dest_mode))
         else:
-            for n, j in enumerate(problem.successors):
+            for n, j in enumerate(problem.successors_id):
                 for succ_job in j:
                     for orig_mode in self.job_modes[n]:
-                        for dest_mode in self.job_modes[succ_job - 1]:
+                        for dest_mode in self.job_modes[succ_job]:
                             self.problem_edges.append((orig_mode, dest_mode))
 
         self.problem_graph = nx.DiGraph()
@@ -272,6 +273,7 @@ class State:
                             renewable=False,
                         )
                     )
+
         else:
             self.n_resources = self.problem.n_resources
             flat_res = np.array(
@@ -310,6 +312,14 @@ class State:
                             renewable=False,
                         )
                     )
+
+            self.res_cal = []
+            if self.problem.res_cal is not None:
+                for r in range(
+                    self.problem.n_renewable_resources
+                    + self.problem.n_nonrenewable_resources
+                ):
+                    self.res_cal.append(self.problem.cals[self.problem.res_cal[r]])
 
         assert len(self.resources) == self.n_resources
         self.reset_frontier()
@@ -810,8 +820,13 @@ class State:
             max_r_date,
             np.concatenate([last_parent_finish_date_real, last_parent_finish_date]),
         )
-        self.set_tct(node_id, start[1:] + self.durations(node_id))
-        self.set_tct_real(node_id, start[0] + self.duration_real(node_id))
+        end_date_with_cal, end_date_real_with_cal = self.compute_ends_with_cal(
+            node_id, resources_used, start
+        )
+        self.set_tct(node_id, end_date_with_cal)
+        self.set_tct_real(node_id, end_date_real_with_cal)
+        # self.set_tct(node_id, start[1:] + self.durations(node_id))
+        # self.set_tct_real(node_id, start[0] + self.duration_real(node_id))
 
         self.consume(0, node_id, start[0], self.tct_real(node_id))
         for i in range(3):
@@ -820,6 +835,54 @@ class State:
         if self.resource_model == "flowGraph" and self.add_rp_edges != "none":
             # extract graph info
             self.update_resource_prec(constraining_resource)
+
+    def compute_ends_with_cal(self, node_id, resources_used, start):
+        durations = self.durations(node_id)
+        duration_real = self.duration_real(node_id)
+        starts = start[1:]
+        start_real = start[0]
+        end_dates = durations + starts
+        end_date_real = duration_real + start_real
+        if len(self.res_cal) == 0:
+            return end_dates, end_date_real
+        for r in resources_used:
+            p = bisect.bisect(self.res_cal[r], start_real, key=lambda x: x[0]) - 1
+            if p == -1:  # date is before first interval
+                p = 0
+            remaining_duration = duration_real
+            opening_duration = self.res_cal[r][p][1] - max(
+                self.res_cal[r][p][0], start_real
+            )
+            while remaining_duration > opening_duration:
+                remaining_duration -= opening_duration
+                p += 1
+                opening_duration = self.res_cal[r][p][1] - self.res_cal[r][p][0]
+            local_end_date_real = (
+                max(start_real, self.res_cal[r][p][0]) + remaining_duration
+            )
+            if local_end_date_real > end_date_real:
+                end_date_real = local_end_date_real
+
+            # TODO : check that end time is at end of window and not at start of next one
+            for i in range(3):
+                p = bisect.bisect(self.res_cal[r], starts[i], key=lambda x: x[0]) - 1
+                if p == -1:
+                    p = 0
+                remaining_duration = durations[i]
+                opening_duration = self.res_cal[r][p][1] - max(
+                    self.res_cal[r][p][0], starts[i]
+                )
+                while remaining_duration > opening_duration:
+                    remaining_duration -= opening_duration
+                    p += 1
+                    opening_duration = self.res_cal[r][p][1] - self.res_cal[r][p][0]
+                local_end_date = (
+                    max(starts[i], self.res_cal[r][p][0]) + remaining_duration
+                )
+                if local_end_date > end_dates[i]:
+                    end_dates[i] = local_end_date
+
+        return end_dates, end_date_real
 
     def update_resource_prec(self, constraining_resource):
         if self.factored_rp:
