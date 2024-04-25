@@ -10,6 +10,7 @@ class Rcpsp:
         self,
         pb_id,
         n_jobs,
+        job_ids,
         n_modes_per_job,
         successors,
         durations,
@@ -24,6 +25,8 @@ class Rcpsp:
         self.pb_id = pb_id
         # Number of jobs in the graph
         self.n_jobs = n_jobs
+        # job id (generally an int, but not necessarily)
+        self.job_ids = job_ids
         # Number of modes for each job
         self.n_modes_per_job = n_modes_per_job
         # Total number of modes in the RCPSP
@@ -179,16 +182,18 @@ class Rcpsp:
         return dist_sink
 
     def job_to_id(self, j):
-        if self.use_index_from_zero:
-            return j
-        else:
-            return j - 1
+        return self.job_ids.index(j)
+        # if self.use_index_from_zero:
+        #     return j
+        # else:
+        #     return j - 1
 
     def id_to_job(self, j):
-        if self.use_index_from_zero:
-            return j
-        else:
-            return j + 1
+        return self.job_ids[j]
+        # if self.use_index_from_zero:
+        #     return j
+        # else:
+        #     return j + 1
 
     def mode_to_id(self, m):
         if self.use_index_from_zero:

@@ -122,9 +122,12 @@ class TaillardRcpsp(Rcpsp):
         n_nonrenewable_resources = 0
         n_doubly_constrained_resources = 0
 
+        job_ids = list(range(1, n_jobs + 1))
+
         super().__init__(
             pb_id,
             n_jobs,
+            job_ids,
             n_modes_per_job,
             successors,
             durations,

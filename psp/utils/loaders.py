@@ -390,6 +390,7 @@ class PSPLoader:
         n_modes_per_job = []
         # Successors for each job. Successors are given by a list
         successors = []
+        job_ids = []
         # Capacity of each resource
         resource_availabilities = []
         # Number of renewable resources
@@ -440,9 +441,10 @@ class PSPLoader:
         self.firstword("PRECEDENCE")
         self.firstword("jobnr.")
         for j in range(n_jobs):
+            job_ids.append(self.sline[0])
             n_modes += int(self.sline[1])
             n_modes_per_job.append(int(self.sline[1]))
-            successors.append([int(s) for s in self.sline[3:]])
+            successors.append([s for s in self.sline[3:]])
             self.nextline()
         self.firstchar("*")
         self.firstword("REQUESTS/DURATIONS:")
@@ -492,6 +494,7 @@ class PSPLoader:
         return Rcpsp(
             pb_id=problem_file,
             n_jobs=n_jobs,
+            job_ids=job_ids,
             n_modes_per_job=n_modes_per_job,
             successors=successors,
             durations=durations,

@@ -97,10 +97,10 @@ class State:
                         for dest_mode in self.job_modes[succ_job - 1]:
                             self.problem_edges.append((orig_mode, dest_mode))
         else:
-            for n, j in enumerate(problem.successors):
+            for n, j in enumerate(problem.successors_id):
                 for succ_job in j:
                     for orig_mode in self.job_modes[n]:
-                        for dest_mode in self.job_modes[succ_job - 1]:
+                        for dest_mode in self.job_modes[succ_job]:
                             self.problem_edges.append((orig_mode, dest_mode))
 
         self.problem_graph = nx.DiGraph()

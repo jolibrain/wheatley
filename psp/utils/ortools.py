@@ -211,7 +211,9 @@ def AnalyseDependencyGraph(problem):
                         before[a].add(b)
     else:
         for n in range(num_nodes):
-            for s in problem.successors[n]:
+            for s in problem.successors_id[n]:
+                # ortools uses legacy job ids that start at 1
+                s += 1
                 ins[s].append(n + 1)
                 outs[n + 1].append(s)
 
@@ -300,6 +302,7 @@ def SolveRcpsp(
       (lower_bound of the objective, best solution found, asssignment)
     """
     # Create the model.
+
     model = cp_model.CpModel()
 
     if isinstance(problem, dict):
@@ -457,7 +460,9 @@ def SolveRcpsp(
     else:
         for t in all_active_tasks:
             # for n in problem.tasks[t].successors:
-            for n in problem.successors[t - 1]:
+            for n in problem.successors_id[t - 1]:
+                # ortools uses legacy job ids that start at 1
+                n += 1
                 if n == sink:
                     model.Add(task_ends[t] <= makespan)
                 elif n in active_tasks:
