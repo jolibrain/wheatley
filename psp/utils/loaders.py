@@ -41,23 +41,29 @@ class PSPLoader:
         self.fw = None
 
     def nextline(self):
-        while True:
-            self.line = self.f.readline()
-            temp = re.split("\s|,|\(|\)|\n", self.line)
-            self.sline = []
-            for t in temp:
-                if t != "":
-                    self.sline.append(t)
-            if len(self.sline) != 0:
-                break
-        self.fc = self.line[0]
-        self.fw = self.sline[0]
+        # while True:
+        self.line = self.f.readline()
+        temp = re.split("\s|,|\(|\)|\n", self.line)
+        self.sline = []
+        for t in temp:
+            if t != "":
+                self.sline.append(t)
+            # if len(self.sline) != 0:
+            #     break
+        if len(self.sline) != 0:
+            self.fc = self.line[0]
+            self.fw = self.sline[0]
 
     def firstchar(self, c, stop=False):
         if self.fc != c:
             raise RuntimeError("bad first char " + c + " found: '" + self.fc + "'")
         if not stop:
             self.nextline()
+
+    def check_firstword(self, w):
+        ok = self.fw == w
+        self.nextline()
+        return ok
 
     def firstword(self, w, stop=False):
         if self.fw != w:
@@ -390,7 +396,7 @@ class PSPLoader:
         n_modes_per_job = []
         # Successors for each job. Successors are given by a list
         successors = []
-        job_ids = []
+        job_labels = []
         # Capacity of each resource
         resource_availabilities = []
         # Number of renewable resources
@@ -441,7 +447,7 @@ class PSPLoader:
         self.firstword("PRECEDENCE")
         self.firstword("jobnr.")
         for j in range(n_jobs):
-            job_ids.append(self.sline[0])
+            job_labels.append(self.sline[0])
             n_modes += int(self.sline[1])
             n_modes_per_job.append(int(self.sline[1]))
             successors.append([s for s in self.sline[3:]])
@@ -488,13 +494,48 @@ class PSPLoader:
         self.firstword("RESOURCEAVAILABILITIES:")
         self.nextline()
         resource_availabilities = [int(rl) for rl in self.sline]
+        self.nextline()
+        self.firstchar("*")
+
+        has_cal = self.check_firstword("RESOURCE")
+        if not has_cal:
+            res_cal = None
+            cals = None
+        else:
+            res_cal = []
+            cal_type = set()
+            cals = {}
+            self.nextline()
+            for i in range(
+                n_renewable_resources
+                + n_nonrenewable_resources
+                + n_doubly_constrained_resources
+            ):
+                res_cal.append(self.sline[i])
+                cal_type.add(self.sline[i])
+            self.nextline()
+            for i in range(len(cal_type)):
+                self.firstchar("*")
+                self.firstword("CALENDARS:")
+                cal_id = self.sline[2]
+                self.nextline()
+                n_periods = int(self.sline[2])
+                self.nextline()
+                self.firstchar("*")
+                intervals = []
+                for j in range(n_periods):
+                    i0 = int(self.sline[0])
+                    i1 = int(self.sline[1])
+                    intervals.append((i0, i1))
+                    self.nextline()
+                cals[cal_id] = intervals
 
         self.cleanup()
 
         return Rcpsp(
             pb_id=problem_file,
             n_jobs=n_jobs,
-            job_ids=job_ids,
+            job_labels=job_labels,
             n_modes_per_job=n_modes_per_job,
             successors=successors,
             durations=durations,
@@ -503,4 +544,6 @@ class PSPLoader:
             n_renewable_resources=n_renewable_resources,
             n_nonrenewable_resources=n_nonrenewable_resources,
             n_doubly_constrained_resources=n_doubly_constrained_resources,
+            res_cal=res_cal,
+            cals=cals,
         )

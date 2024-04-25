@@ -10,7 +10,7 @@ class Rcpsp:
         self,
         pb_id,
         n_jobs,
-        job_ids,
+        job_labels,
         n_modes_per_job,
         successors,
         durations,
@@ -21,12 +21,14 @@ class Rcpsp:
         n_doubly_constrained_resources=0,
         use_index_from_zero=False,
         due_dates=None,
+        res_cal=None,
+        cals=None,
     ):
         self.pb_id = pb_id
         # Number of jobs in the graph
         self.n_jobs = n_jobs
         # job id (generally an int, but not necessarily)
-        self.job_ids = job_ids
+        self.job_labels = job_labels
         # Number of modes for each job
         self.n_modes_per_job = n_modes_per_job
         # Total number of modes in the RCPSP
@@ -51,6 +53,16 @@ class Rcpsp:
         self.durations = durations
         # Consumption for each job and for each mode of jobs
         self.resource_cons = resource_cons
+
+        # resources calendars :
+        # if of calendar for each ressource
+        self.res_cal = res_cal
+        # calendar intervals (opening)
+        self.cals = cals
+
+        # due dates, for forthcoming tardiness
+        self.due_dates = due_dates
+
         # Maximum capacity of each resource
         self.max_resource_availability = max(resource_availabilities)
 
@@ -61,7 +73,6 @@ class Rcpsp:
         self.max_resource_consumption = 0
 
         self.use_index_from_zero = use_index_from_zero
-        self.due_dates = due_dates
 
         for j in range(n_jobs):
             for k in range(n_modes_per_job[j]):
@@ -182,14 +193,14 @@ class Rcpsp:
         return dist_sink
 
     def job_to_id(self, j):
-        return self.job_ids.index(j)
+        return self.job_labels.index(j)
         # if self.use_index_from_zero:
         #     return j
         # else:
         #     return j - 1
 
     def id_to_job(self, j):
-        return self.job_ids[j]
+        return self.job_labels[j]
         # if self.use_index_from_zero:
         #     return j
         # else:
