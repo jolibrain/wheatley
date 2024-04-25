@@ -40,6 +40,10 @@ class TerminalRewardModel:
             sinks_makespans = state.tct(sinks)
             max_makespan = np.max(sinks_makespans)
             return -max_makespan / len(state.job_modes)
+            # BELOW JSSP reward
+            # return -max_makespan / state.max_duration / 2
         if state.finished():
             return -state.undoable_makespan / len(state.job_modes)
+            # BELOW JSSP reward
+            # return -state.undoable_makespan / state.max_duration / 2
         return 0

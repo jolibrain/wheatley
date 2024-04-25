@@ -64,6 +64,7 @@ def node_from_job_mode(problem, jobid, modeid):
 
 
 def compute_ortools_makespan_on_real_duration(solution, state):
+    state.ff = False  # disable source fast forward
     state.reset()  # reset do not redraw real durations
 
     aff = solution.job_schedule

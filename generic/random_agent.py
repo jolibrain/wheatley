@@ -25,6 +25,7 @@
 #
 
 import numpy as np
+import torch
 
 
 class RandomAgent:
@@ -41,6 +42,9 @@ class RandomAgent:
         return solution
 
     def select_action(self, env, action_masks):
-        possible_actions = np.nonzero(action_masks)[0]
+        if isinstance(action_masks, torch.Tensor):
+            possible_actions = torch.nonzero(action_masks, as_tuple=True)[0].numpy()
+        else:
+            possible_actions = np.nonzero(action_masks)[0]
         action = np.random.choice(possible_actions)
         return action
