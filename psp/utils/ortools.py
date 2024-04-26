@@ -81,6 +81,7 @@ def compute_ortools_makespan_on_real_duration(solution, state):
         nid = node_from_job_mode(state.problem, index, modeid)
         state.affect_job(node_from_job_mode(state.problem, index, modeid))
 
+    # with ortools, sink as last node is mandatory
     return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
 
 

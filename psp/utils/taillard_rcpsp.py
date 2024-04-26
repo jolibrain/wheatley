@@ -20,13 +20,23 @@ class TaillardRcpsp(Rcpsp):
         seed: Optional[int] = None,
         source=True,
         sink=True,
+        generate_bounds=None,
+        duration_mode_bounds=None,
+        duration_delta=None,
+        stochastic=False,
     ):
         self.n_jssp_jobs = n_jssp_jobs
         self.n_jssp_machines = n_jssp_machines
         self.seed = seed
 
+        self.generate_bounds = generate_bounds
+        self.duration_mode_bounds = duration_mode_bounds
+        self.duration_delta = duration_delta
+
+        self.stochastic = stochastic
+
         self.durations, self.affectations = generate_taillard(
-            n_jssp_jobs, n_jssp_machines, seed
+            n_jssp_jobs, n_jssp_machines, self.duration_mode_bounds, seed
         )
 
         # In RCPSP, the number of jobs is the total number of tasks in JSSP.
@@ -83,12 +93,37 @@ class TaillardRcpsp(Rcpsp):
             durations = durations + [0]
         # durations = [0] + durations + [0]
         # Add the mode dimension.
-        durations = [[d] for d in durations]
         # Add the dmin and dmax duration bounds.
         # durations = [[d, d, d] for d in durations]
-        durations = [durations, durations, durations]
+        if self.generate_bounds is None:
+            if self.duration_delta is not None and self.stochastic:
+                rng = np.random.default_rng(seed)
 
-        # Resources constraints.
+                deltamin = rng.integers(
+                    1, self.duration_delta[0], size=(len(durations) - 2)
+                )
+                dmin = np.array(durations)[1:-1] - deltamin
+                dmin = np.where(dmin < 1, 1, dmin).tolist()
+                dmin = [0] + dmin + [0]
+                deltamax = rng.integers(
+                    1, self.duration_delta[1], size=(len(durations) - 2)
+                )
+                dmax = (np.array(durations)[1:-1] + deltamax).tolist()
+                dmax = [0] + dmax + [0]
+                durations = [
+                    [[d] for d in durations],
+                    [[d] for d in dmin],
+                    [[d] for d in dmax],
+                ]
+            else:
+                durations = [[d] for d in durations]
+                durations = [durations, durations, durations]
+        else:
+            dmin = [[d * (1.0 - self.generate_bounds[0])] for d in durations]
+            dmax = [[d * (1.0 + self.generate_bounds[1])] for d in durations]
+            durations = [[[d] for d in durations], dmin, dmax]
+
+        # resources constraints.
         affectations = self.affectations.reshape(-1)
         rr = n_jobs
         if source:
@@ -145,4 +180,8 @@ class TaillardRcpsp(Rcpsp):
             self.seed,
             source=True,
             sink=True,
+            generate_bounds=self.generate_bounds,
+            duration_mode_bounds=self.duration_mode_bounds,
+            duration_delta=self.duration_delta,
+            stochastic=self.stochastic,
         )

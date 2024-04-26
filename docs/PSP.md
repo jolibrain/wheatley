@@ -54,10 +54,60 @@ python3 -m psp.train_psp \
 This will launch a training for the 'famous' 272 problem.
 You can choose the instance to train on by using `--load-problem` argument.
 
-### Inference
 
-Once the model is trained, you can use it to solve new problems using:
+## Reproducing JSSP paper results with PSP code:
 
-```sh
-TODO
+### Deterministic results
+```
+python3  -m psp.train_psp \
+        --batch_size 256 \
+        --conflicts node \
+        --device cuda:0 \
+        --exp_name_appendix rcpsp_jssppaper_det \
+        --fixed_validation \
+        --gae_lambda 1.0 \
+        --graph_pooling learn \
+        --hidden_dim_features_extractor 64 \
+        --n_epochs 3 \
+        --n_layers_features_extractor 8 \
+        --n_steps_episode 9500 \
+        --n_workers 10 \
+        --path /tmp/saved_networks/ \
+        --test_dir ./instances/psp/taillards/6x6/ \
+        --total_timesteps 100000000 \
+        --n_j 6 \
+        --n_m 6 \
+        --random_taillard \
+        --duration_mode_bounds 1 100 \
+        --residual_gnn \ 
+        --vecenv_type graphgym 
+```
+
+### Stochastic results
+```
+python3 -m psp.train_psp \
+        --batch_size 256 \
+        --conflicts clique \
+        --device cuda:0\
+        --exp_name_appendix rcpsp_jssppaper_stoch \
+        --fixed_validation \
+        --gae_lambda 1.0 \
+        --graph_pooling learn \
+        --hidden_dim_features_extractor 64 \
+        --n_epochs 3 \
+        --n_layers_features_extractor 8 \
+        --n_steps_episode 9500 \
+        --n_workers 10 \
+        --path /tmp/saved_networks/ \
+        --total_timesteps 100000000 \
+        --n_j 6 \
+        --n_m 6 \
+        --random_taillard \
+        --duration_mode_bounds 10 50 \
+        --residual_gnn \
+        --duration_type stochastic \
+        --duration_delta 10 200 \
+        --vecenv_type graphgym \
+        --n_validation_env 100 \
+        --ortools_strategy realistic optimistic pessimistic averagistic
 ```

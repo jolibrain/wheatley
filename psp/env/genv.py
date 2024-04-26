@@ -95,7 +95,8 @@ class GEnv:
             # The problem instance can be something else than TaillardRcpsp
             # in case we are validating on non-random rcpsp instances. This
             # happens if we use `--random_taillard` and `--test_dir`.
-            if isinstance(self.problem, TaillardRcpsp):
+            # in case of validation problems are already sampled
+            if isinstance(self.problem, TaillardRcpsp) and not self.validate:
                 self.problem = self.problem.sample()
 
     def close(self):
