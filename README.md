@@ -1,6 +1,8 @@
 # Wheatley
 
-A Job-Shop Scheduling problem (JSSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems, and more.
+A Job-Shop Scheduling problem (JSSP) and Ressource-Constrained Planning Scheduling Problem (RCPSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems, and more.
+
+This repo contains the official implementation of [Learning to Solve Job Shop Scheduling under Uncertainty](https://arxiv.org/abs/2404.01308)
 
 ## Features
 
@@ -54,3 +56,14 @@ pre-commit install
 - Wheatley uses advanced GNN, such as gatv2  (with edge info) thanks to DGL.
 - Wheatley embeds more information into every node of the schedule graph (like propagated time bounds), yielding more informed policies
 - Wheatley has support for bounded uncertain durations, including at node and reward levels.
+
+## Citing Wheatley (JSSP)
+```
+@inproceedings{wheatley-jssp,
+  title={Learning to Solve Job Shop Scheduling under Uncertainty},
+  author={Guillaume Infantes and St/'ephanie Roussel and Pierre Pereira and Antoine Jacquet and Emmanuel Benazera},
+  booktitle={21th International Conference on Integration of Constraint Programming, Artificial Intelligence, and Operations Research (CPAIOR)},
+  year={2024},
+}
+
+```
