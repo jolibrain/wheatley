@@ -149,16 +149,15 @@ class State:
             return durs[:, 0]
         else:
             d = np.zeros((durs.shape[0]))
-            null_durations = np.where(durs[1:-1, 1] == durs[1:-1, 2])
-            fixed_durs = durs[1:-1, 2].copy()
-            fixed_durs[null_durations] = 1e-6
+            zero_length = np.where(durs[:, 1] == durs[:, 2])
+            nonzero_length = np.where(durs[:, 1] != durs[:, 2])
 
-            r = np.random.triangular(durs[1:-1, 1], durs[1:-1, 0], fixed_durs)
-
-            # reinstating null durations
-            durs[1:-1, 2][null_durations] = 0
-            # r = np.random.triangular(durs[1:-1, 1], durs[1:-1, 0], durs[1:-1, 2])
-            d[1:-1] = r
+            d[nonzero_length] = np.random.triangular(
+                durs[nonzero_length, 1],
+                durs[nonzero_length, 0],
+                durs[nonzero_length, 2],
+            )
+            d[zero_length] = durs[zero_length, 2]
             return d
 
     def reset_durations(self, redraw_real=True):

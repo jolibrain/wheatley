@@ -116,9 +116,18 @@ class GState:
         if self.deterministic:
             return durs[:, 0]
         else:
-            d = np.zeros((durs.shape[0]))
-            r = np.random.triangular(durs[1:-1, 1], durs[1:-1, 0], durs[1:-1, 2])
-            d[1:-1] = r
+            d = torch.empty(durs.shape[0])
+            zero_length = torch.where(durs[:, 1] == durs[:, 2])[0]
+            nonzero_length = torch.where(durs[:, 1] != durs[:, 2])[0]
+            d[nonzero_length] = torch.tensor(
+                np.random.triangular(
+                    durs[nonzero_length, 1],
+                    durs[nonzero_length, 0],
+                    durs[nonzero_length, 2],
+                ),
+                dtype=torch.float,
+            )
+            d[zero_length] = durs[zero_length, 0]
             return d
 
     def reset_fresh_nodes(self):

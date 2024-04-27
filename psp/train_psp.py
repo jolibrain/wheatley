@@ -62,7 +62,14 @@ def main(args, exp_name, path) -> float:
 
     if args.random_taillard:
         psp = TaillardRcpsp(
-            pb_id=0, n_jssp_jobs=args.n_j, n_jssp_machines=args.n_m, seed=None
+            pb_id=0,
+            n_jssp_jobs=args.n_j,
+            n_jssp_machines=args.n_m,
+            seed=None,
+            generate_bounds=args.generate_duration_bounds,
+            duration_mode_bounds=args.duration_mode_bounds,
+            duration_delta=args.duration_delta,
+            stochastic=args.duration_type == "stochastic",
         )
         train_psps = [psp]
 
@@ -76,6 +83,9 @@ def main(args, exp_name, path) -> float:
                     n_jssp_machines=args.n_m,
                     # To make sure the seeds will never be the same.
                     seed=args.seed + args.total_timesteps * (i + 1),
+                    generate_bounds=args.generate_duration_bounds,
+                    duration_mode_bounds=args.duration_mode_bounds,
+                    duration_delta=args.duration_delta,
                 )
                 for i in range(args.n_validation_env)
             ]

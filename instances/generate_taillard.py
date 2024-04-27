@@ -3,7 +3,9 @@ from typing import Optional
 import numpy as np
 
 
-def generate_taillard(n: int, m: int, seed: Optional[int] = None) -> np.ndarray:
+def generate_taillard(
+    n: int, m: int, duration_bounds=None, seed: Optional[int] = None
+) -> np.ndarray:
     """
     Generate a Taillard instance of size n and m
     :param n: Number of jobs.
@@ -16,7 +18,12 @@ def generate_taillard(n: int, m: int, seed: Optional[int] = None) -> np.ndarray:
     rng = np.random.default_rng(seed)
 
     # Generate the processing times
-    processing_times = rng.integers(1, 100, size=(n, m))
+    if duration_bounds is not None:
+        processing_times = rng.integers(
+            duration_bounds[0], duration_bounds[1], size=(n, m)
+        )
+    else:
+        processing_times = rng.integers(1, 100, size=(n, m))
 
     # Generate the machine order
     machines = []
