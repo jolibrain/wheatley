@@ -43,7 +43,7 @@ class PSPLoader:
     def nextline(self):
         # while True:
         self.line = self.f.readline()
-        temp = re.split("\s|,|\(|\)|\n", self.line)
+        temp = re.split("\s|,|\(|\)|\[|\n", self.line)
         self.sline = []
         for t in temp:
             if t != "":
@@ -173,16 +173,35 @@ class PSPLoader:
             self.nextline()
             resource_availabilities.append(int(self.sline[0]))
         self.nextline()
-        if self.sline[3] == "1":
-            use_index_from_zero = False
-            print("index starting at 1")
-        else:
-            use_index_from_zero = True
-            print("index starting at 0")
+        self.firstword("max_horizon")
+        res_cal = []
+        cal_type = set()
+        cals = {}
+        self.firstword("ressources_calendars", stop=True)
+        res_cal.append(self.sline[2])
         self.nextline()
+        for i in range(n_renew_r + n_nonrenew_r - 1):
+            res_cal.append(self.sline[0])
+            cal_type.add(self.sline[0])
+            self.nextline()
+        self.firstword("ressources_calendars")
+        for i in range(len(cal_type)):
+            calname = self.sline[0]
+            self.nextline()
+            cal_open = []
+            while self.sline[0] not in cal_type and self.sline[0] != "}":
+                cal_open.append((int(self.sline[0]), int(self.sline[1])))
+                self.nextline()
+            cals[calname] = cal_open
+        self.nextline()
+        self.firstword("Id", stop=True)
+        job_labels = []
+        job_labels.append(self.sline[3])
         n_jobs = 1
+        self.nextline()
         while self.sline[0] != "N_modes_per_job":
             n_jobs += 1
+            job_labels.append(self.sline[0])
             self.nextline()
         print("n_jobs", n_jobs)
 
@@ -192,32 +211,29 @@ class PSPLoader:
             n_modes_per_job.append(int(self.sline[0]))
             self.nextline()
 
-        suc = int(self.sline[2])
-        if suc == -1:
+        self.firstword("Successors", stop=True)
+        suc = self.sline[2]
+        if suc == "-1":
             successors = [[]]
         else:
-            if use_index_from_zero:
-                successors = [[suc + 1]]
-            else:
-                successors = [[suc]]
+            successors = [[suc]]
         self.nextline()
 
         for i in range(n_jobs - 1):
-            suc = int(self.sline[0])
-            if suc == -1:
+            suc = self.sline[0]
+            if suc == "-1":
                 successors.append([])
             else:
-                if use_index_from_zero:
-                    successors.append([suc + 1])
-                else:
-                    successors.append([suc])
+                successors.append([suc])
             self.nextline()
+        self.firstword("Due_date", stop=True)
         due_dates = [int(self.sline[2])]
         self.nextline()
         for i in range(n_jobs - 1):
             due_dates.append(self.sline[0])
             self.nextline()
 
+        self.firstword("resource_cons", stop=True)
         resource_cons = []
         resource_cons.append(
             [[int(c) for c in self.sline[2 : 2 + n_renew_r + n_nonrenew_r]]]
@@ -228,6 +244,7 @@ class PSPLoader:
                 [[int(c) for c in self.sline[0 : n_renew_r + n_nonrenew_r]]]
             )
             self.nextline()
+        self.firstword("Durations", stop=True)
         durations = [[], [], []]
         for j in range(3):
             durations[j].append([float(self.sline[2 + j])])
@@ -241,7 +258,9 @@ class PSPLoader:
             durations[j].append([float(self.sline[j])])
 
         return Rcpsp(
+            pb_id=problem_file,
             n_jobs=n_jobs,
+            job_labels=job_labels,
             n_modes_per_job=n_modes_per_job,
             successors=successors,
             durations=durations,
@@ -250,7 +269,6 @@ class PSPLoader:
             n_renewable_resources=n_renew_r,
             n_nonrenewable_resources=n_nonrenew_r,
             n_doubly_constrained_resources=0,
-            use_index_from_zero=use_index_from_zero,
             due_dates=due_dates,
         )
 
