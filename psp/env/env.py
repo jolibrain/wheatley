@@ -91,6 +91,24 @@ class Env(gym.Env):
             if isinstance(self.problem, TaillardRcpsp):
                 self.problem = self.problem.sample()
 
+        self.res_cal_intervals = []
+        self.res_cal_type = self.problem.res_cal
+        if self.res_cal_type is not None:
+            self.res_cal_id = [
+                list(self.problem.cals.keys()).index(c) for c in self.res_cal_type
+            ]
+        else:
+            self.res_cal_id = [0] * self.n_resources
+
+        if self.problem.res_cal is not None:
+            for r in range(
+                self.problem.n_renewable_resources
+                + self.problem.n_nonrenewable_resources
+            ):
+                self.res_cal_intervals.append(
+                    self.problem.cals[self.problem.res_cal[r]]
+                )
+
     def step(self, action):
         # Getting current observation
         obs = self.observe()
@@ -199,6 +217,7 @@ class Env(gym.Env):
                 self.n_jobs,
                 self.n_modes,
                 self.n_resources,
+                self.res_cal_id,
                 self.env_specification.max_n_jobs,
                 self.problem_description.max_n_modes,
                 self.env_specification.max_n_resources,
@@ -224,6 +243,7 @@ class Env(gym.Env):
             self.n_jobs,
             self.n_modes,
             self.n_resources,
+            self.res_cal_id,
             self.env_specification.max_n_jobs,
             self.problem_description.max_n_modes,
             self.env_specification.max_n_resources,

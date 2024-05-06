@@ -35,21 +35,21 @@ from psp.solution import Solution
 from psp.env.genv import GEnv
 
 
-def compute_ortools_makespan_on_real_duration(solution, state):
-    state.reset()  # reset do not redraw real durations
+# def compute_ortools_makespan_on_real_duration(solution, state):
+#     state.reset()  # reset do not redraw real durations
 
-    aff = solution.job_schedule
-    mid = solution.modes
-    while True:
-        index, element = min(enumerate(aff), key=itemgetter(1))
-        if element == float("inf"):
-            break
-        modeid = mid[index]
-        aff[index] = float("inf")
-        nid = node_from_job_mode(state.problem, index, modeid)
-        state.affect_job(node_from_job_mode(state.problem, index, modeid))
+#     aff = solution.job_schedule
+#     mid = solution.modes
+#     while True:
+#         index, element = min(enumerate(aff), key=itemgetter(1))
+#         if element == float("inf"):
+#             break
+#         modeid = mid[index]
+#         aff[index] = float("inf")
+#         nid = node_from_job_mode(state.problem, index, modeid)
+#         state.affect_job(node_from_job_mode(state.problem, index, modeid))
 
-    return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
+#     return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
 
 
 def node_from_job_mode(problem, jobid, modeid):
@@ -108,7 +108,7 @@ def get_ortools_makespan_psp(
     solution, optimal = solve_psp(
         env.problem, durations, max_time_ortools, scaling_constant_ortools
     )
-    if env.state.deterministic:
+    if env.state.deterministic and len(env.state.res_cal) == 0:
         return solution.get_makespan(), solution.schedule, optimal
 
     real_makespan, starts = compute_ortools_makespan_on_real_duration(
@@ -212,7 +212,9 @@ def AnalyseDependencyGraph(problem):
                         before[a].add(b)
     else:
         for n in range(num_nodes):
-            for s in problem.successors[n]:
+            for s in problem.successors_id[n]:
+                # ortools uses legacy job ids that start at 1
+                s += 1
                 ins[s].append(n + 1)
                 outs[n + 1].append(s)
 
@@ -301,6 +303,7 @@ def SolveRcpsp(
       (lower_bound of the objective, best solution found, asssignment)
     """
     # Create the model.
+
     model = cp_model.CpModel()
 
     if isinstance(problem, dict):
@@ -458,7 +461,9 @@ def SolveRcpsp(
     else:
         for t in all_active_tasks:
             # for n in problem.tasks[t].successors:
-            for n in problem.successors[t - 1]:
+            for n in problem.successors_id[t - 1]:
+                # ortools uses legacy job ids that start at 1
+                n += 1
                 if n == sink:
                     model.Add(task_ends[t] <= makespan)
                 elif n in active_tasks:

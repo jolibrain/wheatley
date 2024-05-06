@@ -24,7 +24,7 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 
-from gymnasium.spaces import Discrete, Dict, Box
+from gymnasium.spaces import Discrete, Dict, Box, Sequence, Text
 import numpy as np
 
 
@@ -150,6 +150,12 @@ class EnvSpecification:
             "n_jobs": Discrete(self.max_n_jobs + 1),
             "n_nodes": Discrete(self.max_n_modes + 1),
             "n_resources": Discrete(self.max_n_resources + 1),
+            "res_cal_id": Box(
+                low=0,
+                high=self.max_n_resources,
+                shape=(self.max_n_resources,),
+                dtype=np.int64,
+            ),
             "n_pr_edges": Discrete(self.max_n_edges + 1),
             "features": Box(
                 low=0,
