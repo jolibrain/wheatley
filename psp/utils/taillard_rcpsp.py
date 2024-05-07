@@ -161,7 +161,6 @@ class TaillardRcpsp(Rcpsp):
 
         super().__init__(
             pb_id,
-            n_jobs,
             job_ids,
             n_modes_per_job,
             successors,

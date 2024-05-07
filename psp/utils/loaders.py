@@ -259,7 +259,6 @@ class PSPLoader:
 
         return Rcpsp(
             pb_id=problem_file,
-            n_jobs=n_jobs,
             job_labels=job_labels,
             n_modes_per_job=n_modes_per_job,
             successors=successors,
@@ -270,6 +269,9 @@ class PSPLoader:
             n_nonrenewable_resources=n_nonrenew_r,
             n_doubly_constrained_resources=0,
             due_dates=due_dates,
+            res_cal=res_cal,
+            cals=cals,
+            display_trivial=True,
         )
 
     def load_sm(self, problem_file):
@@ -377,7 +379,6 @@ class PSPLoader:
         self.cleanup()
 
         return {
-            "n_jobs": n_jobs,
             "n_modes": n_modes,
             "n_resources": n_resources,
             "n_renewable_resources": n_renewable_resources,
@@ -552,7 +553,6 @@ class PSPLoader:
 
         return Rcpsp(
             pb_id=problem_file,
-            n_jobs=n_jobs,
             job_labels=job_labels,
             n_modes_per_job=n_modes_per_job,
             successors=successors,
@@ -564,4 +564,5 @@ class PSPLoader:
             n_doubly_constrained_resources=n_doubly_constrained_resources,
             res_cal=res_cal,
             cals=cals,
+            display_trivial=True,
         )

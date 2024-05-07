@@ -8,6 +8,7 @@ import pytest
 
 from args import argument_parser, parse_args
 from generic.agent_specification import AgentSpecification
+from generic.utils import get_path
 from jssp.description import Description
 from jssp.env.env import Env
 from jssp.env.env_specification import EnvSpecification
@@ -119,7 +120,8 @@ def test_args(args: list):
         sys.argv = ["python3"] + args
 
         parser = argument_parser()
-        args, exp_name, path = parse_args(parser)
+        args, exp_name = parse_args(parser)
+        path = get_path(args.path, exp_name)
         main(args, exp_name, path)
     finally:
         # Don't forget to bring back the old argv!

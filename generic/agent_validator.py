@@ -86,6 +86,8 @@ class AgentValidator:
             self.env_specification = env_specification
         self.device = device
 
+        self.display_gantt = training_specification.display_gantt
+
         self.n_validation_env = training_specification.n_validation_env
         self.fixed_validation = training_specification.fixed_validation
         self.fixed_random_validation = training_specification.fixed_random_validation
@@ -443,7 +445,7 @@ class AgentValidator:
                 schedule = solution.schedule
                 makespan = solution.get_makespan()
 
-                if i == 0:
+                if i == 0 and self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_solution(
                         schedule
                     )
@@ -466,7 +468,8 @@ class AgentValidator:
                 state = self.validation_envs[i].state
                 self.last_ppo_makespans[i] = state.undoable_makespan
                 mean_makespan += state.undoable_makespan / self.n_validation_env
-                self.gantt_rl_img = self.validation_envs[i].render_fail()
+                if self.display_gantt:
+                    self.gantt_rl_img = self.validation_envs[i].render_fail()
 
             for ortools_strategy in self.ortools_strategies:
                 if self.fixed_validation:
@@ -486,9 +489,10 @@ class AgentValidator:
                     self.last_ortools_makespans[i] = or_tools_makespan
 
                 if i == 0 and ortools_strategy == self.default_ortools_strategy:
-                    self.gantt_or_img = self.validation_envs[i].render_solution(
-                        or_tools_schedule, scaling=1.0
-                    )
+                    if self.display_gantt:
+                        self.gantt_or_img = self.validation_envs[i].render_solution(
+                            or_tools_schedule, scaling=1.0
+                        )
                     self.ortools_env_zero_is_optimal = optimal
 
                 if (
@@ -525,7 +529,7 @@ class AgentValidator:
                         self.validation_envs[i].state.affectations,
                     )
                     makespan = solution.get_makespan()
-                    if custom_agent.rule == "MOPNR" and i == 0:
+                    if custom_agent.rule == "MOPNR" and i == 0 and self.display_gantt:
                         self.gantt_mopnr_img = self.validation_envs[i].render_solution(
                             solution.schedule
                         )

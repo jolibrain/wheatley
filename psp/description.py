@@ -58,7 +58,9 @@ class Description:
                 [psp["max_resource_availability"] for psp in train_psps + test_psps]
             )
         else:
-            self.max_n_jobs = max([psp.n_jobs for psp in train_psps + test_psps])
+            self.max_n_jobs = max(
+                [len(psp.job_labels) for psp in train_psps + test_psps]
+            )
             self.max_n_modes = max([psp.n_modes for psp in train_psps + test_psps])
 
             self.max_n_resources = max(

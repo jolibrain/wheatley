@@ -32,6 +32,7 @@ from alg.pretrain import Pretrainer
 from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
+from generic.utils import get_path
 from jssp.description import Description as ProblemDescription
 from jssp.env.env import Env
 from jssp.env.env_specification import EnvSpecification
@@ -139,6 +140,7 @@ def main(args, exp_name, path) -> float:
         store_rollouts_on_disk=args.store_rollouts_on_disk,
         critic_loss=args.critic_loss,
         debug_net=False,
+        display_gantt=args.display_gantt,
     )
     training_specification.print_self()
 
@@ -302,5 +304,6 @@ if __name__ == "__main__":
     from args import argument_parser, parse_args
 
     parser = argument_parser()
-    args, exp_name, path = parse_args(parser)
+    args, exp_name = parse_args(parser)
+    path = get_path(args.path, exp_name)
     main(args, exp_name, path)

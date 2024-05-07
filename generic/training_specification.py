@@ -69,6 +69,7 @@ class TrainingSpecification:
         store_rollouts_on_disk,
         critic_loss,
         debug_net,
+        display_gantt,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -101,6 +102,7 @@ class TrainingSpecification:
         self.store_rollouts_on_disk = store_rollouts_on_disk
         self.critic_loss = critic_loss
         self.debug_net = debug_net
+        self.display_gantt = display_gantt
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam

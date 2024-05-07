@@ -843,6 +843,17 @@ class GState:
             while remaining_duration > opening_duration:
                 remaining_duration -= opening_duration
                 p += 1
+                if p >= len(self.res_cal[r]):
+                    print("!!!!! not enough openings for task")
+                    print("time type: real")
+                    print("resource: ", r)
+                    print("calendar: ", self.res_cal[r])
+                    print("node_id: ", node_id)
+                    print("start time: ", start_real)
+                    print("duration", duration_real)
+                    print("remaining duration: ", remaining_duration)
+                    print("trying p:", p)
+                    exit()
                 opening_duration = self.res_cal[r][p][1] - self.res_cal[r][p][0]
 
             local_end_date_real = (
@@ -863,6 +874,17 @@ class GState:
                 while remaining_duration > opening_duration:
                     remaining_duration -= opening_duration
                     p += 1
+                    if p >= len(self.res_cal[r]):
+                        print("!!!!! not enough openings for task")
+                        print("time type: ", i)
+                        print("resource: ", r)
+                        print("calendar: ", self.res_cal[r])
+                        print("node_id: ", node_id)
+                        print("start time: ", starts[i])
+                        print("duration", durations[i])
+                        print("remaining duration: ", remaining_duration)
+                        print("trying p:", p)
+                        exit()
                     opening_duration = self.res_cal[r][p][1] - self.res_cal[r][p][0]
                 local_end_date = (
                     max(starts[i], self.res_cal[r][p][0]) + remaining_duration
@@ -1026,16 +1048,9 @@ class GState:
                 self.set_tct(cur_node_id, new_completion_time)
                 self.set_tct_real(cur_node_id, new_completion_time_real)
 
-                # for successor in self.graph.successors(cur_node_id, etype="prec"):
-                for successor in self.cached_suc(cur_node_id):
-                    to_open = True
-                    # for p in self.graph.predecessors(successor, etype="prec"):
-                    for p in self.cached_pred(successor.item()):
-                        if p.item() == cur_node_id or p.item() in open_nodes:
-                            to_open = False
-                            break
-                    if to_open:
-                        open_nodes.append(successor.item())
+                sucs = self.cached_suc(cur_node_id).tolist()
+                open_nodes = [n for n in open_nodes if n not in sucs]
+                open_nodes.extend(sucs)
 
     def update_frontier(self):
         new_nodes_in_frontier = set()
@@ -1054,8 +1069,8 @@ class GState:
         nif = torch.tensor(list(self.nodes_in_frontier), dtype=torch.long)
         c1 = torch.eq(rp_edges[0].unsqueeze(1), nif.unsqueeze(0))
         c2 = torch.eq(rp_edges[1].unsqueeze(1), nif.unsqueeze(0))
-        src_not_in_frontier = torch.logical_not(torch.any(c1, dim=1))
-        dst_not_in_frontier = torch.logical_not(torch.any(c2, dim=1))
+        # src_not_in_frontier = torch.logical_not(torch.any(c1, dim=1))
+        # dst_not_in_frontier = torch.logical_not(torch.any(c2, dim=1))
         if strict:
             c3 = torch.logical_or(c1, c2)
         else:
@@ -1070,8 +1085,8 @@ class GState:
             nrrf = torch.tensor(list(nodes_removed_from_frontier))
             c1 = torch.eq(rc_edges[0].unsqueeze(1), nrrf.unsqueeze(0))
             c2 = torch.eq(rc_edges[1].unsqueeze(1), nrrf.unsqueeze(0))
-            src_in_removed = torch.any(c1, dim=1)
-            dst_in_removed = torch.any(c2, dim=1)
+            # src_in_removed = torch.any(c1, dim=1)
+            # dst_in_removed = torch.any(c2, dim=1)
             to_remove = torch.where(torch.logical_or(c1, c2))[0]
             eids = rc_edges[2][to_remove]
             self.graph.remove_edges(eids, etype="rc")

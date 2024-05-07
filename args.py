@@ -27,7 +27,7 @@
 import argparse
 from typing import Tuple
 
-from generic.utils import get_exp_name, get_path
+from generic.utils import get_exp_name
 from jssp.dispatching_rules.heuristics import HEURISTICS
 
 
@@ -443,7 +443,7 @@ def argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--add_rp_edges",
-        default="all",
+        default="frontier",
         choices=["all", "frontier", "frontier_strict", "none"],
         help="take into account resource precedence edges",
     )
@@ -456,10 +456,10 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--remove_past_prec",
+        "--keep_past_prec",
         default=False,
         action="store_true",
-        help="remove past precedencies",
+        help="keep past precedencies",
     )
     parser.add_argument(
         "--observation_horizon_step",
@@ -783,6 +783,13 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--display_gantt",
+        default=False,
+        action="store_true",
+        help="display gantt-like execution",
+    )
+
+    parser.add_argument(
         "--taillard_pbs",
         help="taillard problem name (e.g ta01), default is empty for benchmarking all problems",
         default="*",
@@ -859,7 +866,7 @@ def parse_args(parser: argparse.ArgumentParser) -> Tuple[argparse.Namespace, str
     # Parsing
     args = parser.parse_args()
     exp_name = get_exp_name(args)
-    path = get_path(args.path, exp_name)
+    # path = get_path(args.path, exp_name)
 
     if args.eval_n_j is None:
         args.eval_n_j = args.n_j
@@ -904,4 +911,4 @@ def parse_args(parser: argparse.ArgumentParser) -> Tuple[argparse.Namespace, str
     if args.resume:
         args.skip_initial_eval = True
 
-    return args, exp_name, path
+    return args, exp_name

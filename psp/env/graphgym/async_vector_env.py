@@ -137,6 +137,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
             process = ctx.Process(
                 target=target,
                 name=f"Worker<{type(self).__name__}>-{idx}",
+                daemon=True,
                 args=(
                     idx,
                     CloudpickleWrapper(env_fn),

@@ -283,19 +283,6 @@ class GnnDGL(torch.nn.Module):
             n_nodes = observation.get_n_nodes()
             num_nodes = g.num_nodes()
 
-        # if self.add_self_loops:
-        #     if self.graphobs:
-        #         g = dgl.add_self_loop(
-        #             g,
-        #             etype="self",
-        #         )
-        #     else:
-        #         g = dgl.add_self_loop(
-        #             g,
-        #             edge_feat_names=["type"],
-        #             fill_data=AgentObservation.edgeType["self"],
-        #         )
-
         g, poolnodes, resource_nodes, vnodes = rewire(
             g,
             self.graph_pooling,
@@ -312,6 +299,19 @@ class GnnDGL(torch.nn.Module):
             9,
             self.graphobs,
         )
+
+        if self.add_self_loops:
+            if self.graphobs:
+                g = dgl.add_self_loop(
+                    g,
+                    etype="self",
+                )
+            else:
+                g = dgl.add_self_loop(
+                    g,
+                    edge_feat_names=["type"],
+                    fill_data=AgentObservation.edgeType["self"],
+                )
 
         if self.graphobs:
             g, felist = homogeneous_edges(
