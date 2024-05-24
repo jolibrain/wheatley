@@ -9,7 +9,6 @@ class Rcpsp:
     def __init__(
         self,
         pb_id,
-        n_jobs,
         job_labels,
         n_modes_per_job,
         successors,
@@ -19,14 +18,13 @@ class Rcpsp:
         n_renewable_resources,
         n_nonrenewable_resources=0,
         n_doubly_constrained_resources=0,
-        use_index_from_zero=False,
         due_dates=None,
         res_cal=None,
         cals=None,
+        display_trivial=False,
     ):
         self.pb_id = pb_id
-        # Number of jobs in the graph
-        self.n_jobs = n_jobs
+
         # job id (generally an int, but not necessarily)
         self.job_labels = job_labels
         # Number of modes for each job
@@ -53,6 +51,25 @@ class Rcpsp:
         self.durations = durations
         # Consumption for each job and for each mode of jobs
         self.resource_cons = resource_cons
+        if display_trivial:
+            n_trivial = 0
+            for rc in resource_cons:
+                all_mode_dont_consume = True
+                for mode_cons in rc:
+                    if not all(v == 0 for v in mode_cons):
+                        all_mode_dont_consume = False
+                        break
+                if all_mode_dont_consume:
+                    n_trivial += 1
+            print(
+                "Problem ",
+                pb_id,
+                " has ",
+                n_trivial,
+                "/",
+                len(resource_cons),
+                "trivial actions",
+            )
 
         # resources calendars :
         # if of calendar for each ressource
@@ -66,24 +83,22 @@ class Rcpsp:
         # Maximum capacity of each resource
         self.max_resource_availability = max(resource_availabilities)
 
-        # Successors of each node using id of tasks (starting from 0)
-        self.successors_id = [[] for j in range(n_jobs)]
-
         # Compute max resource consumption
         self.max_resource_consumption = 0
+        self.add_source_sink_if_needed()
 
-        self.use_index_from_zero = use_index_from_zero
-
-        for j in range(n_jobs):
-            for k in range(n_modes_per_job[j]):
+        for j in range(len(self.job_labels)):
+            for k in range(self.n_modes_per_job[j]):
                 for r in range(self.n_resources):
-                    if self.max_resource_consumption < resource_cons[j][k][r]:
-                        self.max_resource_consumption = resource_cons[j][k][r]
+                    if self.max_resource_consumption < self.resource_cons[j][k][r]:
+                        self.max_resource_consumption = self.resource_cons[j][k][r]
 
-        self.predecessors = [[] for j in range(n_jobs)]
-        self.predecessors_id = [[] for j in range(n_jobs)]
+        self.predecessors = [[] for j in range(len(self.job_labels))]
+        self.predecessors_id = [[] for j in range(len(self.job_labels))]
 
-        for j in range(n_jobs):
+        # Successors of each node using id of tasks (starting from 0)
+        self.successors_id = [[] for j in range(len(self.job_labels))]
+        for j in range(len(self.job_labels)):
             for succ in self.successors[j]:
                 succ_id = self.job_to_id(succ)
                 self.predecessors[succ_id].append(self.id_to_job(j))
@@ -92,13 +107,76 @@ class Rcpsp:
 
         self.createGraph()
 
+        self.n_jobs = len(self.job_labels)
+
+    def add_source_sink_if_needed(self):
+        n_parents = {}
+        n_children = {}
+        for jl in self.job_labels:
+            n_parents[jl] = 0
+            n_children[jl] = 0
+        for n, s in enumerate(self.successors):
+            n_children[self.id_to_job(n)] += len(s)
+            for c in s:
+                n_parents[c] += 1
+
+        no_parents = []
+        no_children = []
+        for j in self.job_labels:
+            if n_parents[j] == 0:
+                no_parents.append(j)
+            if n_children[j] == 0:
+                no_children.append(j)
+
+        if len(no_parents) != 1 or self.job_to_id(no_parents[0]) != 0:
+            print("adding source")
+            # job_labels
+            self.job_labels.insert(0, "source")
+            # successors
+            self.successors.insert(0, no_parents)
+            # n_modes_per_job
+            self.n_modes_per_job.insert(0, 1)
+            # n_modes
+            self.n_modes += 1
+            # durations
+            for i in range(3):
+                self.durations[i].insert(0, [0.0])
+            # resource_cons
+            self.resource_cons.insert(0, [[0] * self.n_resources])
+            # due_dates
+            self.due_dates.insert(0, None)
+
+        if (
+            len(no_children) != 1
+            or self.job_to_id(no_children[0]) != len(self.job_labels) - 1
+        ):
+            print("adding sink")
+            # job_labels
+            self.job_labels.append("sink")
+            # successors
+            for s in self.successors:
+                if len(s) == 0:
+                    s.append("sink")
+            self.successors.append([])
+            # n_modes_per_job
+            self.n_modes_per_job.append(1)
+            # n_modes
+            self.n_modes += 1
+            # durations
+            for i in range(3):
+                self.durations[i].append([0.0])
+            # resource_cons
+            self.resource_cons.append([[0] * self.n_resources])
+            # due_dates
+            self.due_dates.append(None)
+
     # Create graph with modes as nodes
     def createGraph(self):
         # Compute sources and sinks of the graph
         sources_id = []
         sinks_id = []
 
-        for j in range(self.n_jobs):
+        for j in range(len(self.job_labels)):
             if len(self.predecessors[j]) == 0:
                 sources_id.append(j)
             if len(self.successors[j]) == 0:
@@ -109,9 +187,9 @@ class Rcpsp:
         self.precGraph = nx.DiGraph()
 
         node_idx = 0
-        self.__job_id_to_mode_id_2_node = [[] for j in range(self.n_jobs)]
+        self.__job_id_to_mode_id_2_node = [[] for j in range(len(self.job_labels))]
         self.__node_to_job_id_mode_id = []
-        for j in range(self.n_jobs):
+        for j in range(len(self.job_labels)):
             for mode_j in range(self.n_modes_per_job[j]):
                 self.__job_id_to_mode_id_2_node[j].append(node_idx)
                 self.__node_to_job_id_mode_id.append((j, mode_j))
@@ -119,7 +197,7 @@ class Rcpsp:
 
         # print("job_id_to_mode_to_node",self.__job_id_to_mode_id_2_node)
 
-        for j in range(self.n_jobs):
+        for j in range(len(self.job_labels)):
             for succ in self.successors_id[j]:
                 for mode_j in range(self.n_modes_per_job[j]):
                     for mode_succ in range(self.n_modes_per_job[succ]):
@@ -194,29 +272,9 @@ class Rcpsp:
 
     def job_to_id(self, j):
         return self.job_labels.index(j)
-        # if self.use_index_from_zero:
-        #     return j
-        # else:
-        #     return j - 1
 
     def id_to_job(self, j):
         return self.job_labels[j]
-        # if self.use_index_from_zero:
-        #     return j
-        # else:
-        #     return j + 1
-
-    def mode_to_id(self, m):
-        if self.use_index_from_zero:
-            return m
-        else:
-            return m - 1
-
-    def id_to_mode(self, m):
-        if self.use_index_from_zero:
-            return m
-        else:
-            return m + 1
 
     def sample(self, sampling_type):
         if sampling_type == "resource":
@@ -297,7 +355,6 @@ class Rcpsp:
             self.n_renewable_resources,
             n_nonrenewable_resources=self.n_nonrenewable_resources,
             n_doubly_constrained_resources=self.n_doubly_constrained_resources,
-            use_index_from_zero=True,
         )
 
     # samples the graph by taking all the jobs whose earliest start date id after start_horizon and latest start date is before end_horizon
@@ -312,8 +369,6 @@ class Rcpsp:
 
     def __eq__(self, obj):
         if isinstance(obj, dict):
-            return False
-        if self.n_jobs != obj.n_jobs:
             return False
         if self.n_modes_per_job != obj.n_modes_per_job:
             return False
@@ -340,8 +395,6 @@ class Rcpsp:
         if self.successors_id != obj.successors_id:
             return False
         if self.max_resource_consumption != obj.max_resource_consumption:
-            return False
-        if self.use_index_from_zero != obj.use_index_from_zero:
             return False
         if self.predecessors != obj.predecessors:
             return False

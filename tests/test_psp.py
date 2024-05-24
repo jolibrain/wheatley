@@ -10,7 +10,8 @@ import torch
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from args import argument_parser, get_path, parse_args
+from args import argument_parser, parse_args
+from generic.utils import get_path
 from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
@@ -41,7 +42,7 @@ def instantiate_training_objects(
         sys.argv = ["python3"] + args
 
         parser = argument_parser()
-        args, exp_name, path = parse_args(parser)
+        args, exp_name = parse_args(parser)
     finally:
         # Don't forget to bring back the old argv!
         sys.argv = original_argv
@@ -117,6 +118,7 @@ def instantiate_training_objects(
         ),
         critic_loss=args.critic_loss,
         debug_net=False,
+        display_gantt=False,
     )
 
     if args.conflicts == "clique" and args.precompute_cliques:
@@ -141,7 +143,7 @@ def instantiate_training_objects(
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
         remove_old_resource_info=args.remove_old_resource_info
         and not args.observe_subgraph,
-        remove_past_prec=args.remove_past_prec and not args.observe_subgraph,
+        remove_past_prec=not args.keep_past_prec and not args.observe_subgraph,
         observation_horizon_step=args.observation_horizon_step,
         observation_horizon_time=args.observation_horizon_time,
         fast_forward=args.fast_forward,
@@ -346,8 +348,8 @@ def test_args(args: list):
         sys.argv = ["python3"] + args
 
         parser = argument_parser()
-        args, exp_name, path = parse_args(parser)
-        main(args, exp_name, path)
+        args, exp_name = parse_args(parser)
+        main(args, exp_name)
     finally:
         # Don't forget to bring back the old argv!
         sys.argv = original_argv

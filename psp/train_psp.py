@@ -23,13 +23,15 @@
 
 import os
 import random
+import glob
 
 import numpy as np
 import torch
+import signal
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
-from args import get_path
+from generic.utils import get_path
 from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
@@ -40,9 +42,10 @@ from psp.env.genv import GEnv
 from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
 from psp.utils.taillard_rcpsp import TaillardRcpsp
+from functools import partial
 
 
-def main(args, exp_name, path) -> float:
+def main(args, exp_name) -> float:
     exp_name = args.exp_name_appendix
     path = get_path(args.path, exp_name)
     torch.distributions.Distribution.set_default_validate_args(False)
@@ -160,6 +163,7 @@ def main(args, exp_name, path) -> float:
         store_rollouts_on_disk=args.store_rollouts_on_disk,
         critic_loss=args.critic_loss,
         debug_net=args.debug_net,
+        display_gantt=args.display_gantt,
     )
     training_specification.print_self()
 
@@ -188,7 +192,7 @@ def main(args, exp_name, path) -> float:
         factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
         remove_old_resource_info=args.remove_old_resource_info
         and not args.observe_subgraph,
-        remove_past_prec=args.remove_past_prec and not args.observe_subgraph,
+        remove_past_prec=not args.keep_past_prec and not args.observe_subgraph,
         observation_horizon_step=args.observation_horizon_step,
         observation_horizon_time=args.observation_horizon_time,
         fast_forward=args.fast_forward,
@@ -331,9 +335,25 @@ def main(args, exp_name, path) -> float:
     )
 
 
+def interrupt_handler(path, signum, frame):
+    if path is not None:
+        files = glob.glob(
+            path + "/wheatley_dgl_" + str(os.getpid()) + "_*.obs"
+        ) + glob.glob(path + "/wheatley_pkl_" + str(os.getpid()) + "_*.obs")
+        print("removing ", files)
+        for f in files:
+            os.remove(f)
+    exit()
+
+
 if __name__ == "__main__":
     from args import argument_parser, parse_args
 
     parser = argument_parser()
-    args, exp_name, path = parse_args(parser)
-    main(args, exp_name, path)
+    args, exp_name = parse_args(parser)
+
+    signal.signal(
+        signal.SIGINT, partial(interrupt_handler, args.store_rollouts_on_disk)
+    )
+
+    main(args, exp_name)

@@ -109,8 +109,10 @@ def get_ortools_makespan_psp(
         env.problem, durations, max_time_ortools, scaling_constant_ortools
     )
     if env.state.deterministic and len(env.state.res_cal) == 0:
+        print("direclty reading ortools makespan")
         return solution.get_makespan(), solution.schedule, optimal
 
+    print("computing makespan on env")
     real_makespan, starts = compute_ortools_makespan_on_real_duration(
         solution, env.state
     )
