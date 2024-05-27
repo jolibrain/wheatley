@@ -440,6 +440,7 @@ def test_solve_api(instance_file: str, taillard_offset: bool):
         cache_rwpe=False,
         two_hot=None,
         symlog=False,
+        hl_gauss=None,
         reward_weights=[1],
         sgformer=False,
     )

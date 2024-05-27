@@ -70,6 +70,7 @@ class AgentSpecification:
         cache_rwpe,
         two_hot,
         symlog,
+        hl_gauss,
         reward_weights,
         sgformer,
     ):
@@ -114,6 +115,7 @@ class AgentSpecification:
         self.cache_rwpe = cache_rwpe
         self.two_hot = two_hot
         self.symlog = symlog
+        self.hl_gauss = hl_gauss
         self.reward_weights = reward_weights
         self.sgformer = sgformer
 
@@ -201,6 +203,7 @@ class AgentSpecification:
                 f"RWPE cache:                       {self.cache_rwpe}\n"
                 f"two hot encoding:                 {self.two_hot}\n"
                 f"symlog critic:                    {self.symlog}\n"
+                f"hl gauss encoding:                {self.hl_gauss}\n"
                 f"reward weights:                   {self.reward_weights}\n"
                 f"SGFormer:                         {self.sgformer}\n"
                 f"Net shapes:"

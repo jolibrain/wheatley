@@ -575,6 +575,13 @@ def argument_parser() -> argparse.ArgumentParser:
         help="min,max, nbins parameters for value two hot encoding",
     )
     parser.add_argument(
+        "--hl_gauss",
+        default=None,
+        type=float,
+        nargs=3,
+        help="min,max, nbins parameters for value hl_gauss encoding",
+    )
+    parser.add_argument(
         "--symlog",
         action="store_true",
         default=False,

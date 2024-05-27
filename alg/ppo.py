@@ -554,7 +554,10 @@ class PPO:
 
                     # Value loss
                     newvalue = newvalue.view(-1)
-                    if agent.agent_specification.two_hot is None:
+                    if (
+                        agent.agent_specification.two_hot is None
+                        and agent.agent_specification.hl_gauss is None
+                    ):
                         if agent.agent_specification.symlog:
                             target = symlog(b_returns[mb_inds]).to(train_device)
                         else:
@@ -569,7 +572,7 @@ class PPO:
                             v_loss_unclipped = torch.nn.functional.l1_loss(
                                 newvalue, target
                             )
-                    else:
+                    elif agent.agent_specification.two_hot is not None:
                         with torch.no_grad():
                             if agent.agent_specification.symlog:
                                 twohot_target = calc_twohot(
@@ -581,6 +584,14 @@ class PPO:
                                 )
                         v_loss_unclipped = nn.functional.cross_entropy(
                             newvalue, twohot_target, reduction="mean"
+                        )
+                    else:  # hl_gaus case
+                        with torch.no_grad():
+                            hl_gauss_target = hl_gauss_to_probs(
+                                b_returns[mb_inds], agent.B
+                            )
+                        v_loss_unclipped = torch.nn.functional.cross_entropy(
+                            newvalue, hl_gauss_target
                         )
 
                     if self.clip_vloss:

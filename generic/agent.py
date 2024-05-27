@@ -77,6 +77,16 @@ def calc_twohot(x, B):
     return twohot
 
 
+def hl_gauss_to_probs(x, B):
+    sigma = 0.75 * (B[1].item() - B[0].item())
+    cdf_evals = torch.special.erf(
+        (B - x.unsqueeze(-1)) / (torch.sqrt(torch.tensor(2.0)) * sigma)
+    )
+    z = cdf_evals[..., -1] - cdf_evals[..., 0]
+    bin_probs = cdf_evals[..., 1:] - cdf_evals[..., :-1]
+    return bin_probs / z.unsqueeze(-1)
+
+
 class Agent(torch.nn.Module):
     def __init__(
         self,
@@ -104,7 +114,10 @@ class Agent(torch.nn.Module):
         self.reward_dim = len(self.agent_specification.reward_weights)
         self.max_weight = max(self.agent_specification.reward_weights)
 
-        if self.agent_specification.two_hot is not None:
+        if (
+            self.agent_specification.two_hot is not None
+            or self.agent_specification.hl_gauss is not None
+        ):
             if self.agent_specification.symlog:
                 self.B = torch.nn.Parameter(
                     torch.linspace(
@@ -113,12 +126,20 @@ class Agent(torch.nn.Module):
                         int(self.agent_specification.two_hot[2]),
                     )
                 )
-            else:
+            elif self.agent_specification.two_hot is not None:
                 self.B = torch.nn.Parameter(
                     torch.linspace(
                         self.agent_specification.two_hot[0],
                         self.agent_specification.two_hot[1],
                         int(self.agent_specification.two_hot[2]),
+                    )
+                )
+            elif self.agent_specification.hl_gauss is not None:
+                self.B = torch.nn.Parameter(
+                    torch.linspace(
+                        self.agent_specification.hl_gauss[0],
+                        self.agent_specification.hl_gauss[1],
+                        int(self.agent_specification.hl_gauss[2]),
                     )
                 )
             self.B.requires_grad = False
@@ -268,6 +289,11 @@ class Agent(torch.nn.Module):
     def get_value_from_logits(self, logits):
         if self.agent_specification.two_hot is not None:
             val = logits.softmax(dim=-1) @ self.B.to(logits.device)[:, None]
+        elif self.agent_specification.hl_gauss is not None:
+            centers = (self.B[:-1] + self.B[1:]) / 2
+            # probs = logits.softmax(dim=-1)
+            # val = torch.sum(probs * centers, dim=-1)
+            val = logits.softmax(dim=-1) @ centers.to(logits.device)[:, None]
         else:
             val = logits
         if self.agent_specification.symlog:

@@ -208,6 +208,8 @@ def main(args, exp_name) -> float:
 
     if args.two_hot is not None:
         hidden_dim_critic = max(int(args.two_hot[2]), args.hidden_dim_critic)
+    elif args.hl_gauss is not None:
+        hidden_dim_critic = max(int(args.hl_gauss[2]), args.hidden_dim_critic)
     else:
         hidden_dim_critic = args.hidden_dim_critic
     agent_specification = AgentSpecification(
@@ -252,6 +254,7 @@ def main(args, exp_name) -> float:
         cache_rwpe=args.cache_rwpe,
         two_hot=args.two_hot,
         symlog=args.symlog,
+        hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
     )

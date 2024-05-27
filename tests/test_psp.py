@@ -198,6 +198,7 @@ def instantiate_training_objects(
         cache_rwpe=args.cache_rwpe,
         two_hot=args.two_hot,
         symlog=args.symlog,
+        hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
     )

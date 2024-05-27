@@ -167,6 +167,8 @@ class Agent(Agent):
 
         if self.agent_specification.two_hot is not None:
             value_dim = len(self.B)
+        elif self.agent_specification.hl_gauss is not None:
+            value_dim = len(self.B) - 1
         else:
             value_dim = 1
 
