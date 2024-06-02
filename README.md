@@ -2,7 +2,7 @@
 
 A Job-Shop Scheduling problem (JSSP) and Ressource-Constrained Planning Scheduling Problem (RCPSP) solver based on Reinforcement Learning, targeted to solving real-world industrial problems, and more.
 
-This repo contains the official implementation of [Learning to Solve Job Shop Scheduling under Uncertainty](https://arxiv.org/abs/2404.01308)
+This repo contains the official implementation of [Learning to Solve Job Shop Scheduling under Uncertainty](https://arxiv.org/abs/2404.01308), published at [CPAIOR 2024](https://link.springer.com/book/10.1007/978-3-031-60597-0?page=2#toc) ([slides](/docs/cpaior_slides.pdf)). 
 
 ## Features
 
