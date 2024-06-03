@@ -89,6 +89,7 @@ def main(args, exp_name) -> float:
                     generate_bounds=args.generate_duration_bounds,
                     duration_mode_bounds=args.duration_mode_bounds,
                     duration_delta=args.duration_delta,
+                    stochastic=(args.duration_type == "stochastic"),
                 )
                 for i in range(args.n_validation_env)
             ]
