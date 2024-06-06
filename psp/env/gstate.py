@@ -171,7 +171,9 @@ class GState:
             ("global_data", "null", "global_data"): ((), ()),
         }
 
-        self.graph = dgl.heterograph(gd, device=self.device)
+        self.graph = dgl.heterograph(
+            gd, device=self.device, num_nodes_dict={"n": self.n_nodes, "global_data": 0}
+        )
 
         # START workaround unset attributes schemes
         if self.factored_rp:
@@ -214,7 +216,7 @@ class GState:
         self.pred_cache = {}
         self.suc_cache = {}
         self.indeg_cache = {}
-        for n in range(self.graph.num_nodes()):
+        for n in range(self.graph.num_nodes(ntype="n")):
             # self.pred_cache[n] = self.graph.predecessors(n, etype="prec")
             self.pred_cache[n] = self.graph._graph.predecessors(
                 self.graph.get_etype_id("prec"), n
