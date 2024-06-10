@@ -418,9 +418,17 @@ class PPO:
 
         print("... done creating environments")
 
-        self.optimizer = self.optimizer_class(
-            agent.parameters(), lr=lr, weight_decay=weight_decay
-        )
+        if self.optimizer_class == torch.optim.RAdam:
+            self.optimizer = self.optimizer_class(
+                agent.parameters(),
+                lr=lr,
+                weight_decay=weight_decay,
+                decoupled_weight_decay=True,
+            )
+        else:
+            self.optimizer = self.optimizer_class(
+                agent.parameters(), lr=lr, weight_decay=weight_decay
+            )
         if opt_state_dict is not None:
             self.optimizer.load_state_dict(opt_state_dict)
         for g in self.optimizer.param_groups:
