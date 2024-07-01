@@ -48,7 +48,7 @@ class MLP(torch.nn.Module):
         for layer_id in range(self.n_layers - 1):
             self.layers.append(torch.nn.Linear(last_dim, hidden_dim))
             if self.batch_norm:
-                self.batch_norms.append(torch.nn.BatchNorm1d(hidden_dim))
+                self.batch_norms.append(torch.nn.LayerNorm(hidden_dim))
 
             last_dim = hidden_dim
 
@@ -68,8 +68,9 @@ class MLP(torch.nn.Module):
 
     def forward(self, x):
         for layer in range(self.n_layers - 1):
-            x = self.activation_layer(self.layers[layer](x))
+            x = self.layers[layer](x)
             if self.batch_norm:
                 x = self.batch_norms[layer](x)
+            x = self.activation_layer(x)
 
         return self.layers[-1](x)
