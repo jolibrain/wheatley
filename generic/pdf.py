@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-import dgl
+from dgl import graph
 from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 from dgl import function as fn
 import time
@@ -106,7 +106,7 @@ def basis_transform(
     bases = bases.transpose(-2, -1).contiguous()
 
     # print(new_edge_idx)
-    new_g = dgl.graph(new_edge_idx)
+    new_g = graph(new_edge_idx)
     assert new_g.num_nodes() == g.num_nodes()
     # new_g = DGLHeteroGraph(new_edge_idx, ['_U'], ['_E'])
     new_g.ndata["feat"] = g.ndata["feat"]

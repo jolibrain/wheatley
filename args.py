@@ -92,9 +92,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--vecenv_type",
         type=str,
-        default="subproc",
+        default="graphgym",
         choices=["subproc", "dummy", "graphgym"],
-        help="Use SubprocEnv or DummyVecEnv in SB3",
+        help="everything deprecated but graphgym",
     )
 
     # =================================================TRAINING SPECIFICATION====================================================
@@ -327,6 +327,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sgformer", default=False, action="store_true", help="add sgformer to network"
     )
+    parser.add_argument(
+        "--pyg", default=False, action="store_true", help="use pyg instead of DGL"
+    )
     parser.add_argument("--dropout", type=float, default=0.0, help="dropout ratio")
     parser.add_argument(
         "--ortools_strategy",
@@ -339,9 +342,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fe_type",
         type=str,
-        default="dgl",
-        help="feature extractor type in [dgl|tokengt]",
-        choices=["dgl", "tokengt"],
+        default="message_passing",
+        help="feature extractor type in [message_passing|tokengt]",
+        choices=["message_passing", "tokengt"],
     )
     parser.add_argument(
         "--transformer_flavor",

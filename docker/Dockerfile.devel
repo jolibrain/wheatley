@@ -1,5 +1,4 @@
-#FROM nvidia/cuda:12.3.2-devel-ubuntu22.04 AS wheatley_build
-FROM nvcr.io/nvidia/dgl:23.11-py3 AS wheatley_build
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS wheatley_build
 
 LABEL description="Next-generation scheduling problem solver based on GNNs and Reinforcement Learning"
 LABEL maintainer="contact@jolibrain.com"
@@ -15,23 +14,34 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     python3-pytest \
     python3-opencv \
     libgl1 \
-    ninja-build \
     sudo \
     wget \
     git \
-    unzip
+    unzip \
+    ninja-build \
+    build-essential \
+    python3-dev \
+    make \
+    cmake 
 
 USER jenkins
 RUN mkdir /home/jenkins/app
 WORKDIR /home/jenkins/app
 RUN python3 -m pip install --upgrade pip
-
-# install dgl
-#RUN pip3 install dgl -f https://data.dgl.ai/wheels/cu121/repo.html
-#RUN pip3 install  dglgo -f https://data.dgl.ai/wheels-test/repo.html
-
 ADD requirements.txt .
 RUN pip3 install -r requirements.txt --upgrade
+
+# DGL whl does not contain some libs for torch 2.4, rebuild
+RUN git clone --recurse-submodules https://github.com/dmlc/dgl.git /home/jenkins/dgl
+WORKDIR /home/jenkins/dgl
+ENV DGL_HOME=/home/jenkins/dgl
+RUN bash script/build_dgl.sh -g
+WORKDIR /home/jenkins/dgl/python
+RUN python3 setup.py install --user
+RUN python3 setup.py build_ext --inplace
+
+WORKDIR /home/jenkins/app
+
 RUN mkdir .cache && mkdir .cache/torch 
 RUN export TORCH_HOME=/home/jenkins/app/.cache/torch
 

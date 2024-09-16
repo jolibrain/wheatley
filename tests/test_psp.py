@@ -149,6 +149,7 @@ def instantiate_training_objects(
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
+        pyg=args.pyg,
     )
 
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -201,6 +202,7 @@ def instantiate_training_objects(
         hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
+        pyg=args.pyg,
     )
     agent = Agent(
         env_specification=env_specification, agent_specification=agent_specification
@@ -247,7 +249,7 @@ possible_args = {
     "n_m": [10, 5],
     "dont_normalize_input": [True, False],
     # "sample_n_jobs": [-1, 3],  # WARNING: This option does not work for PSPs?
-    "chunk_n_jobs": [3, -1],
+    # "chunk_n_jobs": [3, -1],
     "max_n_j": [20],
     "max_n_m": [20],
     "lr": [0.0001],
@@ -257,7 +259,7 @@ possible_args = {
     "gamma": [1.0],
     "gae_lambda": [1.0],
     "optimizer": ["adamw"],
-    "fe_type": ["dgl"],
+    "fe_type": ["message_passing"],
     "residual_gnn": [True],
     "graph_has_relu": [True],
     "graph_pooling": ["learn", "learninv"],
@@ -286,15 +288,16 @@ possible_args = {
     "skip_initial_eval": [True, False],
     "exp_name_appendix": ["test"],
     "train_dir": ["./instances/psp/test/"],
-    "vecenv_type": ["subproc", "graphgym"],
+    "vecenv_type": ["graphgym"],
     "return_based_scaling": [True, False],
     "observe_subgraph": [True, False],
     "fast_forward": [True, False],
-    "observation_horizon_step": [0, 5],
-    "observation_horizon_time": [0, 5],
+    "observation_horizon_step": [2, 5],
+    "observation_horizon_time": [2, 5],
     "symlog": [True, False],
     "store_rollouts_on_disk": [False, "/tmp/"],
     "critic_loss": ["l2", "l1"],
+    "pyg": [True, False],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.

@@ -24,9 +24,10 @@
 
 from generic.mlp import MLP
 import torch
-import dgl
 from dgl.nn import GlobalAttentionPooling
-from generic.eegatconv import EEGATConv
+
+# from generic.eegatconv import EEGATConv
+from psp.graph.graph_conv import GraphConv
 
 from dgl import LaplacianPE
 from .agent_observation import AgentObservation
@@ -35,7 +36,7 @@ from .edge_embedder import PspEdgeEmbedder
 from .rewiring import rewire, homogeneous_edges
 
 
-class GnnDGL(torch.nn.Module):
+class GnnMP(torch.nn.Module):
     def __init__(
         self,
         input_dim_features_extractor,
@@ -63,8 +64,10 @@ class GnnDGL(torch.nn.Module):
         rwpe_cache=None,
         graphobs=False,
         shared_conv=True,
+        pyg=True,
     ):
         super().__init__()
+        self.pyg = pyg
         self.conflicts = conflicts
         self.residual = residual
         self.normalize = normalize
@@ -182,13 +185,12 @@ class GnnDGL(torch.nn.Module):
             self.pe_mlp = torch.nn.ModuleList()
 
         if self.shared_conv:
-            self.features_extractors = EEGATConv(
-                self.hidden_dim + self.rwpe_h,
-                self.hidden_dim,
+            self.features_extractors = GraphConv(
                 self.hidden_dim + self.rwpe_h,
                 self.hidden_dim,
                 num_heads=n_attention_heads,
                 edge_scoring=self.update_edge_features,
+                pyg=self.pyg,
             )
             self.mlps = MLP(
                 n_layers=n_mlp_layers_features_extractor,
@@ -210,13 +212,12 @@ class GnnDGL(torch.nn.Module):
 
             if self.rwpe_k != 0:
                 self.pe_conv.append(
-                    EEGATConv(
-                        self.rwpe_h,
-                        self.hidden_dim,
+                    GraphConv(
                         self.rwpe_h,
                         self.hidden_dim,
                         num_heads=n_attention_heads,
                         bias=False,
+                        pyg=self.pyg,
                     )
                 )
                 self.pe_mlp.append(
@@ -231,13 +232,12 @@ class GnnDGL(torch.nn.Module):
                 )
             if not self.shared_conv:
                 self.features_extractors.append(
-                    EEGATConv(
-                        self.hidden_dim + self.rwpe_h,
-                        self.hidden_dim,
+                    GraphConv(
                         self.hidden_dim + self.rwpe_h,
                         self.hidden_dim,
                         num_heads=n_attention_heads,
                         edge_scoring=self.update_edge_features,
+                        pyg=self.pyg,
                     )
                 )
 
@@ -291,14 +291,14 @@ class GnnDGL(torch.nn.Module):
                 rewire_internal=False,
             )
             g = observation.graphs
-            res_cal_id = torch.cat(observation.res_cal_id)
+            res_cal_id = observation.res_cal_id
             batch_size = observation.n_graphs
-            num_nodes = g.num_nodes()
+            num_nodes = observation.num_nodes
             if batch_size == 1:
-                n_nodes = g.batch_num_nodes("n")[0].item()
+                n_nodes = observation.batch_num_nodes[0]
             else:
-                n_nodes = g.batch_num_nodes("n")
-
+                n_nodes = observation.batch_num_nodes
+            origbnn = observation.batch_num_nodes
         else:
             observation = AgentObservation(
                 obs,
@@ -318,20 +318,17 @@ class GnnDGL(torch.nn.Module):
             n_nodes = observation.get_n_nodes()
             num_nodes = g.num_nodes()
 
-        origbnn = g.batch_num_nodes()
+            origbnn = g.batch_num_nodes()
         if self.add_self_loops:
             if self.graphobs:
-                g = dgl.add_self_loop(
-                    g,
-                    etype="self",
-                )
-            else:
-                g = dgl.add_self_loop(
-                    g,
-                    edge_feat_names=["type"],
-                    fill_data=AgentObservation.edgeType["self"],
-                )
-        g.set_batch_num_nodes(origbnn)
+                g.add_self_loops()
+            # else:
+            #     g = dgl.add_self_loop(
+            #         g,
+            #         edge_feat_names=["type"],
+            #         fill_data=AgentObservation.edgeType["self"],
+            #     )
+        # g.set_batch_num_nodes(origbnn)
 
         g, poolnodes, resource_nodes, vnodes = rewire(
             g,
@@ -355,9 +352,10 @@ class GnnDGL(torch.nn.Module):
                 g,
                 AgentGraphObservation.edgeTypes,
                 self.factored_rp,
+                self.conflicts,
                 self.max_n_resources,
             )
-            g = dgl.to_homogeneous(g, ndata=["feat"], edata=felist, store_type=False)
+            g.to_homogeneous(ndata=["feat"], edata=felist)
 
         if self.rwpe_k != 0:
             edge_features_pe = self.edge_embedder_pe(g)
@@ -378,7 +376,7 @@ class GnnDGL(torch.nn.Module):
         edge_features = self.edge_embedder(g)
         if self.update_edge_features:
             edge_scores = self.edge_embedder_scores(g)
-        features = g.ndata["feat"]
+        features = g.ndata("feat")
         # remove job_id and node_type
         features[:, 2:4] = 0
         # remove resource cons
@@ -452,32 +450,30 @@ class GnnDGL(torch.nn.Module):
             else:
                 if self.shared_conv:
                     features, _ = self.features_extractors(
-                        g,
+                        g._graph,
                         features,
                         edge_features,
                     )
-                    features = self.mlps(features.flatten(start_dim=-2, end_dim=-1))
+                    features = self.mlps(features)
                 else:
                     features, _ = self.features_extractors[layer](
-                        g,
+                        g._graph,
                         features,
                         edge_features,
                     )
-                    features = self.mlps[layer](
-                        features.flatten(start_dim=-2, end_dim=-1)
-                    )
+                    features = self.mlps[layer](features)
 
             if self.rwpe_k != 0:
                 if self.update_edge_features_pe:
                     pe, new_e_pe_attr = self.pe_conv[layer](
-                        g, pe, edge_features_pe.clone()
+                        g._graph, pe, edge_features_pe.clone()
                     )
                     edge_features_pe += self.mlps_edges_pe[layer](
                         new_e_pe_attr.flatten(start_dim=-2, end_dim=-1)
                     )
                 else:
-                    pe, _ = self.pe_conv[layer](g, pe, edge_features_pe)
-                pe = self.pe_mlp[layer](pe.flatten(start_dim=-2, end_dim=-1))
+                    pe, _ = self.pe_conv[layer](g._graph, pe, edge_features_pe)
+                pe = self.pe_mlp[layer](pe)
 
             # if self.layer_pooling == "all":
             #     features_list.append(features)

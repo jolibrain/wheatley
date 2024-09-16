@@ -34,7 +34,9 @@ from .state import State
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description, env_specification, pb_ids, validate=False):
+    def __init__(
+        self, problem_description, env_specification, pb_ids, validate=False, pyg=False
+    ):
         self.problem_description = problem_description
         self.env_specification = env_specification
         self.validate = validate

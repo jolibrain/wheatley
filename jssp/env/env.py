@@ -42,7 +42,9 @@ from .observation import EnvObservation
 
 
 class Env(gym.Env):
-    def __init__(self, problem_description, env_specification, i=0, validate=False):
+    def __init__(
+        self, problem_description, env_specification, i=0, validate=False, pyg=False
+    ):
         self.problem_description = problem_description
         self.env_specification = env_specification
         self.rng = problem_description.rng

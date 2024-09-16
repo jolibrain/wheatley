@@ -33,7 +33,7 @@ import cv2
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import pandas as pd
+from pandas import DataFrame as PDDataFrame
 import plotly.figure_factory as ff
 import torch
 
@@ -176,9 +176,9 @@ class State:
                 machine_id = self.affectations[job_id, task_id]
                 node_id = job_and_task_to_node(job_id, task_id, self.n_machines)
                 if machine_id != -1:
-                    self.features[
-                        node_id, 6 : 6 + self.max_n_machines
-                    ] = torch.as_tensor(self.not_one_hot_machine_id[machine_id])
+                    self.features[node_id, 6 : 6 + self.max_n_machines] = (
+                        torch.as_tensor(self.not_one_hot_machine_id[machine_id])
+                    )
 
     def set_one_hot_machine_id(self):
         for job_id in range(self.n_jobs):
@@ -190,9 +190,9 @@ class State:
                         self.max_n_machines
                     )
                 else:
-                    self.features[
-                        node_id, 6 : 6 + self.max_n_machines
-                    ] = torch.as_tensor(self.one_hot_machine_id[machine_id])
+                    self.features[node_id, 6 : 6 + self.max_n_machines] = (
+                        torch.as_tensor(self.one_hot_machine_id[machine_id])
+                    )
 
     def reset_durations(self):
         self.durations = self.original_durations.copy()
@@ -278,25 +278,25 @@ class State:
                         == -1
                         or self.durations[job_id, task_id][0] == -1
                     ):
-                        self.total_machine_time[
-                            self.affectations[job_id, task_id]
-                        ] += self.durations[job_id, task_id]
+                        self.total_machine_time[self.affectations[job_id, task_id]] += (
+                            self.durations[job_id, task_id]
+                        )
                         self.total_machine_time[self.affectations[job_id, task_id]][
                             0
                         ] = -1
                     else:
-                        self.total_machine_time[
-                            self.affectations[job_id, task_id]
-                        ] += self.durations[job_id, task_id]
+                        self.total_machine_time[self.affectations[job_id, task_id]] += (
+                            self.durations[job_id, task_id]
+                        )
 
         self.total_machine_time_job_task = torch.zeros(
             (self.n_jobs, self.n_machines, 4)
         )
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
-                self.total_machine_time_job_task[
-                    job_id, task_id
-                ] = self.total_machine_time[self.affectations[job_id, task_id]]
+                self.total_machine_time_job_task[job_id, task_id] = (
+                    self.total_machine_time[self.affectations[job_id, task_id]]
+                )
                 if "total_machine_time" in self.features_offset:
                     tmtof = self.features_offset["total_machine_time"]
                     self.features[
@@ -324,9 +324,9 @@ class State:
         )
         for job_id in range(self.n_jobs):
             for task_id in range(self.n_machines):
-                self.machine_completion_time_job_task[
-                    job_id, task_id
-                ] = self.machine_completion_time[self.affectations[job_id, task_id]]
+                self.machine_completion_time_job_task[job_id, task_id] = (
+                    self.machine_completion_time[self.affectations[job_id, task_id]]
+                )
                 if "machine_completion_percentage" in self.features_offset:
                     mcpof = self.features_offset["machine_completion_percentage"]
                     result = (
@@ -759,9 +759,9 @@ class State:
 
             if "total_job_time" in self.features_offset:
                 for nid in node_same_job:
-                    self.features[
-                        nid, self.features_offset["total_job_time"][0]
-                    ] = self.total_job_time[job_id][0]
+                    self.features[nid, self.features_offset["total_job_time"][0]] = (
+                        self.total_job_time[job_id][0]
+                    )
 
             if (
                 "total_machine_time" in self.features_offset
@@ -770,13 +770,13 @@ class State:
                 for nid in on_machine:
                     jid, tid = node_to_job_and_task(nid, self.n_machines)
                     if self.total_machine_time_job_task[jid, tid][0] < 0:
-                        self.total_machine_time_job_task[jid, tid][
-                            0
-                        ] = self.get_durations(node_id)[0]
+                        self.total_machine_time_job_task[jid, tid][0] = (
+                            self.get_durations(node_id)[0]
+                        )
                     else:
-                        self.total_machine_time_job_task[jid, tid][
-                            0
-                        ] += self.get_durations(node_id)[0]
+                        self.total_machine_time_job_task[jid, tid][0] += (
+                            self.get_durations(node_id)[0]
+                        )
 
                 if self.total_machine_time[machine_id][0] < 0:
                     self.total_machine_time[machine_id][0] = self.get_durations(
@@ -797,9 +797,9 @@ class State:
                 self.machine_completion_time[machine_id] += self.get_durations(node_id)
                 same_machine = np.asarray(self.affectations == machine_id).nonzero()
                 for coord in zip(same_machine[0], same_machine[1]):
-                    self.machine_completion_time_job_task[
-                        coord[0], coord[1]
-                    ] += self.get_durations(node_id)
+                    self.machine_completion_time_job_task[coord[0], coord[1]] += (
+                        self.get_durations(node_id)
+                    )
                 if self.get_durations(node_id)[0] == -1:
                     self.job_completion_time[job_id][0] = -1
                     self.machine_completion_time[machine_id][0] = -1
@@ -990,7 +990,7 @@ class State:
                 i += 1
         fig = None
         if len(df) > 0:
-            df = pd.DataFrame(df)
+            df = PDDataFrame(df)
             fig = ff.create_gantt(
                 df,
                 index_col="Resource",

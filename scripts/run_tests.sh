@@ -14,7 +14,7 @@ echo "Running pytests."
 for test_file in $(find tests/ -type f -name "*.py" ! -name "*_perf.py"); do
     # Run the test and save the output to a file.
     echo "Running $test_file."
-    python3 -m pytest "$test_file" "$OUT_DIR"
+    python3 -m pytest --rootdir $OUT_DIR  "$test_file" "$OUT_DIR"
 
     if [ $? -ne 0 ]; then
         echo "Tests in $test_file failed."

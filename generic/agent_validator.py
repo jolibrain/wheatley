@@ -137,7 +137,9 @@ class AgentValidator:
             self.validation_envs = validation_envs
         else:
             self.validation_envs = []
-            for i in range(self.n_validation_env):
+            for i in tqdm.tqdm(
+                range(self.n_validation_env), desc="Creating validation envs"
+            ):
                 problem_description = copy.deepcopy(self.problem_description)
                 problem_description.rng = np.random.default_rng(
                     self.problem_description.seed + i
@@ -148,6 +150,7 @@ class AgentValidator:
                         self.env_specification,
                         aff[i],
                         validate=True,
+                        pyg=self.env_specification.pyg,
                     )
                 )
 
@@ -429,11 +432,23 @@ class AgentValidator:
         for i in tqdm.tqdm(range(self.n_validation_env), desc="   evaluating         "):
             if self.batch_size == 0:
                 obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
+                # print("RESET")
+                # print("graph", obs._graph)
+                # print("prec edges", obs.edges("prec"))
+                # print("rp edges", obs.edges("rp"))
+                # print("ndata", obs.ndata())
+                # print("global data", obs.global_data())
                 done = False
                 while not done:
                     action_masks = info["mask"].reshape(1, -1)
                     action_masks = decode_mask(action_masks)
+                    # print("STEP ", i)
                     obs = agent.obs_as_tensor_add_batch_dim(obs)
+                    # print("graph", obs._graph)
+                    # print("prec edges", obs.edges("prec"))
+                    # print("rp edges", obs.edges("rp"))
+                    # print("ndata", obs.ndata())
+                    # print("global data", obs.global_data())
                     action = agent.predict(
                         obs, deterministic=True, action_masks=action_masks
                     )

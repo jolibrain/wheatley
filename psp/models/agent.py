@@ -23,14 +23,13 @@
 
 
 import torch
-import dgl
 import pickle
 
 from generic.agent import Agent
-from .gnn_dgl import GnnDGL
+from .gnn_mp import GnnMP
 from .gnn_tokengt import GnnTokenGT
 from generic.mlp import MLP
-from torch.distributions.categorical import Categorical
+from psp.graph.graph_factory import GraphFactory
 from functools import partial
 import numpy as np
 from .agent_observation import AgentObservation
@@ -76,13 +75,13 @@ class Agent(Agent):
             self.action_net = action_net
             return
 
-        if self.agent_specification.fe_type == "dgl":
+        if self.agent_specification.fe_type == "message_passing":
             if agent_specification.cache_rwpe:
                 self.rwpe_cache = {}
             else:
                 self.rwpe_cache = None
 
-            self.gnn = GnnDGL(
+            self.gnn = GnnMP(
                 input_dim_features_extractor=env_specification.n_features,
                 graph_pooling=agent_specification.graph_pooling,
                 max_n_nodes=env_specification.max_n_nodes,
@@ -108,6 +107,7 @@ class Agent(Agent):
                 rwpe_h=agent_specification.rwpe_h,
                 rwpe_cache=self.rwpe_cache,
                 graphobs=graphobs,
+                pyg=agent_specification.pyg,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -256,7 +256,10 @@ class Agent(Agent):
 
     def _get_obs_graph(self, b_obs, mb_ind):
         if isinstance(b_obs[0], str):
-            return [dgl.load_graphs(b_obs[i])[0][0] for i in mb_ind]
+            # return [dgl.load_graphs(b_obs[i])[0][0] for i in mb_ind]
+            return [
+                GraphFactory.load(b_obs[i], self.env_specification.pyg) for i in mb_ind
+            ]
         return list(b_obs[i] for i in mb_ind)
 
     def _get_obs(self, b_obs, mb_ind):

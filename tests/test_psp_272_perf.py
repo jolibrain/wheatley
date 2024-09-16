@@ -2,6 +2,7 @@ import sys
 
 import pytest
 
+from generic.utils import get_path
 from args import argument_parser, parse_args
 from psp.train_psp import main
 
@@ -28,7 +29,7 @@ from psp.train_psp import main
                 "--optimizer",
                 "adam",
                 "--fe_type",
-                "dgl",
+                "message_passing",
                 "--graph_pooling",
                 "learn",
                 "--hidden_dim_features_extractor",
@@ -38,7 +39,7 @@ from psp.train_psp import main
                 "--layer_pooling",
                 "all",
                 "--n_mlp_layers_features_extractor",
-                "3",
+                "6",
                 "--n_mlp_layers_actor",
                 "1",
                 "--n_mlp_layers_critic",
@@ -52,7 +53,7 @@ from psp.train_psp import main
                 "--n_validation_env",
                 "1",
                 "--n_steps_episode",
-                "1800",
+                "18000",
                 "--batch_size",
                 "1024",
                 "--n_epochs",
@@ -69,6 +70,8 @@ from psp.train_psp import main
                 "--weight_decay",
                 "0.0",
                 "--skip_initial_eval",
+                "--vecenv_type",
+                "graphgym",
             ],
             1.0,
         ),
@@ -90,8 +93,8 @@ def test_performance(args: list, upper_limit_ratios: float):
         sys.argv = ["python3"] + args
 
         parser = argument_parser()
-        args, exp_name, path = parse_args(parser)
-        ppo_ratio = main(args, exp_name, path)
+        args, exp_name = parse_args(parser)
+        ppo_ratio = main(args, exp_name)
 
         assert (
             ppo_ratio <= upper_limit_ratios

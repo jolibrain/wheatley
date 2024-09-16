@@ -49,6 +49,7 @@ class EnvSpecification:
         fast_forward,
         observe_subgraph,
         random_taillard,
+        pyg,
     ):
         self.problems = problems
         self.max_n_modes = self.problems.max_n_modes
@@ -82,6 +83,7 @@ class EnvSpecification:
         self.fast_forward = fast_forward
         self.observe_subgraph = observe_subgraph
         self.random_taillard = random_taillard
+        self.pyg = pyg
 
         if self.max_edges_factor > 0:
             self.shape_pr = (
@@ -219,6 +221,7 @@ class EnvSpecification:
         ]
         print(
             f"==========Env Description     ==========\n"
+            f"Use PYG:                            {self.pyg}\n"
             f"Max size:                           {self.max_n_modes}\n"
             f"Input normalization:                {'Yes' if self.normalize_input else 'No'}\n"
             f"Observe real duration when affect:  {self.observe_real_duration_when_affect}\n"

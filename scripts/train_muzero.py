@@ -43,13 +43,12 @@ from args import args, exp_name, path
 
 from muzero_general.muzero import MuZero
 from env.env import Env
-from models.gnn_dgl import GnnDGL
+from models.gnn_mp import GnnMP
 from models.gnn_tokengt import GNNTokenGT
 from models.muzero_callback import MuZeroCallback
 
 
 def main():
-
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -227,8 +226,8 @@ def main():
             "act_dropout": agent_specification.dropout,
             "cache_lap_node_id": agent_specification.cache_lap_node_id,
         }
-    if agent_specification.fe_type == "dgl":
-        fe_type = GnnDGL
+    if agent_specification.fe_type == "message_passing":
+        fe_type = GnnMP
     elif agent_specification.fe_type == "tokengt":
         fe_type = GnnTokenGT
     else:

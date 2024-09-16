@@ -28,7 +28,7 @@ import torch
 import numpy as np
 from generic.tokengt.utils import get_laplacian_pe_simple
 from psp.utils.utils import compute_resources_graph_torch
-import dgl
+from dgl import graph, heterograph, add_self_loop, batch, random_walk_pe
 import time
 
 
@@ -56,7 +56,7 @@ class AgentObservation:
     def simple_pr_graph(self, nnodes, edges):
         edges0 = edges[0]
         edges1 = edges[1]
-        return dgl.graph(
+        return graph(
             (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
             num_nodes=nnodes,
         )
@@ -78,12 +78,12 @@ class AgentObservation:
         if bidir:
             type1 = [AgentObservation.edgeType["rprec"]] * n_edges
 
-            gnew = dgl.graph(
+            gnew = graph(
                 (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
                 num_nodes=nnodes,
             )
         else:
-            gnew = dgl.graph((edges0, edges1), num_nodes=nnodes)
+            gnew = graph((edges0, edges1), num_nodes=nnodes)
 
         gnew.ndata["feat"] = feats
         if bidir:
@@ -477,11 +477,11 @@ class AgentObservation:
 
                 rc_graphs_num_edges.append(n_rc_edges[i].item() * 2)
 
-            hetero_graphs.append(dgl.heterograph(hg_dict))
+            hetero_graphs.append(heterograph(hg_dict))
             # TODO : add job_id edges, ie link modes that are for same job
 
             if add_self_loops:
-                gnew = dgl.add_self_loop(
+                gnew = add_self_loop(
                     gnew,
                     edge_feat_names=["type"],
                     fill_data=AgentObservation.edgeType["self"],
@@ -511,7 +511,7 @@ class AgentObservation:
                     rcg = hg.edge_type_subgraph(["rc"])
                     gg.ndata["rwpe_rc"] = self.rwpe(rcg, rwpe_k)
 
-            self.graphs = dgl.batch(global_graphs)
+            self.graphs = batch(global_graphs)
             self.graphs.set_batch_num_nodes(torch.tensor(batch_num_nodes))
             self.graphs.set_batch_num_edges(torch.tensor(batch_num_edges))
 
@@ -542,7 +542,7 @@ class AgentObservation:
             if key in self.rwpe_cache:
                 return self.rwpe_cache[key]
             else:
-                pe = dgl.random_walk_pe(g, k)
+                pe = random_walk_pe(g, k)
                 self.rwpe_cache[key] = pe
                 return pe
-        return dgl.random_walk_pe(g, k)
+        return random_walk_pe(g, k)
