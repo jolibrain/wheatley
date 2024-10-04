@@ -30,7 +30,7 @@ from jssp.utils.utils import (
     compute_conflicts_cliques,
     put_back_one_hot_encoding_unbatched,
 )
-import dgl
+from dgl import graph, add_self_loop, batch
 import time
 
 
@@ -58,12 +58,12 @@ class AgentObservation:
         if bidir:
             type1 = [2] * n_edges
 
-            gnew = dgl.graph(
+            gnew = graph(
                 (torch.cat([edges0, edges1]), torch.cat([edges1, edges0])),
                 num_nodes=nnodes,
             )
         else:
-            gnew = dgl.graph((edges0, edges1), num_nodes=nnodes)
+            gnew = graph((edges0, edges1), num_nodes=nnodes)
 
         gnew.ndata["feat"] = feats
         if bidir:
@@ -208,7 +208,7 @@ class AgentObservation:
                 # gnew = AgentObservation.add_conflicts_cliques(gnew, features, nnodes.item(), max_n_machines)
 
             if add_self_loops:
-                gnew = dgl.add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
+                gnew = add_self_loop(gnew, edge_feat_names=["type"], fill_data=0)
             if compute_laplacian_pe:
                 gnew.ndata["laplacian_pe"] = get_laplacian_pe_simple(
                     gnew, laplacian_pe_cache, n_laplacian_eigv
@@ -220,7 +220,7 @@ class AgentObservation:
                 batch_num_edges.append(gnew.num_edges())
 
         if do_batch:
-            graph = dgl.batch(graphs)
+            graph = batch(graphs)
             graph.set_batch_num_nodes(torch.tensor(batch_num_nodes))
             graph.set_batch_num_edges(torch.tensor(batch_num_edges))
 

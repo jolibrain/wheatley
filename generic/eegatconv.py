@@ -7,7 +7,7 @@ from torch.nn import init
 
 import numpy as np
 
-import dgl
+from dgl import graph
 from dgl import function as fn
 from dgl.base import DGLError
 from dgl.utils import expand_as_pair
@@ -316,9 +316,7 @@ class EEGATConv(nn.Module):
 if __name__ == "__main__":
     src = np.random.randint(0, 100, 500)
     dst = np.random.randint(0, 100, 500)
-    edge_pred_graph = dgl.graph(
-        (np.concatenate([src, dst]), np.concatenate([dst, src]))
-    )
+    edge_pred_graph = graph((np.concatenate([src, dst]), np.concatenate([dst, src])))
     edge_pred_graph.ndata["feature"] = torch.randn(100, 10)
     edge_pred_graph.edata["feature"] = torch.randn(1000, 10)
     edge_pred_graph.edata["label"] = torch.randn(1000)

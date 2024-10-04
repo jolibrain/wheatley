@@ -25,7 +25,6 @@
 #
 
 
-import dgl
 import torch
 from dgl import LaplacianPE
 from dgl.nn import DGNConv, EGATConv, GCN2Conv, GINEConv, PNAConv

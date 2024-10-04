@@ -199,6 +199,7 @@ def main(args, exp_name) -> float:
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
+        pyg=args.pyg,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -258,6 +259,7 @@ def main(args, exp_name) -> float:
         hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
+        pyg=args.pyg,
     )
     agent_specification.print_self()
 

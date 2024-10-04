@@ -28,7 +28,6 @@ import torch
 import numpy as np
 from generic.tokengt.utils import get_laplacian_pe_simple
 from psp.utils.utils import compute_resources_graph_torch
-import dgl
 import time
 
 
@@ -59,20 +58,21 @@ class AgentGraphObservation:
         rwpe_k=0,
         rwpe_cache=None,
     ):
-        g.ndata["feat"] = {
-            "n": torch.cat(
+        g.set_ndata(
+            "feat",
+            torch.cat(
                 [
-                    g.ndata["affected"]["n"].unsqueeze(1),
-                    g.ndata["selectable"]["n"].unsqueeze(1),
-                    g.ndata["job"]["n"].unsqueeze(1),
-                    g.ndata["type"]["n"].unsqueeze(1),
-                    g.ndata["normalized_durations"]["n"],
-                    g.ndata["normalized_tct"]["n"],
-                    g.ndata["resources"]["n"],
+                    g.ndata("affected").unsqueeze(1),
+                    g.ndata("selectable").unsqueeze(1),
+                    g.ndata("job").unsqueeze(1),
+                    g.ndata("type").unsqueeze(1),
+                    g.ndata("normalized_durations"),
+                    g.ndata("normalized_tct"),
+                    g.ndata("resources"),
                 ],
                 dim=1,
-            )
-        }
+            ),
+        )
 
         if conflicts == "clique":
             if g.num_edges(etype="rc") == 0:
@@ -81,7 +81,7 @@ class AgentGraphObservation:
                     resource_conf_id,
                     resource_conf_val,
                     resource_conf_val_r,
-                ) = compute_resources_graph_torch(g.ndata["resources"]["n"])
+                ) = compute_resources_graph_torch(g.ndata("resources"))
                 g.add_edges(
                     resource_conf_edges[0],
                     resource_conf_edges[1],
@@ -95,7 +95,7 @@ class AgentGraphObservation:
 
         if bidir:
             prec_edges = g.edges(etype="prec")
-            g.add_edges(prec_edges[1], prec_edges[0], etype="rprec")
+            g.add_edges(prec_edges[1], prec_edges[0], etype="rprec", data=None)
 
             if g.num_edges(etype="rp") != 0:
                 rp_edges = g.edges(etype="rp")
@@ -103,7 +103,7 @@ class AgentGraphObservation:
                     rp_edges[1],
                     rp_edges[0],
                     etype="rrp",
-                    data={"r": g.edata["r"][("n", "rp", "n")]},
+                    data={"r": g.edata("rp", "r")},
                 )
 
         # if add_self_loops:
@@ -113,46 +113,47 @@ class AgentGraphObservation:
         #         etype="self",
         #         fill_data=AgentObservation.edgeType["self"],
         #     )
-        if compute_laplacian_pe:
-            g.ndata["laplacian_pe"] = get_laplacian_pe_simple(
-                dgl.to_homogeneous(g, store_type=False, return_count=False),
-                laplacian_pe_cache,
-                n_laplacian_eigv,
-            )
+        # if compute_laplacian_pe:
+        #     g.ndata["laplacian_pe"] = get_laplacian_pe_simple(
+        #         dgl.to_homogeneous(g, store_type=False, return_count=False),
+        #         laplacian_pe_cache,
+        #         n_laplacian_eigv,
+        #     )
 
-        if rwpe_k != 0:
-            g.ndata["rwpe_global"] = cls.rwpe(
-                dgl.to_homogeneous(g, store_type=False, return_count=False),
-                rwpe_k,
-                rwpe_cache,
-            )
-            g.ndata["rwpe_pr"] = self.rwpe(
-                dgl.to_homogeneous(
-                    g.edge_type_subgraph(["prec", "rprec"]),
-                    store_type=False,
-                    return_count=False,
-                ),
-                rwpe_k,
-                rwpe_cache,
-            )
-            g.ndata["rwpe_rp"] = self.rwpe(
-                dgl.to_homogeneous(
-                    g.edge_type_subgraph(["rp", "rrp"]),
-                    store_type=False,
-                    return_count=False,
-                ),
-                rwpe_k,
-                rwpe_cache,
-            )
-            g.ndata["rwpe_rc"] = self.rwpe(
-                dgl.to_homogeneous(
-                    g.edge_type_subgraph(["rc"]),
-                    store_type=False,
-                    return_count=False,
-                ),
-                rwpe_k,
-                rwpe_cache,
-            )
+        # if rwpe_k != 0:
+        #     g.ndata["rwpe_global"] = cls.rwpe(
+        #         dgl.to_homogeneous(g, store_type=False, return_count=False),
+        #         rwpe_k,
+        #         rwpe_cache,
+        #     )
+        #     g.ndata["rwpe_pr"] = self.rwpe(
+        #         dgl.to_homogeneous(
+        #             g.edge_type_subgraph(["prec", "rprec"]),
+        #             store_type=False,
+        #             return_count=False,
+        #         ),
+        #         rwpe_k,
+        #         rwpe_cache,
+        #     )
+        #     g.ndata["rwpe_rp"] = self.rwpe(
+        #         dgl.to_homogeneous(
+        #             g.edge_type_subgraph(["rp", "rrp"]),
+        #             store_type=False,
+        #             return_count=False,
+        #         ),
+        #         rwpe_k,
+        #         rwpe_cache,
+        #     )
+        #     g.ndata["rwpe_rc"] = self.rwpe(
+        #         dgl.to_homogeneous(
+        #             g.edge_type_subgraph(["rc"]),
+        #             store_type=False,
+        #             return_count=False,
+        #         ),
+        #         rwpe_k,
+        #         rwpe_cache,
+        #     )
+        g.fill_void()
         return g
 
     # self loops, problem precedence, problem precedence (reversed)
@@ -222,8 +223,8 @@ class AgentGraphObservation:
                     rwpe_k,
                     rwpe_cache,
                 )
-            self.res_cal_id.append(g.ndata["res_cal"]["global_data"][0])
-            g = dgl.node_type_subgraph(g, ["n"])
+            self.res_cal_id.append(g.global_data("res_cal"))
+            # g = dgl.node_type_subgraph(g, ["n"])
 
             if do_batch:
                 batch_num_nodes.append(g.num_nodes())
@@ -236,25 +237,30 @@ class AgentGraphObservation:
 
         if do_batch:
             self.glist = False
-            self.graphs = dgl.batch(self.graphs)
-            self.graphs.set_batch_num_nodes(torch.tensor(batch_num_nodes))
-            self.graphs.set_batch_num_edges(batch_num_edges)
+            graphtype = type(self.graphs[0])
+            self.graphs = graphtype.batch(self.graphs, batch_num_nodes, batch_num_edges)
+            self.res_cal_id = torch.cat(self.res_cal_id)
+            self.num_nodes = self.graphs.num_nodes()
+            self.batch_num_nodes = batch_num_nodes
+            # self.graphs = dgl.batch([g._graph for g in self.graphs])
+            # self.graphs.set_batch_num_nodes(torch.tensor(batch_num_nodes))
+            # self.graphs.set_batch_num_edges(batch_num_edges)
 
         else:
             self.glist = True
 
-    @classmethod
-    def rwpe(cls, g, k, rwpe_cache):
-        if rwpe_cache is not None:
-            edges = g.edges(order="srcdst")
-            key = (
-                g.num_nodes(),
-                *(edges[0].tolist() + edges[1].tolist()),
-            )
-            if key in rwpe_cache:
-                return rwpe_cache[key]
-            else:
-                pe = dgl.random_walk_pe(g, k)
-                rwpe_cache[key] = pe
-                return pe
-        return dgl.random_walk_pe(g, k)
+    # @classmethod
+    # def rwpe(cls, g, k, rwpe_cache):
+    #     if rwpe_cache is not None:
+    #         edges = g.edges(order="srcdst")
+    #         key = (
+    #             g.num_nodes(),
+    #             *(edges[0].tolist() + edges[1].tolist()),
+    #         )
+    #         if key in rwpe_cache:
+    #             return rwpe_cache[key]
+    #         else:
+    #             pe = dgl.random_walk_pe(g, k)
+    #             rwpe_cache[key] = pe
+    #             return pe
+    #     return dgl.random_walk_pe(g, k)

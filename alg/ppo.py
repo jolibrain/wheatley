@@ -27,7 +27,6 @@ import time
 from collections import deque
 from functools import partial
 import os
-import dgl
 import glob
 import pickle
 
@@ -49,7 +48,13 @@ from .logger import Logger, configure_logger, monotony, stability
 
 def create_env(env_cls, problem_description, env_specification, i):
     def _init():
-        env = env_cls(problem_description, env_specification, i, validate=False)
+        env = env_cls(
+            problem_description,
+            env_specification,
+            i,
+            validate=False,
+            pyg=env_specification.pyg,
+        )
         return env
 
     return _init
@@ -134,7 +139,7 @@ class PPO:
 
         if self.obs_on_disk is not None:
             for f in glob.glob(
-                self.obs_on_disk + "/wheatley_dgl_" + str(os.getpid()) + "_*.obs"
+                self.obs_on_disk + "/wheatley_" + str(os.getpid()) + "_*.obs"
             ) + glob.glob(
                 self.obs_on_disk + "/wheatley_pkl_" + str(os.getpid()) + "_*.obs"
             ):
@@ -146,13 +151,13 @@ class PPO:
                     for i, o in enumerate(next_obs):
                         fname = (
                             self.obs_on_disk
-                            + "/wheatley_dgl_"
+                            + "/wheatley_"
                             + str(os.getpid())
                             + "_"
                             + str(step * self.num_envs + i)
                             + ".obs"
                         )
-                        dgl.save_graphs(fname, [o])
+                        o.save(fname)
                         obs.append(fname)
                 else:
                     list_obs = [dict(zip(next_obs, t)) for t in zip(*next_obs.values())]
@@ -367,7 +372,7 @@ class PPO:
         # env setup
         batch_size = self.num_envs * self.num_steps
         classVecEnv = gym.vector.AsyncVectorEnv
-        print("creating environments")
+        # print("creating environments")
         pbs_per_env = self.pb_ids(problem_description)
         if self.vecenv_type == "dummy":
             envs = gym.vector.SyncVectorEnv(
@@ -406,7 +411,9 @@ class PPO:
                         env_specification,
                         pbs_per_env[i],
                     )
-                    for i in range(self.num_envs)
+                    for i in tqdm.tqdm(
+                        range(self.num_envs), desc="Creating learning envs"
+                    )
                 ],
                 # spwan helps when observation space is huge
                 # and also with torch in subprocesses
@@ -414,6 +421,7 @@ class PPO:
                 copy=False,
                 shared_memory=True,
                 disk=True,
+                pyg=env_specification.pyg,
             )
 
         print("... done creating environments")

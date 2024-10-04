@@ -1,6 +1,8 @@
-torch
-pre - commit
-numpy
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch 
+torchvision 
+torchaudio 
+numpy<2.0.0
 gymnasium
 ortools
 visdom
@@ -12,3 +14,7 @@ opencv-python
 kaleido
 pandas
 torchinfo
+torch_geometric
+PyYAML
+pydantic
+cython

@@ -73,6 +73,7 @@ class AgentSpecification:
         hl_gauss,
         reward_weights,
         sgformer,
+        pyg,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -118,6 +119,7 @@ class AgentSpecification:
         self.hl_gauss = hl_gauss
         self.reward_weights = reward_weights
         self.sgformer = sgformer
+        self.pyg = pyg
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -190,6 +192,7 @@ class AgentSpecification:
             print(
                 f"Convolutional FE\n"
                 f"Graph convolution type:           {self.gconv_type.upper()}\n"
+                f"Use pyg:                          {self.pyg}\n"
                 f"Add (R)eLU between graph layers:  {'Yes' if self.graph_has_relu else 'No'}\n"
                 f"Graph pooling type:               {self.graph_pooling.title()}\n"
                 f"Activation function of agent:     {self.mlp_act.title()}\n"

@@ -67,7 +67,7 @@ class Agent(Agent):
             self.action_net = action_net
             return
 
-        if self.agent_specification.fe_type == "dgl":
+        if self.agent_specification.fe_type == "message_passing":
             self.gnn = GnnDGL(
                 input_dim_features_extractor=env_specification.n_features,
                 gconv_type=agent_specification.gconv_type,

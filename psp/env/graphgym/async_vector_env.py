@@ -1,4 +1,5 @@
 """An async vector environment."""
+
 import os
 
 import sys
@@ -8,8 +9,8 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 import pickle
 import io
 import contextlib
-import dgl
 from dgl import multiprocessing as mp
+from psp.graph.graph_factory import GraphFactory
 import numpy as np
 import time
 
@@ -57,9 +58,7 @@ def create_shared_memory(size, n, ctx, disk):
     if disk:
         fnames = []
         for i in range(n):
-            fname = (
-                "/tmp/wheatley_dgl_" + str(os.getpid()) + "_worker_" + str(i) + ".obs"
-            )
+            fname = "/tmp/wheatley_" + str(os.getpid()) + "_worker_" + str(i) + ".obs"
             fnames.append(fname)
 
         return fnames
@@ -67,16 +66,17 @@ def create_shared_memory(size, n, ctx, disk):
         return [ctx.Array("B", size) for i in range(n)]
 
 
-def read_from_shared_memory(shared_memory, n, disk):
+def read_from_shared_memory(shared_memory, n, disk, pyg):
     if disk:
-        return [dgl.load_graphs(shared_memory[i])[0][0] for i in range(n)]
+        # return [dgl.load_graphs(shared_memory[i])[0][0] for i in range(n)]
+        return [GraphFactory.load(shared_memory[i], pyg) for i in range(n)]
     else:
-        return [pickle.loads(shared_memory[i].get_obj()) for i in range(n)]
+        return [pickle.load(shared_memory[i].get_obj()) for i in range(n)]
 
 
-def write_to_shared_memory(index, obs, shared_memory, disk):
+def write_to_shared_memory(index, obs, shared_memory, disk, pyg):
     if disk:
-        dgl.save_graphs(shared_memory[index], [obs])
+        obs.save(shared_memory[index])
     else:
         data = pickle.dumps(obs)
         shared_memory[index][: len(data)] = data
@@ -107,6 +107,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         daemon: bool = True,
         worker: Optional[Callable] = None,
         disk=True,
+        pyg=True,
     ):
         ctx = mp.get_context(context)
         self.env_fns = env_fns
@@ -116,6 +117,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         dummy_env = env_fns[0]()
         dummy_env.close()
         del dummy_env
+        self.pyg = pyg
         super().__init__(
             num_envs=len(env_fns),
         )
@@ -146,6 +148,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                     self._obs_buffer,
                     self.disk,
                     self.error_queue,
+                    self.pyg,
                 ),
             )
 
@@ -225,7 +228,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
             self.observations = observations_list
         else:
             self.observations = read_from_shared_memory(
-                self._obs_buffer, n=self.num_envs, disk=self.disk
+                self._obs_buffer, n=self.num_envs, disk=self.disk, pyg=self.pyg
             )
 
         return (deepcopy(self.observations) if self.copy else self.observations), infos
@@ -277,7 +280,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
             self.observations = observations_list
         else:
             self.observations = read_from_shared_memory(
-                self._obs_buffer, n=self.num_envs, disk=self.disk
+                self._obs_buffer, n=self.num_envs, disk=self.disk, pyg=self.pyg
             )
 
         return (
@@ -489,7 +492,7 @@ def _worker(index, env_fn, pipe, parent_pipe, shared_memory, disk, error_queue):
 
 
 def _worker_shared_memory(
-    index, env_fn, pipe, parent_pipe, shared_memory, disk, error_queue
+    index, env_fn, pipe, parent_pipe, shared_memory, disk, error_queue, pyg
 ):
     assert shared_memory is not None
     env = env_fn()
@@ -501,7 +504,7 @@ def _worker_shared_memory(
             if command == "reset":
                 # snap1 = tracemalloc.take_snapshot()
                 observation, info = env.reset(**data)
-                write_to_shared_memory(index, observation, shared_memory, disk)
+                write_to_shared_memory(index, observation, shared_memory, disk, pyg)
                 pipe.send(((None, info), True))
                 # snap2 = tracemalloc.take_snapshot()
                 # top_stats = snap2.compare_to(snap1, "lineno")
@@ -524,7 +527,7 @@ def _worker_shared_memory(
                     info["final_observation"] = old_observation
                     info["final_info"] = old_info
 
-                write_to_shared_memory(index, observation, shared_memory, disk)
+                write_to_shared_memory(index, observation, shared_memory, disk, pyg)
                 pipe.send(((None, reward, terminated, truncated, info), True))
                 # snap2 = tracemalloc.take_snapshot()
                 # top_stats = snap2.compare_to(snap1, "lineno")

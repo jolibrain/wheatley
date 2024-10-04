@@ -127,29 +127,29 @@ class PspEdgeEmbedder(torch.nn.Module):
 
     def forward(self, g):
         if self.edge_embedding_flavor == "sum":
-            ret = self.edge_type_embedder(g.edata["type"])
-            ret += self.resource_id_embedder(g.edata["rid"])
+            ret = self.edge_type_embedder(g.edata(None, "type"))
+            ret += self.resource_id_embedder(g.edata(None, "rid"))
             try:
-                ret += self.rc_att_embedder(g.edata["att_rc"])
+                ret += self.rc_att_embedder(g.edata(None, "att_rc"))
             except KeyError:
                 pass
             if self.add_rp_edges != "none":
                 try:  # if no ressource priory info in graph (ie at start state), key is absent
-                    ret += self.rp_att_embedder(g.edata["att_rp"].float())
+                    ret += self.rp_att_embedder(g.edata(None, "att_rp").float())
                 except KeyError:
                     pass
             return ret
 
         if self.edge_embedding_flavor == "cat":
-            et = self.edge_type_embedder(g.edata["type"])
-            ei = self.resource_id_embedder(g.edata["rid"])
+            et = self.edge_type_embedder(g.edata(None, "type"))
+            ei = self.resource_id_embedder(g.edata(None, "rid"))
             try:
-                ec = self.rc_att_embedder(g.edata["att_rc"])
+                ec = self.rc_att_embedder(g.edata(None, "att_rc"))
             except KeyError:
                 ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
             if self.add_rp_edges != "none":
                 try:
-                    ep = self.rp_att_embedder(g.edata["att_rp"])
+                    ep = self.rp_att_embedder(g.edata(None, "att_rp"))
                 except KeyError:
                     ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
                 return torch.cat([et, ei, ec, ep], dim=-1)
@@ -157,15 +157,16 @@ class PspEdgeEmbedder(torch.nn.Module):
 
         if self.edge_embedding_flavor == "cartesian":
             eit = self.type_rid_embedder(
-                g.edata["type"] * (self.max_n_resources + 1) + g.edata["rid"]
+                g.edata(None, "type") * (self.max_n_resources + 1)
+                + g.edata(None, "rid")
             )
             try:
-                ec = self.rc_att_embedder(g.edata["att_rc"])
+                ec = self.rc_att_embedder(g.edata(None, "att_rc"))
             except KeyError:
                 ec = torch.zeros((g.num_edges(), self.rc_att_hidden_dim))
             if self.add_rp_edges != "none":
                 try:
-                    ep = self.rp_att_embedder(g.edata["att_rp"])
+                    ep = self.rp_att_embedder(g.edata(None, "att_rp"))
                 except KeyError:
                     ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
                 return torch.cat([eit, ec, ep], dim=-1)

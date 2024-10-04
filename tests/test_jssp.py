@@ -39,7 +39,7 @@ possible_args = {
     "gamma": [1.0],
     "gae_lambda": [1.0],
     "optimizer": ["adamw"],
-    "fe_type": ["dgl"],
+    "fe_type": ["message_passing"],
     "residual_gnn": [True],
     "graph_has_relu": [True],
     "graph_pooling": ["learn", "learninv"],
@@ -67,6 +67,7 @@ possible_args = {
     "n_workers": [2],
     "skip_initial_eval": [True, False],
     "return_based_scaling": [True, False],
+    "vecenv_type": ["subproc"],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
@@ -367,8 +368,8 @@ def test_validation_results(
             agents_solutions[rule].append(solution.get_makespan())
 
     for rule, solutions in agents_solutions.items():
-        assert expected_results[rule] == np.mean(
-            solutions
+        assert (
+            expected_results[rule] == np.mean(solutions)
         ), f"Different solutions found ({expected_results[rule]} vs {np.mean(solutions)})"
 
 
@@ -419,7 +420,7 @@ def test_solve_api(instance_file: str, taillard_offset: bool):
         hidden_dim_actor=16,
         n_mlp_layers_critic=1,
         hidden_dim_critic=16,
-        fe_type="dgl",
+        fe_type="message_passing",
         transformer_flavor="linear",
         dropout=0.1,
         cache_lap_node_id=True,
@@ -443,6 +444,7 @@ def test_solve_api(instance_file: str, taillard_offset: bool):
         hl_gauss=None,
         reward_weights=[1],
         sgformer=False,
+        pyg=False,
     )
 
     agent = Agent(env_specification, agent_specification=agent_specification)

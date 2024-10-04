@@ -25,7 +25,6 @@
 import random
 from concurrent.futures import ThreadPoolExecutor
 
-import dgl
 import torch
 
 from ..utils.taillard_rcpsp import TaillardRcpsp
@@ -36,8 +35,11 @@ from .transition_models.transition_model import TransitionModel
 
 
 class GEnv:
-    def __init__(self, problem_description, env_specification, pb_ids, validate=False):
+    def __init__(
+        self, problem_description, env_specification, pb_ids, validate=False, pyg=False
+    ):
         self.problem_description = problem_description
+        self.pyg = pyg
         self.env_specification = env_specification
         self.validate = validate
         self.transition_model_config = problem_description.transition_model_config
@@ -151,18 +153,15 @@ class GEnv:
 
         return self.current_observation, info
 
-    def khop_thread_safe(self, graph, source_nodes, k):
-        return dgl.khop_out_subgraph(graph, source_nodes, k=k, relabel_nodes=True)[0]
-
-    def succ_cached(self, graph, n):
-        if n in self.succ_cache.keys():
-            return self.succ_cache[n]
-        # normal version
-        # suc = set(graph.successors(n, etype="prec").tolist())
-        # skip dgl inernal test
-        suc = set(graph._graph.successors(graph.get_etype_id("prec"), n).tolist())
-        self.succ_cache[n] = suc
-        return suc
+    # def succ_cached(self, graph, n):
+    #     if n in self.succ_cache.keys():
+    #         return self.succ_cache[n]
+    #     # normal version
+    #     # suc = set(graph.successors(n, etype="prec").tolist())
+    #     # skip dgl inernal test
+    #     suc = set(graph._graph.successors(graph.get_etype_id("prec"), n).tolist())
+    #     self.succ_cache[n] = suc
+    #     return suc
 
     def process_obs(self, full_observation):
         if not self.observe_subgraph:
@@ -178,7 +177,8 @@ class GEnv:
                     # vanilla version
                     # outs = set(full_observation.successors(n, etype="prec").tolist())
                     # cached version
-                    outs = self.succ_cached(full_observation, n)
+                    # outs = self.succ_cached(full_observation, n)
+                    outs = set(full_observation.successors(n).tolist())
                     # nocheck version
                     # outs = set(
                     #     full_observation._graph.successors(
@@ -228,22 +228,20 @@ class GEnv:
             )
         )
 
-        subgraph = dgl.node_subgraph(
-            full_observation,
-            nodes_to_keep.to(self.state.device),
-            output_device=torch.device("cpu"),
-        )
+        # subgraph = dgl.node_subgraph(full_observation, nodes_to_keep)
+        subgraph = full_observation.node_subgraph(nodes_to_keep)
         return subgraph
 
     def action_to_node_id(self, action):
         if not self.observe_subgraph:
             return action
-        return self.current_observation.ndata[dgl.NID][action].item()
+        return self.current_observation.subid_to_origid(action)
 
     def process_mask(self, full_mask):
         if not self.observe_subgraph:
             return full_mask
-        return full_mask[self.current_observation.ndata[dgl.NID]]
+        # return full_mask[self.current_observation.ndata[dgl.NID]]
+        return self.current_observation.fullmask_to_submask(full_mask)
 
     def get_solution(self):
         return self.state.get_solution()
@@ -269,6 +267,7 @@ class GEnv:
             self.problem,
             self.deterministic,
             observe_conflicts_as_cliques=self.observe_conflicts_as_cliques,
+            pyg=self.pyg,
         )
 
     def _create_transition_model(self):

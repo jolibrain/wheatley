@@ -61,6 +61,7 @@ class EnvSpecification:
         self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
         self.observe_real_duration_when_affect = observe_real_duration_when_affect
         self.do_not_observe_updated_bounds = do_not_observe_updated_bounds
+        self.pyg = False
 
     def get_n_features(self):
         # 4 for task completion times, 1 for is_affected, max_n_machines for mandatory one_hot_machine_id

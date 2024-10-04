@@ -1,0 +1,44 @@
+import torch
+
+from generic.eegatconv import EEGATConv
+from torch_geometric.nn.conv import GATv2Conv
+
+
+class GraphConv(torch.nn.Module):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        num_heads,
+        bias=True,
+        edge_scoring=False,
+        pyg=False,
+    ):
+        super().__init__()
+        self.pyg = pyg
+        if self.pyg:
+            self.conv = GATv2Conv(
+                in_dim,
+                out_dim,
+                num_heads,
+                add_self_loops=False,
+                edge_dim=in_dim,
+                bias=bias,
+            )
+        else:
+            self.conv = EEGATConv(
+                in_dim,
+                out_dim,
+                in_dim,
+                out_dim,
+                num_heads=num_heads,
+                edge_scoring=edge_scoring,
+            )
+
+    def forward(self, g, node_feats, edge_feats, edge_efeats=None):
+        if self.pyg:
+            return self.conv(node_feats, g.edge_index, edge_feats), None
+        else:
+            f, ef = self.conv(g, node_feats, edge_feats, edge_efeats)
+            return f.flatten(start_dim=-2, end_dim=-1), ef
+            # return self.conv(g, node_feats, edge_feats, edge_efeats)
