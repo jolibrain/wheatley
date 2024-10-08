@@ -780,6 +780,12 @@ def argument_parser() -> argparse.ArgumentParser:
 
     # =================================================OTHER====================================================================
     parser.add_argument(
+        "--max_shared_mem_per_worker",
+        default=2000000,
+        help="max shared memory per worker",
+    )
+
+    parser.add_argument(
         "--skip_initial_eval",
         default=False,
         action="store_true",

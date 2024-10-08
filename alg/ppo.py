@@ -98,6 +98,9 @@ class PPO:
         self.critic_loss = training_specification.critic_loss
         self.debug_net = training_specification.debug_net
         self.discard_incomplete_trials = discard_incomplete_trials
+        self.max_shared_mem_per_worker = (
+            training_specification.max_shared_mem_per_worker
+        )
 
         # in case of resume
         self._num_timesteps_at_start = 0
@@ -420,8 +423,9 @@ class PPO:
                 context="spawn",
                 copy=False,
                 shared_memory=True,
-                disk=True,
+                disk=not env_specification.pyg,
                 pyg=env_specification.pyg,
+                max_mem_size=self.max_shared_mem_per_worker,
             )
 
         print("... done creating environments")

@@ -165,6 +165,7 @@ def main(args, exp_name) -> float:
         critic_loss=args.critic_loss,
         debug_net=args.debug_net,
         display_gantt=args.display_gantt,
+        max_shared_mem_per_worker=args.max_shared_mem_per_worker,
     )
     training_specification.print_self()
 
@@ -343,9 +344,7 @@ def main(args, exp_name) -> float:
 
 def interrupt_handler(path, signum, frame):
     if path is not None:
-        files = glob.glob(
-            path + "/wheatley_dgl_" + str(os.getpid()) + "_*.obs"
-        ) + glob.glob(path + "/wheatley_pkl_" + str(os.getpid()) + "_*.obs")
+        files = glob.glob(path + "/wheatley_" + str(os.getpid()) + "_*.obs")
         print("removing ", files)
         for f in files:
             os.remove(f)
@@ -355,6 +354,7 @@ def interrupt_handler(path, signum, frame):
 if __name__ == "__main__":
     from args import argument_parser, parse_args
 
+    print('installing cleanup handler')
     parser = argument_parser()
     args, exp_name = parse_args(parser)
 

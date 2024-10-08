@@ -141,6 +141,7 @@ def main(args, exp_name, path) -> float:
         critic_loss=args.critic_loss,
         debug_net=False,
         display_gantt=args.display_gantt,
+        max_shared_mem_per_worker=args.max_shared_mem_per_worker,
     )
     training_specification.print_self()
 
