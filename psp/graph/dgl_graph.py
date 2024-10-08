@@ -1,6 +1,7 @@
 from .graph import Graph
 
 import torch
+import copy
 
 from dgl import (
     heterograph,
@@ -193,6 +194,9 @@ class DGLGraph(Graph):
 
     def fullmask_to_submask(self, mask):
         return mask[self._graph.ndata[NID]]
+
+    def clone(self):
+        return copy.deepcopy(self)
 
 
 class DGLBatchGraph(DGLGraph):

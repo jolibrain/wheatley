@@ -3,6 +3,8 @@ from .graph import Graph
 import torch
 import torch_geometric
 from torch_geometric.data import HeteroData, Data, Batch
+import pickle
+import io
 
 
 class PYGGraph(Graph):
@@ -30,6 +32,7 @@ class PYGGraph(Graph):
         self._graph["n"]["durations"] = torch.zeros(
             (num_nodes, 3), dtype=torch.float, device=device
         )
+        self.cache = False
 
     def compute_caches(self):
         self._pred_cache = []
@@ -49,6 +52,7 @@ class PYGGraph(Graph):
             self._outdeg_cache.append(len(sucs))
         self._indeg_cache = torch.tensor(self._indeg_cache)
         self._outdeg_cache = torch.tensor(self._outdeg_cache)
+        self.cache = True
 
     def ndata(self, featname=None):
         if isinstance(self._graph, Data):
@@ -74,12 +78,18 @@ class PYGGraph(Graph):
         return self._graph["n"].num_nodes
 
     def predecessors(self, nid):
+        if not self.cache:
+            self.compute_caches()
         return self._pred_cache[nid]
 
     def successors(self, nid):
+        if not self.cache:
+            self.compute_caches()
         return self._suc_cache[nid]
 
     def indeg(self, nid):
+        if not self.cache:
+            self.compute_caches()
         return self._indeg_cache[nid]
 
     def in_degrees(self, v=None, etype=None):
@@ -94,6 +104,8 @@ class PYGGraph(Graph):
         return torch.tensor(indegs, dtype=torch.int64)
 
     def out_degrees(self):
+        if not self.cache:
+            self.compute_caches()
         return self._outdeg_cache
 
     def set_global_data(self, featname, data):
@@ -176,30 +188,75 @@ class PYGGraph(Graph):
     def batch(cls, graphlist, num_nodes, num_edges):
         return PYGBatchGraph(graphlist)
 
+    def clone(self):
+        g = PYGGraph.__new__(PYGGraph)
+        g._graph = self._graph.clone()
+        g.factored_rp = self.factored_rp
+        g.observe_conflicts_as_cliques = self.observe_conflicts_as_cliques
+        g.cache = False
+        # g._pred_cache = [t.clone() for t in self._pred_cache]
+        # g._suc_cache = [t.clone() for t in self._suc_cache]
+        # g._indeg_cache = self._indeg_cache.clone()
+        # g._outdeg_cache = self._outdeg_cache.clone()
+        return g
+
     def save(self, fname):
         data = {
-            "graph": self._graph,
-            "pred_cache": self._pred_cache,
-            "suc_cache": self._suc_cache,
-            "indeg_cache": self._indeg_cache,
-            "outdeg_cache": self._outdeg_cache,
+            "graph": self._graph.to_dict(),
+            # "pred_cache": [
+            #     self._pred_cache[i].tolist() for i in range(self.num_nodes())
+            # ],
+            # "suc_cache": [self._suc_cache[i].tolist() for i in range(self.num_nodes())],
+            # "indeg_cache": self._indeg_cache.tolist(),
+            # "outdeg_cache": self._outdeg_cache.tolist(),
             "factored_rp": self.factored_rp,
             "obs_cliques": self.observe_conflicts_as_cliques,
         }
-        torch.save(data, fname)
+        torch.save(data, fname, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+
+    def serialize(self):
+        buf = io.BytesIO()
+        data = {
+            "graph": self._graph.to_dict(),
+            # "pred_cache": [
+            #     self._pred_cache[i].tolist() for i in range(self.num_nodes())
+            # ],
+            # "suc_cache": [self._suc_cache[i].tolist() for i in range(self.num_nodes())],
+            # "indeg_cache": self._indeg_cache.tolist(),
+            # "outdeg_cache": self._outdeg_cache.tolist(),
+            "factored_rp": self.factored_rp,
+            "obs_cliques": self.observe_conflicts_as_cliques,
+        }
+        torch.save(data, buf, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+        out = buf.getvalue()
+        return out, len(out)
 
     @classmethod
     def load(cls, fname):
-        # torch.serialization.add_safe_globals([torch_geometric.data.storage.BaseStorage])
-        data = torch.load(fname, weights_only=False)
+        d = torch.load(fname, weights_only=False)
         g = cls.__new__(cls)
-        g._graph = data["graph"]
-        g._pred_cache = data["pred_cache"]
-        g._suc_cache = data["suc_cache"]
-        g._indeg_cache = data["indeg_cache"]
-        g._outdeg_cache = data["outdeg_cache"]
-        g.factored_rp = data["factored_rp"]
-        g.observe_conflicts_as_cliques = data["obs_cliques"]
+        g._graph = HeteroData.from_dict(d["graph"])
+        # g._pred_cache = [torch.tensor(d["pred_cache"][i]) for i in range(g.num_nodes())]
+        # g._suc_cache = [torch.tensor(d["suc_cache"][i]) for i in range(g.num_nodes())]
+        # g._indeg_cache = torch.tensor(d["indeg_cache"])
+        # g._outdeg_cache = torch.tensor(d["outdeg_cache"])
+        g.factored_rp = d["factored_rp"]
+        g.observe_conflicts_as_cliques = d["obs_cliques"]
+        g.cache = False
+        return g
+
+    @classmethod
+    def deserialize(cls, bytearr):
+        d = torch.load(io.BytesIO(bytearr), weights_only=False)
+        g = cls.__new__(cls)
+        g._graph = HeteroData.from_dict(d["graph"])
+        # g._pred_cache = [torch.tensor(d["pred_cache"][i]) for i in range(g.num_nodes())]
+        # g._suc_cache = [torch.tensor(d["suc_cache"][i]) for i in range(g.num_nodes())]
+        # g._indeg_cache = torch.tensor(d["indeg_cache"])
+        # g._outdeg_cache = torch.tensor(d["outdeg_cache"])
+        g.factored_rp = d["factored_rp"]
+        g.observe_conflicts_as_cliques = d["obs_cliques"]
+        g.cache = False
         return g
 
     def fill_void(self):

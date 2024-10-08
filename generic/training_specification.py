@@ -70,6 +70,7 @@ class TrainingSpecification:
         critic_loss,
         debug_net,
         display_gantt,
+        max_shared_mem_per_worker,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -103,6 +104,7 @@ class TrainingSpecification:
         self.critic_loss = critic_loss
         self.debug_net = debug_net
         self.display_gantt = display_gantt
+        self.max_shared_mem_per_worker = max_shared_mem_per_worker
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -128,6 +130,7 @@ class TrainingSpecification:
         print(
             f"==========Training Description==========\n"
             f"Number of timesteps (total)       {self.total_timesteps}\n"
+            f"Max shared memory per worker:     {self.max_shared_mem_per_worker}\n"
             f"Validation frequency:             {self.validation_freq}\n"
             f"Episodes per validation session:  {self.n_validation_env}\n"
             f"Validate on total data:           {self.validate_on_total_data}\n"

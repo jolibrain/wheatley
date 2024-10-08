@@ -459,6 +459,9 @@ class GState:
             self.remove_past_edges(nodes_removed_from_frontier, node_id)
 
     def mask_wrt_non_renewable_resources(self):
+        if self.problem.n_nonrenewable_resources == 0:
+            return
+        # TODO : parallelize
         selectables = torch.where(self.selectables())[0]
         for n in selectables:
             for r, level in enumerate(self.resources_usage(n)):
@@ -602,13 +605,18 @@ class GState:
         # make sucessor selectable, if other parents *jobs* are affected
         # for successor in self.graph.successors(nodeid, etype="prec"):
         for successor in self.graph.successors(nodeid):
+            # parents_jobs = set(
+            #     [
+            #         self.jobid(pm).item()
+            #         # for pm in self.graph.predecessors(successor, etype="prec")
+            #         for pm in self.graph.predecessors(successor.item())
+            #     ]
+            # )
+            ####
             parents_jobs = set(
-                [
-                    self.jobid(pm).item()
-                    # for pm in self.graph.predecessors(successor, etype="prec")
-                    for pm in self.graph.predecessors(successor.item())
-                ]
+                self.jobid(self.graph.predecessors(successor.item())).tolist()
             )
+            ####
             # no need to test job from currently affected node
             parents_jobs.remove(self.graph.ndata("job")[nodeid].item())
             # check if one mode per job is affected
@@ -859,15 +867,19 @@ class GState:
                     (1), dtype=torch.float, device=self.device
                 )
             else:
+                # V0
                 # max_tct_predecessors = torch.max(
-                #     self.tct(self.graph.predecessors(cur_node_id, etype="prec")),
+                #     self.tct(self.graph.predecessors(cur_node_id)),
                 #     0,
                 #     keepdim=True,
                 # )[0]
+                # V1 old workaroud (not needed anymore)
                 # max_tct_predecessors = self.tpe.submit(
                 #     self.max_thread_safe, cur_node_id
                 # ).result()[0]
                 # preds = self.graph.predecessors(cur_node_id, etype="prec")
+
+                # V2 old workaround (not needed anymore)
                 preds = self.graph.predecessors(cur_node_id)
                 max_tct_predecessors = torch.from_numpy(
                     np.max(
@@ -877,9 +889,12 @@ class GState:
                     )
                 ).to(self.device)
 
+                # V0
                 # max_tct_predecessors_real = torch.max(
-                #     self.tct_real(self.graph.predecessors(cur_node_id, etype="prec"))
+                #     self.tct_real(self.graph.predecessors(cur_node_id))
                 # )
+                # V2 old workaroud (not needed anymore)
+                # preds = self.graph.predecessors(cur_node_id)
                 max_tct_predecessors_real = torch.tensor(
                     np.max(self.tct_real(preds).to(torch.device("cpu")).numpy())
                 ).to(self.device)
@@ -889,18 +904,32 @@ class GState:
                 cur_node_id
             )
 
+            # not quicker ...
+            # self.set_tct(cur_node_id, new_completion_time)
+            # self.set_tct_real(cur_node_id, new_completion_time_real)
+
+            # if initial_tct:
+            #     sucs = self.graph.successors(cur_node_id).tolist()
+            #     open_nodes = [n for n in open_nodes if n not in sucs]
+            #     open_nodes.extend(sucs)
+            #     continue
+
+            # sucs = self.graph.successors(cur_node_id)
+            # real_starts = self.tct_real(sucs) - self.duration_real(sucs)
+            # gt_real = torch.gt(new_completion_time_real, real_starts)
+            # starts = self.tct(sucs) - self.durations(sucs)
+            # gt_all = torch.gt(new_completion_time, starts)
+            # if torch.any(gt_real) or torch.any(gt_all):
+            #     sucs_real = set(torch.where(gt_real)[0].tolist())
+            #     sucs_all = set(torch.where(gt_all)[0].tolist())
+            #     sucs = list(sucs_real.union(sucs_all))
+            #     open_nodes = [n for n in open_nodes if n not in sucs]
+            #     open_nodes.extend(sucs)
+
             if (
                 initial_tct
-                or (
-                    torch.not_equal(
-                        new_completion_time_real, self.tct_real(cur_node_id)
-                    )
-                )
-                or (
-                    torch.any(
-                        torch.not_equal(new_completion_time, self.tct(cur_node_id))
-                    )
-                )
+                or (torch.gt(new_completion_time_real, self.tct_real(cur_node_id)))
+                or (torch.any(torch.gt(new_completion_time, self.tct(cur_node_id))))
             ):
                 self.set_tct(cur_node_id, new_completion_time)
                 self.set_tct_real(cur_node_id, new_completion_time_real)
