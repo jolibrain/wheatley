@@ -223,7 +223,7 @@ class Agent(Agent):
         if self.env_specification.observe_subgraph:
             cobs = obs
         else:
-            cobs = copy.deepcopy(obs)
+            cobs = obs.clone()
         return AgentGraphObservation.rewire_internal(
             cobs,
             conflicts=self.agent_specification.conflicts,

@@ -13,6 +13,8 @@ from dgl import multiprocessing as mp
 from psp.graph.graph_factory import GraphFactory
 import numpy as np
 import time
+import torch
+import pickle
 
 # import tracemalloc
 
@@ -54,7 +56,7 @@ class CloudpickleWrapper:
         return self.fn()
 
 
-def create_shared_memory(size, n, ctx, disk):
+def create_shared_memory(maxsize, n, ctx, disk):
     if disk:
         fnames = []
         for i in range(n):
@@ -63,7 +65,7 @@ def create_shared_memory(size, n, ctx, disk):
 
         return fnames
     else:
-        return [ctx.Array("B", size) for i in range(n)]
+        return ([ctx.Array("B", maxsize) for i in range(n)], ctx.Array("Q", n))
 
 
 def read_from_shared_memory(shared_memory, n, disk, pyg):
@@ -71,15 +73,34 @@ def read_from_shared_memory(shared_memory, n, disk, pyg):
         # return [dgl.load_graphs(shared_memory[i])[0][0] for i in range(n)]
         return [GraphFactory.load(shared_memory[i], pyg) for i in range(n)]
     else:
-        return [pickle.load(shared_memory[i].get_obj()) for i in range(n)]
+        # return [
+        #     torch.load(
+        #         io.BytesIO(bytearray(shared_memory[0][i][: shared_memory[1][i]]))
+        #     )
+        #     for i in range(n)
+        # ]
+        return [
+            GraphFactory.deserialize(
+                bytearray(shared_memory[0][i][: shared_memory[1][i]]), pyg
+            )
+            for i in range(n)
+        ]
 
 
-def write_to_shared_memory(index, obs, shared_memory, disk, pyg):
+def write_to_shared_memory(index, obs, shared_memory, disk, pyg, max_mem_size):
     if disk:
         obs.save(shared_memory[index])
     else:
-        data = pickle.dumps(obs)
-        shared_memory[index][: len(data)] = data
+        # buf = io.BytesIO()
+        # torch.save(obs, buf, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+        # out = buf.getvalue()
+        # l = len(out)
+        out, l = obs.serialize()
+        if l > max_mem_size:
+            print(f"insufficient shared memory size : {max_mem_size}   needed: {l}")
+            exit(1)
+        shared_memory[0][index][:l] = out
+        shared_memory[1][index] = l
 
 
 class AsyncGraphVectorEnv(GraphVectorEnv):
@@ -108,8 +129,13 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         worker: Optional[Callable] = None,
         disk=True,
         pyg=True,
+        max_mem_size=2000000,
     ):
+        super().__init__(
+            num_envs=len(env_fns),
+        )
         ctx = mp.get_context(context)
+        mp.set_sharing_strategy("file_system")
         self.env_fns = env_fns
         self.shared_memory = shared_memory
         self.disk = disk
@@ -118,13 +144,10 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         dummy_env.close()
         del dummy_env
         self.pyg = pyg
-        super().__init__(
-            num_envs=len(env_fns),
-        )
 
         if self.shared_memory:
             self._obs_buffer = create_shared_memory(
-                2000000, n=self.num_envs, ctx=ctx, disk=self.disk
+                max_mem_size, n=self.num_envs, ctx=ctx, disk=self.disk
             )
         else:
             _obs_buffer = None
@@ -149,6 +172,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                     self.disk,
                     self.error_queue,
                     self.pyg,
+                    max_mem_size,
                 ),
             )
 
@@ -492,11 +516,21 @@ def _worker(index, env_fn, pipe, parent_pipe, shared_memory, disk, error_queue):
 
 
 def _worker_shared_memory(
-    index, env_fn, pipe, parent_pipe, shared_memory, disk, error_queue, pyg
+    index,
+    env_fn,
+    pipe,
+    parent_pipe,
+    shared_memory,
+    disk,
+    error_queue,
+    pyg,
+    max_mem_size,
 ):
     assert shared_memory is not None
     env = env_fn()
     parent_pipe.close()
+    mp.set_sharing_strategy("file_system")
+
     # tracemalloc.start()
     try:
         while True:
@@ -504,7 +538,9 @@ def _worker_shared_memory(
             if command == "reset":
                 # snap1 = tracemalloc.take_snapshot()
                 observation, info = env.reset(**data)
-                write_to_shared_memory(index, observation, shared_memory, disk, pyg)
+                write_to_shared_memory(
+                    index, observation, shared_memory, disk, pyg, max_mem_size
+                )
                 pipe.send(((None, info), True))
                 # snap2 = tracemalloc.take_snapshot()
                 # top_stats = snap2.compare_to(snap1, "lineno")
@@ -527,7 +563,9 @@ def _worker_shared_memory(
                     info["final_observation"] = old_observation
                     info["final_info"] = old_info
 
-                write_to_shared_memory(index, observation, shared_memory, disk, pyg)
+                write_to_shared_memory(
+                    index, observation, shared_memory, disk, pyg, max_mem_size
+                )
                 pipe.send(((None, reward, terminated, truncated, info), True))
                 # snap2 = tracemalloc.take_snapshot()
                 # top_stats = snap2.compare_to(snap1, "lineno")
