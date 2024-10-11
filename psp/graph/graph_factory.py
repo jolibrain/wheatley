@@ -38,3 +38,10 @@ class GraphFactory:
             return PYGGraph.load(fname)
         else:
             return DGLGraph.load(fname)
+
+    @classmethod
+    def deserialize(cls, bytearr, pyg=True):
+        if pyg:
+            return PYGGraph.deserialize(bytearr)
+        else:
+            raise RuntimeError("not implemented")

@@ -204,7 +204,7 @@ class Env(gym.Env):
         node_id = action % self.env_specification.max_n_nodes
         return node_id, boolean
 
-    def reset(self, soft=False):
+    def reset(self, soft=False, **kwargs):
         # Reset the internal state, but do not sample a new problem
         if soft:
             self.state.reset()

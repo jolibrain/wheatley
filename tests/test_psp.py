@@ -119,6 +119,7 @@ def instantiate_training_objects(
         critic_loss=args.critic_loss,
         debug_net=False,
         display_gantt=False,
+        max_shared_mem_per_worker=args.max_shared_mem_per_worker,
     )
 
     if args.conflicts == "clique" and args.precompute_cliques:

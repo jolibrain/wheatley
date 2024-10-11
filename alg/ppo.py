@@ -98,6 +98,9 @@ class PPO:
         self.critic_loss = training_specification.critic_loss
         self.debug_net = training_specification.debug_net
         self.discard_incomplete_trials = discard_incomplete_trials
+        self.max_shared_mem_per_worker = (
+            training_specification.max_shared_mem_per_worker
+        )
 
         # in case of resume
         self._num_timesteps_at_start = 0
@@ -140,9 +143,7 @@ class PPO:
         if self.obs_on_disk is not None:
             for f in glob.glob(
                 self.obs_on_disk + "/wheatley_" + str(os.getpid()) + "_*.obs"
-            ) + glob.glob(
-                self.obs_on_disk + "/wheatley_pkl_" + str(os.getpid()) + "_*.obs"
-            ):
+            ) :
                 os.remove(f)
 
         for step in tqdm.tqdm(range(0, self.num_steps), desc="   collecting rollouts"):
@@ -420,8 +421,9 @@ class PPO:
                 context="spawn",
                 copy=False,
                 shared_memory=True,
-                disk=True,
+                disk=not env_specification.pyg,
                 pyg=env_specification.pyg,
+                max_mem_size=self.max_shared_mem_per_worker,
             )
 
         print("... done creating environments")
