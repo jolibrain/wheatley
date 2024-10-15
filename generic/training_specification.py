@@ -154,4 +154,5 @@ class TrainingSpecification:
             f"Return-based scaling:             {self.return_based_scaling}\n"
             f"Store rollouts on disk:           {self.store_rollouts_on_disk}\n"
             f"Critic loss:                      {self.critic_loss}\n"
+            f"Ortools strategies                {self.ortools_strategy}\n"
         )

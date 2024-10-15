@@ -30,12 +30,14 @@ class GState:
         observe_conflicts_as_cliques=True,
         normalize_features=True,
         pyg=True,
+        print_zero_dur_with_ressources=False,
     ):
         self.pyg = pyg
         # self.tpe = ThreadPoolExecutor()
         self.problem = problem
         self.problem_description = problem_description
         self.n_features = env_specification.n_features
+        self.print_zero_dur_with_ressources = print_zero_dur_with_ressources
         # self.device = torch.device("cuda:2")
         self.device = torch.device("cpu")
         if isinstance(self.problem, dict):
@@ -100,6 +102,8 @@ class GState:
         # nx.draw_networkx(self.graph)
         # plt.show()
         # self.numpy_problem_graph = np.transpose(np.array(self.problem_edges))
+        if self.print_zero_dur_with_ressources:
+            self.zero_dur_msg = [False] * self.n_nodes
 
         self.reset_graph()
         self.reset_fresh_nodes()
@@ -110,6 +114,7 @@ class GState:
         self.reset_selectable()
         self.reset_type()
         self.reset_conflicts_as_cliques()
+        self.reset_zero_dur()
 
         # self.resources_edges.append((prec, succ))
         # self.resources_edges_att.append((on_start, critical))
@@ -216,6 +221,24 @@ class GState:
         self.reset_selectable()
         self.reset_type()
         self.reset_conflicts_as_cliques()
+        self.reset_zero_dur()
+
+    def reset_zero_dur(self):
+        for node_id in range(self.n_nodes):
+            resources_used = torch.where(self.resources_usage(node_id) != 0)[0]
+            res_and_zero_dur = resources_used.nelement() != 0 and torch.logical_and(
+                torch.all(self.durations(node_id) == 0),
+                self.duration_real(node_id) == 0,
+            )
+
+            if res_and_zero_dur:
+                if self.print_zero_dur_with_ressources:
+                    if not self.zero_dur_msg[node_id]:
+                        print(
+                            f"WARNING: node {node_id} (jid: {self.jobid(node_id)}) uses resources {resources_used.tolist()} but has ZERO duration"
+                        )
+                        self.zero_dur_msg[node_id] = True
+                self.remove_resource_usage(node_id)
 
     def reset_frontier(self):
         self.nodes_in_frontier = set()
@@ -353,6 +376,11 @@ class GState:
     def all_duration_real(self):
         return self.real_durations[:]
 
+    def remove_resource_usage(self, node_id):
+        self.graph.ndata("resources")[node_id] = torch.zeros_like(
+            self.graph.ndata("resources")[node_id]
+        )
+
     def resources_usage(self, node_id):
         return self.graph.ndata("resources")[node_id]
 
@@ -440,7 +468,7 @@ class GState:
 
     def affect_job(self, node_id):
         self.affect_node(node_id)
-        self.compute_dates_on_affectation(node_id)
+        starts = self.compute_dates_on_affectation(node_id)
         self.mask_wrt_non_renewable_resources()
         self.update_completion_times_after(node_id)
         if (
@@ -457,6 +485,7 @@ class GState:
             self.remove_rp_edges(strict=True)
         if self.remove_past_prec:
             self.remove_past_edges(nodes_removed_from_frontier, node_id)
+        return starts
 
     def mask_wrt_non_renewable_resources(self):
         if self.problem.n_nonrenewable_resources == 0:
@@ -697,6 +726,7 @@ class GState:
         if self.add_rp_edges != "none":
             # extract graph info
             self.update_resource_prec(constraining_resource)
+        return start
 
     def compute_ends_with_cal(self, node_id, resources_used, start):
         durations = self.durations(node_id)

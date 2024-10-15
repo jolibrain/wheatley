@@ -919,10 +919,7 @@ def parse_args(parser: argparse.ArgumentParser) -> Tuple[argparse.Namespace, str
         args.custom_heuristic_names = []
 
     if args.ortools_strategy is None:
-        if args.duration_type == "stochastic":
-            args.ortools_strategy = ["averagistic"]
-        else:
-            args.ortools_strategy = ["realistic"]
+        args.ortools_strategy = ["averagistic"]
 
     if args.resume:
         args.skip_initial_eval = True

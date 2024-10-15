@@ -345,16 +345,18 @@ def main(args, exp_name) -> float:
 def interrupt_handler(path, signum, frame):
     if path is not None:
         files = glob.glob(path + "/wheatley_" + str(os.getpid()) + "_*.obs")
-        print("removing ", files)
+        print("cleaning observations ")
         for f in files:
             os.remove(f)
+            print(".", end="")
+    print()
     exit()
 
 
 if __name__ == "__main__":
     from args import argument_parser, parse_args
 
-    print('installing cleanup handler')
+    print("installing cleanup handler")
     parser = argument_parser()
     args, exp_name = parse_args(parser)
 

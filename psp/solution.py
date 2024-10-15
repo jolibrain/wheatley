@@ -61,10 +61,10 @@ class Solution:
     def __init__(
         self, job_schedule=None, modes=None, mode_schedule=None, real_durations=None
     ):
-        self.job_schedule = np.array(job_schedule)
+        self.job_schedule = np.array(job_schedule, dtype=np.float32)
         self.modes = np.array(modes)
         self.mode_schedule = np.array(mode_schedule)
-        self.real_durations = np.array(real_durations)
+        self.real_durations = np.array(real_durations, dtype=np.float32)
         self.schedule = (self.job_schedule, self.modes)
 
     def get_makespan(self):
