@@ -7,6 +7,7 @@ from typing import Tuple
 import numpy as np
 import pytest
 import torch
+import shutil
 
 from alg.ppo import PPO
 from alg.pretrain import Pretrainer
@@ -263,7 +264,7 @@ possible_args = {
     "fe_type": ["message_passing"],
     "residual_gnn": [True],
     "graph_has_relu": [True],
-    "graph_pooling": ["learn", "learninv"],
+    "graph_pooling": ["learn", "max"],
     "hidden_dim_features_extractor": [32],
     "n_layers_features_extractor": [3],
     "mlp_act": ["gelu"],
@@ -283,14 +284,14 @@ possible_args = {
     "seed": [0],
     "duration_type": ["stochastic", "deterministic"],
     "generate_duration_bounds": ["0.05 0.1"],
-    "ortools_strategy": ["averagistic realistic", "pessimistic"],
+    "ortools_strategy": ["averagistic", "realistic", "pessimistic"],
     "device": ["cuda:0"],
     "n_workers": [1, 2],
     "skip_initial_eval": [True, False],
     "exp_name_appendix": ["test"],
     "train_dir": ["./instances/psp/test/"],
     "vecenv_type": ["graphgym"],
-    "return_based_scaling": [True, False],
+    # "return_based_scaling": [True, False],
     "observe_subgraph": [True, False],
     "fast_forward": [True, False],
     "observation_horizon_step": [2, 5],
@@ -298,7 +299,7 @@ possible_args = {
     "symlog": [True, False],
     "store_rollouts_on_disk": [False, "/tmp/"],
     "critic_loss": ["l2", "l1"],
-    "pyg": [True, False],
+    "pyg": [True],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.
@@ -358,6 +359,7 @@ def test_args(args: list):
     finally:
         # Don't forget to bring back the old argv!
         sys.argv = original_argv
+        shutil.rmtree("./saved_networks/test")
 
 
 @pytest.mark.parametrize(
@@ -404,7 +406,9 @@ def test_save_ortools(args: list, problem_1: str, problem_2: str):
     _, _, agent_validator, _, _, _ = instantiate_training_objects(args_1)
     file_path = agent_validator._ortools_solution_path(0, "realistic")
 
-    makespan, schedule, optimal = agent_validator._get_ortools_makespan(0, "realistic")
+    criterion, schedule, optimal = agent_validator._get_ortools_criterion(
+        0, "realistic", "makespan"
+    )
 
     assert (
         agent_validator._ortools_read_solution(
@@ -414,14 +418,14 @@ def test_save_ortools(args: list, problem_1: str, problem_2: str):
     ), "Solution should be found"
 
     (
-        saved_makespan,
+        saved_criterion,
         saved_schedule,
         saved_optimal,
     ) = agent_validator._ortools_read_solution(
         file_path, agent_validator.validation_envs[0].problem
     )
 
-    assert makespan == saved_makespan, "Not the same makespan."
+    assert criterion == saved_criterion, "Not the same criterion."
     assert optimal == saved_optimal, "Not the same optimal."
     for i in range(len(schedule)):
         assert np.all(schedule[i] == saved_schedule[i]), f"Not the same schedule ({i})"

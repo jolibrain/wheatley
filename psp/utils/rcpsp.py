@@ -109,6 +109,14 @@ class Rcpsp:
 
         self.n_jobs = len(self.job_labels)
 
+        self.due_dates_joblabel = due_dates
+        if self.due_dates_joblabel is not None:
+            self.due_dates = [None] * self.n_jobs
+            for jl, dd in self.due_dates_joblabel.items():
+                self.due_dates[self.job_to_id(jl)] = dd
+        else:
+            self.due_dates = None
+
     def add_source_sink_if_needed(self):
         n_parents = {}
         n_children = {}

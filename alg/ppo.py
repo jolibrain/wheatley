@@ -83,7 +83,6 @@ class PPO:
         self.gae_lambda = training_specification.gae_lambda
         self.clip_vloss = False
         self.clip_coef = training_specification.clip_range
-        self.ent_coef = training_specification.ent_coef
         self.vf_coef = training_specification.vf_coef
         self.target_kl = training_specification.target_kl
         self.max_grad_norm = 0.5  # SB3 default
@@ -143,7 +142,7 @@ class PPO:
         if self.obs_on_disk is not None:
             for f in glob.glob(
                 self.obs_on_disk + "/wheatley_" + str(os.getpid()) + "_*.obs"
-            ) :
+            ):
                 os.remove(f)
 
         for step in tqdm.tqdm(range(0, self.num_steps), desc="   collecting rollouts"):
@@ -571,7 +570,7 @@ class PPO:
                         pg_loss = pg_loss1.mean()
 
                     # Value loss
-                    newvalue = newvalue.view(-1)
+                    newvalue = newvalue.view(-1, 1)
                     if (
                         agent.agent_specification.two_hot is None
                         and agent.agent_specification.hl_gauss is None
@@ -579,7 +578,7 @@ class PPO:
                         if agent.agent_specification.symlog:
                             target = symlog(b_returns[mb_inds]).to(train_device)
                         else:
-                            target = b_returns[mb_inds].view(-1).to(train_device)
+                            target = b_returns[mb_inds].to(train_device)
                         if self.critic_loss == "l2":
                             v_loss_unclipped = torch.nn.functional.mse_loss(
                                 newvalue,
@@ -736,8 +735,8 @@ class PPO:
                     "time/total_timesteps", self.global_step, exclude="tensorboard"
                 )
 
-                ratio_to_ortools = np.array(self.validator.makespans) / np.array(
-                    self.validator.ortools_makespans[
+                ratio_to_ortools = np.array(self.validator.criterions) / np.array(
+                    self.validator.ortools_criterions[
                         self.validator.default_ortools_strategy
                     ]
                 )
@@ -758,29 +757,29 @@ class PPO:
 
                 # Statistics from the agent validator.
                 self.logger.record(
-                    "validation/ppo_makespan",
-                    self.validator.makespans[-1],
+                    "validation/ppo_criterion",
+                    self.validator.criterions[-1],
                 )
                 for ortools_strategy in self.validator.ortools_strategies:
                     self.logger.record(
-                        f"validation/ortools_{ortools_strategy}_makespan",
-                        self.validator.ortools_makespans[ortools_strategy][-1],
+                        f"validation/ortools_{ortools_strategy}_criterion",
+                        self.validator.ortools_criterions[ortools_strategy][-1],
                     )
                 self.logger.record(
                     "validation/random_makepsan",
-                    self.validator.random_makespans[-1],
+                    self.validator.random_criterions[-1],
                 )
                 self.logger.record(
                     "validation/ratio_to_ortools",
-                    self.validator.makespans[-1]
-                    / self.validator.ortools_makespans[
+                    self.validator.criterions[-1]
+                    / self.validator.ortools_criterions[
                         self.validator.default_ortools_strategy
                     ][-1],
                 )
                 self.logger.record(
                     "validation/dist_to_ortools",
-                    self.validator.makespans[-1]
-                    - self.validator.ortools_makespans[
+                    self.validator.criterions[-1]
+                    - self.validator.ortools_criterions[
                         self.validator.default_ortools_strategy
                     ][-1],
                 )
@@ -788,12 +787,12 @@ class PPO:
                     name = custom_agent.rule
                     self.logger.record(
                         f"validation/{name}",
-                        self.validator.custom_makespans[name][-1],
+                        self.validator.custom_criterions[name][-1],
                     )
                     self.logger.record(
                         f"validation/{name}_ratio_to_ortools",
-                        self.validator.custom_makespans[name][-1]
-                        / self.validator.ortools_makespans[
+                        self.validator.custom_criterions[name][-1]
+                        / self.validator.ortools_criterions[
                             self.validator.default_ortools_strategy
                         ][-1],
                     )
@@ -802,9 +801,9 @@ class PPO:
 
         envs.close()
 
-        ppo_makespans = np.array(self.validator.makespans)
-        ortools_makespans = np.array(
-            self.validator.ortools_makespans[self.validator.default_ortools_strategy]
+        ppo_criterions = np.array(self.validator.criterions)
+        ortools_criterions = np.array(
+            self.validator.ortools_criterions[self.validator.default_ortools_strategy]
         )
-        ratios = ppo_makespans / ortools_makespans
+        ratios = ppo_criterions / ortools_criterions
         return np.min(ratios)

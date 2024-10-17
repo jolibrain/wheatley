@@ -365,7 +365,7 @@ def test_validation_results(
         for rule in expected_results.keys():
             agent = CustomAgent(rule, "averagistic")
             solution = agent.predict(state.original_durations, state.affectations)
-            agents_solutions[rule].append(solution.get_makespan())
+            agents_solutions[rule].append(solution.get_criterion())
 
     for rule, solutions in agents_solutions.items():
         assert (
