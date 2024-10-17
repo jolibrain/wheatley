@@ -38,23 +38,6 @@ from psp.env.genv import GEnv
 import torch
 
 
-# def compute_ortools_makespan_on_real_duration(solution, state):
-#     state.reset()  # reset do not redraw real durations
-
-#     aff = solution.job_schedule
-#     mid = solution.modes
-#     while True:
-#         index, element = min(enumerate(aff), key=itemgetter(1))
-#         if element == float("inf"):
-#             break
-#         modeid = mid[index]
-#         aff[index] = float("inf")
-#         nid = node_from_job_mode(state.problem, index, modeid)
-#         state.affect_job(node_from_job_mode(state.problem, index, modeid))
-
-#     return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
-
-
 def node_from_job_mode(problem, jobid, modeid):
     nid = 0
     if isinstance(problem, dict):
@@ -66,7 +49,9 @@ def node_from_job_mode(problem, jobid, modeid):
     return nid + modeid
 
 
-def compute_ortools_makespan_on_real_duration(solution, state):
+def compute_ortools_criterion_on_real_duration(
+    solution, state, problem, criterion="makespan"
+):
     state.ff = False  # disable source fast forward
     state.reset()  # reset do not redraw real durations
 
@@ -87,14 +72,26 @@ def compute_ortools_makespan_on_real_duration(solution, state):
         )[3]
 
     # with ortools, sink as last node is mandatory
-    return state.tct_real(-1), computed_start_dates
+    if criterion == "makespan":
+        return state.tct_real(-1), computed_start_dates
+    elif criterion == "tardiness":
+        if problem.due_dates is None:
+            print("asked for tardiness but no die dates given")
+            return state.tct_real(-1), computed_start_dates
+        tcts = state.all_tct_real()
+        tardiness = 0.0
+        for t, d in enumerate(problem.due_dates):
+            if d is not None:
+                tardiness += tcts[t] - d
+        return tardiness, computed_start_dates
 
 
-def get_ortools_makespan_psp(
+def get_ortools_criterion_psp(
     env,
     max_time_ortools,
     scaling_constant_ortools,
     ortools_strategy="pessimistic",
+    criterion="makespan",
 ):
     if ortools_strategy == "realistic":
         durations = env.state.all_duration_real()
@@ -110,7 +107,7 @@ def get_ortools_makespan_psp(
 
     if isinstance(env, GEnv):
         durations = durations.numpy()
-    if env.problem.res_cal is not None:
+    if env.problem.res_cal is not None or criterion == "tardiness":
         solution, optimal = solve_problem_cal(
             env.problem, ortools_strategy, max_time_ortools
         )
@@ -118,14 +115,18 @@ def get_ortools_makespan_psp(
         solution, optimal = solve_psp(
             env.problem, durations, max_time_ortools, scaling_constant_ortools
         )
-    if env.state.deterministic and env.problem.res_cal is None:
+    if (
+        env.state.deterministic
+        and env.problem.res_cal is None
+        and criterion == makespan
+    ):
         return solution.get_makespan(), solution.schedule, optimal
 
-    print("recomputing makespan on real env ", end="")
-    real_makespan, starts = compute_ortools_makespan_on_real_duration(
-        solution, env.state
+    print(f"recomputing {criterion} on real env ", end="")
+    real_criterion, starts = compute_ortools_criterion_on_real_duration(
+        solution, env.state, env.problem, criterion=criterion
     )
-    print("    ", real_makespan.item())
+    print("    ", real_criterion.item())
     torch.set_printoptions(threshold=10000)
     solution2 = Solution.from_mode_schedule(
         starts,
@@ -134,7 +135,7 @@ def get_ortools_makespan_psp(
         env.state.all_jobid(),
         real_durations=env.state.real_durations,
     )
-    return real_makespan, solution2.schedule, optimal
+    return real_criterion, solution2.schedule, optimal
 
 
 def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
