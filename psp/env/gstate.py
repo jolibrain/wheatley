@@ -613,6 +613,7 @@ class GState:
             self.all_affected().to(torch.device("cpu")),
             self.all_jobid().to(torch.device("cpu")),
             real_durations=self.real_durations.to(torch.device("cpu")),
+            criterion=None,
         )
 
     ############################ INTERNAL ###############################

@@ -348,9 +348,7 @@ class AgentValidator:
             return ortools_solution
 
     def _get_random_criterion(self, i):
-        sol = self.random_agent.predict(
-            self.validation_envs[i], self.problem_description.criterion
-        )
+        sol = self.random_agent.predict(self.validation_envs[i])
         if sol is None:
             return self.validation_envs[i].state.undoable_makespan
         return sol.get_criterion()
