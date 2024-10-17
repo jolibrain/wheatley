@@ -246,7 +246,9 @@ def solve(
         objective = makespan
     else:
         tardiness_tasks = [
-            max([0, task_ends[t] - task_due_date[t]]) for t in range(tasks)
+            max([0, task_ends[t] - task_due_date[t]])
+            for t in range(tasks)
+            if task_due_date[t] is not None
         ]
         objective = sum(tardiness_tasks)
 

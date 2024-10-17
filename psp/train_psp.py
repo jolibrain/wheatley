@@ -117,7 +117,7 @@ def main(args, exp_name) -> float:
     # Define problem and visualize it
     problem_description = Description(
         transition_model_config=args.transition_model_config,
-        reward_model_config=args.reward_model_config,
+        reward_model_config=args.criterion,
         deterministic=(args.duration_type == "deterministic"),
         train_psps=train_psps,
         test_psps=test_psps,
