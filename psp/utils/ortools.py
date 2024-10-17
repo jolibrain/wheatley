@@ -29,10 +29,13 @@ from copy import deepcopy
 
 import numpy as np
 from ortools.sat.python import cp_model
+from psp.utils.ortools_rcpsp_calendars import solve_problem as solve_problem_cal
 
 from psp.solution import Solution
 
 from psp.env.genv import GEnv
+
+import torch
 
 
 # def compute_ortools_makespan_on_real_duration(solution, state):
@@ -68,6 +71,7 @@ def compute_ortools_makespan_on_real_duration(solution, state):
     state.reset()  # reset do not redraw real durations
 
     aff = solution.job_schedule
+    computed_start_dates = np.full_like(aff, -1.0)
     while True:
         if aff.min() == float("inf"):
             break
@@ -78,11 +82,12 @@ def compute_ortools_makespan_on_real_duration(solution, state):
         index = np.argmax(dateminAndSelectable)  # get first
         modeid = solution.modes[index]
         aff[index] = float("inf")
-        nid = node_from_job_mode(state.problem, index, modeid)
-        state.affect_job(node_from_job_mode(state.problem, index, modeid))
+        computed_start_dates[index] = state.affect_job(
+            node_from_job_mode(state.problem, index, modeid)
+        )[3]
 
     # with ortools, sink as last node is mandatory
-    return state.tct_real(-1), state.all_tct_real() - state.all_duration_real()
+    return state.tct_real(-1), computed_start_dates
 
 
 def get_ortools_makespan_psp(
@@ -105,15 +110,23 @@ def get_ortools_makespan_psp(
 
     if isinstance(env, GEnv):
         durations = durations.numpy()
-    solution, optimal = solve_psp(
-        env.problem, durations, max_time_ortools, scaling_constant_ortools
-    )
-    if env.state.deterministic and len(env.state.res_cal) == 0:
+    if env.problem.res_cal is not None:
+        solution, optimal = solve_problem_cal(
+            env.problem, ortools_strategy, max_time_ortools
+        )
+    else:
+        solution, optimal = solve_psp(
+            env.problem, durations, max_time_ortools, scaling_constant_ortools
+        )
+    if env.state.deterministic and env.problem.res_cal is None:
         return solution.get_makespan(), solution.schedule, optimal
 
+    print("recomputing makespan on real env ", end="")
     real_makespan, starts = compute_ortools_makespan_on_real_duration(
         solution, env.state
     )
+    print("    ", real_makespan.item())
+    torch.set_printoptions(threshold=10000)
     solution2 = Solution.from_mode_schedule(
         starts,
         env.state.problem,
