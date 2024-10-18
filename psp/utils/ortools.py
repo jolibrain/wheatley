@@ -134,6 +134,7 @@ def get_ortools_criterion_psp(
         env.state.all_affected(),
         env.state.all_jobid(),
         real_durations=env.state.real_durations,
+        criterion=real_criterion,
     )
     return real_criterion, solution2.schedule, optimal
 
