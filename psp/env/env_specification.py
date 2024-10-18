@@ -209,6 +209,8 @@ class EnvSpecification:
         # 3 for duration
         # 1 for source/sink/middle
         n_features = 10
+        # 3 for tardiness
+        n_features += 3
         # level of resource used by every node
         n_features += self.max_n_resources
         # most features make 4 values

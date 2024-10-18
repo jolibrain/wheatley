@@ -245,10 +245,19 @@ def solve(
     if optim_makespan:
         objective = makespan
     else:
-        tardiness_tasks = [
-            max([0, task_ends[t] - task_due_date[t]]) for t in range(tasks)
-        ]
-        objective = sum(tardiness_tasks)
+        tdts = []
+        for t in range(ntasks):
+            if task_due_date[t] is None:
+                continue
+            tdt = model.NewIntVar(0, horizon, f"tardiness_{t}")
+            # tdd = model.NewIntVar(
+            #     int(task_due_date[t]), int(task_due_date[t]), f"due_date_{t}"
+            # )
+            # model.AddMaxEquality(tdt, [0, task_ends[t] - tdd])
+            model.AddMaxEquality(tdt, [0, task_ends[t] - int(task_due_date[t])])
+            tdts.append(tdt)
+
+        objective = sum(tdts)
 
     model.Minimize(objective)
 

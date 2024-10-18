@@ -46,7 +46,7 @@ from jssp.models.custom_agent import CustomAgent
 from jssp.utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
 from psp.env.env import Env as PSPEnv
 from psp.env.genv import GEnv
-from psp.utils.ortools import get_ortools_makespan_psp
+from psp.utils.ortools import get_ortools_criterion_psp
 
 
 class AgentValidator:
@@ -154,15 +154,15 @@ class AgentValidator:
                     )
                 )
 
-        self.makespan_ratio = 1000
-        self.makespans = []
-        self.ortools_makespans = {
+        self.criterion_ratio = 1000
+        self.criterions = []
+        self.ortools_criterions = {
             ortools_strategy: [] for ortools_strategy in self.ortools_strategies
         }
-        self.last_ortools_makespans = [0 for _ in range(self.n_validation_env)]
-        self.last_ppo_makespans = [0 for _ in range(self.n_validation_env)]
-        self.random_makespans = []
-        self.custom_makespans = {agent.rule: [] for agent in self.custom_agents}
+        self.last_ortools_criterions = [0 for _ in range(self.n_validation_env)]
+        self.last_ppo_criterions = [0 for _ in range(self.n_validation_env)]
+        self.random_criterions = []
+        self.custom_criterions = {agent.rule: [] for agent in self.custom_agents}
         self.entropy_losses = []
         self.policy_gradient_losses = []
         self.value_losses = []
@@ -185,11 +185,11 @@ class AgentValidator:
         self.gantt_or_img = None
         self.gantt_mopnr_img = None
         self.current_scatter_fig = None
-        self.all_or_tools_makespan = []
+        self.all_or_tools_criterion = []
         self.all_or_tools_schedule = []
         self.time_to_ortools = []
-        self.best_makespan_wheatley = [float("inf")] * self.n_validation_env
-        self.best_makespan_ortools = [float("inf")] * self.n_validation_env
+        self.best_criterion_wheatley = [float("inf")] * self.n_validation_env
+        self.best_criterion_ortools = [float("inf")] * self.n_validation_env
         self.ortools_env_zero_is_optimal = False
         self.variances = {}
 
@@ -205,7 +205,11 @@ class AgentValidator:
             ):
                 for ortools_strategy in self.ortools_strategies:
                     self.fixed_ortools[ortools_strategy].append(
-                        self._get_ortools_makespan(i, ortools_strategy)
+                        self._get_ortools_criterion(
+                            i,
+                            ortools_strategy,
+                            self.problem_description.reward_model_config,
+                        )
                     )
 
             print(
@@ -232,7 +236,7 @@ class AgentValidator:
                         self.validation_envs[i].state.affectations,
                     )
                     self.fixed_custom_solutions[agent.rule].append(
-                        solution.get_makespan()
+                        solution.get_criterion()
                     )
 
         # Compute random solutions once if validations are fixed
@@ -240,14 +244,14 @@ class AgentValidator:
             print("Computing fixed random solutions ")
             self.fixed_random = []
             for i in tqdm.tqdm(range(self.n_validation_env), desc="   environment"):
-                makespans = []
+                criterions = []
                 for j in tqdm.tqdm(
                     range(self.fixed_random_validation),
                     desc="   instance   ",
                     leave=False,
                 ):
-                    makespans.append(self._get_random_makespan(i))
-                self.fixed_random.append(sum(makespans) / len(makespans))
+                    criterions.append(self._get_random_criterion(i))
+                self.fixed_random.append(sum(criterions) / len(criterions))
 
     def validate(self, agent, alg):
         self._evaluate_agent(agent)
@@ -257,27 +261,27 @@ class AgentValidator:
 
     def _save_if_best_model(self, agent, alg):
         # cur_ratio = np.mean(
-        #     np.array(self.makespans[-4 : len(self.makespans)])
-        #     / np.array(self.ortools_makespans[-4 : len(self.ortools_makespans)])
+        #     np.array(self.criterions[-4 : len(self.criterions)])
+        #     / np.array(self.ortools_criterions[-4 : len(self.ortools_criterions)])
         # )
 
         cur_ratio = (
-            self.makespans[-1]
-            / self.ortools_makespans[self.default_ortools_strategy][-1]
+            self.criterions[-1]
+            / self.ortools_criterions[self.default_ortools_strategy][-1]
         )
-        if cur_ratio <= self.makespan_ratio:
+        if cur_ratio <= self.criterion_ratio:
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")
             torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
             self.save_state(self.path + "validator.pkl")
 
-            self.makespan_ratio = cur_ratio
+            self.criterion_ratio = cur_ratio
             print(f"Current ratio : {cur_ratio:.3f}")
 
             print(f"Saving the figure {self.path + 'best-ortools-ppo-cactus.png'}")
             self.current_scatter_fig.savefig(self.path + "best-ortools-ppo-cactus.png")
 
-    def _get_ortools_makespan(self, i: int, ortools_strategy: str):
+    def _get_ortools_criterion(self, i: int, ortools_strategy: str, criterion: str):
         save_path = self._ortools_solution_path(i, ortools_strategy)
         if self.psp:
             problem = self.validation_envs[i].problem
@@ -289,14 +293,15 @@ class AgentValidator:
             return previous_ortools_solution
 
         if self.psp:
-            makespan, schedule, optimal = get_ortools_makespan_psp(
+            criterion_value, schedule, optimal = get_ortools_criterion_psp(
                 self.validation_envs[i],
                 self.max_time_ortools,
                 self.scaling_constant_ortools,
                 ortools_strategy,
+                criterion,
             )
         else:
-            makespan, schedule, optimal = get_ortools_makespan_jssp(
+            criterion_value, schedule, optimal = get_ortools_makespan_jssp(
                 self.validation_envs[i].state.affectations,
                 self.validation_envs[i].state.original_durations,
                 self.env_specification.n_features,
@@ -305,8 +310,10 @@ class AgentValidator:
                 ortools_strategy,
             )
 
-        self._ortools_save_solution(save_path, problem, (makespan, schedule, optimal))
-        return makespan, schedule, optimal
+        self._ortools_save_solution(
+            save_path, problem, (criterion_value, schedule, optimal)
+        )
+        return criterion_value, schedule, optimal
 
     def _ortools_solution_path(self, i: int, ortools_strategy: str) -> str:
         return os.path.join(self.path, f"ortools_{ortools_strategy}_{i}.pkl")
@@ -338,11 +345,11 @@ class AgentValidator:
         ):
             return ortools_solution
 
-    def _get_random_makespan(self, i):
+    def _get_random_criterion(self, i):
         sol = self.random_agent.predict(self.validation_envs[i])
         if sol is None:
             return self.validation_envs[i].state.undoable_makespan
-        return sol.get_makespan()
+        return sol.get_criterion()
 
     # transform list of dicts to dict of lists
     def _list_to_dict(self, batch_list):
@@ -352,12 +359,12 @@ class AgentValidator:
                 batch_dict.setdefault(key, []).append(value)
         return batch_dict
 
-    def save_csv(self, name, makespan, optimal, schedule, sampled_jobs):
+    def save_csv(self, name, criterion, optimal, schedule, sampled_jobs):
         f = open(self.path + name + ".csv", "w")
         writer = csv.writer(f)
         if sampled_jobs is not None:
             writer.writerow(["sampled jobs", sampled_jobs])
-        writer.writerow(["makespan", makespan])
+        writer.writerow(["criterion", criterion])
         writer.writerow(["optimal", optimal])
         writer.writerow([])
         if hasattr(self.env_specification, "max_n_machines"):
@@ -388,12 +395,12 @@ class AgentValidator:
         f.close()
 
     def _evaluate_agent(self, agent):
-        mean_makespan = 0
-        ortools_mean_makespan = {
+        mean_criterion = 0
+        ortools_mean_criterion = {
             ortools_strategy: 0 for ortools_strategy in self.ortools_strategies
         }
-        random_mean_makespan = 0
-        custom_mean_makespan = {agent.rule: 0 for agent in self.custom_agents}
+        random_mean_criterion = 0
+        custom_mean_criterion = {agent.rule: 0 for agent in self.custom_agents}
         start_eval = time.time()
 
         if self.batch_size != 0:
@@ -458,50 +465,54 @@ class AgentValidator:
             solution = self.validation_envs[i].get_solution()
             if solution is not None:
                 schedule = solution.schedule
-                makespan = solution.get_makespan()
+                criterion = solution.get_criterion()
 
                 if i == 0 and self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_solution(
                         schedule
                     )
 
-                if makespan < self.best_makespan_wheatley[i]:
-                    self.best_makespan_wheatley[i] = makespan
+                if criterion < self.best_criterion_wheatley[i]:
+                    self.best_criterion_wheatley[i] = criterion
                     self.save_csv(
                         f"wheatley_{i}",
-                        makespan,
+                        criterion,
                         "unknown",
                         schedule,
                         self.validation_envs[i].sampled_jobs,
                     )
 
-                self.last_ppo_makespans[i] = makespan
+                self.last_ppo_criterions[i] = criterion
 
-                mean_makespan += makespan / self.n_validation_env
+                mean_criterion += criterion / self.n_validation_env
             else:
                 schedule = None
                 state = self.validation_envs[i].state
-                self.last_ppo_makespans[i] = state.undoable_makespan
-                mean_makespan += state.undoable_makespan / self.n_validation_env
+                self.last_ppo_criterions[i] = state.undoable_criterion
+                mean_criterion += state.undoable_criterion / self.n_validation_env
                 if self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_fail()
 
             for ortools_strategy in self.ortools_strategies:
                 if self.fixed_validation:
                     (
-                        or_tools_makespan,
+                        or_tools_criterion,
                         or_tools_schedule,
                         optimal,
                     ) = self.fixed_ortools[ortools_strategy][i]
                 else:
                     (
-                        or_tools_makespan,
+                        or_tools_criterion,
                         or_tools_schedule,
                         optimal,
-                    ) = self._get_ortools_makespan(i, ortools_strategy)
+                    ) = self._get_ortools_criterion(
+                        i,
+                        ortools_strategy,
+                        self.problem_description.reward_model_config,
+                    )
 
                 if ortools_strategy == self.averagistic_ortools_strategy:
-                    self.last_ortools_makespans[i] = or_tools_makespan
+                    self.last_ortools_criterions[i] = or_tools_criterion
 
                 if i == 0 and ortools_strategy == self.default_ortools_strategy:
                     if self.display_gantt:
@@ -512,56 +523,58 @@ class AgentValidator:
 
                 if (
                     ortools_strategy == self.default_ortools_strategy
-                    and or_tools_makespan < self.best_makespan_ortools[i]
+                    and or_tools_criterion < self.best_criterion_ortools[i]
                 ):
-                    self.best_makespan_ortools[i] = or_tools_makespan
+                    self.best_criterion_ortools[i] = or_tools_criterion
                     self.save_csv(
                         f"ortools_{i}",
-                        or_tools_makespan,
+                        or_tools_criterion,
                         optimal,
                         or_tools_schedule,
                         self.validation_envs[i].sampled_jobs,
                     )
 
-                ortools_mean_makespan[ortools_strategy] += (
-                    or_tools_makespan / self.n_validation_env
+                ortools_mean_criterion[ortools_strategy] += (
+                    or_tools_criterion / self.n_validation_env
                 )
 
             if self.fixed_random_validation:
-                random_makespan = self.fixed_random[i]
+                random_criterion = self.fixed_random[i]
             else:
-                random_makespan = self._get_random_makespan(i)
-            random_mean_makespan += random_makespan / self.n_validation_env
+                random_criterion = self._get_random_criterion(i)
+            random_mean_criterion += random_criterion / self.n_validation_env
 
             for custom_agent in self.custom_agents:
                 name = custom_agent.rule
 
                 if self.fixed_validation:
-                    makespan = self.fixed_custom_solutions[name][i]
+                    criterion = self.fixed_custom_solutions[name][i]
                 else:
                     solution = custom_agent.predict(
                         self.validation_envs[i].state.original_durations,
                         self.validation_envs[i].state.affectations,
+                        self.problem_description.criterion,
+                        self.validation_envs[i],
                     )
-                    makespan = solution.get_makespan()
+                    criterion = solution.get_criterion()
                     if custom_agent.rule == "MOPNR" and i == 0 and self.display_gantt:
                         self.gantt_mopnr_img = self.validation_envs[i].render_solution(
                             solution.schedule
                         )
 
-                custom_mean_makespan[name] += makespan / self.n_validation_env
+                custom_mean_criterion[name] += criterion / self.n_validation_env
 
-        print("--- mean_makespan=", mean_makespan, " ---")
+        print("--- mean_criterion=", mean_criterion, " ---")
         print("--- eval time=", time.time() - start_eval, "  ---")
-        self.makespans.append(mean_makespan)
+        self.criterions.append(mean_criterion)
         for ortools_strategy in self.ortools_strategies:
-            self.ortools_makespans[ortools_strategy].append(
-                ortools_mean_makespan[ortools_strategy]
+            self.ortools_criterions[ortools_strategy].append(
+                ortools_mean_criterion[ortools_strategy]
             )
-        self.random_makespans.append(random_mean_makespan)
+        self.random_criterions.append(random_mean_criterion)
         for custom_agent in self.custom_agents:
-            self.custom_makespans[custom_agent.rule].append(
-                custom_mean_makespan[custom_agent.rule]
+            self.custom_criterions[custom_agent.rule].append(
+                custom_mean_criterion[custom_agent.rule]
             )
 
     def _visdom_metrics(self, agent, alg):
@@ -574,18 +587,18 @@ class AgentValidator:
         """
         self.vis.text(html, win="html", opts={"width": 372, "height": 336})
 
-        X = list(range(len(self.makespans)))
-        Y_list = [self.makespans, self.random_makespans]
+        X = list(range(len(self.criterions)))
+        Y_list = [self.criterions, self.random_criterions]
         opts = {
-            "title": "Validation makespan",
+            "title": "Validation criterion",
             "legend": ["Wheatley", "Random"],
             "linecolor": [[31, 119, 180], [255, 127, 14]],
         }
         Y2_list = [
-            np.array(self.makespans)
-            / np.array(self.ortools_makespans[self.default_ortools_strategy]),
-            np.array(self.random_makespans)
-            / np.array(self.ortools_makespans[self.default_ortools_strategy]),
+            np.array(self.criterions)
+            / np.array(self.ortools_criterions[self.default_ortools_strategy]),
+            np.array(self.random_criterions)
+            / np.array(self.ortools_criterions[self.default_ortools_strategy]),
         ]
         opts2 = {
             "legend": ["Wheatley / OR-tools", "Random / OR-tools"],
@@ -602,7 +615,7 @@ class AgentValidator:
             [127, 127, 127],
         ]
         for ortools_strategy_id, ortools_strategy in enumerate(self.ortools_strategies):
-            Y_list.append(self.ortools_makespans[ortools_strategy])
+            Y_list.append(self.ortools_criterions[ortools_strategy])
             opts["legend"].append("OR-Tools - " + ortools_strategy)
             opts["linecolor"].append(ortools_colors[ortools_strategy_id])
 
@@ -618,10 +631,10 @@ class AgentValidator:
         )
         for custom_agent_id, custom_agent in enumerate(self.custom_agents):
             name = custom_agent.rule
-            Y = np.array(self.custom_makespans[name])
+            Y = np.array(self.custom_criterions[name])
             Y_list.append(Y)
             Y2_list.append(
-                Y / np.array(self.ortools_makespans[self.default_ortools_strategy])
+                Y / np.array(self.ortools_criterions[self.default_ortools_strategy])
             )
 
             opts["linecolor"].append(agent_colors[custom_agent_id])
@@ -631,9 +644,9 @@ class AgentValidator:
             opts2["linecolor"].append(agent_colors[custom_agent_id])
 
         opts["linecolor"] = np.array(opts["linecolor"])
-        self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_makespan", opts=opts)
+        self.vis.line(X=X, Y=np.array(Y_list).T, win="validation_criterion", opts=opts)
         # opts2["linecolor"] = np.array(opts2["linecolor"])
-        # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_makespan_ratio", opts=opts2)
+        # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_criterion_ratio", opts=opts2)
 
         # ratio to OR-tools
         opts = {
@@ -644,8 +657,8 @@ class AgentValidator:
         for ortools_strategy in self.ortools_strategies:
             opts["legend"].append(f"Wheatley/OR-Tools {ortools_strategy}")
             opts["legend"].append(f"Min Wheatley/OR-Tools {ortools_strategy}")
-            ratio_to_ortools = np.array(self.makespans) / np.array(
-                self.ortools_makespans[ortools_strategy]
+            ratio_to_ortools = np.array(self.criterions) / np.array(
+                self.ortools_criterions[ortools_strategy]
             )
             Y_ratios.append(ratio_to_ortools)
             Y_ratios.append(np.minimum.accumulate(ratio_to_ortools))
@@ -659,17 +672,17 @@ class AgentValidator:
 
         # distance to OR-tools
         opts = {"title": "Distance to OR-tools"}
-        dist_to_ortools = np.array(self.makespans) - np.array(
-            self.ortools_makespans[self.default_ortools_strategy]
+        dist_to_ortools = np.array(self.criterions) - np.array(
+            self.ortools_criterions[self.default_ortools_strategy]
         )
         self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
 
         # time to OR-tools
         wins = 0
-        count = min(len(self.makespans), 100)
+        count = min(len(self.criterions), 100)
         for i in range(1, count + 1):
-            ppo = self.makespans[-i]
-            ortools = self.ortools_makespans[self.default_ortools_strategy][-i]
+            ppo = self.criterions[-i]
+            ortools = self.ortools_criterions[self.default_ortools_strategy][-i]
             if ppo <= ortools or np.isclose(ppo, ortools):
                 wins += 1
         pct = 100 * wins / count
@@ -684,23 +697,23 @@ class AgentValidator:
         # and save the image on disk. We can directly plot this image with visdom.
         # This is a bit hacky but it works.
         fig, ax = plt.subplots(figsize=(6, 6))
-        ppo_makespans = np.array(self.last_ppo_makespans)
-        ortools_makespans = np.array(self.last_ortools_makespans)
+        ppo_criterions = np.array(self.last_ppo_criterions)
+        ortools_criterions = np.array(self.last_ortools_criterions)
         ax.scatter(
-            ppo_makespans,
-            ortools_makespans,
-            c=-ppo_makespans / ortools_makespans,
+            ppo_criterions,
+            ortools_criterions,
+            c=-ppo_criterions / ortools_criterions,
             cmap="viridis",
         )
         ax.plot(
-            [0, max(self.last_ppo_makespans + self.last_ortools_makespans)],
-            [0, max(self.last_ppo_makespans + self.last_ortools_makespans)],
+            [0, max(self.last_ppo_criterions + self.last_ortools_criterions)],
+            [0, max(self.last_ppo_criterions + self.last_ortools_criterions)],
             color="red",
         )
-        ax.set_xlabel("Wheatley makespan")
-        ax.set_ylabel("OR-Tools makespan")
+        ax.set_xlabel("Wheatley criterion")
+        ax.set_ylabel("OR-Tools criterion")
         ax.set_title(
-            f"OR-Tools {self.averagistic_ortools_strategy} vs Wheatley - {(ppo_makespans / ortools_makespans).mean():.2f}"
+            f"OR-Tools {self.averagistic_ortools_strategy} vs Wheatley - {(ppo_criterions / ortools_criterions).mean():.2f}"
         )
         fig.savefig(self.path + "ortools-ppo-cactus.png")
 
@@ -722,7 +735,7 @@ class AgentValidator:
             self.first_callback = False
             return
 
-        if self.makespan_ratio <= (ppo_makespans / ortools_makespans).mean():
+        if self.criterion_ratio <= (ppo_criterions / ortools_criterions).mean():
             image = np.array(Image.open(self.path + "best-ortools-ppo-cactus.png"))
         else:
             image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
@@ -872,11 +885,11 @@ class AgentValidator:
 
     def save_state(self, filepath: str):
         validator_state = {
-            "makespan_ratio": self.makespan_ratio,
-            "makespans": self.makespans,
-            "ortools_makespans": self.ortools_makespans,
-            "random_makespans": self.random_makespans,
-            "custom_makespans": self.custom_makespans,
+            "criterion_ratio": self.criterion_ratio,
+            "criterions": self.criterions,
+            "ortools_criterions": self.ortools_criterions,
+            "random_criterions": self.random_criterions,
+            "custom_criterions": self.custom_criterions,
             "entropy_losses": self.entropy_losses,
             "policy_gradient_losses": self.policy_gradient_losses,
             "value_losses": self.value_losses,
@@ -896,11 +909,11 @@ class AgentValidator:
             "gantt_rl_img": self.gantt_rl_img,
             "gantt_or_img": self.gantt_or_img,
             "gantt_mopnr_img": self.gantt_mopnr_img,
-            "all_or_tools_makespan": self.all_or_tools_makespan,
+            "all_or_tools_criterion": self.all_or_tools_criterion,
             "all_or_tools_schedule": self.all_or_tools_schedule,
             "time_to_ortools": self.time_to_ortools,
-            "best_makespan_wheatley": self.best_makespan_wheatley,
-            "best_makespan_ortools": self.best_makespan_ortools,
+            "best_criterion_wheatley": self.best_criterion_wheatley,
+            "best_criterion_ortools": self.best_criterion_ortools,
             "ortools_env_zero_is_optimal": self.ortools_env_zero_is_optimal,
         }
         with open(filepath, "wb") as f:
@@ -910,11 +923,11 @@ class AgentValidator:
         with open(filepath, "rb") as f:
             validator_state = pickle.load(f)
 
-        self.makespan_ratio = validator_state["makespan_ratio"]
-        self.makespans = validator_state["makespans"]
-        self.ortools_makespans = validator_state["ortools_makespans"]
-        self.random_makespans = validator_state["random_makespans"]
-        self.custom_makespans = validator_state["custom_makespans"]
+        self.criterion_ratio = validator_state["criterion_ratio"]
+        self.criterions = validator_state["criterions"]
+        self.ortools_criterions = validator_state["ortools_criterions"]
+        self.random_criterions = validator_state["random_criterions"]
+        self.custom_criterions = validator_state["custom_criterions"]
         self.entropy_losses = validator_state["entropy_losses"]
         self.policy_gradient_losses = validator_state["policy_gradient_losses"]
         self.value_losses = validator_state["value_losses"]
@@ -934,11 +947,11 @@ class AgentValidator:
         self.gantt_rl_img = validator_state["gantt_rl_img"]
         self.gantt_or_img = validator_state["gantt_or_img"]
         self.gantt_mopnr_img = validator_state["gantt_mopnr_img"]
-        self.all_or_tools_makespan = validator_state["all_or_tools_makespan"]
+        self.all_or_tools_criterion = validator_state["all_or_tools_criterion"]
         self.all_or_tools_schedule = validator_state["all_or_tools_schedule"]
         self.time_to_ortools = validator_state["time_to_ortools"]
-        self.best_makespan_wheatley = validator_state["best_makespan_wheatley"]
-        self.best_makespan_ortools = validator_state["best_makespan_ortools"]
+        self.best_criterion_wheatley = validator_state["best_criterion_wheatley"]
+        self.best_criterion_ortools = validator_state["best_criterion_ortools"]
         self.ortools_env_zero_is_optimal = validator_state[
             "ortools_env_zero_is_optimal"
         ]
