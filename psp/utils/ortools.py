@@ -109,7 +109,10 @@ def get_ortools_criterion_psp(
         durations = durations.numpy()
     if env.problem.res_cal is not None or criterion == "tardiness":
         solution, optimal = solve_problem_cal(
-            env.problem, ortools_strategy, max_time_ortools
+            env.problem,
+            ortools_strategy,
+            max_time_ortools,
+            optim_makespan=(criterion == "makespan"),
         )
     else:
         solution, optimal = solve_psp(
