@@ -68,6 +68,7 @@ class AgentGraphObservation:
                     g.ndata("type").unsqueeze(1),
                     g.ndata("normalized_durations"),
                     g.ndata("normalized_tct"),
+                    g.ndata("tardiness"),
                     g.ndata("resources"),
                 ],
                 dim=1,

@@ -107,7 +107,7 @@ class GEnv:
         ):
             print("WARNING: tardiness reward requires but no due dates found")
         else:
-            self.reward_model.set_due_dates(self.problem.due_dates)
+            self.reward_model.set_tardiness()
 
     def close(self):
         pass

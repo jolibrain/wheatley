@@ -71,6 +71,8 @@ class GState:
         # 7,8,9 : tct (min max mode)
         # 10.. 9+max_n_resources : level of resource i used by this mode (normalized)
 
+        self.due_dates = self.problem.due_dates
+
         self.job_modes = []
         if isinstance(problem, dict):
             job_info = problem["job_info"]
@@ -336,6 +338,7 @@ class GState:
         )  # source
 
     def reset_tct(self):
+        self.reset_tardiness()
         self.real_tct = torch.zeros(
             (self.n_nodes), dtype=torch.float, device=self.device
         )
@@ -343,6 +346,15 @@ class GState:
             "tct", torch.zeros((self.n_nodes, 3), dtype=torch.float, device=self.device)
         )
         self.update_completion_times(None)
+
+    def reset_tardiness(self):
+        self.real_tardiness = torch.zeros(
+            (self.n_nodes), dtype=torch.float, device=self.device
+        )
+        self.graph.set_ndata(
+            "tardiness",
+            torch.zeros((self.n_nodes, 3), dtype=torch.float, device=self.device),
+        )
 
     ############################### ACCESSORS ############################
 
@@ -359,10 +371,26 @@ class GState:
         return self.real_tct[nodeid]
 
     def set_tct(self, nodeid, ct):
+        if self.due_dates[nodeid] is not None:
+            self.graph.ndata("tardiness")[nodeid] = ct - self.due_dates[nodeid]
         self.graph.ndata("tct")[nodeid] = ct
 
     def set_tct_real(self, nodeid, ct):
+        if self.due_dates[nodeid] is not None:
+            self.real_tardiness[nodeid] = ct - self.due_dates[nodeid]
         self.real_tct[nodeid] = ct
+
+    def tardiness(self, nodeid):
+        return self.graph.ndata("tardiness")[nodeid]
+
+    def all_tardiness(self):
+        return self.graph.ndata("tardiness")
+
+    def tardiness_real(self, nodeid):
+        return self.real_tardiness[nodeid]
+
+    def all_tardiness_real(self):
+        return self.real_tardiness
 
     def all_durations(self):
         return self.graph.ndata("durations")
@@ -667,9 +695,7 @@ class GState:
 
     def normalize_features(self):
         if self.normalize:
-            self.graph.set_ndata(
-                "normalized_tct", self.graph.ndata("tct") / self.max_duration
-            )
+            self.graph.set_ndata("normalized_tct", self.all_tct() / self.max_duration)
 
     def get_last_finishing_dates(self, jobs):
         if len(jobs) == 0:
