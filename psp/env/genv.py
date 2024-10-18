@@ -254,8 +254,8 @@ class GEnv:
     def get_solution(self):
         sol = self.state.get_solution()
         if self.problem_description.reward_model_config == "makespan":
-            sinks = torch.where(state.types() == 1)[0]
-            sinks_makespans = state.tct(sinks)
+            sinks = torch.where(self.state.types() == 1)[0]
+            sinks_makespans = self.state.tct(sinks)
             max_makespan = torch.max(sinks_makespans)
             sol._criterion = max_makespan
         elif self.problem_description.reward_model_config == "tardiness":
@@ -264,10 +264,10 @@ class GEnv:
             ]
             with_due_dates = torch.tensor(with_due_dates, dtype=torch.int64)
             due_dates = torch.tensor(
-                [v for i, v in enumerate(due_dates) if v != None],
+                [v for i, v in enumerate(self.problem.due_dates) if v != None],
                 dtype=torch.int64,
             )
-            wdd_tct = state.tct_real(self.with_due_dates)
+            wdd_tct = self.state.tct_real(with_due_dates)
             tardy = wdd_tct - due_dates
             sol._criterion = torch.sum(tardy).item()
 
@@ -320,9 +320,6 @@ class GEnv:
             device=self.state.device,
         )
         return torch.cat([mask, pad]).to(torch.device("cpu"))
-
-    def get_solution(self):
-        return self.state.get_solution()
 
     def render_solution(self, schedule, scaling=1.0):
         return self.state.render_solution(schedule, scaling)
