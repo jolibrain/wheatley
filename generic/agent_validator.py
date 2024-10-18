@@ -234,8 +234,6 @@ class AgentValidator:
                     solution = agent.predict(
                         self.validation_envs[i].state.original_durations,
                         self.validation_envs[i].state.affectations,
-                        self.problem_description.reward_model_config,
-                        self.validation_envs[i],
                     )
                     self.fixed_custom_solutions[agent.rule].append(
                         solution.get_criterion()
