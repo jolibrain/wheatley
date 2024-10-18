@@ -247,7 +247,7 @@ def solve(
     else:
         tardiness_tasks = [
             max([0, task_ends[t] - task_due_date[t]])
-            for t in range(tasks)
+            for t in range(ntasks)
             if task_due_date[t] is not None
         ]
         objective = sum(tardiness_tasks)
