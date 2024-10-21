@@ -74,6 +74,7 @@ class AgentSpecification:
         reward_weights,
         sgformer,
         pyg,
+        hierarchical,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -120,6 +121,7 @@ class AgentSpecification:
         self.reward_weights = reward_weights
         self.sgformer = sgformer
         self.pyg = pyg
+        self.hierarchical = hierarchical
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -209,6 +211,7 @@ class AgentSpecification:
                 f"hl gauss encoding:                {self.hl_gauss}\n"
                 f"reward weights:                   {self.reward_weights}\n"
                 f"SGFormer:                         {self.sgformer}\n"
+                f"Hierarchical:                     {self.hierarchical}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (

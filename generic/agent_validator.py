@@ -380,21 +380,15 @@ class AgentValidator:
                 writer.writerow(line)
         else:  # PSP case
             # schedule is (job_schedule, mode)
-            header = []
-            for i in range(len(schedule[0])):
-                header.append("job " + str(i) + " start")
+            header = ["all starts"]
             writer.writerow(header)
             for i in range(len(schedule[0])):
-                line = schedule[0]
-                writer.writerow(line)
+                writer.writerow([schedule[0][i]])
             writer.writerow([])
-            header2 = []
-            for i in range(len(schedule[0])):
-                header.append("job " + str(i) + " mode")
+            header = ["all modes"]
             writer.writerow(header)
             for i in range(len(schedule[0])):
-                line = schedule[1]
-                writer.writerow(line)
+                writer.writerow([schedule[1][i]])
         f.close()
 
     def _evaluate_agent(self, agent):

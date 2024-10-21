@@ -39,6 +39,7 @@ def learned_graph_pool(
     poolnodes = list(range(node_offset, node_offset + batch_size))
     data = torch.zeros((batch_size, input_dim_features_extractor))
     g.add_nodes(batch_size, "feat", data)
+    g.add_batchinfo(torch.tensor([i for i in range(batch_size)]))
     ei0 = []
     ei1 = []
     startnode = 0
@@ -114,6 +115,11 @@ def node_conflicts(
         1
     )
     g.add_nodes(num_resources * batch_size, "feat", data)
+    bi = []
+    for i in range(batch_size):
+        bi.extend([i] * num_resources)
+    g.add_batchinfo(torch.tensor(bi))
+
     idxaffected = torch.where(resources_used != 0)
     consumers = idxaffected[0]
     nconsumers = consumers.shape[0]

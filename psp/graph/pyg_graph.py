@@ -154,6 +154,9 @@ class PYGGraph(Graph):
     def add_nodes(self, num_nodes, featname, data):
         self._graph["n"][featname] = torch.cat([self._graph["n"][featname], data])
 
+    def add_batchinfo(self, batchinfo):
+        self._graph["n"]["batch"] = torch.cat([self._graph["n"]["batch"], batchinfo])
+
     def add_edges(self, sources, destinations, etype, data=None):
         new_edges = torch.stack([sources, destinations], dim=0)
         if self._graph["n", etype, "n"].num_edges == 0:

@@ -13,6 +13,7 @@ class GraphConv(torch.nn.Module):
         bias=True,
         edge_scoring=False,
         pyg=False,
+        edge_dim=None,
     ):
         super().__init__()
         self.pyg = pyg
@@ -22,7 +23,7 @@ class GraphConv(torch.nn.Module):
                 out_dim,
                 num_heads,
                 add_self_loops=False,
-                edge_dim=in_dim,
+                edge_dim=in_dim if edge_dim is None else edge_dim,
                 bias=bias,
             )
         else:
@@ -42,3 +43,6 @@ class GraphConv(torch.nn.Module):
             f, ef = self.conv(g, node_feats, edge_feats, edge_efeats)
             return f.flatten(start_dim=-2, end_dim=-1), ef
             # return self.conv(g, node_feats, edge_feats, edge_efeats)
+
+    def forward_nog(self, node_feats, edge_index, edge_feats, edge_efeats=None):
+        return self.conv(node_feats, edge_index, edge_feats), None
