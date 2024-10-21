@@ -152,6 +152,7 @@ def agent_specification(env_specification_small):
         dropout=0.0,
         cache_lap_node_id=False,
         lap_node_id_k=10,
+        hierarchical=False,
     )
 
 

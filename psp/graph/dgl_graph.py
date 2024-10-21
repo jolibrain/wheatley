@@ -216,6 +216,9 @@ class DGLBatchGraph(DGLGraph):
     def add_nodes(self, num_nodes, featname, data):
         self._graph.add_nodes(num_nodes, data={featname: data})
 
+    def add_batchinfo(self, batchinfo):
+        pass
+
     def add_edges(self, sources, dests, etype, data=None):
         self._graph.add_edges(sources, dests, etype=etype, data=data)
 

@@ -108,6 +108,7 @@ class Agent(Agent):
                 rwpe_cache=self.rwpe_cache,
                 graphobs=graphobs,
                 pyg=agent_specification.pyg,
+                hierarchical=agent_specification.hierarchical,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(

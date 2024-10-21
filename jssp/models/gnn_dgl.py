@@ -131,7 +131,7 @@ class GnnDGL(torch.nn.Module):
             input_dim=input_dim_features_extractor,
             hidden_dim=hidden_dim_features_extractor,
             output_dim=hidden_dim_features_extractor,
-            batch_norm=self.normalize,
+            norm=self.normalize,
             activation=activation_features_extractor,
         )
 
@@ -157,7 +157,7 @@ class GnnDGL(torch.nn.Module):
                     input_dim=self.hidden_dim,
                     hidden_dim=self.hidden_dim,
                     output_dim=self.hidden_dim,
-                    batch_norm=self.normalize,
+                    norm=self.normalize,
                     activation=activation_features_extractor,
                 )
                 self.features_extractors.append(GINEConv(mlp, learn_eps=True))
@@ -177,7 +177,7 @@ class GnnDGL(torch.nn.Module):
                         input_dim=hidden_dim_features_extractor * n_attention_heads,
                         hidden_dim=hidden_dim_features_extractor * n_attention_heads,
                         output_dim=hidden_dim_features_extractor,
-                        batch_norm=self.normalize,
+                        norm=self.normalize,
                         activation=activation_features_extractor,
                     )
                 )
@@ -187,7 +187,7 @@ class GnnDGL(torch.nn.Module):
                 #         input_dim=hidden_dim_features_extractor * n_attention_heads,
                 #         hidden_dim=hidden_dim_features_extractor * n_attention_heads,
                 #         output_dim=hidden_dim_features_extractor,
-                #         batch_norm=self.normalize,
+                #         norm=self.normalize,
                 #         activation=activation_features_extractor,
                 #     )
                 # )
