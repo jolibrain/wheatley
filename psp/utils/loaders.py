@@ -43,7 +43,7 @@ class PSPLoader:
     def nextline(self):
         # while True:
         self.line = self.f.readline()
-        temp = re.split("\s|,|\(|\)|\[|\n", self.line)
+        temp = re.split(r"\s|,|\(|\)|\[|\n", self.line)
         self.sline = []
         for t in temp:
             if t != "":

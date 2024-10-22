@@ -254,12 +254,12 @@ class AgentValidator:
                 self.fixed_random.append(sum(criterions) / len(criterions))
 
     def validate(self, agent, alg):
-        self._evaluate_agent(agent)
+        solutions = self._evaluate_agent(agent)
         self._visdom_metrics(agent, alg)
-        self._save_if_best_model(agent, alg)
+        self._save_if_best_model(agent, alg, solutions)
         return True
 
-    def _save_if_best_model(self, agent, alg):
+    def _save_if_best_model(self, agent, alg, solutions):
         # cur_ratio = np.mean(
         #     np.array(self.criterions[-4 : len(self.criterions)])
         #     / np.array(self.ortools_criterions[-4 : len(self.ortools_criterions)])
@@ -270,6 +270,9 @@ class AgentValidator:
             / self.ortools_criterions[self.default_ortools_strategy][-1]
         )
         if cur_ratio <= self.criterion_ratio:
+            print("saving solutions")
+            for i, sol in enumerate(solutions):
+                sol.save(self.path + f"sol_{i}.txt")
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")
             torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
@@ -436,6 +439,7 @@ class AgentValidator:
                 envs = todo_envs
             print("...done")
 
+        solution = []
         for i in tqdm.tqdm(range(self.n_validation_env), desc="   evaluating         "):
             if self.batch_size == 0:
                 obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
@@ -462,10 +466,10 @@ class AgentValidator:
                     obs, reward, done, _, info = self.validation_envs[i].step(
                         action.long().item()
                     )
-            solution = self.validation_envs[i].get_solution()
-            if solution is not None:
-                schedule = solution.schedule
-                criterion = solution.get_criterion()
+            solution.append(self.validation_envs[i].get_solution())
+            if solution[i] is not None:
+                schedule = solution[i].schedule
+                criterion = solution[i].get_criterion()
 
                 if i == 0 and self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_solution(
@@ -576,6 +580,7 @@ class AgentValidator:
             self.custom_criterions[custom_agent.rule].append(
                 custom_mean_criterion[custom_agent.rule]
             )
+        return solution
 
     def _visdom_metrics(self, agent, alg):
         commandline = " ".join(sys.argv)

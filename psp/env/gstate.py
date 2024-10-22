@@ -653,8 +653,8 @@ class GState:
     def get_solution(self):
         if not self.succeeded():
             return None
-        tct = self.real_tct
-        schedule = tct - self.real_durations[:]
+        schedule = self.all_tct_real() - self.all_duration_real()
+        schedule_stoch = self.all_tct() - self.all_durations()
 
         return Solution.from_mode_schedule(
             schedule.to(torch.device("cpu")),
@@ -663,6 +663,7 @@ class GState:
             self.all_jobid().to(torch.device("cpu")),
             real_durations=self.real_durations.to(torch.device("cpu")),
             criterion=None,
+            schedule_stoch=schedule_stoch,
         )
 
     ############################ INTERNAL ###############################
