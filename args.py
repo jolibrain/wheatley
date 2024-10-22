@@ -628,6 +628,14 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--criterion",
+        type=str,
+        default="makespan",
+        choices=["makespan", "tardiness"],
+        help="psp criterion in makespan|tardiness",
+    )
+
+    parser.add_argument(
         "--reward_model_config",
         type=str,
         default="Sparse",

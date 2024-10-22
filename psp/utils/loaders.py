@@ -43,7 +43,7 @@ class PSPLoader:
     def nextline(self):
         # while True:
         self.line = self.f.readline()
-        temp = re.split("\s|,|\(|\)|\[|\n", self.line)
+        temp = re.split(r"\s|,|\(|\)|\[|\n", self.line)
         self.sline = []
         for t in temp:
             if t != "":
@@ -62,12 +62,13 @@ class PSPLoader:
 
     def check_firstword(self, w):
         ok = self.fw == w
-        self.nextline()
+        if ok:
+            self.nextline()
         return ok
 
     def firstword(self, w, stop=False):
         if self.fw != w:
-            raise RuntimeError("bad first word " + w)
+            raise RuntimeError("bad first word " + self.fw + "   wanted " + w)
         if not stop:
             self.nextline()
 
@@ -510,6 +511,15 @@ class PSPLoader:
                 durations[i].append(job_durations[i])
             resources_cons.append(job_resources)
         self.firstchar("*")
+        has_due = self.check_firstword("DUE")
+        if not has_due:
+            due_dates = None
+        else:
+            due_dates = {}
+            while self.fc != "*":
+                due_dates[self.sline[0]] = float(self.sline[1])
+                self.nextline()
+            self.firstchar("*")
         self.firstword("RESOURCEAVAILABILITIES:")
         self.nextline()
         resource_availabilities = [int(rl) for rl in self.sline]
@@ -565,4 +575,5 @@ class PSPLoader:
             res_cal=res_cal,
             cals=cals,
             display_trivial=True,
+            due_dates=due_dates,
         )

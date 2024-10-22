@@ -29,19 +29,48 @@ import torch
 
 class GraphTerminalRewardModel:
     def __init__(self):
-        pass
+        self.tardiness = False
+
+    # def set_due_dates(self, due_dates):
+    #     if due_dates is not None:
+    #         with_due_dates = [i for i, v in enumerate(due_dates) if v != None]
+    #         self.with_due_dates = torch.tensor(with_due_dates, dtype=torch.int64)
+    #         self.due_dates = torch.tensor(
+    #             [v for i, v in enumerate(due_dates) if v != None],
+    #             dtype=torch.int64,
+    #         )
+    #     else:
+    #         self.due_dates = None
+    def set_tardiness(self):
+        self.tardiness = True
 
     def evaluate(self, state):
         """
         Reward is 0 for every time steps, except for the last one, where it is the opposite of the Makespan
         """
         if state.succeeded():
-            sinks = torch.where(state.types() == 1)[0]
-            sinks_makespans = state.tct(sinks)
-            max_makespan = torch.max(sinks_makespans)
-            makespan = max_makespan.item()
-            # makespan = state.tct(-1)[0].item() / len(state.job_modes)
-            return -makespan / len(state.job_modes)
+            if not self.tardiness:
+                sinks = torch.where(state.types() == 1)[0]
+                sinks_makespans = state.tct(sinks)
+                max_makespan = torch.max(sinks_makespans)
+                makespan = max_makespan.item()
+                # makespan = state.tct(-1)[0].item() / len(state.job_modes)
+                return -makespan / len(state.job_modes)
+            else:
+                # wdd_tct = state.tct(self.with_due_dates)
+                # tardy = wdd_tct - self.due_dates.unsqueeze(-1)
+                raw_tardy = state.all_tardiness()
+                tardy = torch.where(raw_tardy < 0, 0, raw_tardy)
+                return (
+                    -torch.sum(tardy).item()
+                    / 3.0
+                    / len(state.job_modes)
+                    / len(state.job_modes)
+                )  # average min,max,ave and come back close to 1
+
         if state.finished():
-            return -state.undoable_makespan / len(state.job_modes)
+            if self.due_dates is not None:
+                raise NotImplementedError("failure and tardiness")
+            else:
+                return -state.undoable_makespan / len(state.job_modes)
         return 0

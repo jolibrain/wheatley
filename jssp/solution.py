@@ -34,7 +34,7 @@ class Solution:
         self.schedule = schedule
         self.real_durations = real_durations
 
-    def get_makespan(self):
+    def get_criterion(self):
         return np.max(self.schedule + self.real_durations)
 
     def save(self, path: Union[Path, str]):
