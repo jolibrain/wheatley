@@ -191,7 +191,7 @@ def solve_psp(problem, durations, max_time_ortools, scaling_constant_ortools):
             np.array(assignment[1]),
             None,
             np.array([d / scaling_constant_ortools for d in durations]),
-            criterion=value,
+            criterion=value / scaling_constant_ortools,
         ),
         optimal,
     )
