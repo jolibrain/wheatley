@@ -413,7 +413,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--n_attention_heads",
         type=int,
         default=4,
-        help="Dimension of hidden and output for GNN",
+        help="Number of heads for internal attention",
     )
     parser.add_argument(
         "--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN"
@@ -589,6 +589,12 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="predict value internally as log of expected sum of reward",
+    )
+    parser.add_argument(
+        "--hierarchical",
+        action="store_true",
+        default=False,
+        help="use hierarchical GNN",
     )
 
     # =================================================ENVIRONMENT SPECIFICATION================================================
