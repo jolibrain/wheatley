@@ -101,13 +101,11 @@ class GEnv:
             if isinstance(self.problem, TaillardRcpsp) and not self.validate:
                 self.problem = self.problem.sample()
 
-        if (
-            self.problem_description.reward_model_config == "tardiness"
-            and self.problem.due_dates is None
-        ):
-            print("WARNING: tardiness reward requires but no due dates found")
-        else:
-            self.reward_model.set_tardiness()
+        if self.problem_description.reward_model_config == "tardiness":
+            if self.problem.due_dates is None:
+                print("WARNING: tardiness reward requires but no due dates found")
+            else:
+                self.reward_model.set_tardiness()
 
     def close(self):
         pass
