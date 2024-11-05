@@ -19,8 +19,10 @@ class ScoreAggr(torch.nn.Module):
     def __init__(self, hidden_dim):
         super(ScoreAggr, self).__init__()
         self.lin = torch.nn.Linear(hidden_dim + 1, hidden_dim)
+        # self.mlp = mlp quite bad results
 
     def forward(self, features, score):
+        # return self.mlp(torch.cat((features, score), dim=-1))
         return self.lin(torch.cat((features, score), dim=-1))
 
 
@@ -425,7 +427,7 @@ class GnnHier(torch.nn.Module):
         self.x_aggr = torch.nn.ModuleList()
         self.edge_aggr = torch.nn.ModuleList()
         for i in range(self.n_layers_features_extractor):
-            self.score_aggr.append(ScoreAggr(self.hidden_dim))
+            self.score_aggr.append(ScoreAggr(hidden_dim=self.hidden_dim))
             self.x_aggr.append(
                 NodeAggr(
                     self.hidden_dim,
@@ -445,31 +447,18 @@ class GnnHier(torch.nn.Module):
                 )
             )
 
-        for i in range(self.n_layers_features_extractor - 1):
             self.pools.append(
                 KMISPooling(
                     self.hidden_dim,
-                    k=1,
+                    k=1 if i < self.n_layers_features_extractor - 1 else 2,
                     aggr_x=self.x_aggr[i],
                     aggr_score=self.score_aggr[i],
-                    # below first score
+                    # below first score , very bad results
                     # scorer="first",
                     # score_passthrough=None,
                     aggr_edge=self.edge_aggr[i],
                 )
             )
-        self.pools.append(
-            KMISPooling(
-                self.hidden_dim,
-                k=2,
-                aggr_x=self.x_aggr[-1],
-                aggr_score=self.score_aggr[-1],
-                # below first score
-                # scorer="first",
-                # score_passthrough=None,
-                aggr_edge=self.edge_aggr[-1],
-            )
-        )
 
         for i in range(self.n_layers_features_extractor + 1):
             self.down_convs.append(
