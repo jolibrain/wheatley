@@ -887,6 +887,11 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable visdom logging",
     )
+    parser.add_argument(
+        "--disable_ortools",
+        action="store_true",
+        help="Disable ortools solution computation",
+    )
 
     return parser
 

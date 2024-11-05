@@ -318,6 +318,7 @@ def main(args, exp_name) -> float:
         training_specification,
         args.disable_visdom,
         graphobs=args.vecenv_type == "graphgym",
+        compute_ortools=not args.disable_ortools,
     )
     if args.vecenv_type == "graphgym":
         env_cls = GEnv
