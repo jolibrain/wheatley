@@ -191,6 +191,20 @@ class PYGGraph(Graph):
     def batch(cls, graphlist, num_nodes, num_edges):
         return PYGBatchGraph(graphlist)
 
+    @classmethod
+    def pad_resources(cls, graphlist):
+        num_res = 0
+        for g in graphlist:
+            nr = g.ndata("resources").shape[1]
+            if nr > num_res:
+                num_res = nr
+        for g in graphlist:
+            res = g.ndata("resources")
+            nr = res.shape[1]
+            p = torch.nn.functional.pad(res, (0, num_res - nr))
+            g.set_ndata("resources", p)
+        return num_res, graphlist
+
     def clone(self):
         g = PYGGraph.__new__(PYGGraph)
         g._graph = self._graph.clone()

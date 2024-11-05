@@ -107,13 +107,11 @@ def node_conflicts(
     batch_id = torch.IntTensor(batch_id)
     data = torch.zeros(
         (
-            batch_size * max_n_resources,
+            batch_size * num_resources,
             input_dim_features_extractor,
         )
     )
-    data[:, :] = torch.LongTensor(list(range(max_n_resources)) * batch_size).unsqueeze(
-        1
-    )
+    data[:, :] = torch.LongTensor(list(range(num_resources)) * batch_size).unsqueeze(1)
     g.add_nodes(num_resources * batch_size, "feat", data)
     bi = []
     for i in range(batch_size):
