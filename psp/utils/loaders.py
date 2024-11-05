@@ -60,6 +60,10 @@ class PSPLoader:
         if not stop:
             self.nextline()
 
+    def firstcharopt(self, c):
+        if self.fc == c:
+            self.nextline()
+
     def check_firstword(self, w):
         ok = self.fw == w
         if ok:
@@ -394,6 +398,7 @@ class PSPLoader:
         }
 
     def load_single_rcpsp(self, problem_file):
+        print("loading ", problem_file)
         self.f = open(problem_file, "r")
         self.nextline()
 
@@ -466,6 +471,7 @@ class PSPLoader:
         self.firstchar("*")
         self.firstword("PRECEDENCE")
         self.firstword("jobnr.")
+        self.firstcharopt("-")
         for j in range(n_jobs):
             job_labels.append(self.sline[0])
             n_modes += int(self.sline[1])
@@ -475,7 +481,7 @@ class PSPLoader:
         self.firstchar("*")
         self.firstword("REQUESTS/DURATIONS:")
         self.firstword("jobnr.")
-        self.firstchar("-")
+        self.firstcharopt("-")
         for j in range(n_jobs):
             job_durations = [[], [], []]
             job_resources = []
