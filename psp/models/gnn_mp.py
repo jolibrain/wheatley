@@ -135,8 +135,11 @@ class GnnMP(torch.nn.Module):
                 1, self.input_dim_features_extractor
             )
         if self.conflicts == "node":
-            self.resource_node_embedder = torch.nn.Embedding(
-                max_n_resources, self.input_dim_features_extractor
+            # self.resource_node_embedder = torch.nn.Embedding(
+            #     max_n_resources, self.input_dim_features_extractor
+            # )
+            self.resource_node_embedder = torch.nn.Linear(
+                3, self.input_dim_features_extractor
             )
 
         self.edge_embedder = PspEdgeEmbedder(

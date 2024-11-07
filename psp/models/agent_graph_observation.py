@@ -260,7 +260,7 @@ class AgentGraphObservation:
         ret = []
         for rci in res_cal_id_list:
             nr = rci.shape[0]
-            ret.append(torch.nn.functional.pad(rci, (0, max_num_res - nr)))
+            ret.append(torch.nn.functional.pad(rci, (0, 0, 0, max_num_res - nr)))
         return ret
 
     # @classmethod
