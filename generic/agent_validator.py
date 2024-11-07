@@ -283,7 +283,11 @@ class AgentValidator:
                 / self.ortools_criterions[self.default_ortools_strategy][-1]
             )
         else:
-            cur_ratio = self.criterions[-1] / self.criterions[0]
+            cur_ratio = (
+                self.criterions[-1] / self.criterions[0]
+                if self.criterions[0] != 0
+                else self.criterions[-1]
+            )
 
         if cur_ratio <= self.criterion_ratio:
             print("saving solutions")
