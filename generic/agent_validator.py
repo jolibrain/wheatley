@@ -292,7 +292,10 @@ class AgentValidator:
         if cur_ratio <= self.criterion_ratio:
             print("saving solutions")
             for i, sol in enumerate(solutions):
-                sol.save(self.path + f"sol_{i}.txt")
+                sol.save(
+                    self.path + f"sol_{i}.txt",
+                    self.problem_description.test_psps[i].pb_id,
+                )
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")
             torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
