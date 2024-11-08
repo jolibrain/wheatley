@@ -65,7 +65,7 @@ class GnnMP(torch.nn.Module):
         rwpe_h=16,
         rwpe_cache=None,
         graphobs=False,
-        shared_conv=True,
+        shared_conv=False,
         pyg=True,
         hierarchical=True,
     ):
@@ -166,120 +166,6 @@ class GnnMP(torch.nn.Module):
                 self.add_rp_edges,
                 self.factored_rp,
             )
-
-        self.features_embedder = MLP(
-            n_layers=n_mlp_layers_features_extractor,
-            input_dim=self.input_dim_features_extractor,
-            hidden_dim=self.hidden_dim,
-            output_dim=self.hidden_dim,
-            norm=self.normalize,
-            activation=activation_features_extractor,
-        )
-
-        if self.normalize:
-            self.norms = torch.nn.ModuleList()
-            self.normsbis = torch.nn.ModuleList()
-            self.norm0 = torch.nn.LayerNorm(self.input_dim_features_extractor)
-            self.norm1 = torch.nn.LayerNorm(self.hidden_dim)
-
-        if self.update_edge_features:
-            self.mlps_edges = torch.nn.ModuleList()
-        if self.update_edge_features_pe and self.rwpe_k != 0:
-            self.mlps_edges_pe = torch.nn.ModuleList()
-
-        if self.rwpe_k != 0:
-            self.pe_conv = torch.nn.ModuleList()
-            self.pe_mlp = torch.nn.ModuleList()
-
-        if self.shared_conv:
-            self.features_extractors = GraphConv(
-                self.hidden_dim + self.rwpe_h,
-                self.hidden_dim,
-                num_heads=n_attention_heads,
-                edge_scoring=self.update_edge_features,
-                pyg=self.pyg,
-            )
-            self.mlps = MLP(
-                n_layers=n_mlp_layers_features_extractor,
-                input_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                hidden_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                output_dim=self.hidden_dim,
-                norm=self.normalize,
-                activation=activation_features_extractor,
-            )
-        else:
-            self.features_extractors = torch.nn.ModuleList()
-            self.mlps = torch.nn.ModuleList()
-
-        for layer in range(self.n_layers_features_extractor):
-            if self.normalize:
-                self.norms.append(torch.nn.LayerNorm(self.hidden_dim))
-                if self.residual:
-                    self.normsbis.append(torch.nn.LayerNorm(self.hidden_dim))
-
-            if self.rwpe_k != 0:
-                self.pe_conv.append(
-                    GraphConv(
-                        self.rwpe_h,
-                        self.hidden_dim,
-                        num_heads=n_attention_heads,
-                        bias=False,
-                        pyg=self.pyg,
-                    )
-                )
-                self.pe_mlp.append(
-                    MLP(
-                        n_layers=n_mlp_layers_features_extractor,
-                        input_dim=self.rwpe_h * n_attention_heads,
-                        hidden_dim=self.rwpe_h * n_attention_heads,
-                        output_dim=self.rwpe_h,
-                        norm=self.normalize,
-                        activation="tanh",
-                    )
-                )
-            if not self.shared_conv:
-                self.features_extractors.append(
-                    GraphConv(
-                        self.hidden_dim + self.rwpe_h,
-                        self.hidden_dim,
-                        num_heads=n_attention_heads,
-                        edge_scoring=self.update_edge_features,
-                        pyg=self.pyg,
-                    )
-                )
-
-                self.mlps.append(
-                    MLP(
-                        n_layers=n_mlp_layers_features_extractor,
-                        input_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                        hidden_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                        output_dim=self.hidden_dim,
-                        norm=self.normalize,
-                        activation=activation_features_extractor,
-                    )
-                )
-            if self.update_edge_features:
-                self.mlps_edges.append(
-                    MLP(
-                        n_layers=n_mlp_layers_features_extractor,
-                        input_dim=self.hidden_dim * n_attention_heads,
-                        hidden_dim=self.hidden_dim * n_attention_heads,
-                        output_dim=self.hidden_dim,
-                        norm=self.normalize,
-                        activation=activation_features_extractor,
-                    )
-                )
-            if self.update_edge_features_pe and rwpe_k != 0:
-                self.mlps_edges_pe.append(
-                    MLP(
-                        n_layers=n_mlp_layers_features_extractor,
-                        input_dim=self.hidden_dim * n_attention_heads,
-                        hidden_dim=self.hidden_dim * n_attention_heads,
-                        output_dim=self.hidden_dim,
-                        norm=self.normalize,
-                        activation=activation_features_extractor,
-                    )
-                )
 
         if self.hierarchical:
             self.gnn = GnnHier(
