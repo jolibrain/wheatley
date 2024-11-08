@@ -323,7 +323,7 @@ class GState:
             #     list(self.problem.cals.keys()).index(c) for c in self.problem.res_cal
             # ]
         else:
-            self.res_cal_id = [0] * self.n_resources
+            self.res_cal_id = [(0, 0, 0)] * self.n_resources
 
         # TODO : res_cal should be an extract of real calendar and not an id
         # variable length=> res_cal_0 etc...
