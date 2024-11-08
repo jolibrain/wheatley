@@ -427,6 +427,9 @@ class GState:
     def all_tardiness(self):
         return self.graph.ndata("tardiness")
 
+    def all_due_dates(self):
+        return self.graph.ndata("due_date")
+
     def tardiness_real(self, nodeid):
         return self.real_tardiness[nodeid]
 
@@ -738,6 +741,12 @@ class GState:
     def normalize_features(self):
         if self.normalize:
             self.graph.set_ndata("normalized_tct", self.all_tct() / self.max_duration)
+            self.graph.set_ndata(
+                "normalized_tardiness", self.all_tardiness() / self.max_duration
+            )
+            self.graph.set_ndata(
+                "normalized_due_dates", self.all_due_dates() / self.max_duration
+            )
 
     def get_last_finishing_dates(self, jobs):
         if len(jobs) == 0:
