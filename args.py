@@ -596,6 +596,12 @@ def argument_parser() -> argparse.ArgumentParser:
         default=False,
         help="use hierarchical GNN",
     )
+    parser.add_argument(
+        "--shared_conv",
+        action="store_true",
+        default=False,
+        help="use same conv params across levels",
+    )
 
     # =================================================ENVIRONMENT SPECIFICATION================================================
     parser.add_argument(

@@ -65,9 +65,9 @@ class GnnMP(torch.nn.Module):
         rwpe_h=16,
         rwpe_cache=None,
         graphobs=False,
-        shared_conv=False,
+        shared_conv=True,
         pyg=True,
-        hierarchical=True,
+        hierarchical=False,
     ):
         super().__init__()
         self.pyg = pyg

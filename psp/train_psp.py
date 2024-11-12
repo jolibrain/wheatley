@@ -262,6 +262,7 @@ def main(args, exp_name) -> float:
         sgformer=args.sgformer,
         pyg=args.pyg or args.hierarchical,
         hierarchical=args.hierarchical,
+        shared_conv=args.shared_conv,
     )
     agent_specification.print_self()
 

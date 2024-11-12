@@ -109,6 +109,7 @@ class Agent(Agent):
                 graphobs=graphobs,
                 pyg=agent_specification.pyg,
                 hierarchical=agent_specification.hierarchical,
+                shared_conv=agent_specification.shared_conv,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(

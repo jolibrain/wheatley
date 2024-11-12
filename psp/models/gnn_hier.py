@@ -426,7 +426,12 @@ class GnnHier(torch.nn.Module):
         self.score_aggr = torch.nn.ModuleList()
         self.x_aggr = torch.nn.ModuleList()
         self.edge_aggr = torch.nn.ModuleList()
-        for i in range(self.n_layers_features_extractor):
+
+        if self.shared_conv:
+            range_conv = 1
+        else:
+            range_conv = self.n_layers_features_extractor
+        for i in range(range_conv):
             self.score_aggr.append(ScoreAggr(hidden_dim=self.hidden_dim))
             self.x_aggr.append(
                 NodeAggr(
@@ -450,7 +455,9 @@ class GnnHier(torch.nn.Module):
             self.pools.append(
                 KMISPooling(
                     self.hidden_dim,
-                    k=1 if i < self.n_layers_features_extractor - 1 else 2,
+                    k=1
+                    if i < self.n_layers_features_extractor - 1 and not self.shared_conv
+                    else 2,
                     aggr_x=self.x_aggr[i],
                     aggr_score=self.score_aggr[i],
                     # below first score , very bad results
@@ -460,7 +467,11 @@ class GnnHier(torch.nn.Module):
                 )
             )
 
-        for i in range(self.n_layers_features_extractor + 1):
+        if self.shared_conv:
+            range_conv2 = 1
+        else:
+            range_conv2 = self.n_layers_features_extractor + 1
+        for i in range(range_conv2):
             self.down_convs.append(
                 GraphConv(
                     self.hidden_dim,
@@ -482,9 +493,7 @@ class GnnHier(torch.nn.Module):
             )
             self.up_convs.append(
                 GraphConv(
-                    self.hidden_dim * 2
-                    if i < self.n_layers_features_extractor
-                    else self.hidden_dim,
+                    self.hidden_dim * 2,
                     self.hidden_dim,
                     num_heads=n_attention_heads,
                     edge_scoring=self.update_edge_features,
@@ -527,11 +536,18 @@ class GnnHier(torch.nn.Module):
         all_edge_features = [edge_features]
         perms = []
         for i in range(1, self.n_layers_features_extractor + 1):
-            x, edge_index, edge_features, batch, _, cluster, perm = self.pools[i - 1](
-                x, edge_index, edge_features, batch
-            )
-            x, _ = self.down_convs[i].forward_nog(x, edge_index, edge_features)
-            x = self.down_mlps[i](x)
+            if self.shared_conv:
+                x, edge_index, edge_features, batch, _, cluster, perm = self.pools[0](
+                    x, edge_index, edge_features, batch
+                )
+                x, _ = self.down_convs[0].forward_nog(x, edge_index, edge_features)
+                x = self.down_mlps[0](x)
+            else:
+                x, edge_index, edge_features, batch, _, cluster, perm = self.pools[
+                    i - 1
+                ](x, edge_index, edge_features, batch)
+                x, _ = self.down_convs[i].forward_nog(x, edge_index, edge_features)
+                x = self.down_mlps[i](x)
             if i < self.n_layers_features_extractor:
                 xs.append(x)
                 edge_indices.append(edge_index)
@@ -545,8 +561,14 @@ class GnnHier(torch.nn.Module):
             up = torch.zeros_like(res)
             up[perm] = x
             x = res + up if self.sum_res else torch.cat((res, up), dim=-1)
-            x, _ = self.up_convs[i].forward_nog(x, edge_index, all_edge_features[j])
-            x = self.up_mlps[i](x)
-        x, _ = self.up_convs[-1].forward_nog(x, edge_index, all_edge_features[0])
+            if self.shared_conv:
+                x, _ = self.up_convs[0].forward_nog(x, edge_index, all_edge_features[j])
+                x = self.up_mlps[0](x)
+            else:
+                x, _ = self.up_convs[i].forward_nog(x, edge_index, all_edge_features[j])
+                x = self.up_mlps[i](x)
+        x, _ = self.up_convs[-1].forward_nog(
+            torch.cat((x, x0), dim=-1), edge_index, all_edge_features[0]
+        )
         x = self.up_mlps[-1](x)
         return x
