@@ -1,4 +1,4 @@
---extra-index-url https://download.pytorch.org/whl/cu124
+--find-links https://data.pyg.org/whl/torch-2.5.0+cu124.html
 torch 
 torchvision 
 torchaudio 
@@ -18,7 +18,6 @@ torch_geometric
 PyYAML
 pydantic
 cython
---find-links https://data.pyg.org/whl/torch-2.4.0+cu121.html
 pyg_lib
 torch_scatter
 torch_sparse

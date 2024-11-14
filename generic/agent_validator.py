@@ -298,10 +298,7 @@ class AgentValidator:
                         self.problem_description.test_psps[i].pb_id,
                     )
                 else:
-                    sol.save(
-                        self.path + f"sol_{i}.txt",
-                        str(i),
-                    )
+                    sol.save(self.path + f"sol_{i}.txt")
 
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")

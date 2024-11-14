@@ -2,8 +2,8 @@ pipeline {
   agent {
     dockerfile {
       filename 'docker/Dockerfile.devel'
-      additionalBuildArgs '--no-cache'
-      args '--shm-size=8gb -u jenkins'
+      label 'n5'
+      args '--shm-size=8gb -u jenkins --entrypoint=""'
     }
 
   }
@@ -18,6 +18,7 @@ pipeline {
           sh 'mkdir /home/jenkins/app/checkpoints'
           sh '''
           export CUDA_VISIBLE_DEVICES=$(echo ${LOCKED_GPU} | sed -n -e "s/[^,]* GPU \\([^[0-9,]]\\)*/\\1/gp")
+          export TORCH_CUDA_ARCH_LIST="8.6"
           echo "Running on GPU ${CUDA_VISIBLE_DEVICES}"
           TORCH_HOME=/home/jenkins/app/.cache/ bash ./scripts/run_tests.sh /home/jenkins/app/checkpoints/'''
         }
