@@ -60,6 +60,7 @@ class AgentValidator:
         validation_envs=None,
         verbose=2,
         graphobs=False,
+        compute_ortools=True,
     ):
         super().__init__()
 
@@ -71,6 +72,8 @@ class AgentValidator:
             self.psp = True
 
         self.graphobs = graphobs
+
+        self.compute_ortools = compute_ortools
 
         if self.psp:
             if self.graphobs:
@@ -98,15 +101,19 @@ class AgentValidator:
         )
         self.path = training_specification.path
         # self.ortools_strategies = [training_specification.ortools_strategy, "realistic"]
-        self.ortools_strategies = training_specification.ortools_strategy
+        if self.compute_ortools:
+            self.ortools_strategies = training_specification.ortools_strategy
 
         self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
         self.custom_names = training_specification.custom_heuristic_names
 
-        self.max_time_ortools = training_specification.max_time_ortools
-        self.scaling_constant_ortools = training_specification.scaling_constant_ortools
+        if self.compute_ortools:
+            self.max_time_ortools = training_specification.max_time_ortools
+            self.scaling_constant_ortools = (
+                training_specification.scaling_constant_ortools
+            )
         self.debug_net = training_specification.debug_net
 
         # Comparative agents
@@ -156,10 +163,11 @@ class AgentValidator:
 
         self.criterion_ratio = 1000
         self.criterions = []
-        self.ortools_criterions = {
-            ortools_strategy: [] for ortools_strategy in self.ortools_strategies
-        }
-        self.last_ortools_criterions = [0 for _ in range(self.n_validation_env)]
+        if self.compute_ortools:
+            self.ortools_criterions = {
+                ortools_strategy: [] for ortools_strategy in self.ortools_strategies
+            }
+            self.last_ortools_criterions = [0 for _ in range(self.n_validation_env)]
         self.last_ppo_criterions = [0 for _ in range(self.n_validation_env)]
         self.random_criterions = []
         self.custom_criterions = {agent.rule: [] for agent in self.custom_agents}
@@ -187,42 +195,46 @@ class AgentValidator:
         self.current_scatter_fig = None
         self.all_or_tools_criterion = []
         self.all_or_tools_schedule = []
-        self.time_to_ortools = []
+        if self.compute_ortools:
+            self.time_to_ortools = []
+            self.best_criterion_ortools = [float("inf")] * self.n_validation_env
+            self.ortools_env_zero_is_optimal = False
+
         self.best_criterion_wheatley = [float("inf")] * self.n_validation_env
-        self.best_criterion_ortools = [float("inf")] * self.n_validation_env
-        self.ortools_env_zero_is_optimal = False
         self.variances = {}
 
         self.batch_size = training_specification.validation_batch_size
 
         # Compute OR-Tools solutions once if validations are fixed
         if self.fixed_validation:
-            self.fixed_ortools = {
-                ortools_strategy: [] for ortools_strategy in self.ortools_strategies
-            }
-            for i in tqdm.tqdm(
-                range(self.n_validation_env), desc="Computing fixed OR-Tools solutions"
-            ):
-                for ortools_strategy in self.ortools_strategies:
-                    self.fixed_ortools[ortools_strategy].append(
-                        self._get_ortools_criterion(
-                            i,
-                            ortools_strategy,
-                            self.problem_description.reward_model_config,
+            if self.compute_ortools:
+                self.fixed_ortools = {
+                    ortools_strategy: [] for ortools_strategy in self.ortools_strategies
+                }
+                for i in tqdm.tqdm(
+                    range(self.n_validation_env),
+                    desc="Computing fixed OR-Tools solutions",
+                ):
+                    for ortools_strategy in self.ortools_strategies:
+                        self.fixed_ortools[ortools_strategy].append(
+                            self._get_ortools_criterion(
+                                i,
+                                ortools_strategy,
+                                self.problem_description.reward_model_config,
+                            )
                         )
-                    )
 
-            print(
-                f"   optimal solutions ({self.default_ortools_strategy}):",
-                sum(
-                    [
-                        res[2]
-                        for res in self.fixed_ortools[self.default_ortools_strategy]
-                    ]
-                ),
-                " / ",
-                self.n_validation_env,
-            )
+                print(
+                    f"   optimal solutions ({self.default_ortools_strategy}):",
+                    sum(
+                        [
+                            res[2]
+                            for res in self.fixed_ortools[self.default_ortools_strategy]
+                        ]
+                    ),
+                    " / ",
+                    self.n_validation_env,
+                )
 
             self.fixed_custom_solutions = dict()
             for agent in self.custom_agents:
@@ -265,14 +277,29 @@ class AgentValidator:
         #     / np.array(self.ortools_criterions[-4 : len(self.ortools_criterions)])
         # )
 
-        cur_ratio = (
-            self.criterions[-1]
-            / self.ortools_criterions[self.default_ortools_strategy][-1]
-        )
+        if self.compute_ortools:
+            cur_ratio = (
+                self.criterions[-1]
+                / self.ortools_criterions[self.default_ortools_strategy][-1]
+            )
+        else:
+            cur_ratio = (
+                self.criterions[-1] / self.criterions[0]
+                if self.criterions[0] != 0
+                else self.criterions[-1]
+            )
+
         if cur_ratio <= self.criterion_ratio:
             print("saving solutions")
             for i, sol in enumerate(solutions):
-                sol.save(self.path + f"sol_{i}.txt")
+                if hasattr(self.problem_description, "test_psps"):
+                    sol.save(
+                        self.path + f"sol_{i}.txt",
+                        self.problem_description.test_psps[i].pb_id,
+                    )
+                else:
+                    sol.save(self.path + f"sol_{i}.txt")
+
             print("Saving agent", self.path + "agent.pkl")
             agent.save(self.path + "agent.pkl")
             torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
@@ -281,8 +308,11 @@ class AgentValidator:
             self.criterion_ratio = cur_ratio
             print(f"Current ratio : {cur_ratio:.3f}")
 
-            print(f"Saving the figure {self.path + 'best-ortools-ppo-cactus.png'}")
-            self.current_scatter_fig.savefig(self.path + "best-ortools-ppo-cactus.png")
+            if self.compute_ortools:
+                print(f"Saving the figure {self.path + 'best-ortools-ppo-cactus.png'}")
+                self.current_scatter_fig.savefig(
+                    self.path + "best-ortools-ppo-cactus.png"
+                )
 
     def _get_ortools_criterion(self, i: int, ortools_strategy: str, criterion: str):
         save_path = self._ortools_solution_path(i, ortools_strategy)
@@ -380,28 +410,23 @@ class AgentValidator:
                 writer.writerow(line)
         else:  # PSP case
             # schedule is (job_schedule, mode)
-            header = []
-            for i in range(len(schedule[0])):
-                header.append("job " + str(i) + " start")
+            header = ["all starts"]
             writer.writerow(header)
             for i in range(len(schedule[0])):
-                line = schedule[0]
-                writer.writerow(line)
+                writer.writerow([schedule[0][i]])
             writer.writerow([])
-            header2 = []
-            for i in range(len(schedule[0])):
-                header.append("job " + str(i) + " mode")
+            header = ["all modes"]
             writer.writerow(header)
             for i in range(len(schedule[0])):
-                line = schedule[1]
-                writer.writerow(line)
+                writer.writerow([schedule[1][i]])
         f.close()
 
     def _evaluate_agent(self, agent):
         mean_criterion = 0
-        ortools_mean_criterion = {
-            ortools_strategy: 0 for ortools_strategy in self.ortools_strategies
-        }
+        if self.compute_ortools:
+            ortools_mean_criterion = {
+                ortools_strategy: 0 for ortools_strategy in self.ortools_strategies
+            }
         random_mean_criterion = 0
         custom_mean_criterion = {agent.rule: 0 for agent in self.custom_agents}
         start_eval = time.time()
@@ -497,50 +522,51 @@ class AgentValidator:
                 if self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_fail()
 
-            for ortools_strategy in self.ortools_strategies:
-                if self.fixed_validation:
-                    (
-                        or_tools_criterion,
-                        or_tools_schedule,
-                        optimal,
-                    ) = self.fixed_ortools[ortools_strategy][i]
-                else:
-                    (
-                        or_tools_criterion,
-                        or_tools_schedule,
-                        optimal,
-                    ) = self._get_ortools_criterion(
-                        i,
-                        ortools_strategy,
-                        self.problem_description.reward_model_config,
-                    )
-
-                if ortools_strategy == self.averagistic_ortools_strategy:
-                    self.last_ortools_criterions[i] = or_tools_criterion
-
-                if i == 0 and ortools_strategy == self.default_ortools_strategy:
-                    if self.display_gantt:
-                        self.gantt_or_img = self.validation_envs[i].render_solution(
-                            or_tools_schedule, scaling=1.0
+            if self.compute_ortools:
+                for ortools_strategy in self.ortools_strategies:
+                    if self.fixed_validation:
+                        (
+                            or_tools_criterion,
+                            or_tools_schedule,
+                            optimal,
+                        ) = self.fixed_ortools[ortools_strategy][i]
+                    else:
+                        (
+                            or_tools_criterion,
+                            or_tools_schedule,
+                            optimal,
+                        ) = self._get_ortools_criterion(
+                            i,
+                            ortools_strategy,
+                            self.problem_description.reward_model_config,
                         )
-                    self.ortools_env_zero_is_optimal = optimal
 
-                if (
-                    ortools_strategy == self.default_ortools_strategy
-                    and or_tools_criterion < self.best_criterion_ortools[i]
-                ):
-                    self.best_criterion_ortools[i] = or_tools_criterion
-                    self.save_csv(
-                        f"ortools_{i}",
-                        or_tools_criterion,
-                        optimal,
-                        or_tools_schedule,
-                        self.validation_envs[i].sampled_jobs,
+                    if ortools_strategy == self.averagistic_ortools_strategy:
+                        self.last_ortools_criterions[i] = or_tools_criterion
+
+                    if i == 0 and ortools_strategy == self.default_ortools_strategy:
+                        if self.display_gantt:
+                            self.gantt_or_img = self.validation_envs[i].render_solution(
+                                or_tools_schedule, scaling=1.0
+                            )
+                        self.ortools_env_zero_is_optimal = optimal
+
+                    if (
+                        ortools_strategy == self.default_ortools_strategy
+                        and or_tools_criterion < self.best_criterion_ortools[i]
+                    ):
+                        self.best_criterion_ortools[i] = or_tools_criterion
+                        self.save_csv(
+                            f"ortools_{i}",
+                            or_tools_criterion,
+                            optimal,
+                            or_tools_schedule,
+                            self.validation_envs[i].sampled_jobs,
+                        )
+
+                    ortools_mean_criterion[ortools_strategy] += (
+                        or_tools_criterion / self.n_validation_env
                     )
-
-                ortools_mean_criterion[ortools_strategy] += (
-                    or_tools_criterion / self.n_validation_env
-                )
 
             if self.fixed_random_validation:
                 random_criterion = self.fixed_random[i]
@@ -571,10 +597,11 @@ class AgentValidator:
         print("--- mean_criterion=", mean_criterion, " ---")
         print("--- eval time=", time.time() - start_eval, "  ---")
         self.criterions.append(mean_criterion)
-        for ortools_strategy in self.ortools_strategies:
-            self.ortools_criterions[ortools_strategy].append(
-                ortools_mean_criterion[ortools_strategy]
-            )
+        if self.compute_ortools:
+            for ortools_strategy in self.ortools_strategies:
+                self.ortools_criterions[ortools_strategy].append(
+                    ortools_mean_criterion[ortools_strategy]
+                )
         self.random_criterions.append(random_mean_criterion)
         for custom_agent in self.custom_agents:
             self.custom_criterions[custom_agent.rule].append(
@@ -599,30 +626,33 @@ class AgentValidator:
             "legend": ["Wheatley", "Random"],
             "linecolor": [[31, 119, 180], [255, 127, 14]],
         }
-        Y2_list = [
-            np.array(self.criterions)
-            / np.array(self.ortools_criterions[self.default_ortools_strategy]),
-            np.array(self.random_criterions)
-            / np.array(self.ortools_criterions[self.default_ortools_strategy]),
-        ]
-        opts2 = {
-            "legend": ["Wheatley / OR-tools", "Random / OR-tools"],
-            "linecolor": [[31, 119, 180], [255, 127, 14]],
-        }
+        if self.compute_ortools:
+            Y2_list = [
+                np.array(self.criterions)
+                / np.array(self.ortools_criterions[self.default_ortools_strategy]),
+                np.array(self.random_criterions)
+                / np.array(self.ortools_criterions[self.default_ortools_strategy]),
+            ]
+            opts2 = {
+                "legend": ["Wheatley / OR-tools", "Random / OR-tools"],
+                "linecolor": [[31, 119, 180], [255, 127, 14]],
+            }
 
-        # OR-Tools plots
-        ortools_colors = [
-            [44, 160, 44],
-            [214, 39, 40],
-            [148, 103, 189],
-            [140, 86, 75],
-            [227, 119, 194],
-            [127, 127, 127],
-        ]
-        for ortools_strategy_id, ortools_strategy in enumerate(self.ortools_strategies):
-            Y_list.append(self.ortools_criterions[ortools_strategy])
-            opts["legend"].append("OR-Tools - " + ortools_strategy)
-            opts["linecolor"].append(ortools_colors[ortools_strategy_id])
+            # OR-Tools plots
+            ortools_colors = [
+                [44, 160, 44],
+                [214, 39, 40],
+                [148, 103, 189],
+                [140, 86, 75],
+                [227, 119, 194],
+                [127, 127, 127],
+            ]
+            for ortools_strategy_id, ortools_strategy in enumerate(
+                self.ortools_strategies
+            ):
+                Y_list.append(self.ortools_criterions[ortools_strategy])
+                opts["legend"].append("OR-Tools - " + ortools_strategy)
+                opts["linecolor"].append(ortools_colors[ortools_strategy_id])
 
         # Custom agent plots
         agent_colors = np.array(
@@ -638,9 +668,10 @@ class AgentValidator:
             name = custom_agent.rule
             Y = np.array(self.custom_criterions[name])
             Y_list.append(Y)
-            Y2_list.append(
-                Y / np.array(self.ortools_criterions[self.default_ortools_strategy])
-            )
+            if self.compute_ortools:
+                Y2_list.append(
+                    Y / np.array(self.ortools_criterions[self.default_ortools_strategy])
+                )
 
             opts["linecolor"].append(agent_colors[custom_agent_id])
             opts["legend"].append(name)
@@ -653,104 +684,106 @@ class AgentValidator:
         # opts2["linecolor"] = np.array(opts2["linecolor"])
         # self.vis.line(X=X, Y=np.stack(Y2_list).T, win="validation_criterion_ratio", opts=opts2)
 
-        # ratio to OR-tools
-        opts = {
-            "title": "Wheatley / OR-Tools",
-            "legend": [],
-        }
-        Y_ratios = []
-        for ortools_strategy in self.ortools_strategies:
-            opts["legend"].append(f"Wheatley/OR-Tools {ortools_strategy}")
-            opts["legend"].append(f"Min Wheatley/OR-Tools {ortools_strategy}")
-            ratio_to_ortools = np.array(self.criterions) / np.array(
-                self.ortools_criterions[ortools_strategy]
+        if self.compute_ortools:
+            # ratio to OR-tools
+            opts = {
+                "title": "Wheatley / OR-Tools",
+                "legend": [],
+            }
+            Y_ratios = []
+            for ortools_strategy in self.ortools_strategies:
+                opts["legend"].append(f"Wheatley/OR-Tools {ortools_strategy}")
+                opts["legend"].append(f"Min Wheatley/OR-Tools {ortools_strategy}")
+                ratio_to_ortools = np.array(self.criterions) / np.array(
+                    self.ortools_criterions[ortools_strategy]
+                )
+                Y_ratios.append(ratio_to_ortools)
+                Y_ratios.append(np.minimum.accumulate(ratio_to_ortools))
+
+            self.vis.line(
+                X=X,
+                Y=np.array(Y_ratios).T,
+                win="ratio_to_ortools",
+                opts=opts,
             )
-            Y_ratios.append(ratio_to_ortools)
-            Y_ratios.append(np.minimum.accumulate(ratio_to_ortools))
 
-        self.vis.line(
-            X=X,
-            Y=np.array(Y_ratios).T,
-            win="ratio_to_ortools",
-            opts=opts,
-        )
+            # distance to OR-tools
+            opts = {"title": "Distance to OR-tools"}
+            dist_to_ortools = np.array(self.criterions) - np.array(
+                self.ortools_criterions[self.default_ortools_strategy]
+            )
+            self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
 
-        # distance to OR-tools
-        opts = {"title": "Distance to OR-tools"}
-        dist_to_ortools = np.array(self.criterions) - np.array(
-            self.ortools_criterions[self.default_ortools_strategy]
-        )
-        self.vis.line(X=X, Y=dist_to_ortools, win="dist_to_ortools", opts=opts)
+            # time to OR-tools
+            wins = 0
+            count = min(len(self.criterions), 100)
+            for i in range(1, count + 1):
+                ppo = self.criterions[-i]
+                ortools = self.ortools_criterions[self.default_ortools_strategy][-i]
+                if ppo <= ortools or np.isclose(ppo, ortools):
+                    wins += 1
+            pct = 100 * wins / count
+            self.time_to_ortools.append(pct)
+            opts = {"title": "Time to OR-tools %"}
+            self.vis.line(
+                X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts
+            )
 
-        # time to OR-tools
-        wins = 0
-        count = min(len(self.criterions), 100)
-        for i in range(1, count + 1):
-            ppo = self.criterions[-i]
-            ortools = self.ortools_criterions[self.default_ortools_strategy][-i]
-            if ppo <= ortools or np.isclose(ppo, ortools):
-                wins += 1
-        pct = 100 * wins / count
-        self.time_to_ortools.append(pct)
-        opts = {"title": "Time to OR-tools %"}
-        self.vis.line(
-            X=X, Y=np.array(self.time_to_ortools), win="time_to_ortools", opts=opts
-        )
+            # Plot OR-Tools solutions vs Wheatley solutions.
+            # Visdom is a little bit limited so we build the plot ourself using matplotlib
+            # and save the image on disk. We can directly plot this image with visdom.
+            # This is a bit hacky but it works.
+            fig, ax = plt.subplots(figsize=(6, 6))
+            ppo_criterions = np.array(self.last_ppo_criterions)
+            ortools_criterions = np.array(self.last_ortools_criterions)
+            ax.scatter(
+                ppo_criterions,
+                ortools_criterions,
+                c=-ppo_criterions / ortools_criterions,
+                cmap="viridis",
+            )
+            ax.plot(
+                [0, max(self.last_ppo_criterions + self.last_ortools_criterions)],
+                [0, max(self.last_ppo_criterions + self.last_ortools_criterions)],
+                color="red",
+            )
+            ax.set_xlabel("Wheatley criterion")
+            ax.set_ylabel("OR-Tools criterion")
+            ax.set_title(
+                f"OR-Tools {self.averagistic_ortools_strategy} vs Wheatley - {(ppo_criterions / ortools_criterions).mean():.2f}"
+            )
+            fig.savefig(self.path + "ortools-ppo-cactus.png")
 
-        # Plot OR-Tools solutions vs Wheatley solutions.
-        # Visdom is a little bit limited so we build the plot ourself using matplotlib
-        # and save the image on disk. We can directly plot this image with visdom.
-        # This is a bit hacky but it works.
-        fig, ax = plt.subplots(figsize=(6, 6))
-        ppo_criterions = np.array(self.last_ppo_criterions)
-        ortools_criterions = np.array(self.last_ortools_criterions)
-        ax.scatter(
-            ppo_criterions,
-            ortools_criterions,
-            c=-ppo_criterions / ortools_criterions,
-            cmap="viridis",
-        )
-        ax.plot(
-            [0, max(self.last_ppo_criterions + self.last_ortools_criterions)],
-            [0, max(self.last_ppo_criterions + self.last_ortools_criterions)],
-            color="red",
-        )
-        ax.set_xlabel("Wheatley criterion")
-        ax.set_ylabel("OR-Tools criterion")
-        ax.set_title(
-            f"OR-Tools {self.averagistic_ortools_strategy} vs Wheatley - {(ppo_criterions / ortools_criterions).mean():.2f}"
-        )
-        fig.savefig(self.path + "ortools-ppo-cactus.png")
+            if self.current_scatter_fig is not None:
+                plt.close(self.current_scatter_fig)
+            self.current_scatter_fig = fig
 
-        if self.current_scatter_fig is not None:
-            plt.close(self.current_scatter_fig)
-        self.current_scatter_fig = fig
-
-        # Load the image into a numpy array and pass it to visdom.
-        image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
-        image = image.transpose(2, 0, 1)
-        image = image[:3, :, :]  # Remove alpha channel.
-        self.vis.image(
-            image,
-            win="ortools-ppo-cactus",
-            opts={"caption": "OR-Tools vs Wheatley"},
-        )
+            # Load the image into a numpy array and pass it to visdom.
+            image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
+            image = image.transpose(2, 0, 1)
+            image = image[:3, :, :]  # Remove alpha channel.
+            self.vis.image(
+                image,
+                win="ortools-ppo-cactus",
+                opts={"caption": "OR-Tools vs Wheatley"},
+            )
 
         if self.first_callback:
             self.first_callback = False
             return
 
-        if self.criterion_ratio <= (ppo_criterions / ortools_criterions).mean():
-            image = np.array(Image.open(self.path + "best-ortools-ppo-cactus.png"))
-        else:
-            image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
-        image = image.transpose(2, 0, 1)
-        image = image[:3, :, :]  # Remove alpha channel.
-        self.vis.image(
-            image,
-            win="best-ortools-ppo-cactus",
-            opts={"caption": "Best OR-Tools vs Wheatley"},
-        )
+        if self.compute_ortools:
+            if self.criterion_ratio <= (ppo_criterions / ortools_criterions).mean():
+                image = np.array(Image.open(self.path + "best-ortools-ppo-cactus.png"))
+            else:
+                image = np.array(Image.open(self.path + "ortools-ppo-cactus.png"))
+            image = image.transpose(2, 0, 1)
+            image = image[:3, :, :]  # Remove alpha channel.
+            self.vis.image(
+                image,
+                win="best-ortools-ppo-cactus",
+                opts={"caption": "Best OR-Tools vs Wheatley"},
+            )
 
         self.entropy_losses.append(
             alg.ent_coef * alg.logger.name_to_value["train/entropy_loss"]
@@ -889,38 +922,68 @@ class AgentValidator:
             return self.ortools_strategies[0]
 
     def save_state(self, filepath: str):
-        validator_state = {
-            "criterion_ratio": self.criterion_ratio,
-            "criterions": self.criterions,
-            "ortools_criterions": self.ortools_criterions,
-            "random_criterions": self.random_criterions,
-            "custom_criterions": self.custom_criterions,
-            "entropy_losses": self.entropy_losses,
-            "policy_gradient_losses": self.policy_gradient_losses,
-            "value_losses": self.value_losses,
-            "losses": self.losses,
-            "approx_kls": self.approx_kls,
-            "clip_fractions": self.clip_fractions,
-            "explained_variances": self.explained_variances,
-            "clip_ranges": self.clip_ranges,
-            "ep_len_means": self.ep_len_means,
-            "ep_rew_means": self.ep_rew_means,
-            "fpss": self.fpss,
-            "dpss": self.dpss,
-            "stabilities": self.stabilities,
-            "monotonies": self.monotonies,
-            "total_timestepss": self.total_timestepss,
-            "first_callback": self.first_callback,
-            "gantt_rl_img": self.gantt_rl_img,
-            "gantt_or_img": self.gantt_or_img,
-            "gantt_mopnr_img": self.gantt_mopnr_img,
-            "all_or_tools_criterion": self.all_or_tools_criterion,
-            "all_or_tools_schedule": self.all_or_tools_schedule,
-            "time_to_ortools": self.time_to_ortools,
-            "best_criterion_wheatley": self.best_criterion_wheatley,
-            "best_criterion_ortools": self.best_criterion_ortools,
-            "ortools_env_zero_is_optimal": self.ortools_env_zero_is_optimal,
-        }
+        if self.compute_ortools:
+            validator_state = {
+                "criterion_ratio": self.criterion_ratio,
+                "criterions": self.criterions,
+                "ortools_criterions": self.ortools_criterions,
+                "random_criterions": self.random_criterions,
+                "custom_criterions": self.custom_criterions,
+                "entropy_losses": self.entropy_losses,
+                "policy_gradient_losses": self.policy_gradient_losses,
+                "value_losses": self.value_losses,
+                "losses": self.losses,
+                "approx_kls": self.approx_kls,
+                "clip_fractions": self.clip_fractions,
+                "explained_variances": self.explained_variances,
+                "clip_ranges": self.clip_ranges,
+                "ep_len_means": self.ep_len_means,
+                "ep_rew_means": self.ep_rew_means,
+                "fpss": self.fpss,
+                "dpss": self.dpss,
+                "stabilities": self.stabilities,
+                "monotonies": self.monotonies,
+                "total_timestepss": self.total_timestepss,
+                "first_callback": self.first_callback,
+                "gantt_rl_img": self.gantt_rl_img,
+                "gantt_or_img": self.gantt_or_img,
+                "gantt_mopnr_img": self.gantt_mopnr_img,
+                "all_or_tools_criterion": self.all_or_tools_criterion,
+                "all_or_tools_schedule": self.all_or_tools_schedule,
+                "time_to_ortools": self.time_to_ortools,
+                "best_criterion_wheatley": self.best_criterion_wheatley,
+                "best_criterion_ortools": self.best_criterion_ortools,
+                "ortools_env_zero_is_optimal": self.ortools_env_zero_is_optimal,
+            }
+        else:
+            validator_state = {
+                "criterion_ratio": self.criterion_ratio,
+                "criterions": self.criterions,
+                "random_criterions": self.random_criterions,
+                "custom_criterions": self.custom_criterions,
+                "entropy_losses": self.entropy_losses,
+                "policy_gradient_losses": self.policy_gradient_losses,
+                "value_losses": self.value_losses,
+                "losses": self.losses,
+                "approx_kls": self.approx_kls,
+                "clip_fractions": self.clip_fractions,
+                "explained_variances": self.explained_variances,
+                "clip_ranges": self.clip_ranges,
+                "ep_len_means": self.ep_len_means,
+                "ep_rew_means": self.ep_rew_means,
+                "fpss": self.fpss,
+                "dpss": self.dpss,
+                "stabilities": self.stabilities,
+                "monotonies": self.monotonies,
+                "total_timestepss": self.total_timestepss,
+                "first_callback": self.first_callback,
+                "gantt_rl_img": self.gantt_rl_img,
+                "gantt_or_img": self.gantt_or_img,
+                "gantt_mopnr_img": self.gantt_mopnr_img,
+                "all_or_tools_criterion": self.all_or_tools_criterion,
+                "all_or_tools_schedule": self.all_or_tools_schedule,
+                "best_criterion_wheatley": self.best_criterion_wheatley,
+            }
         with open(filepath, "wb") as f:
             pickle.dump(validator_state, f)
 
@@ -930,7 +993,8 @@ class AgentValidator:
 
         self.criterion_ratio = validator_state["criterion_ratio"]
         self.criterions = validator_state["criterions"]
-        self.ortools_criterions = validator_state["ortools_criterions"]
+        if self.compute_ortools:
+            self.ortools_criterions = validator_state["ortools_criterions"]
         self.random_criterions = validator_state["random_criterions"]
         self.custom_criterions = validator_state["custom_criterions"]
         self.entropy_losses = validator_state["entropy_losses"]
@@ -954,11 +1018,13 @@ class AgentValidator:
         self.gantt_mopnr_img = validator_state["gantt_mopnr_img"]
         self.all_or_tools_criterion = validator_state["all_or_tools_criterion"]
         self.all_or_tools_schedule = validator_state["all_or_tools_schedule"]
-        self.time_to_ortools = validator_state["time_to_ortools"]
+        if self.compute_ortools:
+            self.time_to_ortools = validator_state["time_to_ortools"]
         self.best_criterion_wheatley = validator_state["best_criterion_wheatley"]
-        self.best_criterion_ortools = validator_state["best_criterion_ortools"]
-        self.ortools_env_zero_is_optimal = validator_state[
-            "ortools_env_zero_is_optimal"
-        ]
+        if self.compute_ortools:
+            self.best_criterion_ortools = validator_state["best_criterion_ortools"]
+            self.ortools_env_zero_is_optimal = validator_state[
+                "ortools_env_zero_is_optimal"
+            ]
 
         return self

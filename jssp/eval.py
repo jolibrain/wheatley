@@ -1,4 +1,5 @@
 """Evaluate trained model on all instances size."""
+
 import argparse
 import json
 from pathlib import Path
@@ -71,6 +72,7 @@ def load_agent(args: argparse.Namespace, path: str) -> Agent:
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
         mid_in_edges=args.mid_in_edges,
+        hierarchical=args.hierarchical,
     )
     agent = Agent.load(path)
     agent.env_specification = env_specification

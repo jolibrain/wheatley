@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 python -m psp.train_psp --batch_size 2048 --conflicts node --device cuda:0 --exp_name_appendix 272_hierarchical_testcsv --fixed_validation  --n_epochs 5  --n_steps_episode 1900 --n_workers 10 --path /data1/infantes/saved_networks/ --load_problem ./instances/psp/272/272.sm --total_timesteps 100000000 --hierarchical

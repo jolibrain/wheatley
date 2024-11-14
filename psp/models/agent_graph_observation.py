@@ -68,10 +68,12 @@ class AgentGraphObservation:
                     g.ndata("type").unsqueeze(1),
                     g.ndata("normalized_durations"),
                     g.ndata("normalized_tct"),
-                    g.ndata("tardiness"),
+                    # g.ndata("tardiness"),
+                    g.ndata("normalized_tardiness"),
                     g.ndata("has_due_date").unsqueeze(1),
-                    g.ndata("due_date").unsqueeze(1),
-                    g.ndata("resources"),
+                    # g.ndata("due_date").unsqueeze(1),
+                    g.ndata("normalized_due_dates").unsqueeze(1),
+                    # g.ndata("resources"),
                 ],
                 dim=1,
             ),
@@ -241,7 +243,11 @@ class AgentGraphObservation:
         if do_batch:
             self.glist = False
             graphtype = type(self.graphs[0])
+            # PAD resources
+            max_num_res, self.graphs = graphtype.pad_resources(self.graphs)
             self.graphs = graphtype.batch(self.graphs, batch_num_nodes, batch_num_edges)
+            # PAD res_cal ids
+            self.res_cal_id = self.pad_res_cal_id(self.res_cal_id, max_num_res)
             self.res_cal_id = torch.cat(self.res_cal_id)
             self.num_nodes = self.graphs.num_nodes()
             self.batch_num_nodes = batch_num_nodes
@@ -251,6 +257,13 @@ class AgentGraphObservation:
 
         else:
             self.glist = True
+
+    def pad_res_cal_id(self, res_cal_id_list, max_num_res):
+        ret = []
+        for rci in res_cal_id_list:
+            nr = rci.shape[0]
+            ret.append(torch.nn.functional.pad(rci, (0, 0, 0, max_num_res - nr)))
+        return ret
 
     # @classmethod
     # def rwpe(cls, g, k, rwpe_cache):

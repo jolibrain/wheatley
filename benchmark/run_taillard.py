@@ -136,6 +136,7 @@ def main():
             hidden_dim_actor=args.hidden_dim_actor,
             n_mlp_layers_critic=args.n_mlp_layers_critic,
             hidden_dim_critic=args.hidden_dim_critic,
+            hierarchical=args.hierarchical,
         )
         agent_specification.print_self()
         agent = Agent(

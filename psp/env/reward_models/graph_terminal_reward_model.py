@@ -62,10 +62,8 @@ class GraphTerminalRewardModel:
                 raw_tardy = state.all_tardiness()
                 tardy = torch.where(raw_tardy < 0, 0, raw_tardy)
                 return (
-                    -torch.sum(tardy).item()
-                    / 3.0
-                    / len(state.job_modes)
-                    / len(state.job_modes)
+                    -torch.sum(tardy).item() / 3.0 / len(state.job_modes)
+                    # / len(state.job_modes)
                 )  # average min,max,ave and come back close to 1
 
         if state.finished():

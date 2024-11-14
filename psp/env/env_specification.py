@@ -215,7 +215,7 @@ class EnvSpecification:
         # 1 for due_date
         n_features += 2
         # level of resource used by every node
-        n_features += self.max_n_resources
+        # n_features += self.max_n_resources
         # most features make 4 values
         n_features += 4 * len(self.input_list)
         return n_features
@@ -228,6 +228,7 @@ class EnvSpecification:
             f"==========Env Description     ==========\n"
             f"Use PYG:                            {self.pyg}\n"
             f"Max size:                           {self.max_n_modes}\n"
+            f"Max n ressources:                   {self.max_n_resources}\n"
             f"Input normalization:                {'Yes' if self.normalize_input else 'No'}\n"
             f"Observe real duration when affect:  {self.observe_real_duration_when_affect}\n"
             f"Do not observe tct:                 {self.do_not_observe_updated_bounds}\n"

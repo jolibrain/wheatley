@@ -200,7 +200,7 @@ def main(args, exp_name) -> float:
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
-        pyg=args.pyg,
+        pyg=args.pyg or args.hierarchical,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -220,7 +220,7 @@ def main(args, exp_name) -> float:
         gconv_type=args.gconv_type,
         graph_has_relu=args.graph_has_relu,
         graph_pooling=args.graph_pooling,
-        layer_pooling=args.layer_pooling,
+        layer_pooling=args.layer_pooling if not args.hierarchical else "last",
         mlp_act=args.mlp_act,
         mlp_act_graph=args.mlp_act_graph,
         device=torch.device(args.device),
@@ -260,7 +260,9 @@ def main(args, exp_name) -> float:
         hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
-        pyg=args.pyg,
+        pyg=args.pyg or args.hierarchical,
+        hierarchical=args.hierarchical,
+        shared_conv=args.shared_conv,
     )
     agent_specification.print_self()
 
@@ -317,6 +319,7 @@ def main(args, exp_name) -> float:
         training_specification,
         args.disable_visdom,
         graphobs=args.vecenv_type == "graphgym",
+        compute_ortools=not args.disable_ortools,
     )
     if args.vecenv_type == "graphgym":
         env_cls = GEnv

@@ -93,8 +93,9 @@ class Solution:
     def get_criterion(self):
         return self._criterion
 
-    def save(self, path):
+    def save(self, path, label):
         with open(path, "w") as f:
+            f.write(f"prolem: {label}\n")
             f.write(f"criterion value: {self._criterion}\n")
             f.write(f"njobs: {len(self.job_schedule)}\n")
             f.write("job_schedule starts (real)\n")

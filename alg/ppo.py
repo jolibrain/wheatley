@@ -735,13 +735,18 @@ class PPO:
                     "time/total_timesteps", self.global_step, exclude="tensorboard"
                 )
 
-                ratio_to_ortools = np.array(self.validator.criterions) / np.array(
-                    self.validator.ortools_criterions[
-                        self.validator.default_ortools_strategy
-                    ]
-                )
-                self.logger.record("train/ratio_monotony", monotony(ratio_to_ortools))
-                self.logger.record("train/ratio_stability", stability(ratio_to_ortools))
+                if self.validator.compute_ortools:
+                    ratio_to_ortools = np.array(self.validator.criterions) / np.array(
+                        self.validator.ortools_criterions[
+                            self.validator.default_ortools_strategy
+                        ]
+                    )
+                    self.logger.record(
+                        "train/ratio_monotony", monotony(ratio_to_ortools)
+                    )
+                    self.logger.record(
+                        "train/ratio_stability", stability(ratio_to_ortools)
+                    )
                 if self.debug_net:
                     for k in variances.keys():
                         self.logger.record("net/var_" + k, np.mean(variances[k]))
@@ -760,50 +765,59 @@ class PPO:
                     "validation/ppo_criterion",
                     self.validator.criterions[-1],
                 )
-                for ortools_strategy in self.validator.ortools_strategies:
-                    self.logger.record(
-                        f"validation/ortools_{ortools_strategy}_criterion",
-                        self.validator.ortools_criterions[ortools_strategy][-1],
-                    )
+                if self.validator.compute_ortools:
+                    for ortools_strategy in self.validator.ortools_strategies:
+                        self.logger.record(
+                            f"validation/ortools_{ortools_strategy}_criterion",
+                            self.validator.ortools_criterions[ortools_strategy][-1],
+                        )
                 self.logger.record(
                     "validation/random_makepsan",
                     self.validator.random_criterions[-1],
                 )
-                self.logger.record(
-                    "validation/ratio_to_ortools",
-                    self.validator.criterions[-1]
-                    / self.validator.ortools_criterions[
-                        self.validator.default_ortools_strategy
-                    ][-1],
-                )
-                self.logger.record(
-                    "validation/dist_to_ortools",
-                    self.validator.criterions[-1]
-                    - self.validator.ortools_criterions[
-                        self.validator.default_ortools_strategy
-                    ][-1],
-                )
+
+                if self.validator.compute_ortools:
+                    self.logger.record(
+                        "validation/ratio_to_ortools",
+                        self.validator.criterions[-1]
+                        / self.validator.ortools_criterions[
+                            self.validator.default_ortools_strategy
+                        ][-1],
+                    )
+                    self.logger.record(
+                        "validation/dist_to_ortools",
+                        self.validator.criterions[-1]
+                        - self.validator.ortools_criterions[
+                            self.validator.default_ortools_strategy
+                        ][-1],
+                    )
                 for custom_agent in self.validator.custom_agents:
                     name = custom_agent.rule
                     self.logger.record(
                         f"validation/{name}",
                         self.validator.custom_criterions[name][-1],
                     )
-                    self.logger.record(
-                        f"validation/{name}_ratio_to_ortools",
-                        self.validator.custom_criterions[name][-1]
-                        / self.validator.ortools_criterions[
-                            self.validator.default_ortools_strategy
-                        ][-1],
-                    )
+                    if self.validator.compute_ortools:
+                        self.logger.record(
+                            f"validation/{name}_ratio_to_ortools",
+                            self.validator.custom_criterions[name][-1]
+                            / self.validator.ortools_criterions[
+                                self.validator.default_ortools_strategy
+                            ][-1],
+                        )
 
             self.logger.dump(step=self.global_step)
 
         envs.close()
 
         ppo_criterions = np.array(self.validator.criterions)
-        ortools_criterions = np.array(
-            self.validator.ortools_criterions[self.validator.default_ortools_strategy]
-        )
-        ratios = ppo_criterions / ortools_criterions
+        if self.validator.compute_ortools:
+            ortools_criterions = np.array(
+                self.validator.ortools_criterions[
+                    self.validator.default_ortools_strategy
+                ]
+            )
+            ratios = ppo_criterions / ortools_criterions
+        else:
+            ratios = ppo_criterions / ppo_criterions[0]
         return np.min(ratios)

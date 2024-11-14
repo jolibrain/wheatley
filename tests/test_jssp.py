@@ -445,6 +445,7 @@ def test_solve_api(instance_file: str, taillard_offset: bool):
         reward_weights=[1],
         sgformer=False,
         pyg=False,
+        hierarchical=False,
     )
 
     agent = Agent(env_specification, agent_specification=agent_specification)

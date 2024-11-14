@@ -266,7 +266,8 @@ class GEnv:
                 dtype=torch.int64,
             )
             wdd_tct = self.state.tct_real(with_due_dates)
-            tardy = wdd_tct - due_dates
+            raw_tardy = wdd_tct - due_dates
+            tardy = torch.where(raw_tardy > 0, raw_tardy, 0)
             sol._criterion = torch.sum(tardy).item()
 
         return sol

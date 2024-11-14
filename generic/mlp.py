@@ -31,7 +31,7 @@ class MLP(torch.nn.Module):
         input_dim,
         hidden_dim,
         output_dim,
-        batch_norm,
+        norm,
         activation,
     ):
         super(MLP, self).__init__()
@@ -39,16 +39,16 @@ class MLP(torch.nn.Module):
             raise Exception("Number of layers must be >= 1")
         self.n_layers = n_layers
         self.layers = torch.nn.ModuleList()
-        self.batch_norm = batch_norm
+        self.norm = norm
 
-        if self.batch_norm:
-            self.batch_norms = torch.nn.ModuleList()
+        if self.norm:
+            self.norms = torch.nn.ModuleList()
 
         last_dim = input_dim
         for layer_id in range(self.n_layers - 1):
             self.layers.append(torch.nn.Linear(last_dim, hidden_dim))
-            if self.batch_norm:
-                self.batch_norms.append(torch.nn.LayerNorm(hidden_dim))
+            if self.norm:
+                self.norms.append(torch.nn.LayerNorm(hidden_dim))
 
             last_dim = hidden_dim
 
@@ -69,8 +69,8 @@ class MLP(torch.nn.Module):
     def forward(self, x):
         for layer in range(self.n_layers - 1):
             x = self.layers[layer](x)
-            if self.batch_norm:
-                x = self.batch_norms[layer](x)
+            if self.norm:
+                x = self.norms[layer](x)
             x = self.activation_layer(x)
 
         return self.layers[-1](x)

@@ -306,13 +306,33 @@ class GState:
                 + self.problem.n_nonrenewable_resources
             ):
                 self.res_cal.append(self.problem.cals[self.problem.res_cal[r]])
-            self.res_cal_id = [
-                list(self.problem.cals.keys()).index(c) for c in self.problem.res_cal
-            ]
+            self.res_cal_id = []
+            for c in self.problem.res_cal:
+                if c == "full_time":
+                    self.res_cal_id.append((24, 7, 0))
+                elif c == "1/8":
+                    self.res_cal_id.append((8, 5, 5))
+                elif c == "2/8":
+                    self.res_cal_id.append((16, 5, 5))
+                elif c == "3/8":
+                    self.res_cal_id.append((24, 5, 0))
+                else:
+                    print("unknown cal type ", c)
+                    exit()
+            # self.res_cal_id = [
+            #     list(self.problem.cals.keys()).index(c) for c in self.problem.res_cal
+            # ]
         else:
-            self.res_cal_id = [0] * self.n_resources
+            self.res_cal_id = [(0, 0, 0)] * self.n_resources
 
-        self.graph.set_global_data("res_cal", torch.tensor(self.res_cal_id))
+        # TODO : res_cal should be an extract of real calendar and not an id
+        # variable length=> res_cal_0 etc...
+        # or 50 days meaning 0,24, 24,48  for fulltime
+        # or rbf like stuff
+        # very simple n hours per day, ndays per week, start hour for 1/8 and 2/8
+        self.graph.set_global_data(
+            "res_cal", torch.tensor(self.res_cal_id, dtype=torch.float32)
+        )
 
         assert len(self.resources) == self.n_resources
         self.reset_frontier()
@@ -406,6 +426,9 @@ class GState:
 
     def all_tardiness(self):
         return self.graph.ndata("tardiness")
+
+    def all_due_dates(self):
+        return self.graph.ndata("due_date")
 
     def tardiness_real(self, nodeid):
         return self.real_tardiness[nodeid]
@@ -718,6 +741,12 @@ class GState:
     def normalize_features(self):
         if self.normalize:
             self.graph.set_ndata("normalized_tct", self.all_tct() / self.max_duration)
+            self.graph.set_ndata(
+                "normalized_tardiness", self.all_tardiness() / self.max_duration
+            )
+            self.graph.set_ndata(
+                "normalized_due_dates", self.all_due_dates() / self.max_duration
+            )
 
     def get_last_finishing_dates(self, jobs):
         if len(jobs) == 0:
