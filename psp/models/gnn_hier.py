@@ -436,7 +436,7 @@ class GnnHier(torch.nn.Module):
             self.x_aggr.append(
                 NodeAggr(
                     self.hidden_dim,
-                    num_heads=n_attention_heads,
+                    num_heads=1,
                     n_mlp_layers=n_mlp_layers_features_extractor,
                     normalize=self.normalize,
                     activation=activation_features_extractor,
@@ -445,7 +445,7 @@ class GnnHier(torch.nn.Module):
             self.edge_aggr.append(
                 EdgeAggr(
                     self.hidden_dim,
-                    num_heads=n_attention_heads,
+                    num_heads=1,
                     n_mlp_layers=n_mlp_layers_features_extractor,
                     normalize=self.normalize,
                     activation=activation_features_extractor,
@@ -516,9 +516,15 @@ class GnnHier(torch.nn.Module):
         # if self.normalize:
         #     features = self.norm0(features)
 
+        if self.layer_pooling == "all":
+            pooled_layers = [features]
+
         features = self.features_embedder(features)
         if self.normalize:
             features = self.norm1(features)
+
+        if self.layer_pooling == "all":
+            pooled_layers.append(features)
 
         edge_index = g._graph.edge_index
 
@@ -535,6 +541,8 @@ class GnnHier(torch.nn.Module):
         edge_indices = [edge_index]
         all_edge_features = [edge_features]
         perms = []
+        if self.layer_pooling == "all":
+            pooled_layers.extend([x] * self.n_layers_features_extractor)
         for i in range(1, self.n_layers_features_extractor + 1):
             if self.shared_conv:
                 x, edge_index, edge_features, batch, _, cluster, perm = self.pools[0](
@@ -567,8 +575,16 @@ class GnnHier(torch.nn.Module):
             else:
                 x, _ = self.up_convs[i].forward_nog(x, edge_index, all_edge_features[j])
                 x = self.up_mlps[i](x)
+            if self.layer_pooling == "all":
+                target = pooled_layers[j + 2]
+                for k in range(j):
+                    target = target[perms[k]]
+                target = x
         x, _ = self.up_convs[-1].forward_nog(
             torch.cat((x, x0), dim=-1), edge_index, all_edge_features[0]
         )
         x = self.up_mlps[-1](x)
+        if self.layer_pooling == "all":
+            pooled_layers[-1] = x
+            return torch.cat(pooled_layers, axis=1)
         return x

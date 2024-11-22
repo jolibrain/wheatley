@@ -220,7 +220,7 @@ def main(args, exp_name) -> float:
         gconv_type=args.gconv_type,
         graph_has_relu=args.graph_has_relu,
         graph_pooling=args.graph_pooling,
-        layer_pooling=args.layer_pooling if not args.hierarchical else "last",
+        layer_pooling=args.layer_pooling,
         mlp_act=args.mlp_act,
         mlp_act_graph=args.mlp_act_graph,
         device=torch.device(args.device),
