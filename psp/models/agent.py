@@ -45,7 +45,7 @@ class Agent(Agent):
         value_net=None,
         action_net=None,
         agent_specification=None,
-        graphobs=False,
+        graphobs=True,
     ):
         """
         There are 2 ways to init an Agent:
@@ -143,7 +143,7 @@ class Agent(Agent):
         self.init_heads()
 
     @classmethod
-    def load(cls, path, graphobs=False):
+    def load(cls, path, graphobs=True):
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
         save_data = torch.load(path + "agent.pkl")
         agent_specification = save_data["agent_specification"]
