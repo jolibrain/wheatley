@@ -616,6 +616,12 @@ def argument_parser() -> argparse.ArgumentParser:
         default=False,
         help="use same conv params across levels",
     )
+    parser.add_argument(
+        "--gcon",
+        action="store_true",
+        default=False,
+        help="use gcon conv",
+    )
 
     # =================================================ENVIRONMENT SPECIFICATION================================================
     parser.add_argument(

@@ -270,6 +270,7 @@ def main(args, exp_name) -> float:
         tokengt=args.tokengt,
         shared_conv=args.shared_conv,
         checkpoint=args.checkpoint,
+        gcon=args.gcon,
     )
     agent_specification.print_self()
 

@@ -78,6 +78,7 @@ class AgentSpecification:
         tokengt=False,
         shared_conv=False,
         checkpoint=1,
+        gcon=False,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -128,6 +129,7 @@ class AgentSpecification:
         self.tokengt = tokengt
         self.shared_conv = shared_conv
         self.checkpoint = checkpoint
+        self.gcon = gcon
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -223,6 +225,7 @@ class AgentSpecification:
                 f"TokenGT:                          {self.tokengt}\n"
                 f"Shared conv:                      {self.shared_conv}\n"
                 f"checkpoint:                       {self.checkpoint}\n"
+                f"GCon:                             {self.gcon}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (
