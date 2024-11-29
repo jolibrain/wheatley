@@ -68,6 +68,7 @@ class GnnMP(torch.nn.Module):
         shared_conv=True,
         pyg=True,
         hierarchical=False,
+        gcon=False,
     ):
         super().__init__()
         self.pyg = pyg
@@ -183,7 +184,7 @@ class GnnMP(torch.nn.Module):
                 update_edge_features,
                 update_edge_features_pe,
                 shared_conv,
-                pyg,
+                gcon,
             )
         else:
             self.gnn = GnnFlat(
@@ -202,6 +203,7 @@ class GnnMP(torch.nn.Module):
                 update_edge_features_pe,
                 shared_conv,
                 pyg,
+                gcon,
             )
 
     def reset_egat(self):

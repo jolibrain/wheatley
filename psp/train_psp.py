@@ -200,7 +200,7 @@ def main(args, exp_name) -> float:
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
-        pyg=args.pyg or args.hierarchical,
+        pyg=args.pyg or args.hierarchical or args.gcon,
         max_n_modes=args.max_n_modes,
     )
     env_specification.print_self()
@@ -264,6 +264,7 @@ def main(args, exp_name) -> float:
         pyg=args.pyg or args.hierarchical,
         hierarchical=args.hierarchical,
         shared_conv=args.shared_conv,
+        gcon=args.gcon,
     )
     agent_specification.print_self()
 
