@@ -201,6 +201,7 @@ def main(args, exp_name) -> float:
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
         pyg=args.pyg or args.hierarchical,
+        max_n_modes=args.max_n_modes,
     )
     env_specification.print_self()
     if args.batch_size == 1 and not args.dont_normalize_advantage:

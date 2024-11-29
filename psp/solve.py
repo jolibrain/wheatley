@@ -33,7 +33,7 @@ if __name__ == "__main__":
         args.load_problem is not None
     ), "You should provide a problem to solve (use --load_problem)."
 
-    agent = Agent.load(args.path)
+    agent = Agent.load(args.path, max_n_modes=args.max_n_modes)
     loader = PSPLoader()
 
     psp = loader.load_single(args.load_problem)
