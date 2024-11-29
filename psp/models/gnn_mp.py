@@ -68,6 +68,7 @@ class GnnMP(torch.nn.Module):
         shared_conv=True,
         pyg=True,
         hierarchical=False,
+        gcon=False,
         checkpoint=1,
     ):
         super().__init__()
@@ -186,6 +187,7 @@ class GnnMP(torch.nn.Module):
                 update_edge_features_pe,
                 shared_conv,
                 pyg,
+                gcon,
                 self.checkpoint,
             )
         else:
@@ -205,6 +207,7 @@ class GnnMP(torch.nn.Module):
                 update_edge_features_pe,
                 shared_conv,
                 pyg,
+                gcon,
                 self.checkpoint,
             )
 
