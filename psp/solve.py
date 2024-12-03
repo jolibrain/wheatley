@@ -33,12 +33,12 @@ if __name__ == "__main__":
         args.load_problem is not None
     ), "You should provide a problem to solve (use --load_problem)."
 
-    agent = Agent.load(args.path, max_n_modes=args.max_n_modes)
     loader = PSPLoader()
 
     psp = loader.load_single(args.load_problem)
     train_psps = [psp]
     test_psps = [psp]
+
     problem_description = Description(
         transition_model_config=args.transition_model_config,
         reward_model_config=args.criterion,
@@ -47,6 +47,8 @@ if __name__ == "__main__":
         test_psps=test_psps,
         seed=args.seed,
     )
+    agent = Agent.load(args.path, max_n_modes=problem_description.max_n_modes)
+
     agent.to(args.device)
     sol = solve_instance(problem_description, agent)
     sol.save(os.path.basename(psp.pb_id) + ".sol", psp.pb_id)
