@@ -50,9 +50,13 @@ class EnvSpecification:
         observe_subgraph,
         random_taillard,
         pyg,
+        max_n_modes=None,
     ):
         self.problems = problems
-        self.max_n_modes = self.problems.max_n_modes
+        if max_n_modes is None:
+            self.max_n_modes = self.problems.max_n_modes
+        else:
+            self.max_n_modes = max_n_modes
         self.max_n_nodes = self.max_n_modes
         self.max_n_jobs = self.problems.max_n_jobs
         self.max_n_edges = self.max_n_nodes**2

@@ -546,7 +546,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--edge_embedding_flavor",
         type=str,
         default="sum",
-        choices=["sum", "cat", "cartesian"],
+        choices=["sum", "cat"],
         help="edge embedding technique for RCPSP",
     )
 
@@ -729,6 +729,12 @@ def argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=4,
         help="Upper bound factor to max_n_edges, allows lowering the overall memory usage",
+    )
+    parser.add_argument(
+        "--max_n_modes",
+        type=int,
+        default=None,
+        help="max_n_modes, for padding purposes",
     )
 
     # ============================= PRETRAIN ======================================

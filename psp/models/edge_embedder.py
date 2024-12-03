@@ -62,9 +62,9 @@ class PspEdgeEmbedder(torch.nn.Module):
         self.n_edge_type = 12
 
         if self.edge_embedding_flavor == "sum":
-            self.resource_id_embedder = torch.nn.Embedding(
-                self.max_n_resources + 1, self.hidden_dim
-            )
+            # self.resource_id_embedder = torch.nn.Embedding(
+            #     self.max_n_resources + 1, self.hidden_dim
+            # )
             self.edge_type_embedder = torch.nn.Embedding(
                 self.n_edge_type, self.hidden_dim
             )
@@ -82,10 +82,11 @@ class PspEdgeEmbedder(torch.nn.Module):
             self.edge_type_embedder = torch.nn.Embedding(
                 self.n_edge_type, self.n_edge_type
             )
-            self.resource_id_embedder = torch.nn.Embedding(
-                self.max_n_resources + 1, self.max_n_resources + 1
-            )
-            rest = self.hidden_dim - self.n_edge_type - self.max_n_resources - 1
+            # self.resource_id_embedder = torch.nn.Embedding(
+            #     self.max_n_resources + 1, self.max_n_resources + 1
+            # )
+            # rest = self.hidden_dim - self.n_edge_type - self.max_n_resources - 1
+            rest = self.hidden_dim - self.n_edge_type
             if rest < 4:
                 raise ValueError(
                     f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"
@@ -100,26 +101,26 @@ class PspEdgeEmbedder(torch.nn.Module):
                     )
                 else:
                     self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
-        elif self.edge_embedding_flavor == "cartesian":
-            self.type_rid_hidden_dim = int(self.hidden_dim / 2)
-            self.type_rid_embedder = torch.nn.Embedding(
-                8 * (self.max_n_resources + 1), self.type_rid_hidden_dim
-            )
-            self.rc_att_hidden_dim = int(
-                (self.hidden_dim - self.type_rid_hidden_dim) / 2
-            )
-            self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
-            if self.add_rp_edges != "none":
-                self.rp_att_hidden_dim = (
-                    self.hidden_dim - self.type_rid_hidden_dim - self.rc_att_hidden_dim
-                )
+        # elif self.edge_embedding_flavor == "cartesian":
+        #     self.type_rid_hidden_dim = int(self.hidden_dim / 2)
+        #     self.type_rid_embedder = torch.nn.Embedding(
+        #         8 * (self.max_n_resources + 1), self.type_rid_hidden_dim
+        #     )
+        #     self.rc_att_hidden_dim = int(
+        #         (self.hidden_dim - self.type_rid_hidden_dim) / 2
+        #     )
+        #     self.rc_att_embedder = torch.nn.Linear(2, self.rc_att_hidden_dim)
+        #     if self.add_rp_edges != "none":
+        #         self.rp_att_hidden_dim = (
+        #             self.hidden_dim - self.type_rid_hidden_dim - self.rc_att_hidden_dim
+        #         )
 
-                if self.factored_rp:
-                    self.rp_att_embedder = torch.nn.Linear(
-                        3 * max_n_resources, self.rp_att_hidden_dim
-                    )
-                else:
-                    self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
+        #         if self.factored_rp:
+        #             self.rp_att_embedder = torch.nn.Linear(
+        #                 3 * max_n_resources, self.rp_att_hidden_dim
+        #             )
+        #         else:
+        #             self.rp_att_embedder = torch.nn.Linear(3, self.rp_att_hidden_dim)
         else:
             raise ValueError(
                 "unknown edge embedding flavor " + self.edge_embedding_flavor
@@ -128,7 +129,7 @@ class PspEdgeEmbedder(torch.nn.Module):
     def forward(self, g):
         if self.edge_embedding_flavor == "sum":
             ret = self.edge_type_embedder(g.edata(None, "type"))
-            ret += self.resource_id_embedder(g.edata(None, "rid"))
+            # ret += self.esource_id_embedder(g.edata(None, "rid"))
             try:
                 ret += self.rc_att_embedder(g.edata(None, "att_rc"))
             except KeyError:
@@ -142,7 +143,7 @@ class PspEdgeEmbedder(torch.nn.Module):
 
         if self.edge_embedding_flavor == "cat":
             et = self.edge_type_embedder(g.edata(None, "type"))
-            ei = self.resource_id_embedder(g.edata(None, "rid"))
+            # ei = self.resource_id_embedder(g.edata(None, "rid"))
             try:
                 ec = self.rc_att_embedder(g.edata(None, "att_rc"))
             except KeyError:
@@ -152,7 +153,9 @@ class PspEdgeEmbedder(torch.nn.Module):
                     ep = self.rp_att_embedder(g.edata(None, "att_rp"))
                 except KeyError:
                     ep = torch.zeros((g.num_edges(), self.rp_att_hidden_dim))
-                return torch.cat([et, ei, ec, ep], dim=-1)
+                # return torch.cat([et, ei, ec, ep], dim=-1)
+                return torch.cat([et, ec, ep], dim=-1)
+            # return torch.cat([et, ei, ec], dim=-1)
             return torch.cat([et, ei, ec], dim=-1)
 
         if self.edge_embedding_flavor == "cartesian":
