@@ -2,7 +2,7 @@ import torch
 
 # from generic.eegatconv import EEGATConv
 from torch_geometric.nn.conv import GATv2Conv
-from generic.gcon import HybridConv_v2
+from generic.gcongat import HybridConv_v2
 from generic.mlp import MLP
 
 
@@ -72,7 +72,7 @@ class GraphConv(torch.nn.Module):
                 node_feats = self.mlp(node_feats)
             return self.conv(node_feats, g.edge_index, edge_feats)
         elif self.pyg:
-            feats, _ = self.conv(node_feats, g.edge_index, edge_feats), None
+            feats = self.conv(node_feats, g.edge_index, edge_feats)
             return self.mlp(feats)
         else:
             f, ef = self.conv(g, node_feats, edge_feats, edge_efeats)
@@ -85,5 +85,5 @@ class GraphConv(torch.nn.Module):
                 node_feats = self.mlp(node_feats)
             return self.conv(node_feats, edge_index, edge_feats)
         else:
-            feats, _ = self.conv(node_feats, edge_index, edge_feats), None
+            feats = self.conv(node_feats, edge_index, edge_feats)
             return self.mlp(feats)
