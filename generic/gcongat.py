@@ -99,7 +99,7 @@ class HybridConv_v2(MessagePassing):
             if combine_fn == "att_bias":
                 m = 1
 
-            if skip:
+            if self.skip:
                 m += 1
 
             self.mlp_out = MLP(
