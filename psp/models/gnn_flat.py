@@ -22,6 +22,7 @@ class GnnFlat(torch.nn.Module):
         update_edge_features_pe,
         shared_conv,
         pyg,
+        gcon,
     ):
         super().__init__()
         self.hidden_dim = hidden_dim_features_extractor
@@ -44,6 +45,7 @@ class GnnFlat(torch.nn.Module):
             norm=self.normalize,
             activation=activation_features_extractor,
         )
+        self.gcon = gcon
 
         if self.shared_conv:
             self.features_extractors = GraphConv(
@@ -53,17 +55,8 @@ class GnnFlat(torch.nn.Module):
                 edge_scoring=self.update_edge_features,
                 pyg=self.pyg,
             )
-            self.mlps = MLP(
-                n_layers=n_mlp_layers_features_extractor,
-                input_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                hidden_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                output_dim=self.hidden_dim,
-                norm=self.normalize,
-                activation=activation_features_extractor,
-            )
         else:
             self.features_extractors = torch.nn.ModuleList()
-            self.mlps = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
             if self.normalize:
@@ -99,19 +92,13 @@ class GnnFlat(torch.nn.Module):
                         num_heads=n_attention_heads,
                         edge_scoring=self.update_edge_features,
                         pyg=self.pyg,
-                    )
-                )
-
-                self.mlps.append(
-                    MLP(
-                        n_layers=n_mlp_layers_features_extractor,
-                        input_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                        hidden_dim=(self.hidden_dim + self.rwpe_h) * n_attention_heads,
-                        output_dim=self.hidden_dim,
+                        gcon=self.gcon,
+                        n_mlp_layers=n_mlp_layers_features_extractor,
                         norm=self.normalize,
                         activation=activation_features_extractor,
                     )
                 )
+
             if self.update_edge_features:
                 self.mlps_edges.append(
                     MLP(
@@ -180,19 +167,15 @@ class GnnFlat(torch.nn.Module):
 
             else:
                 if self.shared_conv:
-                    features, _ = self.features_extractors(
+                    features = self.features_extractors(
                         g._graph,
                         features,
                         edge_features,
                     )
-                    features = self.mlps(features)
                 else:
-                    features, _ = self.features_extractors[layer](
-                        g._graph,
-                        features,
-                        edge_features,
+                    features = self.features_extractors[layer](
+                        g._graph, features, edge_features
                     )
-                    features = self.mlps[layer](features)
 
             if self.rwpe_k != 0:
                 if self.update_edge_features_pe:

@@ -110,6 +110,7 @@ class Agent(Agent):
                 pyg=agent_specification.pyg,
                 hierarchical=agent_specification.hierarchical,
                 shared_conv=agent_specification.shared_conv,
+                gcon=agent_specification.gcon,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
