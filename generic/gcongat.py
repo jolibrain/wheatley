@@ -63,7 +63,7 @@ class HybridConv_v2(MessagePassing):
         self.radius_list.sort()
         self.combine_fn = combine_fn
         self.num_heads = num_heads
-        self.skip = False
+        self.skip = skip
         self.add_self_loops = True
         self.norm = norm
         self.filter_norm_dim = filter_norm_dim
@@ -327,21 +327,6 @@ class HybridConv_v2(MessagePassing):
             f"{self.__class__.__name__}({self.input_dim}, "
             f"{self.output_dim}, channel_list={self.channel_list})"
         )
-
-
-class HybridConvLayer(nn.Module):
-    """HybridConv layer"""
-
-    def __init__(self, in_dim, out_dim, num_heads):
-        super().__init__()
-        self.model = HybridConv_v2(
-            in_dim,
-            out_dim,
-            num_heads=num_heads,
-        )
-
-    def forward(self, g, node_feats, edge_feats):
-        return self.model(node_feats, g.edge_index, edge_feats)
 
 
 def rw_norm(
