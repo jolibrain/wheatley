@@ -264,6 +264,7 @@ def main(args, exp_name) -> float:
         pyg=args.pyg or args.hierarchical,
         hierarchical=args.hierarchical,
         shared_conv=args.shared_conv,
+        checkpoint=args.checkpoint,
     )
     agent_specification.print_self()
 

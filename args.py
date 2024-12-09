@@ -200,6 +200,12 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="collect and display statistics about net",
     )
+    parser.add_argument(
+        "--checkpoint",
+        default=1,
+        type=int,
+        help="keep 1 out of checkpoint (this args)  layers in memory during forward pass",
+    )
 
     # =================================================VALIDATION SPECIFICATION=================================================
     parser.add_argument(

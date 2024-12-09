@@ -390,6 +390,7 @@ class GnnHier(torch.nn.Module):
         update_edge_features_pe,
         shared_conv,
         pyg,
+        checkpoint,
     ):
         super(GnnHier, self).__init__()
         self.hidden_dim = hidden_dim_features_extractor
@@ -405,6 +406,7 @@ class GnnHier(torch.nn.Module):
         self.sum_res = False
         self.input_dim_features_extractor = input_dim_features_extractor
         self.n_attention_heads = n_attention_heads
+        self.checkpoint = checkpoint
 
         if self.normalize:
             self.norm1 = torch.nn.LayerNorm(self.hidden_dim)
@@ -551,13 +553,30 @@ class GnnHier(torch.nn.Module):
                 x, _ = self.down_convs[0].forward_nog(x, edge_index, edge_features)
                 x = self.down_mlps[0](x)
             else:
-                x, edge_index, edge_features, batch, _, cluster, perm = self.pools[
-                    i - 1
-                ](x, edge_index, edge_features, batch)
-                x, _ = self.down_convs[i].forward_nog(x, edge_index, edge_features)
-                x = self.down_mlps[i](x)
-            if i < self.n_layers_features_extractor:
-                xs.append(x)
+                if i % self.checkpoint:
+                    x, edge_index, edge_features, batch, _, cluster, perm = (
+                        torch.utils.checkpoint(
+                            self.pools[i - 1],
+                            x,
+                            edge_index,
+                            edge_features,
+                            batch,
+                            use_reentrant=False,
+                        )
+                    )
+                    x, _ = torch.utils.checkpoint(
+                        self.down_convs[i].forward_nog, x, edge_index, edge_features
+                    )
+                    x = torch.utils.checkpoint(self.down_mlps[i], x)
+                else:
+                    x, edge_index, edge_features, batch, _, cluster, perm = self.pools[
+                        i - 1
+                    ](x, edge_index, edge_features, batch)
+                    x, _ = self.down_convs[i].forward_nog(x, edge_index, edge_features)
+                    x = self.down_mlps[i](x)
+
+                if i < self.n_layers_features_extractor:
+                    xs.append(x)
                 edge_indices.append(edge_index)
                 all_edge_features.append(edge_features)
             perms.append(perm)
@@ -573,8 +592,19 @@ class GnnHier(torch.nn.Module):
                 x, _ = self.up_convs[0].forward_nog(x, edge_index, all_edge_features[j])
                 x = self.up_mlps[0](x)
             else:
-                x, _ = self.up_convs[i].forward_nog(x, edge_index, all_edge_features[j])
-                x = self.up_mlps[i](x)
+                if i % self.checkpoint:
+                    x, _ = torch.utils.checkpoint(
+                        self.up_convs[i].forward_nog,
+                        x,
+                        edge_index,
+                        all_edge_features[j],
+                    )
+                    x = torch.utils.checkpoint(self.up_mlps[i], x)
+                else:
+                    x, _ = self.up_convs[i].forward_nog(
+                        x, edge_index, all_edge_features[j]
+                    )
+                    x = self.up_mlps[i](x)
             if self.layer_pooling == "all":
                 target = pooled_layers[j + 2]
                 for k in range(j):
