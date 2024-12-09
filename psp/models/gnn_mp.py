@@ -68,6 +68,7 @@ class GnnMP(torch.nn.Module):
         shared_conv=True,
         pyg=True,
         hierarchical=False,
+        checkpoint=1,
     ):
         super().__init__()
         self.pyg = pyg
@@ -110,6 +111,7 @@ class GnnMP(torch.nn.Module):
 
         self.vnode = vnode
         self.shared_conv = shared_conv
+        self.checkpoint = checkpoint
 
         self.rwpe_cache = rwpe_cache
 
@@ -184,6 +186,7 @@ class GnnMP(torch.nn.Module):
                 update_edge_features_pe,
                 shared_conv,
                 pyg,
+                self.checkpoint,
             )
         else:
             self.gnn = GnnFlat(
@@ -202,6 +205,7 @@ class GnnMP(torch.nn.Module):
                 update_edge_features_pe,
                 shared_conv,
                 pyg,
+                self.checkpoint,
             )
 
     def reset_egat(self):
