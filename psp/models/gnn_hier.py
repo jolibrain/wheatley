@@ -28,29 +28,20 @@ class ScoreAggr(torch.nn.Module):
 
 class NodeAggr(torch.nn.Module):
     def __init__(
-        self,
-        hidden_dim,
-        num_heads,
-        n_mlp_layers,
-        normalize,
-        activation,
+        self, hidden_dim, num_heads, n_mlp_layers, normalize, activation, gcon
     ):
         super(NodeAggr, self).__init__()
         self.emb = torch.nn.Embedding(1, hidden_dim)
-        self.mlp = MLP(
-            n_layers=n_mlp_layers,
-            input_dim=hidden_dim * num_heads,
-            hidden_dim=hidden_dim * num_heads,
-            output_dim=hidden_dim,
-            norm=normalize,
-            activation=activation,
-        )
         self.gc = GraphConv(
             hidden_dim,
             hidden_dim,
             num_heads=num_heads,
             edge_scoring=False,
             pyg=True,
+            gcon=gcon,
+            n_mlp_layers=n_mlp_layers,
+            norm=normalize,
+            activation=activation,
         )
 
     def forward(self, x, index, dim_size):
@@ -66,36 +57,26 @@ class NodeAggr(torch.nn.Module):
             ]
         )
         y, _ = self.gc.forward_nog(x2, new_index, None, None)
-        y2 = y[:dim_size]
-        y3 = self.mlp(y2)
+        y3 = y[:dim_size]
         return y3
 
 
 class EdgeAggr(torch.nn.Module):
     def __init__(
-        self,
-        hidden_dim,
-        num_heads,
-        n_mlp_layers,
-        normalize,
-        activation,
+        self, hidden_dim, num_heads, n_mlp_layers, normalize, activation, gcon
     ):
         super(EdgeAggr, self).__init__()
         self.emb = torch.nn.Embedding(1, hidden_dim)
-        self.mlp = MLP(
-            n_layers=n_mlp_layers,
-            input_dim=hidden_dim * num_heads,
-            hidden_dim=hidden_dim * num_heads,
-            output_dim=hidden_dim,
-            norm=normalize,
-            activation=activation,
-        )
         self.gc = GraphConv(
             hidden_dim,
             hidden_dim,
             num_heads=num_heads,
             edge_scoring=False,
             pyg=True,
+            gcon=gcon,
+            n_mlp_layers=n_mlp_layers,
+            norm=normalize,
+            activation=activation,
         )
 
     def forward(self, x, row, col, c):
@@ -112,17 +93,8 @@ class EdgeAggr(torch.nn.Module):
             ]
         )
         y, _ = self.gc.forward_nog(x2, new_index, None, None)
-        y2 = y[: u.shape[0]]
-        y3 = self.mlp(y2)
+        y3 = y[: u.shape[0]]
 
-        # adj = SparseTensor(
-        #     row=u.div(c, rounding_mode="floor"),
-        #     col=torch.remainder(u, c),
-        #     value=y3,
-        #     sparse_sizes=(c, c),
-        #     is_sorted=False,
-        # )
-        # return adj
         row = u.div(c, rounding_mode="floor")
         col = torch.remainder(u, c)
         edge_index = torch.stack([row, col])
@@ -390,6 +362,7 @@ class GnnHier(torch.nn.Module):
         update_edge_features_pe,
         shared_conv,
         pyg,
+        gcon,
         checkpoint,
     ):
         super(GnnHier, self).__init__()
@@ -401,7 +374,7 @@ class GnnHier(torch.nn.Module):
         self.update_edge_features_pe = update_edge_features_pe
         self.n_layers_features_extractor = n_layers_features_extractor
         self.shared_conv = shared_conv
-        self.pyg = pyg
+        self.gcon = gcon
         self.normalize = normalize
         self.sum_res = False
         self.input_dim_features_extractor = input_dim_features_extractor
@@ -420,9 +393,7 @@ class GnnHier(torch.nn.Module):
         )
 
         self.down_convs = torch.nn.ModuleList()
-        self.down_mlps = torch.nn.ModuleList()
         self.up_convs = torch.nn.ModuleList()
-        self.up_mlps = torch.nn.ModuleList()
         self.pools = torch.nn.ModuleList()
 
         self.score_aggr = torch.nn.ModuleList()
@@ -442,6 +413,7 @@ class GnnHier(torch.nn.Module):
                     n_mlp_layers=n_mlp_layers_features_extractor,
                     normalize=self.normalize,
                     activation=activation_features_extractor,
+                    gcon=self.gcon,
                 )
             )
             self.edge_aggr.append(
@@ -451,6 +423,7 @@ class GnnHier(torch.nn.Module):
                     n_mlp_layers=n_mlp_layers_features_extractor,
                     normalize=self.normalize,
                     activation=activation_features_extractor,
+                    gcon=self.gcon,
                 )
             )
 
@@ -481,14 +454,8 @@ class GnnHier(torch.nn.Module):
                     num_heads=n_attention_heads,
                     edge_scoring=self.update_edge_features,
                     pyg=True,
-                )
-            )
-            self.down_mlps.append(
-                MLP(
-                    n_layers=n_mlp_layers_features_extractor,
-                    input_dim=self.hidden_dim * n_attention_heads,
-                    hidden_dim=self.hidden_dim * n_attention_heads,
-                    output_dim=self.hidden_dim,
+                    gcon=self.gcon,
+                    n_mlp_layers=n_mlp_layers_features_extractor,
                     norm=self.normalize,
                     activation=activation_features_extractor,
                 )
@@ -501,14 +468,8 @@ class GnnHier(torch.nn.Module):
                     edge_scoring=self.update_edge_features,
                     edge_dim=self.hidden_dim,
                     pyg=True,
-                )
-            )
-            self.up_mlps.append(
-                MLP(
-                    n_layers=n_mlp_layers_features_extractor,
-                    input_dim=self.hidden_dim * n_attention_heads,
-                    hidden_dim=self.hidden_dim * n_attention_heads,
-                    output_dim=self.hidden_dim,
+                    gcon=self.gcon,
+                    n_mlp_layers=n_mlp_layers_features_extractor,
                     norm=self.normalize,
                     activation=activation_features_extractor,
                 )
@@ -538,7 +499,6 @@ class GnnHier(torch.nn.Module):
             batch = g._graph["n"].batch
         x0 = x
         x, _ = self.down_convs[0](g._graph, x, edge_features)
-        x = self.down_mlps[0](x)
         xs = [x]
         edge_indices = [edge_index]
         all_edge_features = [edge_features]
@@ -550,8 +510,7 @@ class GnnHier(torch.nn.Module):
                 x, edge_index, edge_features, batch, _, cluster, perm = self.pools[0](
                     x, edge_index, edge_features, batch
                 )
-                x, _ = self.down_convs[0].forward_nog(x, edge_index, edge_features)
-                x = self.down_mlps[0](x)
+                x = self.down_convs[0].forward_nog(x, edge_index, edge_features)
             else:
                 if i % self.checkpoint:
                     x, edge_index, edge_features, batch, _, cluster, perm = (
@@ -567,13 +526,11 @@ class GnnHier(torch.nn.Module):
                     x, _ = torch.utils.checkpoint.checkpoint(
                         self.down_convs[i].forward_nog, x, edge_index, edge_features
                     )
-                    x = torch.utils.checkpoint.checkpoint(self.down_mlps[i], x)
                 else:
                     x, edge_index, edge_features, batch, _, cluster, perm = self.pools[
                         i - 1
                     ](x, edge_index, edge_features, batch)
                     x, _ = self.down_convs[i].forward_nog(x, edge_index, edge_features)
-                    x = self.down_mlps[i](x)
 
                 if i < self.n_layers_features_extractor:
                     xs.append(x)
@@ -589,8 +546,7 @@ class GnnHier(torch.nn.Module):
             up[perm] = x
             x = res + up if self.sum_res else torch.cat((res, up), dim=-1)
             if self.shared_conv:
-                x, _ = self.up_convs[0].forward_nog(x, edge_index, all_edge_features[j])
-                x = self.up_mlps[0](x)
+                x = self.up_convs[0].forward_nog(x, edge_index, all_edge_features[j])
             else:
                 if i % self.checkpoint:
                     x, _ = torch.utils.checkpoint.checkpoint(
@@ -599,12 +555,10 @@ class GnnHier(torch.nn.Module):
                         edge_index,
                         all_edge_features[j],
                     )
-                    x = torch.utils.checkpoint.checkpoint(self.up_mlps[i], x)
                 else:
                     x, _ = self.up_convs[i].forward_nog(
                         x, edge_index, all_edge_features[j]
                     )
-                    x = self.up_mlps[i](x)
             if self.layer_pooling == "all":
                 target = pooled_layers[j + 2]
                 for k in range(j):
@@ -613,7 +567,6 @@ class GnnHier(torch.nn.Module):
         x, _ = self.up_convs[-1].forward_nog(
             torch.cat((x, x0), dim=-1), edge_index, all_edge_features[0]
         )
-        x = self.up_mlps[-1](x)
         if self.layer_pooling == "all":
             pooled_layers[-1] = x
             return torch.cat(pooled_layers, axis=1)

@@ -76,6 +76,7 @@ class AgentSpecification:
         pyg,
         hierarchical,
         shared_conv=False,
+        gcon=False,
         checkpoint=1,
     ):
         self.n_features = n_features
@@ -126,6 +127,7 @@ class AgentSpecification:
         self.hierarchical = hierarchical
         self.shared_conv = shared_conv
         self.checkpoint = checkpoint
+        self.gcon = gcon
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -217,6 +219,7 @@ class AgentSpecification:
                 f"SGFormer:                         {self.sgformer}\n"
                 f"Hierarchical:                     {self.hierarchical}\n"
                 f"Shared conv:                      {self.shared_conv}\n"
+                f"GCon:                             {self.gcon}\n"
                 f"checkpoint:                       {self.checkpoint}\n"
                 f"Net shapes:"
             )
