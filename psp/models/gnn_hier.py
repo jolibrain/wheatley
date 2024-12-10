@@ -555,7 +555,7 @@ class GnnHier(torch.nn.Module):
             else:
                 if i % self.checkpoint:
                     x, edge_index, edge_features, batch, _, cluster, perm = (
-                        torch.utils.checkpoint(
+                        torch.utils.checkpoint.checkpoint(
                             self.pools[i - 1],
                             x,
                             edge_index,
@@ -564,10 +564,10 @@ class GnnHier(torch.nn.Module):
                             use_reentrant=False,
                         )
                     )
-                    x, _ = torch.utils.checkpoint(
+                    x, _ = torch.utils.checkpoint.checkpoint(
                         self.down_convs[i].forward_nog, x, edge_index, edge_features
                     )
-                    x = torch.utils.checkpoint(self.down_mlps[i], x)
+                    x = torch.utils.checkpoint.checkpoint(self.down_mlps[i], x)
                 else:
                     x, edge_index, edge_features, batch, _, cluster, perm = self.pools[
                         i - 1
@@ -593,13 +593,13 @@ class GnnHier(torch.nn.Module):
                 x = self.up_mlps[0](x)
             else:
                 if i % self.checkpoint:
-                    x, _ = torch.utils.checkpoint(
+                    x, _ = torch.utils.checkpoint.checkpoint(
                         self.up_convs[i].forward_nog,
                         x,
                         edge_index,
                         all_edge_features[j],
                     )
-                    x = torch.utils.checkpoint(self.up_mlps[i], x)
+                    x = torch.utils.checkpoint.checkpoint(self.up_mlps[i], x)
                 else:
                     x, _ = self.up_convs[i].forward_nog(
                         x, edge_index, all_edge_features[j]

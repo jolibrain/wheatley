@@ -190,14 +190,14 @@ class GnnFlat(torch.nn.Module):
                     features = self.mlps(features)
                 else:
                     if layer % self.checkpoint:
-                        features, _ = torch.utils.checkpoint(
+                        features, _ = torch.utils.checkpoint.checkpoint(
                             self.features_extractors[layer],
                             g._graph,
                             features,
                             edge_features,
                             use_reentrant=False,
                         )
-                        features = torch.utils.checkpoint(
+                        features = torch.utils.checkpoint.checkpoint(
                             self.mlps[layer], features, use_reentrant=False
                         )
                     else:
