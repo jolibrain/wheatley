@@ -100,18 +100,21 @@ def node_conflicts(
     else:
         resources_used = g.ndata["feat"][:, first_res_index:]
     num_resources = resources_used.shape[1]
-    resource_nodes = list(range(node_offset, node_offset + num_resources * batch_size))
-    batch_id = []
-    for i, nn in enumerate(origbnn):
-        batch_id.extend([i] * nn)
-    batch_id = torch.IntTensor(batch_id)
-    data = torch.zeros(
+    # resource_nodes = list(range(node_offset, node_offset + num_resources * batch_size))
+    resource_nodes = torch.arange(node_offset, node_offset + num_resources * batch_size)
+    # batch_id = []
+    # for i, nn in enumerate(origbnn):
+    #     batch_id.extend([i] * nn)
+    # batch_id = torch.IntTensor(batch_id)
+    batch_id = g.batch_id()
+    data = torch.empty(
         (
             batch_size * num_resources,
             input_dim_features_extractor,
         )
     )
-    data[:, :] = torch.LongTensor(list(range(num_resources)) * batch_size).unsqueeze(1)
+
+    # data[:, :] = torch.LongTensor(list(range(num_resources)) * batch_size).unsqueeze(1)
     g.add_nodes(num_resources * batch_size, "feat", data)
     bi = []
     for i in range(batch_size):
@@ -121,15 +124,14 @@ def node_conflicts(
     idxaffected = torch.where(resources_used != 0)
     consumers = idxaffected[0]
     nconsumers = consumers.shape[0]
-    resource_start_per_batch = []
-    for i in range(batch_size):
-        resource_start_per_batch.append(node_offset + num_resources * i)
+    # resource_start_per_batch = []
+    # for i in range(batch_size):
+    #     resource_start_per_batch.append(node_offset + num_resources * i)
+    resource_start_per_batch = [
+        node_offset + num_resources * i for i in range(batch_size)
+    ]
     resource_start_per_batch = torch.IntTensor(resource_start_per_batch)
     resource_index = idxaffected[1] + resource_start_per_batch[batch_id[consumers]]
-
-    rntype = torch.LongTensor(
-        list(range(num_resources)) * batch_size
-    ) + torch.LongTensor([edge_type_offset] * len(resource_nodes))
 
     rc = torch.gather(resources_used[consumers], 1, idxaffected[1].unsqueeze(1)).expand(
         nconsumers, 2
@@ -196,8 +198,11 @@ def node_conflicts(
     # find unused resources
     # ad local self loops
     if graphobs:
-        unused_resources = torch.tensor(resource_nodes)[
-            torch.where(g.in_degrees(v=resource_nodes, etype="nodeconf") == 0)[0]
+        # unused_resources = resource_nodes[
+        #     torch.where(g.in_degrees(v=resource_nodes, etype="nodeconf") == 0)[0]
+        # ]
+        unused_resources = resource_nodes[
+            torch.where(torch.all(resources_used == 0, dim=0))
         ]
 
         g.add_edges(
@@ -213,7 +218,7 @@ def node_conflicts(
             # },
         )
     else:
-        unused_resources = torch.tensor(resource_nodes)[
+        unused_resources = resource_nodes[
             torch.where(g.in_degrees(v=resource_nodes) == 0)[0]
         ]
         g.add_edges(
@@ -363,26 +368,23 @@ def homogeneous_edges(g, edgetypes, factored_rp, conflict_type, max_n_resources)
     # att_rp    : factorred: 3*max_res    nonfact: 3
     # att_rc   : 2
     for t in edgetypes.keys():
+        num_edges = g.num_edges(etype=t)
         g.set_edata(
             t,
             "type",
-            torch.zeros((g.num_edges(etype=t)), dtype=torch.long) + edgetypes[t],
+            torch.zeros((num_edges), dtype=torch.long) + edgetypes[t],
         )
 
         if t not in ["rc", "nodeconf", "rnodeconf"] or g.num_edges(etype=t) == 0:
-            g.set_edata(t, "rid", torch.zeros((g.num_edges(etype=t)), dtype=torch.int))
+            g.set_edata(t, "rid", torch.zeros((num_edges), dtype=torch.int))
 
         if (conflict_type != "node") or (t not in ["nodeconf", "rnodeconf"]):
-            g.set_edata(
-                t, "att_rc", torch.zeros((g.num_edges(etype=t), 2), dtype=torch.float)
-            )
+            g.set_edata(t, "att_rc", torch.zeros((num_edges, 2), dtype=torch.float))
 
         if factored_rp:
-            rpdata = torch.zeros(
-                (g.num_edges(etype=t), 3 * max_n_resources), dtype=torch.float
-            )
+            rpdata = torch.zeros((num_edges, 3 * max_n_resources), dtype=torch.float)
         else:
-            rpdata = torch.zeros((g.num_edges(etype=t), 3), dtype=torch.float)
+            rpdata = torch.zeros((num_edges, 3), dtype=torch.float)
         g.set_edata(t, "att_rp", rpdata)
 
     if g.num_edges(etype="rp") != 0:
