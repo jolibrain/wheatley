@@ -202,7 +202,7 @@ class Agent(torch.nn.Module):
             mask = torch.as_tensor(
                 action_masks, dtype=torch.bool, device=features.device
             )
-            HUGE_NEG = torch.tensor(-1e12, dtype=logits.dtype, device=features.device)
+            HUGE_NEG = torch.tensor(-1e20, dtype=logits.dtype, device=features.device)
             logits = torch.where(mask, logits, HUGE_NEG)
         distrib = Categorical(logits=logits)
         if action is None:
@@ -210,12 +210,13 @@ class Agent(torch.nn.Module):
                 action = distrib.sample()
             else:
                 action = torch.argmax(distrib.probs, dim=1)
-        if action_masks is not None:
-            p_log_p = distrib.logits * distrib.probs
-            p_log_p = torch.where(mask, p_log_p, torch.tensor(0.0).to(features.device))
-            entropy = -p_log_p.sum(-1)
-        else:
-            entropy = distrib.entropy()
+        # if action_masks is not None:
+        #     p_log_p = distrib.logits * distrib.probs
+        #     p_log_p = torch.where(mask, p_log_p, torch.tensor(0.0).to(features.device))
+        #     entropy = -p_log_p.sum(-1)
+        # else:
+        #     entropy = distrib.entropy()
+        entropy = distrib.entropy()
         return action, distrib.log_prob(action), entropy, value
 
     def get_action_probs_and_value(self, x, action_masks):
@@ -231,7 +232,7 @@ class Agent(torch.nn.Module):
                 action_masks, dtype=torch.bool, device=features.device
             )
             HUGE_NEG = torch.tensor(
-                -1e12, dtype=action_logits.dtype, device=features.device
+                -1e20, dtype=action_logits.dtype, device=features.device
             )
             logits = torch.where(mask, action_logits, HUGE_NEG)
             probs = torch.nn.functional.softmax(logits, dim=-1)
@@ -253,14 +254,15 @@ class Agent(torch.nn.Module):
                     action_masks, dtype=torch.bool, device=features.device
                 ).reshape(logits.shape)
                 HUGE_NEG = torch.tensor(
-                    -1e12, dtype=logits.dtype, device=features.device
+                    -1e20, dtype=logits.dtype, device=features.device
                 )
                 logits = torch.where(mask, logits, HUGE_NEG)
-            distrib = Categorical(logits=logits.squeeze(-1))
-            if deterministic == False:
+            if not deterministic:
+                distrib = Categorical(logits=logits.squeeze(-1))
                 action = distrib.sample()
             else:
-                action = torch.argmax(distrib.probs, dim=1)
+                action = torch.argmax(logits.squeeze(-1), dim=-1)
+                # action = torch.argmax(distrib.probs)
             return action
 
     def solve(self, problem_description):
