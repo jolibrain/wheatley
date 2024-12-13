@@ -212,7 +212,8 @@ class EnvSpecification:
         # 1 for job id (in case of several modes per job)
         # 3 for duration
         # 1 for source/sink/middle
-        n_features = 10
+        # 1 for past
+        n_features = 11
         # 3 for tardiness
         n_features += 3
         # 1 for has_due_date

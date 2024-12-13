@@ -21,6 +21,7 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 import torch
+from generic.mlp import MLP
 
 
 class PspEdgeEmbedder(torch.nn.Module):
@@ -31,6 +32,8 @@ class PspEdgeEmbedder(torch.nn.Module):
         hidden_dim,
         add_rp_edges,
         factored_rp,
+        n_mlp_layers_features_extractor,
+        activation_features_extractor,
     ):
         super().__init__()
         self.edge_embedding_flavor = edge_embedding_flavor
@@ -59,7 +62,7 @@ class PspEdgeEmbedder(torch.nn.Module):
         # for rc edges : type,  rid, rval
         # for rp edges : type, rid , level, criticial, timetype
 
-        self.n_edge_type = 12
+        self.n_edge_type = 16
 
         if self.edge_embedding_flavor == "sum":
             # self.resource_id_embedder = torch.nn.Embedding(
@@ -79,14 +82,12 @@ class PspEdgeEmbedder(torch.nn.Module):
                     self.rp_att_embedder = torch.nn.Linear(3, self.hidden_dim)
 
         elif self.edge_embedding_flavor == "cat":
-            self.edge_type_embedder = torch.nn.Embedding(
-                self.n_edge_type, self.n_edge_type
-            )
+            self.edge_type_embedder = torch.nn.Embedding(self.n_edge_type, 4)
             # self.resource_id_embedder = torch.nn.Embedding(
             #     self.max_n_resources + 1, self.max_n_resources + 1
             # )
             # rest = self.hidden_dim - self.n_edge_type - self.max_n_resources - 1
-            rest = self.hidden_dim - self.n_edge_type
+            rest = self.hidden_dim - 4
             if rest < 4:
                 raise ValueError(
                     f"too small hidden_dim_features_extractor for cat edge embedder, should be at least max_n_resources + num_edge_type + 4, ie {self.max_n_resources+11}"

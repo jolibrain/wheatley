@@ -2,6 +2,7 @@ import torch
 
 from psp.graph.graph_conv import GraphConv
 from generic.mlp import MLP
+from .edge_embedder import PspEdgeEmbedder
 
 
 class GnnFlat(torch.nn.Module):
@@ -21,6 +22,10 @@ class GnnFlat(torch.nn.Module):
         update_edge_features,
         update_edge_features_pe,
         shared_conv,
+        edge_embedding_flavor,
+        max_n_resources,
+        add_rp_edges,
+        factored_rp,
         pyg,
         checkpoint,
     ):
@@ -37,14 +42,6 @@ class GnnFlat(torch.nn.Module):
         self.normalize = normalize
         self.residual = residual
         self.input_dim_features_extractor = input_dim_features_extractor
-        self.features_embedder = MLP(
-            n_layers=n_mlp_layers_features_extractor,
-            input_dim=self.input_dim_features_extractor,
-            hidden_dim=self.hidden_dim,
-            output_dim=self.hidden_dim,
-            norm=self.normalize,
-            activation=activation_features_extractor,
-        )
         self.checkpoint = checkpoint
 
         if self.shared_conv:
@@ -66,6 +63,7 @@ class GnnFlat(torch.nn.Module):
         else:
             self.features_extractors = torch.nn.ModuleList()
             self.mlps = torch.nn.ModuleList()
+            self.edge_embedders = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
             if self.normalize:
@@ -114,6 +112,18 @@ class GnnFlat(torch.nn.Module):
                         activation=activation_features_extractor,
                     )
                 )
+                self.edge_embedders.append(
+                    PspEdgeEmbedder(
+                        edge_embedding_flavor,
+                        max_n_resources,
+                        self.hidden_dim,
+                        add_rp_edges,
+                        factored_rp,
+                        n_mlp_layers_features_extractor,
+                        activation_features_extractor,
+                    )
+                )
+
             if self.update_edge_features:
                 self.mlps_edges.append(
                     MLP(
@@ -137,24 +147,14 @@ class GnnFlat(torch.nn.Module):
                     )
                 )
 
-    def forward(self, g, features, edge_features, pe):
-        if self.normalize:
-            features = self.norm0(features)
-        if self.layer_pooling == "all":
-            features_list = []
-            edge_scores_list = []
-            if self.rwpe_k != 0:
-                features_list.append(torch.cat([features, pe], dim=-1))
-            else:
-                features_list.append(features)
-            if self.update_edge_features:
-                edge_scores_list.append(edge_scores)
-
-        features = self.features_embedder(features)
+    # @torch.autocast(device_type="cuda")
+    def forward(self, g, features, pe):
         if self.normalize:
             features = self.norm1(features)
 
         if self.layer_pooling == "all":
+            features_list = []
+            edge_scores_list = []
             if self.rwpe_k != 0:
                 features_list.append(torch.cat([features, pe], dim=-1))
             else:
@@ -204,7 +204,7 @@ class GnnFlat(torch.nn.Module):
                         features, _ = self.features_extractors[layer](
                             g._graph,
                             features,
-                            edge_features,
+                            self.edge_embedders[layer](g),
                         )
                         features = self.mlps[layer](features)
 
@@ -255,8 +255,5 @@ class GnnFlat(torch.nn.Module):
                     edge_scores_list.append(edge_scores)
 
         if self.layer_pooling == "all":
-            features = torch.cat(
-                features_list, axis=1
-            )  # The final embedding is concatenation of all layers embeddings
-
+            return features_list
         return features

@@ -18,6 +18,8 @@ import torch
 import bisect
 from psp.graph.graph_factory import GraphFactory
 from psp.graph.graph import Graph
+from queue import PriorityQueue
+import numpy as np
 
 
 class GState:
@@ -117,6 +119,7 @@ class GState:
         self.reset_type()
         self.reset_conflicts_as_cliques()
         self.reset_zero_dur()
+        self.no_resource_usage = torch.all(self.all_resources_usage() == 0, 1)
 
         # self.resources_edges.append((prec, succ))
         # self.resources_edges_att.append((on_start, critical))
@@ -179,6 +182,8 @@ class GState:
                 self.graph.ndata("job")[mi] = n
             m += j
 
+        self.topo_sort()
+
     def reset_durations(self, redraw_real=True):
         # at init, draw real durations from distrib if not deterministic
         for i in range(3):
@@ -224,6 +229,7 @@ class GState:
         self.reset_type()
         self.reset_conflicts_as_cliques()
         self.reset_zero_dur()
+        self.no_resource_usage = torch.all(self.all_resources_usage() == 0, 1)
 
     def reset_zero_dur(self):
         for node_id in range(self.n_nodes):
@@ -335,6 +341,7 @@ class GState:
         )
 
         assert len(self.resources) == self.n_resources
+
         self.reset_frontier()
 
     def reset_type(self):
@@ -511,7 +518,7 @@ class GState:
         return torch.where(
             torch.logical_and(
                 self.selectables(),
-                torch.all(self.all_resources_usage() == 0, 1),
+                self.no_resource_usage,
             )
         )[0]
 
@@ -697,7 +704,6 @@ class GState:
             nodeid
         ), f"invalid action selected:  {nodeid} ; selectables: {self.selectables() == 1}"
         # all modes become unselectable
-        self.set_past(self.modes(self.jobid(nodeid).item()))
         self.set_unselectable(self.modes(self.jobid(nodeid).item()))
         if self.remove_old_resource_info:
             other_modes = self.modes(self.jobid(nodeid)).copy()
@@ -708,14 +714,6 @@ class GState:
         # make sucessor selectable, if other parents *jobs* are affected
         # for successor in self.graph.successors(nodeid, etype="prec"):
         for successor in self.graph.successors(nodeid):
-            # parents_jobs = set(
-            #     [
-            #         self.jobid(pm).item()
-            #         # for pm in self.graph.predecessors(successor, etype="prec")
-            #         for pm in self.graph.predecessors(successor.item())
-            #     ]
-            # )
-            ####
             parents_jobs = set(
                 self.jobid(self.graph.predecessors(successor.item())).tolist()
             )
@@ -767,26 +765,33 @@ class GState:
             affected_parents
         )
 
-        resources_used = torch.where(self.resources_usage(node_id) != 0)[0]
-        max_r_date = torch.tensor(
-            [0.0, 0.0, 0.0, 0.0], dtype=torch.float, device=self.device
-        )
+        resources_used = torch.nonzero(self.resources_usage(node_id), as_tuple=True)[
+            0
+        ].tolist()
+        # max_r_date = torch.tensor(
+        #     [0.0, 0.0, 0.0, 0.0], dtype=torch.float, device=self.device
+        # )
+        max_r_date = np.zeros(4)
         constraining_resource = [None] * 4
 
         for r in resources_used:
             rad = self.resource_available_date_flowgraph(
-                r.item(), self.resource_usage(node_id, r)
+                r, self.resource_usage(node_id, r)
             )
             # rad is only the date
             for i in range(4):
                 if rad[i] > max_r_date[i]:
                     max_r_date[i] = float(rad[i])
-                    constraining_resource[i] = r.item()
+                    constraining_resource[i] = r
 
         # do a min per coord
-        start = torch.maximum(
+        # start = torch.maximum(
+        #     max_r_date,
+        #     torch.cat([last_parent_finish_date_real, last_parent_finish_date]),
+        # )
+        start = np.maximum(
             max_r_date,
-            torch.cat([last_parent_finish_date_real, last_parent_finish_date]),
+            np.concatenate([last_parent_finish_date_real, last_parent_finish_date]),
         )
 
         ends_with_cal, end_real_with_cal = self.compute_ends_with_cal(
@@ -797,9 +802,11 @@ class GState:
         # self.set_tct(node_id, start[1:] + self.durations(node_id))
         # self.set_tct_real(node_id, start[0] + self.duration_real(node_id))
 
-        self.consume(0, node_id, start[0], self.tct_real(node_id))
+        self.consume(0, node_id, start[0], end_real_with_cal, resources_used)
         for i in range(3):
-            self.consume(i + 1, node_id, start[i + 1], self.tct(node_id)[i])
+            self.consume(
+                i + 1, node_id, start[i + 1], ends_with_cal[i].item(), resources_used
+            )
 
         if self.add_rp_edges != "none":
             # extract graph info
@@ -844,7 +851,7 @@ class GState:
                 opening_duration = self.res_cal[r][p][1] - self.res_cal[r][p][0]
 
             local_end_date_real = (
-                max(start_real.item(), self.res_cal[r][p][0]) + remaining_duration
+                max(start_real, self.res_cal[r][p][0]) + remaining_duration
             )
 
             if local_end_date_real > end_date_real:
@@ -904,6 +911,8 @@ class GState:
 
         else:
             for r in range(self.n_resources):
+                # DETERMINISTIC CASE : range 1
+                # RANGE 3 in case of probabilistic case
                 for i in range(3):
                     if self.resources[r][i + 1].new_edges_cache:
                         ne = (
@@ -931,21 +940,21 @@ class GState:
     def resource_available_date_flowgraph(self, rid, level):
         return [self.resources[rid][i].availability(level.item()) for i in range(4)]
 
-    def consume(self, timeindex, node_id, start, end):
-        resources_used = torch.where(self.resources_usage(node_id) != 0)[0]
+    def consume(self, timeindex, node_id, start, end, resources_used):
+        # resources_used = torch.where(self.resources_usage(node_id) != 0)[0]
         for r in resources_used:
             self.resources[r][timeindex].consume(
                 node_id,
                 self.resource_usage(node_id, r).item(),
-                start.item(),
-                end.item(),
+                start,
+                end,
                 debug=(timeindex == 0),
             )
 
     def update_completion_times_after(self, node_id):
-        # for n in self.graph.successors(node_id, etype="prec"):
-        for n in self.graph.successors(node_id):
-            self.update_completion_times(n)
+        # for n in self.graph.successors(node_id):
+        #     self.update_completion_times(n)
+        self.update_completion_times(self.graph.successors(node_id))
 
     def max_thread_safe(self, cur_node_id):
         return torch.max(
@@ -955,25 +964,63 @@ class GState:
             True,
         )
 
+    def topo_sort(self):
+        indeg_map = self.graph.in_degrees().clone()
+        topo_order = torch.empty_like(indeg_map)
+        zero_indeg = torch.where(indeg_map == 0)[0].tolist()
+        topo_order[zero_indeg] = 0
+        deep = 1
+        while zero_indeg:
+            new_zero_indeg = []
+            for n in zero_indeg:
+                for child in self.graph.successors(n):
+                    c = child.item()
+                    indeg_map[c] -= 1
+                    if indeg_map[c] == 0:
+                        new_zero_indeg.append(c)
+            topo_order[new_zero_indeg] = deep
+            deep += 1
+            zero_indeg = new_zero_indeg
+        self.topo_order = topo_order.tolist()
+
     def update_completion_times(self, node_id):
         initial_tct = False
+        open_nodes = PriorityQueue()
+        node_in_pq = {}
         if node_id is None:
             indeg = self.graph.in_degrees()
-            open_nodes = torch.where(indeg == 0)[0].tolist()
+            zeroindeg = torch.where(indeg == 0)[0].tolist()
+            node_in_pq[0] = zeroindeg
+            for n in zeroindeg:
+                open_nodes.put((0, n))
             initial_tct = True
+        elif isinstance(node_id, torch.Tensor):
+            nodes = node_id.tolist()
+            for n in node_id:
+                open_nodes.put((self.topo_order[n], n))
+                try:
+                    node_in_pq[self.topo_order[n]].append(n)
+                except:
+                    node_in_pq[self.topo_order[n]] = [n]
         else:
-            open_nodes = [node_id.item()]
-        while open_nodes:
-            cur_node_id = open_nodes.pop(0)
-
+            # open_nodes = [node_id.item()]
+            node = node_id.item()
+            open_nodes.put((self.topo_order[node], node))
+            try:
+                node_in_pq[self.topo_order[node]].append(node)
+            except:
+                node_in_pq[self.topo_order[node]] = [node]
+        while not open_nodes.empty():
+            # cur_node_id = open_nodes.pop(0)
+            cur_node_id = open_nodes.get()[1]
+            node_in_pq[self.topo_order[cur_node_id]].remove(cur_node_id)
             # if self.graph.in_degrees(cur_node_id, etype="prec") == 0:
             if self.graph.indeg(cur_node_id) == 0:
-                max_tct_predecessors = torch.zeros(
-                    (3), dtype=torch.float, device=self.device
-                )
-                max_tct_predecessors_real = torch.zeros(
-                    (1), dtype=torch.float, device=self.device
-                )
+                # new_completion_time = self.durations(cur_node_id)
+                # new_completion_time_real = self.duration_real(cur_node_id)
+                new_completion_time_np = self.durations(cur_node_id).numpy()
+                new_completion_time_real_np = self.duration_real(cur_node_id).numpy()
+
             else:
                 # V0
                 # max_tct_predecessors = torch.max(
@@ -981,70 +1028,81 @@ class GState:
                 #     0,
                 #     keepdim=True,
                 # )[0]
-                # V1 old workaroud (not needed anymore)
-                # max_tct_predecessors = self.tpe.submit(
-                #     self.max_thread_safe, cur_node_id
-                # ).result()[0]
-                # preds = self.graph.predecessors(cur_node_id, etype="prec")
 
                 # V2 old workaround (not needed anymore)
+                # preds = self.graph.predecessors(cur_node_id)
+                # max_tct_predecessors = torch.from_numpy(
+                #     np.max(
+                #         self.tct(preds).to(torch.device("cpu")).numpy(),
+                #         axis=0,
+                #         keepdims=True,
+                #     )
+                # ).to(self.device)
+
+                # V3
                 preds = self.graph.predecessors(cur_node_id)
-                max_tct_predecessors = torch.from_numpy(
-                    np.max(
-                        self.tct(preds).to(torch.device("cpu")).numpy(),
-                        axis=0,
-                        keepdims=True,
-                    )
-                ).to(self.device)
+                max_tct_predecessors_np = np.max(
+                    self.tct(preds).numpy(), axis=0, keepdims=True
+                )
 
                 # V0
                 # max_tct_predecessors_real = torch.max(
                 #     self.tct_real(self.graph.predecessors(cur_node_id))
                 # )
                 # V2 old workaroud (not needed anymore)
-                # preds = self.graph.predecessors(cur_node_id)
-                max_tct_predecessors_real = torch.tensor(
-                    np.max(self.tct_real(preds).to(torch.device("cpu")).numpy())
-                ).to(self.device)
+                # max_tct_predecessors_real = torch.tensor(
+                #     np.max(self.tct_real(preds).to(torch.device("cpu")).numpy())
+                # ).to(self.device)
 
-            new_completion_time = max_tct_predecessors + self.durations(cur_node_id)
-            new_completion_time_real = max_tct_predecessors_real + self.duration_real(
-                cur_node_id
-            )
+                # new_completion_time = max_tct_predecessors + self.durations(cur_node_id)
+                # new_completion_time_real = (
+                #     max_tct_predecessors_real + self.duration_real(cur_node_id)
+                # )
 
-            # not quicker ...
-            # self.set_tct(cur_node_id, new_completion_time)
-            # self.set_tct_real(cur_node_id, new_completion_time_real)
+                # V3
+                max_tct_predecessors_real_np = np.max(self.tct_real(preds).numpy())
 
-            # if initial_tct:
-            #     sucs = self.graph.successors(cur_node_id).tolist()
-            #     open_nodes = [n for n in open_nodes if n not in sucs]
-            #     open_nodes.extend(sucs)
-            #     continue
-
-            # sucs = self.graph.successors(cur_node_id)
-            # real_starts = self.tct_real(sucs) - self.duration_real(sucs)
-            # gt_real = torch.gt(new_completion_time_real, real_starts)
-            # starts = self.tct(sucs) - self.durations(sucs)
-            # gt_all = torch.gt(new_completion_time, starts)
-            # if torch.any(gt_real) or torch.any(gt_all):
-            #     sucs_real = set(torch.where(gt_real)[0].tolist())
-            #     sucs_all = set(torch.where(gt_all)[0].tolist())
-            #     sucs = list(sucs_real.union(sucs_all))
-            #     open_nodes = [n for n in open_nodes if n not in sucs]
-            #     open_nodes.extend(sucs)
+                new_completion_time_np = (
+                    max_tct_predecessors_np + self.durations(cur_node_id).numpy()
+                )
+                new_completion_time_real_np = (
+                    max_tct_predecessors_real_np
+                    + self.duration_real(cur_node_id).numpy()
+                )
 
             if (
                 initial_tct
-                or (torch.gt(new_completion_time_real, self.tct_real(cur_node_id)))
-                or (torch.any(torch.gt(new_completion_time, self.tct(cur_node_id))))
+                or new_completion_time_real_np > self.tct_real(cur_node_id).item()
+                or np.any(
+                    np.greater(new_completion_time_np, self.tct(cur_node_id).numpy())
+                )
+                # or (torch.gt(new_completion_time_real, self.tct_real(cur_node_id)))
+                # or (torch.any(torch.gt(new_completion_time, self.tct(cur_node_id))))
             ):
-                self.set_tct(cur_node_id, new_completion_time)
-                self.set_tct_real(cur_node_id, new_completion_time_real)
+                self.set_tct(cur_node_id, torch.tensor(new_completion_time_np))
+                self.set_tct_real(
+                    cur_node_id, torch.tensor(new_completion_time_real_np)
+                )
 
                 sucs = self.graph.successors(cur_node_id).tolist()
-                open_nodes = [n for n in open_nodes if n not in sucs]
-                open_nodes.extend(sucs)
+                for s in sucs:
+                    # if not any((s) in item for item in open_nodes.queue):
+                    try:
+                        if not s in node_in_pq[self.topo_order[s]]:
+                            open_nodes.put((self.topo_order[s], s))
+                            node_in_pq[self.topo_order[s]].append(s)
+                    except:
+                        open_nodes.put((self.topo_order[s], s))
+                        node_in_pq[self.topo_order[s]] = [s]
+                # for s in sucs:
+                #     try:
+                #         open_nodes.remove(s)
+                #     except:
+                #         pass
+
+                # open_nodes.append(s)
+                # open_nodes = [n for n in open_nodes if n not in sucs]
+                # open_nodes.extend(sucs)
 
     def update_frontier(self):
         new_nodes_in_frontier = set()
@@ -1054,6 +1112,7 @@ class GState:
                     new_nodes_in_frontier.add(fe[1])
         removed_from_frontier = self.nodes_in_frontier - new_nodes_in_frontier
         self.nodes_in_frontier = new_nodes_in_frontier
+        self.set_past(list(removed_from_frontier))
         return removed_from_frontier
 
     def remove_rp_edges(self, strict):
@@ -1063,12 +1122,14 @@ class GState:
         nif = torch.tensor(list(self.nodes_in_frontier), dtype=torch.long)
         c1 = torch.eq(rp_edges[0].unsqueeze(1), nif.unsqueeze(0))
         c2 = torch.eq(rp_edges[1].unsqueeze(1), nif.unsqueeze(0))
-        # src_not_in_frontier = torch.logical_not(torch.any(c1, dim=1))
-        # dst_not_in_frontier = torch.logical_not(torch.any(c2, dim=1))
+        src_not_in_frontier = torch.logical_not(torch.any(c1, dim=1))
+        dst_not_in_frontier = torch.logical_not(torch.any(c2, dim=1))
         if strict:
-            c3 = torch.logical_or(c1, c2)
+            # c3 = torch.logical_or(c1, c2)
+            c3 = torch.logical_or(src_not_in_frontier, dst_not_in_frontier)
         else:
-            c3 = torch.logical_and(c1, c2)
+            # c3 = torch.logical_and(c1, c2)
+            c3 = torch.logical_and(src_not_in_frontier, dst_not_in_frontier)
         to_remove = torch.where(c3)[0]
         self.graph.remove_edges(rp_edges[2][to_remove], etype="rp")
 
@@ -1085,41 +1146,18 @@ class GState:
             eids = rc_edges[2][to_remove]
             self.graph.remove_edges(eids, etype="rc")
 
+    # def remove_past_edges(self, removed_from_frontier, newly_affected):
+    #     nodes_to_remove = removed_from_frontier
+    #     if not newly_affected in self.nodes_in_frontier:
+    #         nodes_to_remove.add(newly_affected)
+    #     pr_edges = self.graph.edges(etype="prec")
+    #     nitr = torch.tensor(list(nodes_to_remove), dtype=torch.long)
+    #     c = torch.eq(pr_edges[1].unsqueeze(1), nitr.unsqueeze(0))
+    #     dst_in_nitr = torch.any(c, dim=1)
+    #     to_remove = torch.where(dst_in_nitr)[0]
+    #     self.graph.remove_edges(pr_edges[2][to_remove], etype="prec")
+
     def remove_past_edges(self, removed_from_frontier, newly_affected):
-        nodes_to_remove = removed_from_frontier
-        if not newly_affected in self.nodes_in_frontier:
-            nodes_to_remove.add(newly_affected)
         pr_edges = self.graph.edges(etype="prec")
-        nitr = torch.tensor(list(nodes_to_remove), dtype=torch.long)
-        c = torch.eq(pr_edges[1].unsqueeze(1), nitr.unsqueeze(0))
-        dst_in_nitr = torch.any(c, dim=1)
-        to_remove = torch.where(dst_in_nitr)[0]
+        to_remove = torch.where(torch.eq(pr_edges[1], newly_affected))[0]
         self.graph.remove_edges(pr_edges[2][to_remove], etype="prec")
-
-    def rp_edges_to_keep(self):
-        new_edges = []
-        edge_indices = []
-        for ei, edge in enumerate(self.resource_prec_edges):
-            if edge[0] in self.nodes_in_frontier or edge[1] in self.nodes_in_frontier:
-                new_edges.append(edge)
-                edge_indices.append(ei)
-        if len(new_edges) == 0:
-            return None, None
-        return (
-            np.transpose(new_edges),
-            np.concatenate(self.resource_prec_att)[edge_indices],
-        )
-
-    def rp_edges_to_keep_strict(self):
-        new_edges = []
-        edge_indices = []
-        for ei, edge in enumerate(self.resource_prec_edges):
-            if edge[0] in self.nodes_in_frontier and edge[1] in self.nodes_in_frontier:
-                new_edges.append(edge)
-                edge_indices.append(ei)
-        if len(new_edges) == 0:
-            return None, None
-        return (
-            np.transpose(new_edges),
-            np.concatenate(self.resource_prec_att)[edge_indices],
-        )

@@ -26,7 +26,8 @@
 
 import torch
 import numpy as np
-from generic.tokengt.utils import get_laplacian_pe_simple
+
+# from generic.tokengt.utils import get_laplacian_pe_simple
 from psp.utils.utils import compute_resources_graph_torch
 import time
 
@@ -45,6 +46,10 @@ class AgentGraphObservation:
         "rvnode": 9,
         "nodeconf": 10,
         "rnodeconf": 11,
+        "poolres": 12,
+        "rpoolres": 13,
+        "selfpool": 14,
+        "selfres": 15,
     }
 
     @classmethod
@@ -74,6 +79,7 @@ class AgentGraphObservation:
                     # g.ndata("due_date").unsqueeze(1),
                     g.ndata("normalized_due_dates").unsqueeze(1),
                     # g.ndata("resources"),
+                    g.ndata("past").unsqueeze(1),
                 ],
                 dim=1,
             ),

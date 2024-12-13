@@ -1,6 +1,6 @@
 import torch
 
-from generic.eegatconv import EEGATConv
+# from generic.eegatconv import EEGATConv
 from torch_geometric.nn.conv import GATv2Conv
 
 

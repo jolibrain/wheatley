@@ -75,6 +75,7 @@ class AgentSpecification:
         sgformer,
         pyg,
         hierarchical,
+        tokengt=False,
         shared_conv=False,
         checkpoint=1,
     ):
@@ -124,6 +125,7 @@ class AgentSpecification:
         self.sgformer = sgformer
         self.pyg = pyg
         self.hierarchical = hierarchical
+        self.tokengt = tokengt
         self.shared_conv = shared_conv
         self.checkpoint = checkpoint
 
@@ -151,6 +153,8 @@ class AgentSpecification:
             self.activation_fn_graph = torch.nn.GELU
         elif mlp_act_graph.lower() == "selu":
             self.activation_fn_graph = torch.nn.SELU
+        elif mlp_act_graph.lower() == "silu":
+            self.activation_fn_graph = torch.nn.SiLU
         else:
             raise Exception("Activation not recognized")
 
@@ -216,6 +220,7 @@ class AgentSpecification:
                 f"reward weights:                   {self.reward_weights}\n"
                 f"SGFormer:                         {self.sgformer}\n"
                 f"Hierarchical:                     {self.hierarchical}\n"
+                f"TokenGT:                          {self.tokengt}\n"
                 f"Shared conv:                      {self.shared_conv}\n"
                 f"checkpoint:                       {self.checkpoint}\n"
                 f"Net shapes:"

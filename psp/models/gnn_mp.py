@@ -24,18 +24,15 @@
 
 from generic.mlp import MLP
 import torch
-from dgl.nn import GlobalAttentionPooling
+# from dgl.nn import GlobalAttentionPooling
 
-# from generic.eegatconv import EEGATConv
 from psp.graph.graph_conv import GraphConv
-
-from dgl import LaplacianPE
-from .agent_observation import AgentObservation
 from .agent_graph_observation import AgentGraphObservation
 from .edge_embedder import PspEdgeEmbedder
 from .rewiring import rewire, homogeneous_edges
 from .gnn_flat import GnnFlat
 from .gnn_hier import GnnHier
+from generic.tokenGT import TokenGT
 
 
 class GnnMP(torch.nn.Module):
@@ -68,6 +65,7 @@ class GnnMP(torch.nn.Module):
         shared_conv=True,
         pyg=True,
         hierarchical=False,
+        tokengt=False,
         checkpoint=1,
     ):
         super().__init__()
@@ -84,6 +82,12 @@ class GnnMP(torch.nn.Module):
         else:
             self.rwpe_h = rwpe_h
         self.hierarchical = hierarchical
+
+        self.node_type_size = 2
+        self.tokengt = tokengt
+        if self.tokengt:
+            layer_pooling = "last"
+
         if layer_pooling == "all":
             self.features_dim = (
                 self.input_dim_features_extractor
@@ -98,7 +102,6 @@ class GnnMP(torch.nn.Module):
 
         self.factored_rp = factored_rp
         self.add_rp_edges = add_rp_edges
-        self.features_dim *= 2
         self.max_n_resources = max_n_resources
         # self.add_self_loops = add_self_loops
         self.add_self_loops = True
@@ -114,12 +117,21 @@ class GnnMP(torch.nn.Module):
         self.checkpoint = checkpoint
 
         self.rwpe_cache = rwpe_cache
+        self.edge_embedding_flavor = edge_embedding_flavor
 
         if self.rwpe_k != 0:
             self.rwpe_embedder = torch.nn.Linear(self.rwpe_k * 4, self.rwpe_h)
 
+        self.node_type_embedder = torch.nn.Embedding(4, self.node_type_size)
+        # 0 for poolnode
+        # 1 for ressource
+        # 2 for task
+        # 3 for vnode
+        self.node_type_embedder = torch.compile(self.node_type_embedder)
+
         self.pool_node_embedder = torch.nn.Embedding(
-            1, self.input_dim_features_extractor
+            1,
+            hidden_dim_features_extractor - self.node_type_size,
         )
 
         if self.graph_pooling == "gap":
@@ -134,23 +146,16 @@ class GnnMP(torch.nn.Module):
             self.gap = GlobalAttentionPooling(self.gate_nn)
         if self.vnode:
             self.vnode_embedder = torch.nn.Embedding(
-                1, self.input_dim_features_extractor
+                1,
+                hidden_dim_features_extractor - self.node_type_size,
             )
         if self.conflicts == "node":
-            # self.resource_node_embedder = torch.nn.Embedding(
-            #     max_n_resources, self.input_dim_features_extractor
-            # )
             self.resource_node_embedder = torch.nn.Linear(
-                3, self.input_dim_features_extractor
+                3,
+                hidden_dim_features_extractor - self.node_type_size,
             )
+            self.resource_node_embedder = torch.compile(self.resource_node_embedder)
 
-        self.edge_embedder = PspEdgeEmbedder(
-            edge_embedding_flavor,
-            self.max_n_resources,
-            self.hidden_dim,
-            self.add_rp_edges,
-            self.factored_rp,
-        )
         if self.update_edge_features:
             self.edge_embedder_scores = PspEdgeEmbedder(
                 edge_embedding_flavor,
@@ -188,6 +193,19 @@ class GnnMP(torch.nn.Module):
                 pyg,
                 self.checkpoint,
             )
+        elif self.tokengt:
+            self.gnn = TokenGT(
+                self.input_dim_features_extractor,
+                hidden_dim_features_extractor,
+                hidden_dim_features_extractor,
+                n_layers_features_extractor,
+                n_attention_heads,
+                "orf",
+                10,
+                10,
+                use_graph_token=False,
+            )
+
         else:
             self.gnn = GnnFlat(
                 self.input_dim_features_extractor,
@@ -204,142 +222,95 @@ class GnnMP(torch.nn.Module):
                 update_edge_features,
                 update_edge_features_pe,
                 shared_conv,
+                edge_embedding_flavor,
+                max_n_resources,
+                add_rp_edges,
+                factored_rp,
                 pyg,
                 self.checkpoint,
             )
+            self.gnn = torch.compile(self.gnn, dynamic=True)
+
+        self.features_embedder = MLP(
+            n_layers=n_mlp_layers_features_extractor,
+            input_dim=self.input_dim_features_extractor,
+            hidden_dim=self.hidden_dim - self.node_type_size,
+            output_dim=self.hidden_dim - self.node_type_size,
+            norm=self.normalize,
+            activation=activation_features_extractor,
+        )
+        self.features_embedder = torch.compile(self.features_embedder, dynamic=True)
 
     def reset_egat(self):
         for egat in self.features_extractors:
             egat.reset_parameters()
 
     def forward(self, obs):
-        if self.graphobs:
-            observation = AgentGraphObservation(
-                obs,
-                conflicts=self.conflicts,
-                factored_rp=self.factored_rp,
-                add_rp_edges=self.add_rp_edges,
-                max_n_resources=self.max_n_resources,
-                rwpe_k=self.rwpe_k,
-                rwpe_cache=self.rwpe_cache,
-                rewire_internal=False,
-            )
-            g = observation.graphs
-            res_cal_id = observation.res_cal_id
-            batch_size = observation.n_graphs
-            num_nodes = observation.num_nodes
-            if batch_size == 1:
-                n_nodes = observation.batch_num_nodes[0]
-            else:
-                n_nodes = observation.batch_num_nodes
-            origbnn = observation.batch_num_nodes
-        else:
-            observation = AgentObservation(
-                obs,
-                conflicts=self.conflicts,
-                add_self_loops=False,
-                factored_rp=self.factored_rp,
-                add_rp_edges=self.add_rp_edges,
-                max_n_resources=self.max_n_resources,
-                rwpe_k=self.rwpe_k,
-                rwpe_cache=self.rwpe_cache,
-            )
-            batch_size = observation.get_batch_size()
-
-            g = observation.to_graph()
-            res_cal_id = observation.res_cal_id.flatten()
-
-            n_nodes = observation.get_n_nodes()
-            num_nodes = g.num_nodes()
-
-            origbnn = g.batch_num_nodes()
-        if self.add_self_loops:
-            if self.graphobs:
-                g.add_self_loops()
-            # else:
-            #     g = dgl.add_self_loop(
-            #         g,
-            #         edge_feat_names=["type"],
-            #         fill_data=AgentObservation.edgeType["self"],
-            #     )
-        # g.set_batch_num_nodes(origbnn)
-
-        g, poolnodes, resource_nodes, vnodes = rewire(
+        (
             g,
-            self.graph_pooling,
-            self.conflicts == "node",
-            self.vnode,
             batch_size,
-            self.input_dim_features_extractor,
-            self.max_n_resources,
-            6,
-            7,
-            10,
-            10,
-            8,
-            9,
-            self.graphobs,
-        )
-
-        if self.graphobs:
-            g, felist = homogeneous_edges(
-                g,
-                AgentGraphObservation.edgeTypes,
-                self.factored_rp,
-                self.conflicts,
-                self.max_n_resources,
-            )
-            g.to_homogeneous(ndata=["feat"], edata=felist)
-
-        if self.rwpe_k != 0:
-            edge_features_pe = self.edge_embedder_pe(g)
-            g.ndata["pe"] = self.rwpe_embedder(
-                torch.cat(
-                    [
-                        g.ndata["rwpe_global"],
-                        g.ndata["rwpe_pr"],
-                        g.ndata["rwpe_rp"],
-                        g.ndata["rwpe_rc"],
-                    ],
-                    1,
-                ),
-            )
-            pe = g.ndata["pe"]
-        else:
-            pe = None
+            num_nodes,
+            n_nodes,
+            poolnodes,
+            resource_nodes,
+            vnodes,
+            res_cal_id,
+            pe,
+        ) = obs
 
         g = g.to(next(self.parameters()).device)
-        edge_features = self.edge_embedder(g)
+
         if self.update_edge_features:
             edge_scores = self.edge_embedder_scores(g)
         features = g.ndata("feat")
         # remove job_id and node_type
         features[:, 2:4] = 0
-        # remove resource cons
-        features[:, 10:] = 0
+
+        if self.normalize:
+            features = self.norm0(features)
+        orig_features = features
+        features = torch.empty(
+            (orig_features.shape[0], self.hidden_dim), device=orig_features.device
+        )
+
+        features[:num_nodes, : self.node_type_size] = self.node_type_embedder(
+            torch.LongTensor([2] * num_nodes).to(features.device)
+        )
+        features[:num_nodes, self.node_type_size :] = self.features_embedder(
+            orig_features[:num_nodes]
+        )
 
         if self.graph_pooling == "learn":
-            features[poolnodes] = self.pool_node_embedder(
+            features[poolnodes, : self.node_type_size] = self.node_type_embedder(
+                torch.LongTensor([0] * len(poolnodes)).to(features.device)
+            )
+            features[poolnodes, self.node_type_size :] = self.pool_node_embedder(
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
             )
 
         if self.vnode:
-            features[vnodes] = self.vnode_embedder(
+            features[vnodes, : self.node_type_size] = self.node_type_embedder(
+                torch.LongTensor([3] * len(vnodes)).to(features.device)
+            )
+            features[vnodes, self.node_type_size :] = self.vnode_embedder(
                 torch.LongTensor([0] * len(vnodes)).to(features.device)
             )
+
         if self.conflicts == "node":
-            features[resource_nodes] = self.resource_node_embedder(
-                # one embedding per resnode : not better, nres dependent : DISCARD
-                # torch.LongTensor(list(range(self.max_n_resources)) * batch_size).to(
-                # same embedding
-                # torch.LongTensor([0] * batch_size * self.max_n_resources).to(
-                #     features.device
-                # )
-                # embedding depending on calendar type
-                res_cal_id.to(features.device)
+            features[resource_nodes, : self.node_type_size] = self.node_type_embedder(
+                torch.LongTensor([1] * len(resource_nodes)).to(features.device)
+            )
+            features[resource_nodes, self.node_type_size :] = (
+                self.resource_node_embedder(res_cal_id.to(device=features.device))
             )
 
-        features = self.gnn(g, features, edge_features, pe)
+        features = self.gnn(g, features, pe)
+
+        if self.layer_pooling == "all":
+            if self.rwpe_k != 0:
+                features = torch.cat([orig_features, pe] + features, dim=-1)
+            else:
+                features = torch.cat([orig_features] + features, dim=-1)
 
         node_features = features[:num_nodes, :]
 
@@ -412,6 +383,8 @@ class GnnMP(torch.nn.Module):
 
         graph_embedding = graph_embedding.reshape(batch_size, 1, -1)
         # repeat the graph embedding to match the nodes embedding size
-        repeated = graph_embedding.expand(node_features.shape)
-        ret = torch.cat((node_features, repeated), dim=2)
-        return ret
+        # repeated = graph_embedding.clone().detach().expand(node_features.shape)
+        # ret = torch.cat((node_features, repeated), dim=2)
+        # return ret
+        return node_features, graph_embedding
+        # return ret, graph_embedding

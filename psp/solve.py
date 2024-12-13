@@ -4,20 +4,32 @@ from psp.env.genv import GEnv
 from generic.utils import decode_mask
 from psp.description import Description
 import os
+import tqdm
 
 
 def solve_instance(problem_description, agent):
+    print("creating inference env")
     venv = GEnv(
-        problem_description, agent.env_specification, [0], validate=True, pyg=True
+        problem_description,
+        agent.env_specification,
+        [0],
+        validate=True,
+        pyg=True,
+        reset=False,
     )
-    obs, info = venv.reset(soft=True)
+    print("reseting inference env")
+    obs, info = venv.reset(soft=False)
     done = False
-    while not done:
+    for _ in tqdm.tqdm(range(problem_description.test_psps[0].n_jobs)):
         action_masks = info["mask"].reshape(1, -1)
         action_masks = decode_mask(action_masks)
         obs = agent.obs_as_tensor_add_batch_dim(obs)
-        action = agent.predict(obs, deterministic=True, action_masks=action_masks)
+        action = agent.predict(
+            agent.preprocess(obs), deterministic=True, action_masks=action_masks
+        )
         obs, reward, done, _, info = venv.step(action.long().item())
+        if done:
+            break
     sol = venv.get_solution()
 
     return sol

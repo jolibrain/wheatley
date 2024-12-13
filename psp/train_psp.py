@@ -44,6 +44,8 @@ from psp.utils.loaders import PSPLoader
 from psp.utils.taillard_rcpsp import TaillardRcpsp
 from functools import partial
 
+torch.set_float32_matmul_precision("high")
+
 
 def main(args, exp_name) -> float:
     exp_name = args.exp_name_appendix
@@ -200,7 +202,8 @@ def main(args, exp_name) -> float:
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
-        pyg=args.pyg or args.hierarchical,
+        # pyg=args.pyg or args.hierarchical or args.tokengt,
+        pyg=True,
         max_n_modes=args.max_n_modes,
     )
     env_specification.print_self()
@@ -261,8 +264,10 @@ def main(args, exp_name) -> float:
         hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
-        pyg=args.pyg or args.hierarchical,
+        # pyg=args.pyg or args.hierarchical or args.tokengt,
+        pyg=True,
         hierarchical=args.hierarchical,
+        tokengt=args.tokengt,
         shared_conv=args.shared_conv,
         checkpoint=args.checkpoint,
     )
@@ -344,6 +349,7 @@ def main(args, exp_name) -> float:
         opt_state_dict=None,
         skip_initial_eval=args.skip_initial_eval,
         skip_model_trace=args.skip_model_trace,
+        warmup=args.warmup,
     )
 
 

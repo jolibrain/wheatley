@@ -61,9 +61,15 @@ class GraphTerminalRewardModel:
                 # tardy = wdd_tct - self.due_dates.unsqueeze(-1)
                 raw_tardy = state.all_tardiness()
                 tardy = torch.where(raw_tardy < 0, 0, raw_tardy)
+                # num_has_due_date = state.graph.ndata("has_due_date").sum().item()
+                # print("num_has_due_date", num_has_due_date)
                 return (
-                    -torch.sum(tardy).item() / 3.0 / len(state.job_modes)
-                    # / len(state.job_modes)
+                    -torch.sum(tardy).item()
+                    / 3.0
+                    # / num_has_due_date
+                    / len(state.job_modes)
+                    # / state.max_duration
+                    # / num_has_due_date
                 )  # average min,max,ave and come back close to 1
 
         if state.finished():

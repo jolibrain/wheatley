@@ -29,23 +29,23 @@ RUN mkdir /home/jenkins/app
 WORKDIR /home/jenkins/app
 RUN python3 -m pip install --upgrade pip
 ADD requirements.txt .
-RUN pip3 install -r requirements.txt --upgrade
+RUN pip3 install -r requirements.txt --upgrade && pip3 install flash-attn
 
 # DGL whl does not contain some libs for torch 2.4, rebuild
-RUN git clone --recurse-submodules https://github.com/dmlc/dgl.git /home/jenkins/dgl
-WORKDIR /home/jenkins/dgl
-ENV DGL_HOME=/home/jenkins/dgl
-RUN mkdir /home/jenkins/dgl/build
-WORKDIR /home/jenkins/dgl/build
-ENV TORCH_CUDA_ARCH_LIST="8.6"
-ENV CUDA_ARCH_BIN="86"
-ENV CUDA_ARCH_PTX="86"
-RUN cmake -DBUILD_TYPE="release" -DUSE_CUDA=ON -DBUILD_GRAPHBOLT=OFF -DCUDA_ARCH_NAME="Manual" -DCUDA_ARCH_BIN="86" -DCUDA_ARCH_PTX="86" ..
-RUN make -j1
-#RUN bash script/build_dgl.sh -g
-WORKDIR /home/jenkins/dgl/python
-RUN python3 setup.py install --user
-RUN python3 setup.py build_ext --inplace
+# RUN git clone --recurse-submodules https://github.com/dmlc/dgl.git /home/jenkins/dgl
+# WORKDIR /home/jenkins/dgl
+# ENV DGL_HOME=/home/jenkins/dgl
+# RUN mkdir /home/jenkins/dgl/build
+# WORKDIR /home/jenkins/dgl/build
+# ENV TORCH_CUDA_ARCH_LIST="8.6"
+# ENV CUDA_ARCH_BIN="86"
+# ENV CUDA_ARCH_PTX="86"
+# RUN cmake -DBUILD_TYPE="release" -DUSE_CUDA=ON -DBUILD_GRAPHBOLT=OFF -DCUDA_ARCH_NAME="Manual" -DCUDA_ARCH_BIN="86" -DCUDA_ARCH_PTX="86" ..
+# RUN make -j1
+# #RUN bash script/build_dgl.sh -g
+# WORKDIR /home/jenkins/dgl/python
+# RUN python3 setup.py install --user
+# RUN python3 setup.py build_ext --inplace
 
 WORKDIR /home/jenkins/app
 
