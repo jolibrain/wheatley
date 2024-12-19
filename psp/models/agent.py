@@ -35,6 +35,7 @@ import numpy as np
 from .agent_observation import AgentObservation
 from .agent_graph_observation import AgentGraphObservation
 import copy
+from tqdm.contrib.concurrent import process_map
 
 
 class Agent(Agent):
@@ -110,7 +111,9 @@ class Agent(Agent):
                 pyg=agent_specification.pyg,
                 hierarchical=agent_specification.hierarchical,
                 shared_conv=agent_specification.shared_conv,
-                checkpoint=agent_specification.checkpoint,
+                checkpoint=agent_specification.checkpoint
+                if hasattr(agent_specification, "checkpoint")
+                else 1,
             )
         elif self.agent_specification.fe_type == "tokengt":
             self.gnn = GnnTokenGT(
@@ -264,6 +267,10 @@ class Agent(Agent):
     def _get_obs_graph(self, b_obs, mb_ind):
         if isinstance(b_obs[0], str):
             # return [dgl.load_graphs(b_obs[i])[0][0] for i in mb_ind]
+            # bobsi = [b_obs[i] for i in mb_ind]
+            # return process_map(
+            #     GraphFactory.load, bobsi, max_workers=16, chunksize=1, disable=True
+            # )
             return [
                 GraphFactory.load(b_obs[i], self.env_specification.pyg) for i in mb_ind
             ]

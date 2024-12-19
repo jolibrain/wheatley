@@ -36,7 +36,13 @@ from .transition_models.transition_model import TransitionModel
 
 class GEnv:
     def __init__(
-        self, problem_description, env_specification, pb_ids, validate=False, pyg=False
+        self,
+        problem_description,
+        env_specification,
+        pb_ids,
+        validate=False,
+        pyg=False,
+        reset=True,
     ):
         self.problem_description = problem_description
         self.pyg = pyg
@@ -59,7 +65,8 @@ class GEnv:
         self.pb_index = -1
         self.succ_cache = {}
 
-        self.reset()
+        if reset:
+            self.reset()
 
     def _problem_init(self):
         self.pb_index += 1
