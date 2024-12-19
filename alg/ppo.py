@@ -528,7 +528,9 @@ class PPO:
                     batch_size=self.minibatch_size,
                     shuffle=True,
                     collate_fn=partial(collate_rollout, agent=agent),
-                    num_workers=5,
+                    num_workers=8,
+                    pin_memory=True,
+                    pin_memory_device=train_device,
                 )
                 # for start in tqdm.tqdm(
                 #     range(0, batch_size, self.minibatch_size),
@@ -604,7 +606,7 @@ class PPO:
                         and agent.agent_specification.hl_gauss is None
                     ):
                         if agent.agent_specification.symlog:
-                            target = symlog(b_returns[mb_inds]).to(train_device)
+                            target = symlog(batched_returns).to(train_device)
                         else:
                             # target = b_returns[mb_inds].to(train_device)
                             target = batched_returns.to(train_device)
@@ -622,11 +624,12 @@ class PPO:
                         with torch.no_grad():
                             if agent.agent_specification.symlog:
                                 twohot_target = calc_twohot(
-                                    symlog(b_returns[mb_inds]).to(train_device), agent.B
+                                    symlog(batched_returns).to(train_device),
+                                    agent.B,
                                 )
                             else:
                                 twohot_target = calc_twohot(
-                                    b_returns[mb_inds].to(train_device), agent.B
+                                    batched_returns.to(train_device), agent.B
                                 )
                         v_loss_unclipped = nn.functional.cross_entropy(
                             newvalue, twohot_target, reduction="mean"
@@ -634,30 +637,30 @@ class PPO:
                     else:  # hl_gaus case
                         with torch.no_grad():
                             hl_gauss_target = hl_gauss_to_probs(
-                                b_returns[mb_inds], agent.B
+                                batched_returns, agent.B
                             )
                         v_loss_unclipped = torch.nn.functional.cross_entropy(
                             newvalue, hl_gauss_target
                         )
 
                     if self.clip_vloss:
-                        v_clipped = b_values[mb_inds].to(train_device) + torch.clamp(
-                            newvalue - b_values[mb_inds].to(train_device),
+                        v_clipped = batched_values.to(train_device) + torch.clamp(
+                            newvalue - batched_values.to(train_device),
                             -self.clip_coef,
                             self.clip_coef,
                         )
                         if self.critic_loss == "l2":
                             v_loss_clipped = (
-                                v_clipped - b_returns[mb_inds].to(train_device)
+                                v_clipped - batched_returns.to(train_device)
                             ) ** 2
                         elif self.critic_loss == "l1":
                             v_loss_clipped = torch.abs(
-                                v_clipped - b_returns[mb_inds].to(train_device)
+                                v_clipped - batched_returns.to(train_device)
                             )
                         elif self.critic_loss == "sl1":
                             v_loss_clipped = torch.nn.functional.smooth_l1_loss(
                                 v_clipped,
-                                b_returns[mb_inds].to(train_device),
+                                batched_returns.to(train_device),
                                 reduction="none",
                             )
                         v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
