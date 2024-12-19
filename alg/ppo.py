@@ -40,10 +40,12 @@ import torch.optim as optim
 import torchinfo
 import tqdm
 import math
+from alg.rollout_dataset import RolloutDataset, collate_rollout
 
 from generic.utils import decode_mask, safe_mean
 
 from .logger import Logger, configure_logger, monotony, stability
+from functools import partial
 
 
 def create_env(env_cls, problem_description, env_specification, i):
@@ -186,7 +188,7 @@ class PPO:
 
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(
-                    next_obs, action_masks=action_mask
+                    agent.preprocess(next_obs), action_masks=action_mask
                 )
                 value = agent.get_value_from_logits(value)
 
@@ -219,7 +221,7 @@ class PPO:
 
         with torch.no_grad():
             next_value = (
-                agent.get_value_from_logits(agent.get_value(next_obs))
+                agent.get_value_from_logits(agent.get_value(agent.preprocess(next_obs)))
                 .reshape(-1, agent.reward_dim)
                 .to(data_device)
             )
@@ -327,7 +329,8 @@ class PPO:
                 bobs_tokeep = list(b_obs[i] for i in to_keep_b)
             else:
                 bobs_tokeep = self.keep_only(b_obs, to_keep_b)
-            return (
+            return RolloutDataset(
+                agent,
                 bobs_tokeep,
                 b_logprobs[to_keep_b],
                 b_actions[to_keep_b],
@@ -337,7 +340,8 @@ class PPO:
                 b_action_masks[to_keep_b],
                 sigma,
             )
-        return (
+        return RolloutDataset(
+            agent,
             b_obs,
             b_logprobs,
             b_actions,
@@ -475,22 +479,22 @@ class PPO:
 
             agent.to(rollout_agent_device)
             # collect data with current policy
-            (
-                b_obs,
-                b_logprobs,
-                b_actions,
-                b_advantages,
-                b_returns,
-                b_values,
-                b_action_masks,
-                sigma,
-            ) = self.collect_rollouts(
+            # (
+            #     b_obs,
+            #     b_logprobs,
+            #     b_actions,
+            #     b_advantages,
+            #     b_returns,
+            #     b_values,
+            #     b_action_masks,
+            #     sigma,)
+            rollout_dataset = self.collect_rollouts(
                 agent, envs, env_specification, rollout_data_device, sigma
             )
 
-            batch_size = b_logprobs.shape[0]
+            # batch_size = b_logprobs.shape[0]
             # Optimizing the policy and value network
-            b_inds = np.arange(batch_size)
+            # b_inds = np.arange(batch_size)
             clipfracs = []
 
             entropy_losses = []
@@ -514,25 +518,48 @@ class PPO:
                 range(self.update_epochs), desc="   epochs             "
             ):
                 self.n_epochs += 1
-                np.random.shuffle(b_inds)
+                # np.random.shuffle(b_inds)
                 self.optimizer.zero_grad()
                 iter_it = 0
 
                 approx_kl_divs_on_epoch = []
-                for start in tqdm.tqdm(
-                    range(0, batch_size, self.minibatch_size),
+                dataloader = torch.utils.data.DataLoader(
+                    rollout_dataset,
+                    batch_size=self.minibatch_size,
+                    shuffle=True,
+                    collate_fn=partial(collate_rollout, agent=agent),
+                    num_workers=5,
+                )
+                # for start in tqdm.tqdm(
+                #     range(0, batch_size, self.minibatch_size),
+                #     leave=False,
+                # ):
+                for (
+                    batched_obs,
+                    batched_logprobs,
+                    batched_actions,
+                    batched_advantages,
+                    batched_returns,
+                    batched_values,
+                    batched_actions_masks,
+                ) in tqdm.tqdm(
+                    dataloader,
                     desc="   minibatches        ",
                     leave=False,
                 ):
-                    end = start + self.minibatch_size
-                    mb_inds = b_inds[start:end]
+                    # end = start + self.minibatch_size
+                    # mb_inds = b_inds[start:end]
 
                     _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                        agent.get_obs(b_obs, mb_inds),
-                        action=b_actions.long()[mb_inds].to(train_device),
-                        action_masks=b_action_masks[mb_inds],
+                        # agent.get_obs(b_obs, mb_inds),
+                        batched_obs,
+                        # action=b_actions.long()[mb_inds].to(train_device),
+                        action=batched_actions.long().to(train_device),
+                        # action_masks=b_action_masks[mb_inds],
+                        action_masks=batched_actions_masks,
                     )
-                    logratio = newlogprob - b_logprobs[mb_inds].to(train_device)
+                    # logratio = newlogprob - b_logprobs[mb_inds].to(train_device)
+                    logratio = newlogprob - batched_logprobs.to(train_device)
                     ratio = logratio.exp()
 
                     with torch.no_grad():
@@ -549,7 +576,8 @@ class PPO:
                     if self.target_kl is not None:
                         approx_kl_divs_on_epoch.append(approx_kl.item())
 
-                    mb_advantages = agent.aggregate_reward(b_advantages[mb_inds]).to(
+                    # mb_advantages = agent.aggregate_reward(b_advantages[mb_inds]).to(
+                    mb_advantages = agent.aggregate_reward(batched_advantages).to(
                         train_device
                     )
                     if self.norm_adv and mb_advantages.shape[0] > 1:
@@ -578,7 +606,8 @@ class PPO:
                         if agent.agent_specification.symlog:
                             target = symlog(b_returns[mb_inds]).to(train_device)
                         else:
-                            target = b_returns[mb_inds].to(train_device)
+                            # target = b_returns[mb_inds].to(train_device)
+                            target = batched_returns.to(train_device)
                         if self.critic_loss == "l2":
                             v_loss_unclipped = torch.nn.functional.mse_loss(
                                 newvalue,
@@ -676,7 +705,7 @@ class PPO:
                         )
                         break
 
-            y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+            y_pred, y_true = batched_values.cpu().numpy(), batched_returns.cpu().numpy()
             var_y = np.var(y_true)
             explained_var = (
                 np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y

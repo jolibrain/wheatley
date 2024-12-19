@@ -486,7 +486,9 @@ class AgentValidator:
                     # print("ndata", obs.ndata())
                     # print("global data", obs.global_data())
                     action = agent.predict(
-                        obs, deterministic=True, action_masks=action_masks
+                        agent.preprocess(obs),
+                        deterministic=True,
+                        action_masks=action_masks,
                     )
                     obs, reward, done, _, info = self.validation_envs[i].step(
                         action.long().item()

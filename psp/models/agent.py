@@ -36,6 +36,8 @@ from .agent_observation import AgentObservation
 from .agent_graph_observation import AgentGraphObservation
 import copy
 from tqdm.contrib.concurrent import process_map
+from psp.models.agent_graph_observation import AgentGraphObservation
+from psp.models.rewiring import rewire, homogeneous_edges
 
 
 class Agent(Agent):
@@ -284,3 +286,113 @@ class Agent(Agent):
         for key in b_obs:
             minibatched_obs[key] = b_obs[key][mb_ind]
         return minibatched_obs
+
+    def preprocess(self, obs):
+        if self.graphobs:
+            observation = AgentGraphObservation(
+                list(obs) if isinstance(obs, tuple) else obs,
+                conflicts=self.agent_specification.conflicts,
+                factored_rp=self.env_specification.factored_rp,
+                add_rp_edges=self.env_specification.add_rp_edges,
+                max_n_resources=self.env_specification.max_n_resources,
+                rwpe_k=self.agent_specification.rwpe_k,
+                rwpe_cache=None,
+                rewire_internal=False,
+            )
+            g = observation.graphs
+            res_cal_id = observation.res_cal_id
+            batch_size = observation.n_graphs
+            num_nodes = observation.num_nodes
+            if batch_size == 1:
+                n_nodes = observation.batch_num_nodes[0]
+            else:
+                n_nodes = observation.batch_num_nodes
+                origbnn = observation.batch_num_nodes
+        else:
+            observation = AgentObservation(
+                obs,
+                conflicts=self.conflicts,
+                add_self_loops=False,
+                factored_rp=self.factored_rp,
+                add_rp_edges=self.add_rp_edges,
+                max_n_resources=self.max_n_resources,
+                rwpe_k=self.rwpe_k,
+                rwpe_cache=self.rwpe_cache,
+            )
+            batch_size = observation.get_batch_size()
+
+            g = observation.to_graph()
+            res_cal_id = observation.res_cal_id.flatten()
+
+            n_nodes = observation.get_n_nodes()
+            num_nodes = g.num_nodes()
+
+            origbnn = g.batch_num_nodes()
+        if (
+            self.env_specification.remove_past_prec
+            or self.env_specification.observe_subgraph
+        ):
+            if self.graphobs:
+                g.add_self_loops()
+                # else:
+                #     g = dgl.add_self_loop(
+                #         g,
+                #         edge_feat_names=["type"],
+                #         fill_data=AgentObservation.edgeType["self"],
+                #     )
+                # g.set_batch_num_nodes(origbnn)
+
+        g, poolnodes, resource_nodes, vnodes = rewire(
+            g,
+            self.agent_specification.graph_pooling,
+            self.agent_specification.conflicts == "node",
+            self.agent_specification.vnode,
+            batch_size,
+            self.env_specification.n_features,
+            self.env_specification.max_n_resources,
+            6,
+            7,
+            10,
+            10,
+            8,
+            9,
+            self.graphobs,
+        )
+
+        if self.graphobs:
+            g, felist = homogeneous_edges(
+                g,
+                AgentGraphObservation.edgeTypes,
+                self.env_specification.factored_rp,
+                self.agent_specification.conflicts,
+                self.env_specification.max_n_resources,
+            )
+            g.to_homogeneous(ndata=["feat"], edata=felist)
+
+        if self.agent_specification.rwpe_k != 0:
+            edge_features_pe = self.edge_embedder_pe(g)
+            g.ndata["pe"] = self.rwpe_embedder(
+                torch.cat(
+                    [
+                        g.ndata["rwpe_global"],
+                        g.ndata["rwpe_pr"],
+                        g.ndata["rwpe_rp"],
+                        g.ndata["rwpe_rc"],
+                    ],
+                    1,
+                ),
+            )
+            pe = g.ndata["pe"]
+        else:
+            pe = None
+        return (
+            g,
+            batch_size,
+            num_nodes,
+            n_nodes,
+            poolnodes,
+            resource_nodes,
+            vnodes,
+            res_cal_id,
+            pe,
+        )
