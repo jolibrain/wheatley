@@ -21,7 +21,7 @@
 # along with Wheatley. If not, see <https://www.gnu.org/licenses/>.
 #
 import torch
-from .agent_observation import AgentObservation
+from .agent_graph_observation import AgentGraphObservation
 
 
 def learned_graph_pool(
@@ -48,12 +48,6 @@ def learned_graph_pool(
         ei1 += list(range(startnode, startnode + origbnn[i]))
         startnode += origbnn[i]
 
-    if resource_nodes is not None:
-        num_res = len(resource_nodes) // batch_size
-        for i in range(batch_size):
-            ei1 += resource_nodes[i * num_res : (i + 1) * num_res]
-            ei0 += [node_offset + i] * num_res
-
     if graphobs:
         g.add_edges(
             torch.tensor(ei1, dtype=torch.int64),
@@ -70,6 +64,29 @@ def learned_graph_pool(
                 ei0, ei1, data={"type": torch.LongTensor([revtypeid] * len(ei0))}
             )
 
+    if resource_nodes is not None:
+        ei0 = []
+        ei1 = []
+        num_res = len(resource_nodes) // batch_size
+        for i in range(batch_size):
+            ei1 += resource_nodes[i * num_res : (i + 1) * num_res]
+            ei0 += [node_offset + i] * num_res
+        if graphobs:
+            g.add_edges(
+                torch.tensor(ei1, dtype=torch.int64),
+                torch.tensor(ei0, dtype=torch.int64),
+                etype="poolres",
+            )
+        else:
+            g.add_edges(ei1, ei0, data={"type": torch.LongTensor([typeid] * len(ei0))})
+        if inverse_pooling:
+            if graphobs:
+                g.add_edges(torch.tensor(ei0), torch.tensor(ei1), etype="rpoolres")
+            else:
+                g.add_edges(
+                    ei0, ei1, data={"type": torch.LongTensor([revtypeid] * len(ei0))}
+                )
+
     # self loops
     g.add_edges(
         torch.tensor(
@@ -78,7 +95,7 @@ def learned_graph_pool(
         torch.tensor(
             list(range(node_offset, node_offset + batch_size)), dtype=torch.int64
         ),
-        etype="self",
+        etype="selfpool",
     )
 
     return g, poolnodes, node_offset + batch_size
@@ -100,18 +117,21 @@ def node_conflicts(
     else:
         resources_used = g.ndata["feat"][:, first_res_index:]
     num_resources = resources_used.shape[1]
-    resource_nodes = list(range(node_offset, node_offset + num_resources * batch_size))
-    batch_id = []
-    for i, nn in enumerate(origbnn):
-        batch_id.extend([i] * nn)
-    batch_id = torch.IntTensor(batch_id)
-    data = torch.zeros(
+    # resource_nodes = list(range(node_offset, node_offset + num_resources * batch_size))
+    resource_nodes = torch.arange(node_offset, node_offset + num_resources * batch_size)
+    # batch_id = []
+    # for i, nn in enumerate(origbnn):
+    #     batch_id.extend([i] * nn)
+    # batch_id = torch.IntTensor(batch_id)
+    batch_id = g.batch_id()
+    data = torch.empty(
         (
             batch_size * num_resources,
             input_dim_features_extractor,
         )
     )
-    data[:, :] = torch.LongTensor(list(range(num_resources)) * batch_size).unsqueeze(1)
+
+    # data[:, :] = torch.LongTensor(list(range(num_resources)) * batch_size).unsqueeze(1)
     g.add_nodes(num_resources * batch_size, "feat", data)
     bi = []
     for i in range(batch_size):
@@ -121,15 +141,14 @@ def node_conflicts(
     idxaffected = torch.where(resources_used != 0)
     consumers = idxaffected[0]
     nconsumers = consumers.shape[0]
-    resource_start_per_batch = []
-    for i in range(batch_size):
-        resource_start_per_batch.append(node_offset + num_resources * i)
+    # resource_start_per_batch = []
+    # for i in range(batch_size):
+    #     resource_start_per_batch.append(node_offset + num_resources * i)
+    resource_start_per_batch = [
+        node_offset + num_resources * i for i in range(batch_size)
+    ]
     resource_start_per_batch = torch.IntTensor(resource_start_per_batch)
     resource_index = idxaffected[1] + resource_start_per_batch[batch_id[consumers]]
-
-    rntype = torch.LongTensor(
-        list(range(num_resources)) * batch_size
-    ) + torch.LongTensor([edge_type_offset] * len(resource_nodes))
 
     rc = torch.gather(resources_used[consumers], 1, idxaffected[1].unsqueeze(1)).expand(
         nconsumers, 2
@@ -196,14 +215,17 @@ def node_conflicts(
     # find unused resources
     # ad local self loops
     if graphobs:
-        unused_resources = torch.tensor(resource_nodes)[
-            torch.where(g.in_degrees(v=resource_nodes, etype="nodeconf") == 0)[0]
+        # unused_resources = resource_nodes[
+        #     torch.where(g.in_degrees(v=resource_nodes, etype="nodeconf") == 0)[0]
+        # ]
+        unused_resources = resource_nodes[
+            torch.where(torch.all(resources_used == 0, dim=0))
         ]
 
         g.add_edges(
             unused_resources,
             unused_resources,
-            etype="self",
+            etype="selfres",
             # data={
             # "type": torch.LongTensor(
             #     [AgentObservation.edgeType["self"]] * unused_resources.shape[0]
@@ -213,7 +235,7 @@ def node_conflicts(
             # },
         )
     else:
-        unused_resources = torch.tensor(resource_nodes)[
+        unused_resources = resource_nodes[
             torch.where(g.in_degrees(v=resource_nodes) == 0)[0]
         ]
         g.add_edges(
@@ -221,7 +243,8 @@ def node_conflicts(
             unused_resources,
             data={
                 "type": torch.LongTensor(
-                    [AgentObservation.edgeType["self"]] * unused_resources.shape[0]
+                    [AgentGraphObservation.edgeTypes["self"]]
+                    * unused_resources.shape[0]
                 ),
                 "rid": torch.zeros_like(unused_resources, dtype=torch.int),
                 "att_rc": torch.zeros(unused_resources.shape[0], 2),
@@ -363,26 +386,23 @@ def homogeneous_edges(g, edgetypes, factored_rp, conflict_type, max_n_resources)
     # att_rp    : factorred: 3*max_res    nonfact: 3
     # att_rc   : 2
     for t in edgetypes.keys():
+        num_edges = g.num_edges(etype=t)
         g.set_edata(
             t,
             "type",
-            torch.zeros((g.num_edges(etype=t)), dtype=torch.long) + edgetypes[t],
+            torch.zeros((num_edges), dtype=torch.long) + edgetypes[t],
         )
 
         if t not in ["rc", "nodeconf", "rnodeconf"] or g.num_edges(etype=t) == 0:
-            g.set_edata(t, "rid", torch.zeros((g.num_edges(etype=t)), dtype=torch.int))
+            g.set_edata(t, "rid", torch.zeros((num_edges), dtype=torch.int))
 
         if (conflict_type != "node") or (t not in ["nodeconf", "rnodeconf"]):
-            g.set_edata(
-                t, "att_rc", torch.zeros((g.num_edges(etype=t), 2), dtype=torch.float)
-            )
+            g.set_edata(t, "att_rc", torch.zeros((num_edges, 2), dtype=torch.float))
 
         if factored_rp:
-            rpdata = torch.zeros(
-                (g.num_edges(etype=t), 3 * max_n_resources), dtype=torch.float
-            )
+            rpdata = torch.zeros((num_edges, 3 * max_n_resources), dtype=torch.float)
         else:
-            rpdata = torch.zeros((g.num_edges(etype=t), 3), dtype=torch.float)
+            rpdata = torch.zeros((num_edges, 3), dtype=torch.float)
         g.set_edata(t, "att_rp", rpdata)
 
     if g.num_edges(etype="rp") != 0:

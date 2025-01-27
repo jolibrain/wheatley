@@ -28,6 +28,7 @@ import numpy as np
 import torch
 import math
 from torch.distributions.categorical import Categorical
+from torch.distributions.utils import logits_to_probs
 
 
 def symlog(x):
@@ -148,6 +149,7 @@ class Agent(torch.nn.Module):
     def init_weights(module, gain=1, zero_bias=False, ortho_embed=False) -> None:
         if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d)):
             torch.nn.init.orthogonal_(module.weight, gain=gain)
+            # torch.nn.init.kaiming_normal_(module.weight, mode="fan_out")
             if module.bias is not None and zero_bias:
                 module.bias.data.fill_(0.0)
         if ortho_embed and isinstance(module, torch.nn.Embedding):
@@ -182,16 +184,17 @@ class Agent(torch.nn.Module):
     #     return self.action_net(self.gnn(x))
 
     def get_value(self, x):
-        features = self.gnn(x)
-        # filter out node specific features
-        return self.value_net(features[:, 0, features.shape[2] // 2 :])
+        node_features, graph_embedding = self.gnn(x)
+        return self.value_net(graph_embedding)
 
     def get_action_and_value(
         self, x, action=None, action_masks=None, deterministic=False
     ):
-        features = self.gnn(x)
-        value = self.value_net(features[:, 0, features.shape[2] // 2 :])
-        logits = self.action_net(features).squeeze(-1)
+        node_features, graph_embedding = self.gnn(x)
+        value = self.value_net(graph_embedding)
+        logits = self.action_net(node_features).squeeze(-1)
+
+        unmasked_distrib = Categorical(logits=logits)
         if action_masks is not None:
             # Features are paded to the maximum number of nodes in the actual observation.
             # `action_masks` can be paded to the maximum number of nodes in the whole rollout,
@@ -199,39 +202,48 @@ class Agent(torch.nn.Module):
             current_max_n_nodes = logits.shape[1]
             action_masks = action_masks[:, :current_max_n_nodes]
 
-            mask = torch.as_tensor(
-                action_masks, dtype=torch.bool, device=features.device
-            )
-            HUGE_NEG = torch.tensor(-1e12, dtype=logits.dtype, device=features.device)
+            mask = torch.as_tensor(action_masks, dtype=torch.bool, device=logits.device)
+            HUGE_NEG = torch.tensor(-1e20, dtype=logits.dtype, device=logits.device)
             logits = torch.where(mask, logits, HUGE_NEG)
+
         distrib = Categorical(logits=logits)
         if action is None:
             if deterministic == False:
                 action = distrib.sample()
             else:
                 action = torch.argmax(distrib.probs, dim=1)
-        if action_masks is not None:
-            p_log_p = distrib.logits * distrib.probs
-            p_log_p = torch.where(mask, p_log_p, torch.tensor(0.0).to(features.device))
-            entropy = -p_log_p.sum(-1)
-        else:
+        if action_masks is None:
             entropy = distrib.entropy()
-        return action, distrib.log_prob(action), entropy, value
+        else:
+            nlogits = logits - logits.logsumexp(dim=-1, keepdim=True)
+            p_log_p = nlogits * logits_to_probs(nlogits)
+            p_log_p = torch.where(
+                mask, p_log_p, torch.tensor(0.0, device=logits.device)
+            )
+            entropy = -p_log_p.sum(-1)
+
+        return (
+            action,
+            distrib.log_prob(action),
+            entropy,
+            value,
+            unmasked_distrib,
+        )
 
     def get_action_probs_and_value(self, x, action_masks):
-        features = self.gnn(x)
-        value = self.value_net(features[:, 0, features.shape[2] // 2 :])
-        action_logits = self.action_net(features).squeeze(-1)
+        node_features, graph_feature = self.gnn(x)
+        value = self.value_net(graph_feature)
+        action_logits = self.action_net(node_features).squeeze(-1)
 
         if action_masks is not None:
             current_max_n_nodes = action_logits.shape[1]
             action_masks = action_masks[:, :current_max_n_nodes]
 
             mask = torch.as_tensor(
-                action_masks, dtype=torch.bool, device=features.device
+                action_masks, dtype=torch.bool, device=action_logits.device
             )
             HUGE_NEG = torch.tensor(
-                -1e12, dtype=action_logits.dtype, device=features.device
+                -1e10, dtype=action_logits.dtype, device=action_logits.device
             )
             logits = torch.where(mask, action_logits, HUGE_NEG)
             probs = torch.nn.functional.softmax(logits, dim=-1)
@@ -243,7 +255,7 @@ class Agent(torch.nn.Module):
 
     def predict(self, observation, deterministic, action_masks):
         with torch.no_grad():
-            features = self.gnn(observation)
+            features, _ = self.gnn(observation)
             logits = self.action_net(features)
             if action_masks is not None:
                 current_max_n_nodes = logits.shape[1]
@@ -253,14 +265,15 @@ class Agent(torch.nn.Module):
                     action_masks, dtype=torch.bool, device=features.device
                 ).reshape(logits.shape)
                 HUGE_NEG = torch.tensor(
-                    -1e12, dtype=logits.dtype, device=features.device
+                    -1e20, dtype=logits.dtype, device=features.device
                 )
                 logits = torch.where(mask, logits, HUGE_NEG)
-            distrib = Categorical(logits=logits.squeeze(-1))
-            if deterministic == False:
+            if not deterministic:
+                distrib = Categorical(logits=logits.squeeze(-1))
                 action = distrib.sample()
             else:
-                action = torch.argmax(distrib.probs, dim=1)
+                action = torch.argmax(logits.squeeze(-1), dim=-1)
+                # action = torch.argmax(distrib.probs)
             return action
 
     def solve(self, problem_description):

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from .dgl_graph import DGLGraph
+
+# from .dgl_graph import DGLGraph
 from .pyg_graph import PYGGraph
 from torch_geometric.data import Batch
 

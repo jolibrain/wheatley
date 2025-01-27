@@ -40,10 +40,11 @@ import torch.optim as optim
 import torchinfo
 import tqdm
 import math
-
+from alg.rollout_dataset import RolloutDataset, collate_rollout
 from generic.utils import decode_mask, safe_mean
 
 from .logger import Logger, configure_logger, monotony, stability
+from functools import partial
 
 
 def create_env(env_cls, problem_description, env_specification, i):
@@ -185,8 +186,8 @@ class PPO:
                     to_keep_candidate[i].append(step)
 
             with torch.no_grad():
-                action, logprob, _, value = agent.get_action_and_value(
-                    next_obs, action_masks=action_mask
+                action, logprob, _, value, _ = agent.get_action_and_value(
+                    agent.preprocess(next_obs), action_masks=action_mask
                 )
                 value = agent.get_value_from_logits(value)
 
@@ -219,7 +220,7 @@ class PPO:
 
         with torch.no_grad():
             next_value = (
-                agent.get_value_from_logits(agent.get_value(next_obs))
+                agent.get_value_from_logits(agent.get_value(agent.preprocess(next_obs)))
                 .reshape(-1, agent.reward_dim)
                 .to(data_device)
             )
@@ -327,7 +328,8 @@ class PPO:
                 bobs_tokeep = list(b_obs[i] for i in to_keep_b)
             else:
                 bobs_tokeep = self.keep_only(b_obs, to_keep_b)
-            return (
+            return RolloutDataset(
+                agent,
                 bobs_tokeep,
                 b_logprobs[to_keep_b],
                 b_actions[to_keep_b],
@@ -337,7 +339,8 @@ class PPO:
                 b_action_masks[to_keep_b],
                 sigma,
             )
-        return (
+        return RolloutDataset(
+            agent,
             b_obs,
             b_logprobs,
             b_actions,
@@ -368,6 +371,7 @@ class PPO:
         opt_state_dict=None,
         skip_initial_eval=False,
         skip_model_trace=False,
+        warmup=0,
     ) -> float:
         # env setup
         batch_size = self.num_envs * self.num_steps
@@ -470,29 +474,24 @@ class PPO:
             sigma = None
         else:
             sigma = 1.0
-        for update in range(1, num_updates + 1):
-            print("UPDATE ", update)
+        start = -warmup + 1 if warmup != 0 else 1
+        if warmup > 0:
+            warmup_nb = 0
+        for update in range(start, num_updates + 1):
+            if update < 1:
+                print("WARMUP", update + warmup)
+            else:
+                print("UPDATE ", update)
+                if update == 1:
+                    for g in self.optimizer.param_groups:
+                        g["lr"] = lr
 
             agent.to(rollout_agent_device)
-            # collect data with current policy
-            (
-                b_obs,
-                b_logprobs,
-                b_actions,
-                b_advantages,
-                b_returns,
-                b_values,
-                b_action_masks,
-                sigma,
-            ) = self.collect_rollouts(
+            rollout_dataset = self.collect_rollouts(
                 agent, envs, env_specification, rollout_data_device, sigma
             )
 
-            batch_size = b_logprobs.shape[0]
-            # Optimizing the policy and value network
-            b_inds = np.arange(batch_size)
             clipfracs = []
-
             entropy_losses = []
             pg_losses = []
             value_losses = []
@@ -514,25 +513,46 @@ class PPO:
                 range(self.update_epochs), desc="   epochs             "
             ):
                 self.n_epochs += 1
-                np.random.shuffle(b_inds)
                 self.optimizer.zero_grad()
                 iter_it = 0
 
                 approx_kl_divs_on_epoch = []
-                for start in tqdm.tqdm(
-                    range(0, batch_size, self.minibatch_size),
+                dataloader = torch.utils.data.DataLoader(
+                    rollout_dataset,
+                    batch_size=self.minibatch_size,
+                    shuffle=True,
+                    collate_fn=partial(collate_rollout, agent=agent),
+                    num_workers=6,
+                    pin_memory=True,
+                    pin_memory_device=train_device,
+                )
+                for (
+                    batched_obs,
+                    batched_logprobs,
+                    batched_actions,
+                    batched_advantages,
+                    batched_returns,
+                    batched_values,
+                    batched_actions_masks,
+                ) in tqdm.tqdm(
+                    dataloader,
                     desc="   minibatches        ",
                     leave=False,
                 ):
-                    end = start + self.minibatch_size
-                    mb_inds = b_inds[start:end]
+                    if update < 1:
+                        warmup_nb += 1
+                        warmup_lr = lr * math.sqrt(1 - math.pow(0.999, warmup_nb))
+                        for g in self.optimizer.param_groups:
+                            g["lr"] = warmup_lr
 
-                    _, newlogprob, entropy, newvalue = agent.get_action_and_value(
-                        agent.get_obs(b_obs, mb_inds),
-                        action=b_actions.long()[mb_inds].to(train_device),
-                        action_masks=b_action_masks[mb_inds],
+                    _, newlogprob, entropy, newvalue, unmasked_distrib = (
+                        agent.get_action_and_value(
+                            batched_obs,
+                            action=batched_actions.long().to(train_device),
+                            action_masks=batched_actions_masks,
+                        )
                     )
-                    logratio = newlogprob - b_logprobs[mb_inds].to(train_device)
+                    logratio = newlogprob - batched_logprobs.to(train_device)
                     ratio = logratio.exp()
 
                     with torch.no_grad():
@@ -549,7 +569,7 @@ class PPO:
                     if self.target_kl is not None:
                         approx_kl_divs_on_epoch.append(approx_kl.item())
 
-                    mb_advantages = agent.aggregate_reward(b_advantages[mb_inds]).to(
+                    mb_advantages = agent.aggregate_reward(batched_advantages).to(
                         train_device
                     )
                     if self.norm_adv and mb_advantages.shape[0] > 1:
@@ -576,9 +596,9 @@ class PPO:
                         and agent.agent_specification.hl_gauss is None
                     ):
                         if agent.agent_specification.symlog:
-                            target = symlog(b_returns[mb_inds]).to(train_device)
+                            target = symlog(batched_returns).to(train_device)
                         else:
-                            target = b_returns[mb_inds].to(train_device)
+                            target = batched_returns.to(train_device)
                         if self.critic_loss == "l2":
                             v_loss_unclipped = torch.nn.functional.mse_loss(
                                 newvalue,
@@ -593,11 +613,12 @@ class PPO:
                         with torch.no_grad():
                             if agent.agent_specification.symlog:
                                 twohot_target = calc_twohot(
-                                    symlog(b_returns[mb_inds]).to(train_device), agent.B
+                                    symlog(batched_returns).to(train_device),
+                                    agent.B,
                                 )
                             else:
                                 twohot_target = calc_twohot(
-                                    b_returns[mb_inds].to(train_device), agent.B
+                                    batched_returns.to(train_device), agent.B
                                 )
                         v_loss_unclipped = nn.functional.cross_entropy(
                             newvalue, twohot_target, reduction="mean"
@@ -605,30 +626,30 @@ class PPO:
                     else:  # hl_gaus case
                         with torch.no_grad():
                             hl_gauss_target = hl_gauss_to_probs(
-                                b_returns[mb_inds], agent.B
+                                batched_returns, agent.B
                             )
                         v_loss_unclipped = torch.nn.functional.cross_entropy(
                             newvalue, hl_gauss_target
                         )
 
                     if self.clip_vloss:
-                        v_clipped = b_values[mb_inds].to(train_device) + torch.clamp(
-                            newvalue - b_values[mb_inds].to(train_device),
+                        v_clipped = batched_values.to(train_device) + torch.clamp(
+                            newvalue - batched_values.to(train_device),
                             -self.clip_coef,
                             self.clip_coef,
                         )
                         if self.critic_loss == "l2":
                             v_loss_clipped = (
-                                v_clipped - b_returns[mb_inds].to(train_device)
+                                v_clipped - batched_returns.to(train_device)
                             ) ** 2
                         elif self.critic_loss == "l1":
                             v_loss_clipped = torch.abs(
-                                v_clipped - b_returns[mb_inds].to(train_device)
+                                v_clipped - batched_returns.to(train_device)
                             )
                         elif self.critic_loss == "sl1":
                             v_loss_clipped = torch.nn.functional.smooth_l1_loss(
                                 v_clipped,
-                                b_returns[mb_inds].to(train_device),
+                                batched_returns.to(train_device),
                                 reduction="none",
                             )
                         v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
@@ -639,16 +660,26 @@ class PPO:
                         else:
                             v_loss = v_loss_unclipped
                     entropy_loss = entropy.mean()
+                    if update <= 1:
+                        target_distrib = torch.ones_like(
+                            unmasked_distrib.probs, device=unmasked_distrib.probs.device
+                        )
+                        target_distrib /= unmasked_distrib.probs.shape[1]
+                        uniform_loss = torch.nn.functional.l1_loss(
+                            unmasked_distrib.probs, target_distrib, reduction="sum"
+                        )
                     loss = (
-                        pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef
+                        (pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef)
+                        if update > 0
+                        else v_loss + 0.1 * uniform_loss
                     )
 
                     losses.append(loss.item())
                     value_losses.append(v_loss.item())
                     pg_losses.append(pg_loss.item())
                     entropy_losses.append(entropy_loss.item())
-
                     loss.backward()
+
                     if self.debug_net:
                         for n, p in agent.named_parameters():
                             if "bias" not in n:
@@ -661,7 +692,7 @@ class PPO:
 
                     iter_it += 1
                     if iter_it == self.iter_size:
-                        nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
+                        # nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
                         self.optimizer.step()
                         self.optimizer.zero_grad()
                         iter_it = 0
@@ -676,7 +707,7 @@ class PPO:
                         )
                         break
 
-            y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+            y_pred, y_true = batched_values.cpu().numpy(), batched_returns.cpu().numpy()
             var_y = np.var(y_true)
             explained_var = (
                 np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y

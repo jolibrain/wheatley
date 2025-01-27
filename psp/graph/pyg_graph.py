@@ -98,7 +98,7 @@ class PYGGraph(Graph):
         indegs = []
         for n in v:
             preds = self._graph["n", etype, "n"].edge_index[0][
-                torch.where(self._graph["n", etype, "n"].edge_index[1] == n)[0]
+                torch.where(self._graph["n", etype, "n"].edge_index[1] == n.item())[0]
             ]
             indegs.append(len(preds))
         return torch.tensor(indegs, dtype=torch.int64)
@@ -133,7 +133,8 @@ class PYGGraph(Graph):
             return (
                 edges[0],
                 edges[1],
-                torch.tensor(list(range(edges.shape[1])), dtype=torch.int64),
+                # torch.tensor(list(range(edges.shape[1])), dtype=torch.int64),
+                torch.arange(edges.shape[1], dtype=torch.int64),
             )
 
     def remove_edges(self, eid, etype):
@@ -144,12 +145,17 @@ class PYGGraph(Graph):
         mask = torch_geometric.utils.index_to_mask(
             eid, size=self._graph["n", etype, "n"].num_edges
         )
-        self._graph["n", etype, "n"].edge_index = (
-            #            self._graph["n", etype, "n"].edge_index[:, mask].clone()
-            torch_geometric.utils.mask_select(
-                self._graph["n", etype, "n"].edge_index, 1, torch.logical_not(mask)
+        for k in self._graph["n", etype, "n"]:
+            if k == "edge_index":
+                dim = 1
+            else:
+                dim = 0
+            self._graph["n", etype, "n"][k] = (
+                #            self._graph["n", etype, "n"].edge_index[:, mask].clone()
+                torch_geometric.utils.mask_select(
+                    self._graph["n", etype, "n"][k], dim, torch.logical_not(mask)
+                )
             )
-        )
 
     def add_nodes(self, num_nodes, featname, data):
         self._graph["n"][featname] = torch.cat([self._graph["n"][featname], data])
@@ -289,12 +295,12 @@ class PYGGraph(Graph):
             self._graph["n", "rp", "n"].edge_index = torch.tensor(
                 [[], []], dtype=torch.int64
             )
-            self._graph["n", "rp", "n"].r = torch.empty(0, 4, dtype=torch.float)
+            self._graph["n", "rp", "n"].r = torch.empty(0, 4)
         if not "edge_index" in self._graph["n", "rrp", "n"]:
             self._graph["n", "rrp", "n"].edge_index = torch.tensor(
                 [[], []], dtype=torch.int64
             )
-            self._graph["n", "rrp", "n"].r = torch.empty(0, 4, dtype=torch.float)
+            self._graph["n", "rrp", "n"].r = torch.empty(0, 4)
 
     def node_subgraph(self, nodes_to_keep):
         g = type(self).__new__(type(self))
@@ -320,6 +326,9 @@ class PYGBatchGraph(PYGGraph):
         ptrs = self._graph["n"].ptr
         return ptrs[1:] - ptrs[:-1]
         # return self._graph._slice_dict["n"]["feat"][1:]
+
+    def batch_id(self):
+        return self._graph["n"].batch
 
     def add_self_loops(self):
         l = list(range(self._graph.num_nodes))

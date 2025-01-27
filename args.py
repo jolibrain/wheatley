@@ -154,14 +154,14 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--optimizer",
         type=str,
-        default="adam",
+        default="radam",
         choices=["adam", "sgd", "adamw", "radam", "dadam", "lion"],
         help="Which optimizer to use",
     )
     parser.add_argument(
         "--weight_decay",
         type=float,
-        default=0.0,
+        default=0.01,
         help="PPO weight decay",
     )
     parser.add_argument(
@@ -206,6 +206,8 @@ def argument_parser() -> argparse.ArgumentParser:
         type=int,
         help="keep 1 out of checkpoint (this args)  layers in memory during forward pass",
     )
+
+    parser.add_argument("--warmup", default=0, type=int, help="warmup steps")
 
     # =================================================VALIDATION SPECIFICATION=================================================
     parser.add_argument(
@@ -269,7 +271,7 @@ def argument_parser() -> argparse.ArgumentParser:
         help="Limit the KL divergence between updates",
     )
     parser.add_argument(
-        "--ent_coef", type=float, default=0.005, help="Entropy coefficient"
+        "--ent_coef", type=float, default=0.0, help="Entropy coefficient"
     )
     parser.add_argument(
         "--vf_coef", type=float, default=0.5, help="Value function coefficient"
@@ -320,7 +322,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--mlp_act_graph",
         type=str,
         default="gelu",
-        choices=["relu", "tanh", "elu", "gelu", "selu"],
+        choices=["relu", "tanh", "elu", "gelu", "selu", "silu"],
         help="agent mlp extractor activation type",
     )
     parser.add_argument(
@@ -333,9 +335,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sgformer", default=False, action="store_true", help="add sgformer to network"
     )
-    parser.add_argument(
-        "--pyg", default=False, action="store_true", help="use pyg instead of DGL"
-    )
+    # parser.add_argument(
+    #     "--pyg", default=True, action="store_true", help="use pyg instead of DGL"
+    # )
     parser.add_argument("--dropout", type=float, default=0.0, help="dropout ratio")
     parser.add_argument(
         "--ortools_strategy",
@@ -452,7 +454,7 @@ def argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--add_rp_edges",
-        default="frontier",
+        default="frontier_strict",
         choices=["all", "frontier", "frontier_strict", "none"],
         help="take into account resource precedence edges",
     )
@@ -601,6 +603,12 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="use hierarchical GNN",
+    )
+    parser.add_argument(
+        "--tokengt",
+        action="store_true",
+        default=False,
+        help="use tokenGT",
     )
     parser.add_argument(
         "--shared_conv",

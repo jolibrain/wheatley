@@ -61,6 +61,7 @@ class MLP(torch.nn.Module):
                 "elu": torch.nn.ELU,
                 "gelu": torch.nn.GELU,
                 "selu": torch.nn.SELU,
+                "silu": torch.nn.SiLU,
             }
             activation = act_map[activation]
 

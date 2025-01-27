@@ -151,7 +151,7 @@ def instantiate_training_objects(
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
-        pyg=args.pyg or args.hierarchical,
+        pyg=True,
     )
 
     if args.batch_size == 1 and not args.dont_normalize_advantage:
@@ -204,7 +204,7 @@ def instantiate_training_objects(
         hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
-        pyg=args.pyg or args.hierarchical,
+        pyg=True,
         hierarchical=args.hierarchical,
     )
     agent = Agent(
@@ -261,15 +261,15 @@ possible_args = {
     "clip_range": [0.25],
     "gamma": [1.0],
     "gae_lambda": [1.0],
-    "optimizer": ["adamw"],
+    "optimizer": ["radam"],
     "fe_type": ["message_passing"],
-    "residual_gnn": [True],
+    "residual_gnn": [False, True],
     "graph_has_relu": [True],
     "graph_pooling": ["learn", "max"],
     "hidden_dim_features_extractor": [32],
     "n_layers_features_extractor": [3],
     "mlp_act": ["gelu"],
-    "layer_pooling": ["last"],
+    "layer_pooling": ["all", "last"],
     "n_mlp_layers_features_extractor": [1],
     "n_mlp_layers_actor": [1],
     "n_mlp_layers_critic": [1],
@@ -287,21 +287,20 @@ possible_args = {
     "generate_duration_bounds": ["0.05 0.1"],
     "ortools_strategy": ["averagistic", "realistic", "pessimistic"],
     "device": ["cuda:0"],
-    "n_workers": [1, 2],
+    "n_workers": [2],
     "skip_initial_eval": [True, False],
     "exp_name_appendix": ["test"],
     "train_dir": ["./instances/psp/test/"],
     "vecenv_type": ["graphgym"],
     # "return_based_scaling": [True, False],
-    "observe_subgraph": [True, False],
+    "observe_subgraph": [False],
     "fast_forward": [True, False],
     "observation_horizon_step": [2, 5],
     "observation_horizon_time": [2, 5],
     "symlog": [True, False],
     "store_rollouts_on_disk": [False, "/tmp/"],
     "critic_loss": ["l2", "l1"],
-    "pyg": [True],
-    "hierarchical": [True, False],
+    "hierarchical": [False],
 }
 
 # Duplicate each entry to match the maximum number of possibilities to try.

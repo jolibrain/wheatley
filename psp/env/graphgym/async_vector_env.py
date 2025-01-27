@@ -9,7 +9,7 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 import pickle
 import io
 import contextlib
-from dgl import multiprocessing as mp
+import torch.multiprocessing as mp
 from psp.graph.graph_factory import GraphFactory
 import numpy as np
 import time
