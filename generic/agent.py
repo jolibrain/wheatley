@@ -246,12 +246,14 @@ class Agent(torch.nn.Module):
                 -1e10, dtype=action_logits.dtype, device=action_logits.device
             )
             logits = torch.where(mask, action_logits, HUGE_NEG)
-            probs = torch.nn.functional.softmax(logits, dim=-1)
-            return probs, value
+            distrib = Categorical(logits=logits)
+            # probs = torch.nn.functional.softmax(logits, dim=-1)
+            return distrib.probs, distrib.entropy(), value
         # distrib = Categorical(logits=action_logits)
         # return distrib.probs
-        probs = torch.nn.functional.softmax(action_logits, dim=-1)
-        return probs, value
+        distrib = Categorical(logits=action_logits)
+        # probs = torch.nn.functional.softmax(action_logits, dim=-1)
+        return distrib.probs, distrib.entropy(), value
 
     def predict(self, observation, deterministic, action_masks):
         with torch.no_grad():
