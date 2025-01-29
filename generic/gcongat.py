@@ -63,7 +63,7 @@ class HybridConv_v2(MessagePassing):
         self.radius_list.sort()
         self.combine_fn = combine_fn
         self.num_heads = num_heads
-        self.skip = False
+        self.skip = skip
         self.add_self_loops = True
         self.norm = norm
         self.filter_norm_dim = filter_norm_dim
@@ -99,7 +99,7 @@ class HybridConv_v2(MessagePassing):
             if combine_fn == "att_bias":
                 m = 1
 
-            if skip:
+            if self.skip:
                 m += 1
 
             self.mlp_out = MLP(

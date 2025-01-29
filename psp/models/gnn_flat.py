@@ -56,7 +56,6 @@ class GnnFlat(torch.nn.Module):
             )
         else:
             self.features_extractors = torch.nn.ModuleList()
-            self.mlps = torch.nn.ModuleList()
             self.edge_embedders = torch.nn.ModuleList()
 
         for layer in range(self.n_layers_features_extractor):
@@ -181,11 +180,8 @@ class GnnFlat(torch.nn.Module):
                             self.features_extractors[layer],
                             g._graph,
                             features,
-                            edge_features,
+                            self.edge_embedders[layer](g),
                             use_reentrant=False,
-                        )
-                        features = torch.utils.checkpoint.checkpoint(
-                            self.mlps[layer], features, use_reentrant=False
                         )
                     else:
                         features, _ = self.features_extractors[layer](
@@ -193,7 +189,6 @@ class GnnFlat(torch.nn.Module):
                             features,
                             self.edge_embedders[layer](g),
                         )
-                        features = self.mlps[layer](features)
 
             if self.rwpe_k != 0:
                 if self.update_edge_features_pe:

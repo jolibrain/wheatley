@@ -70,10 +70,10 @@ class GraphConv(torch.nn.Module):
         if self.gcon:
             if self.gcon_has_mlp:
                 node_feats = self.mlp(node_feats)
-            return self.conv(node_feats, g.edge_index, edge_feats)
+            return self.conv(node_feats, g.edge_index, edge_feats), None
         elif self.pyg:
             feats = self.conv(node_feats, g.edge_index, edge_feats)
-            return self.mlp(feats)
+            return self.mlp(feats), None
         else:
             f, ef = self.conv(g, node_feats, edge_feats, edge_efeats)
             return f.flatten(start_dim=-2, end_dim=-1), ef
