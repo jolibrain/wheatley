@@ -67,6 +67,7 @@ class GnnMP(torch.nn.Module):
         hierarchical=False,
         tokengt=False,
         checkpoint=1,
+        gcon=False,
     ):
         super().__init__()
         self.pyg = pyg
@@ -190,8 +191,8 @@ class GnnMP(torch.nn.Module):
                 update_edge_features,
                 update_edge_features_pe,
                 shared_conv,
-                pyg,
                 self.checkpoint,
+                gcon,
             )
         elif self.tokengt:
             self.gnn = TokenGT(
@@ -228,6 +229,7 @@ class GnnMP(torch.nn.Module):
                 factored_rp,
                 pyg,
                 self.checkpoint,
+                gcon,
             )
             self.gnn = torch.compile(self.gnn, dynamic=True)
 
