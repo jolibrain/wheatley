@@ -328,7 +328,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mlp_act",
         type=str,
-        default="tanh",
+        default="gelu",
         choices=["relu", "tanh", "elu", "gelu", "selu"],
         help="agent mlp extractor activation type",
     )
@@ -822,6 +822,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max_shared_mem_per_worker",
         default=2000000,
+        type=int,
         help="max shared memory per worker",
     )
 

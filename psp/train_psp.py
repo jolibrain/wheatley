@@ -332,11 +332,7 @@ def main(args, exp_name) -> float:
         env_cls = GEnv
     else:
         env_cls = Env
-    ppo = PPO(
-        training_specification,
-        env_cls,
-        validator,
-    )
+    ppo = PPO(training_specification, env_cls, validator, args.generate_duration_bounds)
     return ppo.train(
         agent,
         problem_description,
