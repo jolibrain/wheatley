@@ -110,6 +110,10 @@ class PPO:
         # in case of resume
         self._num_timesteps_at_start = 0
         self.ep_info_buffer = deque(maxlen=100)
+        self.espo = training_specification.espo
+
+        if self.espo:
+            self.clip_coef = None
 
     def keep_only(self, obs, to_keep):
         kobs = {}
@@ -510,6 +514,7 @@ class PPO:
             value_losses = []
             approx_kl_divs = []
             losses = []
+            max_espo_dev = 0
             if self.debug_net:
                 variances = {}
                 grad_var = {}
@@ -600,6 +605,9 @@ class PPO:
                         )
                         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
                     else:
+                        espo_dev = (ratio - 1).abs().mean()
+                        if max_espo_dev < espo_dev:
+                            max_espo_dev = espo_dev
                         pg_loss = pg_loss1.mean()
 
                     # Value loss
@@ -710,7 +718,18 @@ class PPO:
                         self.optimizer.zero_grad()
                         iter_it = 0
 
-                if self.target_kl is not None:
+                    # if self.clip_coef is None:
+                    #     if espo_devs > 0.25:
+                    #         break
+
+                if self.clip_coef is None:
+                    if max_espo_dev > 0.25:
+                        print(
+                            f"\nstopping update due to espo devs too high after epoch {epoch} / {self.update_epochs}  (last espo_dev : {espo_dev})\n"
+                        )
+                        break
+
+                elif self.target_kl is not None:
                     if np.mean(approx_kl_divs_on_epoch) > self.target_kl:
                         print(
                             "stopping update due to too high kl divergence after epoch",

@@ -119,6 +119,7 @@ class Agent(Agent):
                 checkpoint=agent_specification.checkpoint
                 if hasattr(agent_specification, "checkpoint")
                 else 1,
+                dual_net=agent_specification.dual_net,
             )
         # elif self.agent_specification.fe_type == "tokengt":
         #     self.gnn = GnnTokenGT(

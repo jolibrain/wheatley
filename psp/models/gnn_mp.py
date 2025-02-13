@@ -67,6 +67,7 @@ class GnnMP(torch.nn.Module):
         hierarchical=False,
         tokengt=False,
         checkpoint=1,
+        dual_net=False,
     ):
         super().__init__()
         self.pyg = pyg
@@ -118,21 +119,33 @@ class GnnMP(torch.nn.Module):
 
         self.rwpe_cache = rwpe_cache
         self.edge_embedding_flavor = edge_embedding_flavor
+        self.dual_net = dual_net
 
         if self.rwpe_k != 0:
             self.rwpe_embedder = torch.nn.Linear(self.rwpe_k * 4, self.rwpe_h)
 
-        self.node_type_embedder = torch.nn.Embedding(4, self.node_type_size)
         # 0 for poolnode
         # 1 for ressource
         # 2 for task
         # 3 for vnode
+        self.node_type_embedder = torch.nn.Embedding(4, self.node_type_size)
         self.node_type_embedder = torch.compile(self.node_type_embedder)
 
         self.pool_node_embedder = torch.nn.Embedding(
             1,
             hidden_dim_features_extractor - self.node_type_size,
         )
+        self.pool_node_embedder = torch.compile(self.pool_node_embedder)
+
+        if self.dual_net:
+            self.node_type_embedder2 = torch.nn.Embedding(4, self.node_type_size)
+            self.node_type_embedder2 = torch.compile(self.node_type_embedder2)
+
+            self.pool_node_embedder2 = torch.nn.Embedding(
+                1,
+                hidden_dim_features_extractor - self.node_type_size,
+            )
+            self.pool_node_embedder2 = torch.compile(self.pool_node_embedder2)
 
         if self.graph_pooling == "gap":
             self.gate_nn = MLP(
@@ -149,12 +162,26 @@ class GnnMP(torch.nn.Module):
                 1,
                 hidden_dim_features_extractor - self.node_type_size,
             )
+            if self.dual_net:
+                self.vnode_embedder2 = torch.nn.Embedding(
+                    1,
+                    hidden_dim_features_extractor - self.node_type_size,
+                )
+
         if self.conflicts == "node":
             self.resource_node_embedder = torch.nn.Linear(
                 3,
                 hidden_dim_features_extractor - self.node_type_size,
             )
             self.resource_node_embedder = torch.compile(self.resource_node_embedder)
+            if self.dual_net:
+                self.resource_node_embedder2 = torch.nn.Linear(
+                    3,
+                    hidden_dim_features_extractor - self.node_type_size,
+                )
+                self.resource_node_embedder2 = torch.compile(
+                    self.resource_node_embedder2
+                )
 
         if self.update_edge_features:
             self.edge_embedder_scores = PspEdgeEmbedder(
@@ -230,6 +257,30 @@ class GnnMP(torch.nn.Module):
                 self.checkpoint,
             )
             self.gnn = torch.compile(self.gnn, dynamic=True)
+            if self.dual_net:
+                self.gnn2 = GnnFlat(
+                    self.input_dim_features_extractor,
+                    hidden_dim_features_extractor,
+                    n_layers_features_extractor,
+                    n_mlp_layers_features_extractor,
+                    layer_pooling,
+                    n_attention_heads,
+                    normalize,
+                    activation_features_extractor,
+                    residual,
+                    rwpe_k,
+                    self.rwpe_h,
+                    update_edge_features,
+                    update_edge_features_pe,
+                    shared_conv,
+                    edge_embedding_flavor,
+                    max_n_resources,
+                    add_rp_edges,
+                    factored_rp,
+                    pyg,
+                    self.checkpoint,
+                )
+                self.gnn2 = torch.compile(self.gnn2, dynamic=True)
 
         self.features_embedder = MLP(
             n_layers=n_mlp_layers_features_extractor,
@@ -240,6 +291,18 @@ class GnnMP(torch.nn.Module):
             activation=activation_features_extractor,
         )
         self.features_embedder = torch.compile(self.features_embedder, dynamic=True)
+        if self.dual_net:
+            self.features_embedder2 = MLP(
+                n_layers=n_mlp_layers_features_extractor,
+                input_dim=self.input_dim_features_extractor,
+                hidden_dim=self.hidden_dim - self.node_type_size,
+                output_dim=self.hidden_dim - self.node_type_size,
+                norm=self.normalize,
+                activation=activation_features_extractor,
+            )
+            self.features_embedder2 = torch.compile(
+                self.features_embedder2, dynamic=True
+            )
 
     def reset_egat(self):
         for egat in self.features_extractors:
@@ -269,6 +332,7 @@ class GnnMP(torch.nn.Module):
         if self.normalize:
             features = self.norm0(features)
         orig_features = features
+
         features = torch.empty(
             (orig_features.shape[0], self.hidden_dim), device=orig_features.device
         )
@@ -288,6 +352,26 @@ class GnnMP(torch.nn.Module):
                 torch.LongTensor([0] * len(poolnodes)).to(features.device)
             )
 
+        if self.dual_net:
+            features2 = torch.empty(
+                (orig_features.shape[0], self.hidden_dim), device=orig_features.device
+            )
+
+            features2[:num_nodes, : self.node_type_size] = self.node_type_embedder2(
+                torch.LongTensor([2] * num_nodes).to(features.device)
+            )
+            features2[:num_nodes, self.node_type_size :] = self.features_embedder2(
+                orig_features[:num_nodes]
+            )
+
+            if self.graph_pooling == "learn":
+                features2[poolnodes, : self.node_type_size] = self.node_type_embedder2(
+                    torch.LongTensor([0] * len(poolnodes)).to(features.device)
+                )
+                features2[poolnodes, self.node_type_size :] = self.pool_node_embedder2(
+                    torch.LongTensor([0] * len(poolnodes)).to(features.device)
+                )
+
         if self.vnode:
             features[vnodes, : self.node_type_size] = self.node_type_embedder(
                 torch.LongTensor([3] * len(vnodes)).to(features.device)
@@ -295,6 +379,13 @@ class GnnMP(torch.nn.Module):
             features[vnodes, self.node_type_size :] = self.vnode_embedder(
                 torch.LongTensor([0] * len(vnodes)).to(features.device)
             )
+            if self.dual_net:
+                features2[vnodes, : self.node_type_size] = self.node_type_embedder2(
+                    torch.LongTensor([3] * len(vnodes)).to(features.device)
+                )
+                features2[vnodes, self.node_type_size :] = self.vnode_embedder2(
+                    torch.LongTensor([0] * len(vnodes)).to(features.device)
+                )
 
         if self.conflicts == "node":
             features[resource_nodes, : self.node_type_size] = self.node_type_embedder(
@@ -303,14 +394,27 @@ class GnnMP(torch.nn.Module):
             features[resource_nodes, self.node_type_size :] = (
                 self.resource_node_embedder(res_cal_id.to(device=features.device))
             )
+            if self.dual_net:
+                features2[resource_nodes, : self.node_type_size] = (
+                    self.node_type_embedder2(
+                        torch.LongTensor([1] * len(resource_nodes)).to(features.device)
+                    )
+                )
+                features2[resource_nodes, self.node_type_size :] = (
+                    self.resource_node_embedder2(res_cal_id.to(device=features.device))
+                )
 
         features = self.gnn(g, features, pe)
+        if self.dual_net:
+            features2 = self.gnn2(g, features2, pe)
 
         if self.layer_pooling == "all":
             if self.rwpe_k != 0:
                 features = torch.cat([orig_features, pe] + features, dim=-1)
             else:
                 features = torch.cat([orig_features] + features, dim=-1)
+                if self.dual_net:
+                    features2 = torch.cat([orig_features] + features2, dim=-1)
 
         node_features = features[:num_nodes, :]
 
@@ -337,7 +441,10 @@ class GnnMP(torch.nn.Module):
                     startelt += nn
                 graph_embedding = torch.stack(graph_embedding)
             elif self.graph_pooling in ["learn", "learninv"]:
-                graph_embedding = features[poolnodes, :]
+                if self.dual_net:
+                    graph_embedding = features2[poolnodes, :]
+                else:
+                    graph_embedding = features[poolnodes, :]
 
             nnf = []
             startelt = 0
@@ -368,7 +475,10 @@ class GnnMP(torch.nn.Module):
             elif self.graph_pooling == "gap":
                 graph_embedding = self.gap(g, features)
             elif self.graph_pooling in ["learn", "learninv"]:
-                graph_embedding = features[poolnodes, :]
+                if self.dual_net:
+                    graph_embedding = features2[poolnodes, :]
+                else:
+                    graph_embedding = features[poolnodes, :]
             else:
                 raise Exception(
                     f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg"
