@@ -168,6 +168,7 @@ def main(args, exp_name) -> float:
         debug_net=args.debug_net,
         display_gantt=args.display_gantt,
         max_shared_mem_per_worker=args.max_shared_mem_per_worker,
+        espo=args.espo,
     )
     training_specification.print_self()
 
@@ -270,6 +271,7 @@ def main(args, exp_name) -> float:
         tokengt=args.tokengt,
         shared_conv=args.shared_conv,
         checkpoint=args.checkpoint,
+        dual_net=args.dual_net,
     )
     agent_specification.print_self()
 

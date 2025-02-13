@@ -98,6 +98,11 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     # =================================================TRAINING SPECIFICATION====================================================
+
+    parser.add_argument(
+        "--espo", default=False, action="store_true", help="use espo instead of PPO"
+    )
+
     parser.add_argument(
         "--total_timesteps",
         type=int,
@@ -615,6 +620,12 @@ def argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="use same conv params across levels",
+    )
+    parser.add_argument(
+        "--dual_net",
+        action="store_true",
+        default=False,
+        help="use two gnn",
     )
 
     # =================================================ENVIRONMENT SPECIFICATION================================================
