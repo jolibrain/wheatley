@@ -34,6 +34,7 @@ class Description:
         train_psps,
         test_psps,
         seed,
+        unload=True,
     ):
         """ """
 
@@ -43,6 +44,7 @@ class Description:
         self.train_psps = train_psps
         self.test_psps = test_psps
         self.seed = seed
+        self.unload = unload
 
         if isinstance(train_psps[0], dict):
             self.max_n_jobs = max([psp["n_jobs"] for psp in train_psps + test_psps])
@@ -72,6 +74,16 @@ class Description:
             self.max_resource_availability = max(
                 [psp.max_resource_availability for psp in train_psps + test_psps]
             )
+            if self.unload:
+                self.train_psps_ids = [psp.pb_id for psp in train_psps]
+                self.train_psps = None
+                self.test_psps_ids = [psp.pb_id for psp in test_psps]
+                self.test_psps = None
+                self.ntrain = len(self.train_psps_ids)
+                self.ntest = len(self.test_psps_ids)
+            else:
+                self.ntrain = len(self.train_psps)
+                self.ntest = len(self.test_psps)
 
     def print_self(self):
         print(
@@ -82,6 +94,6 @@ class Description:
             f"Transition model:                 {self.transition_model_config}\n"
             f"Reward model:                     {self.reward_model_config}\n"
             f"Deterministic/Stochastic:         {'Deterministic' if self.deterministic else 'Stochastic'}\n"
-            f"Train set size:                   {len(self.train_psps)}\n"
-            f"Test set size:                    {len(self.test_psps)}\n"
+            f"Train set size:                   {self.ntrain}\n"
+            f"Test set size:                    {self.ntest}\n"
         )

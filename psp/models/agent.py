@@ -119,6 +119,7 @@ class Agent(Agent):
                 checkpoint=agent_specification.checkpoint
                 if hasattr(agent_specification, "checkpoint")
                 else 1,
+                dual_net=agent_specification.dual_net,
             )
         # elif self.agent_specification.fe_type == "tokengt":
         #     self.gnn = GnnTokenGT(
@@ -193,8 +194,8 @@ class Agent(Agent):
             self.agent_specification.net_arch["vf"][0],
             value_dim,
             False,
-            # self.agent_specification.activation_fn,
-            "gelu",
+            self.agent_specification.activation_fn,
+            #            "gelu",
         )
         self.value_net = torch.compile(self.value_net, dynamic=True)
         # # action
@@ -204,8 +205,8 @@ class Agent(Agent):
             self.agent_specification.net_arch["pi"][0],
             1,
             False,
-            # self.agent_specification.activation_fn,
-            "gelu",
+            self.agent_specification.activation_fn,
+            #            "gelu",
         )
         self.action_net = torch.compile(self.action_net, dynamic=True)
         # usually ppo use gain = np.sqrt(2) here

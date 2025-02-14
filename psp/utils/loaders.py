@@ -29,9 +29,10 @@ import re
 
 
 class PSPLoader:
-    def __init__(self, generate_bounds=None):
+    def __init__(self, generate_bounds=None, verbose=True):
         self.cleanup()
         self.generate_bounds = generate_bounds
+        self.verbose = verbose
 
     def cleanup(self):
         self.f = None
@@ -276,7 +277,7 @@ class PSPLoader:
             due_dates=due_dates,
             res_cal=res_cal,
             cals=cals,
-            display_trivial=True,
+            display_trivial=self.verbose,
         )
 
     def load_sm(self, problem_file):
@@ -398,7 +399,8 @@ class PSPLoader:
         }
 
     def load_single_rcpsp(self, problem_file):
-        print("loading ", problem_file)
+        if self.verbose:
+            print("loading ", problem_file)
         self.f = open(problem_file, "r")
         self.nextline()
 
@@ -580,6 +582,6 @@ class PSPLoader:
             n_doubly_constrained_resources=n_doubly_constrained_resources,
             res_cal=res_cal,
             cals=cals,
-            display_trivial=True,
+            display_trivial=self.verbose,
             due_dates=due_dates,
         )

@@ -28,6 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 import torch
 
 from ..utils.taillard_rcpsp import TaillardRcpsp
+from ..utils.loaders import PSPLoader
 from .gstate import GState as State
 from .observation import EnvObservation
 from .reward_models.graph_terminal_reward_model import GraphTerminalRewardModel
@@ -43,6 +44,7 @@ class GEnv:
         validate=False,
         pyg=False,
         reset=True,
+        generate_duration_bounds=None,
     ):
         self.problem_description = problem_description
         self.pyg = pyg
@@ -64,6 +66,10 @@ class GEnv:
         random.shuffle(self.pb_ids)
         self.pb_index = -1
         self.succ_cache = {}
+        if self.problem_description.unload:
+            self.psp_loader = PSPLoader(
+                generate_bounds=generate_duration_bounds, verbose=False
+            )
 
         if reset:
             self.reset()
@@ -73,15 +79,47 @@ class GEnv:
         if self.pb_index == len(self.pb_ids):
             random.shuffle(self.pb_ids)
             self.pb_index = 0
-
-        if self.validate:
-            self.problem = self.problem_description.test_psps[
-                self.pb_ids[self.pb_index]
-            ]
+        if self.problem_description.unload:
+            if self.validate:
+                # print(
+                #     "reloading pb ",
+                #     self.problem_description.test_psps_ids[self.pb_ids[self.pb_index]],
+                # )
+                self.problem = self.psp_loader.load_single(
+                    self.problem_description.test_psps_ids[self.pb_ids[self.pb_index]]
+                )
+            else:
+                # print(
+                #     "reloading pb ",
+                #     self.problem_description.train_psps_ids[self.pb_ids[self.pb_index]],
+                # )
+                self.problem = self.psp_loader.load_single(
+                    self.problem_description.train_psps_ids[self.pb_ids[self.pb_index]]
+                )
         else:
-            self.problem = self.problem_description.train_psps[
-                self.pb_ids[self.pb_index]
-            ]
+            if self.validate:
+                print(
+                    "using pb ",
+                    self.problem_description.test_psps[
+                        self.pb_ids[self.pb_index]
+                    ].pb_id,
+                )
+            else:
+                print(
+                    "using pb ",
+                    self.problem_description.train_psps[
+                        self.pb_ids[self.pb_index]
+                    ].pb_id,
+                )
+
+            if self.validate:
+                self.problem = self.problem_description.test_psps[
+                    self.pb_ids[self.pb_index]
+                ]
+            else:
+                self.problem = self.problem_description.train_psps[
+                    self.pb_ids[self.pb_index]
+                ]
 
         if isinstance(self.problem, dict):
             self.n_jobs = self.problem["n_jobs"]
@@ -261,7 +299,7 @@ class GEnv:
         if self.problem_description.reward_model_config == "makespan":
             sinks = torch.where(self.state.types() == 1)[0]
             sinks_makespans = self.state.tct(sinks)
-            max_makespan = torch.max(sinks_makespans)
+            max_makespan = torch.max(sinks_makespans).item()
             sol._criterion = max_makespan
         elif self.problem_description.reward_model_config == "tardiness":
             with_due_dates = [

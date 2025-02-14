@@ -2,7 +2,6 @@ pipeline {
   agent {
     dockerfile {
       filename 'docker/Dockerfile.devel'
-      label 'n5'
       args '--shm-size=8gb -u jenkins --entrypoint=""'
     }
 

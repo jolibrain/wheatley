@@ -71,6 +71,7 @@ class TrainingSpecification:
         debug_net,
         display_gantt,
         max_shared_mem_per_worker,
+        espo,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -105,6 +106,7 @@ class TrainingSpecification:
         self.debug_net = debug_net
         self.display_gantt = display_gantt
         self.max_shared_mem_per_worker = max_shared_mem_per_worker
+        self.espo = espo
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -154,5 +156,6 @@ class TrainingSpecification:
             f"Return-based scaling:             {self.return_based_scaling}\n"
             f"Store rollouts on disk:           {self.store_rollouts_on_disk}\n"
             f"Critic loss:                      {self.critic_loss}\n"
+            f"ESPO:                             {self.espo}\n"
             f"Ortools strategies                {self.ortools_strategy}\n"
         )
