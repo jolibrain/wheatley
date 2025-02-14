@@ -2,6 +2,7 @@ import torch
 
 # from generic.eegatconv import EEGATConv
 from torch_geometric.nn.conv import GATv2Conv
+from generic.gatv3_conv import GATv3Conv
 
 
 class GraphConv(torch.nn.Module):
@@ -16,16 +17,27 @@ class GraphConv(torch.nn.Module):
         edge_dim=None,
     ):
         super().__init__()
+        self.gatv3 = False
         self.pyg = pyg
         if self.pyg:
-            self.conv = GATv2Conv(
-                in_dim,
-                out_dim,
-                num_heads,
-                add_self_loops=False,
-                edge_dim=in_dim if edge_dim is None else edge_dim,
-                bias=bias,
-            )
+            if self.gatv3:
+                self.conv = GATv3Conv(
+                    in_dim,
+                    out_dim,
+                    num_heads,
+                    dropout=0,
+                    edge_dim=in_dim if edge_dim is None else edge_dim,
+                    bias=bias,
+                )
+            else:
+                self.conv = GATv2Conv(
+                    in_dim,
+                    out_dim,
+                    num_heads,
+                    add_self_loops=False,
+                    edge_dim=in_dim if edge_dim is None else edge_dim,
+                    bias=bias,
+                )
         else:
             self.conv = EEGATConv(
                 in_dim,
