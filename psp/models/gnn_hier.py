@@ -12,6 +12,7 @@ from torch_geometric.nn.dense import Linear
 from torch_scatter import scatter_max, scatter_min, scatter_add, scatter
 
 from torch_sparse import SparseTensor, remove_diag
+from .edge_embedder import PspEdgeEmbedder
 
 
 class ScoreAggr(torch.nn.Module):
@@ -403,21 +404,13 @@ class GnnHier(torch.nn.Module):
         self.shared_conv = shared_conv
         self.pyg = pyg
         self.normalize = normalize
-        self.sum_res = False
+        self.sum_res = residual
         self.input_dim_features_extractor = input_dim_features_extractor
         self.n_attention_heads = n_attention_heads
         self.checkpoint = checkpoint
 
         if self.normalize:
             self.norm1 = torch.nn.LayerNorm(self.hidden_dim)
-        self.features_embedder = MLP(
-            n_layers=n_mlp_layers_features_extractor,
-            input_dim=self.input_dim_features_extractor,
-            hidden_dim=self.hidden_dim,
-            output_dim=self.hidden_dim,
-            norm=self.normalize,
-            activation=activation_features_extractor,
-        )
 
         self.down_convs = torch.nn.ModuleList()
         self.down_mlps = torch.nn.ModuleList()
@@ -433,6 +426,17 @@ class GnnHier(torch.nn.Module):
             range_conv = 1
         else:
             range_conv = self.n_layers_features_extractor
+
+        self.edge_embedder = PspEdgeEmbedder(
+            "sum",
+            None,
+            self.hidden_dim,
+            "frontier_strict",
+            False,
+            n_mlp_layers_features_extractor,
+            activation_features_extractor,
+        )
+
         for i in range(range_conv):
             self.score_aggr.append(ScoreAggr(hidden_dim=self.hidden_dim))
             self.x_aggr.append(
@@ -495,7 +499,7 @@ class GnnHier(torch.nn.Module):
             )
             self.up_convs.append(
                 GraphConv(
-                    self.hidden_dim * 2,
+                    self.hidden_dim if self.sum_res else self.hidden_dim * 2,
                     self.hidden_dim,
                     num_heads=n_attention_heads,
                     edge_scoring=self.update_edge_features,
@@ -514,16 +518,14 @@ class GnnHier(torch.nn.Module):
                 )
             )
 
-    def forward(self, g, features, edge_features, pe):
+    def forward(self, g, features, pe):
         # if self.normalize:
         #     features = self.norm0(features)
 
         if self.layer_pooling == "all":
             pooled_layers = [features]
 
-        features = self.features_embedder(features)
-        if self.normalize:
-            features = self.norm1(features)
+        edge_features = self.edge_embedder(g)
 
         if self.layer_pooling == "all":
             pooled_layers.append(features)
@@ -610,11 +612,15 @@ class GnnHier(torch.nn.Module):
                 for k in range(j):
                     target = target[perms[k]]
                 target = x
-        x, _ = self.up_convs[-1].forward_nog(
-            torch.cat((x, x0), dim=-1), edge_index, all_edge_features[0]
-        )
+        if self.sum_res:
+            x, _ = self.up_convs[-1].forward_nog(x, edge_index, all_edge_features[0])
+        else:
+            x, _ = self.up_convs[-1].forward_nog(
+                torch.cat((x0, x), dim=-1), edge_index, all_edge_features[0]
+            )
+
         x = self.up_mlps[-1](x)
         if self.layer_pooling == "all":
             pooled_layers[-1] = x
-            return torch.cat(pooled_layers, axis=1)
+            return pooled_layers
         return x

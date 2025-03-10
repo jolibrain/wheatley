@@ -98,6 +98,11 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     # =================================================TRAINING SPECIFICATION====================================================
+
+    parser.add_argument(
+        "--espo", default=False, action="store_true", help="use espo instead of PPO"
+    )
+
     parser.add_argument(
         "--total_timesteps",
         type=int,
@@ -328,7 +333,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mlp_act",
         type=str,
-        default="tanh",
+        default="gelu",
         choices=["relu", "tanh", "elu", "gelu", "selu"],
         help="agent mlp extractor activation type",
     )
@@ -616,6 +621,12 @@ def argument_parser() -> argparse.ArgumentParser:
         default=False,
         help="use same conv params across levels",
     )
+    parser.add_argument(
+        "--dual_net",
+        action="store_true",
+        default=False,
+        help="use two gnn",
+    )
 
     # =================================================ENVIRONMENT SPECIFICATION================================================
     parser.add_argument(
@@ -822,6 +833,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max_shared_mem_per_worker",
         default=2000000,
+        type=int,
         help="max shared memory per worker",
     )
 

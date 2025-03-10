@@ -125,7 +125,10 @@ class AgentValidator:
 
         # Inner variables
         if hasattr(self.problem_description, "test_psps"):
-            n_test_pb = len(self.problem_description.test_psps)
+            if self.problem_description.unload:
+                n_test_pb = len(self.problem_description.test_psps_ids)
+            else:
+                n_test_pb = len(self.problem_description.test_psps)
 
             if (
                 n_test_pb == self.n_validation_env and self.fixed_random_validation == 0
@@ -293,10 +296,16 @@ class AgentValidator:
             print("saving solutions")
             for i, sol in enumerate(solutions):
                 if hasattr(self.problem_description, "test_psps"):
-                    sol.save(
-                        self.path + f"sol_{i}.txt",
-                        self.problem_description.test_psps[i].pb_id,
-                    )
+                    if self.problem_description.unload:
+                        sol.save(
+                            self.path + f"sol_{i}.txt",
+                            self.problem_description.test_psps_ids[i],
+                        )
+                    else:
+                        sol.save(
+                            self.path + f"sol_{i}.txt",
+                            self.problem_description.test_psps[i].pb_id,
+                        )
                 else:
                     sol.save(self.path + f"sol_{i}.txt")
 

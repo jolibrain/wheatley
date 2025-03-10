@@ -47,7 +47,9 @@ from .logger import Logger, configure_logger, monotony, stability
 from functools import partial
 
 
-def create_env(env_cls, problem_description, env_specification, i):
+def create_env(
+    env_cls, problem_description, env_specification, i, generate_duration_bounds
+):
     def _init():
         env = env_cls(
             problem_description,
@@ -55,6 +57,7 @@ def create_env(env_cls, problem_description, env_specification, i):
             i,
             validate=False,
             pyg=env_specification.pyg,
+            generate_duration_bounds=generate_duration_bounds,
         )
         return env
 
@@ -68,12 +71,14 @@ class PPO:
         env_cls,
         validator=None,
         discard_incomplete_trials=True,
+        generate_duration_bounds=None,
     ):
         self.optimizer_class = training_specification.optimizer_class
         self.logger = configure_logger(
             folder=training_specification.path, format_strings=["json"]
         )
         self.env_cls = env_cls
+        self.generate_duration_bounds = generate_duration_bounds
 
         self.num_envs = training_specification.n_workers
         self.gamma = training_specification.gamma
@@ -105,6 +110,10 @@ class PPO:
         # in case of resume
         self._num_timesteps_at_start = 0
         self.ep_info_buffer = deque(maxlen=100)
+        self.espo = training_specification.espo
+
+        if self.espo:
+            self.clip_coef = None
 
     def keep_only(self, obs, to_keep):
         kobs = {}
@@ -355,7 +364,12 @@ class PPO:
         if not hasattr(problem_description, "train_psps"):
             return list(range(self.num_envs))  # simple env id
         # for psps, we should return a list per env of list of problems for this env
-        return [list(range(len(problem_description.train_psps)))] * self.num_envs
+        if problem_description.unload:
+            return [
+                list(range(len(problem_description.train_psps_ids)))
+            ] * self.num_envs
+        else:
+            return [list(range(len(problem_description.train_psps)))] * self.num_envs
 
     def train(
         self,
@@ -386,6 +400,7 @@ class PPO:
                         problem_description,
                         env_specification,
                         pbs_per_env[i],
+                        generate_duration_bounds=self.generate_duration_bounds,
                     )
                     for i in range(self.num_envs)
                 ],
@@ -399,6 +414,7 @@ class PPO:
                         problem_description,
                         env_specification,
                         pbs_per_env[i],
+                        generate_duration_bounds=self.generate_duration_bounds,
                     )
                     for i in range(self.num_envs)
                 ],
@@ -414,6 +430,7 @@ class PPO:
                         problem_description,
                         env_specification,
                         pbs_per_env[i],
+                        generate_duration_bounds=self.generate_duration_bounds,
                     )
                     for i in tqdm.tqdm(
                         range(self.num_envs), desc="Creating learning envs"
@@ -497,6 +514,7 @@ class PPO:
             value_losses = []
             approx_kl_divs = []
             losses = []
+            max_espo_dev = 0
             if self.debug_net:
                 variances = {}
                 grad_var = {}
@@ -587,6 +605,9 @@ class PPO:
                         )
                         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
                     else:
+                        espo_dev = (ratio - 1).abs().mean()
+                        if max_espo_dev < espo_dev:
+                            max_espo_dev = espo_dev
                         pg_loss = pg_loss1.mean()
 
                     # Value loss
@@ -697,7 +718,18 @@ class PPO:
                         self.optimizer.zero_grad()
                         iter_it = 0
 
-                if self.target_kl is not None:
+                    # if self.clip_coef is None:
+                    #     if espo_devs > 0.25:
+                    #         break
+
+                if self.clip_coef is None:
+                    if max_espo_dev > 0.25:
+                        print(
+                            f"\nstopping update due to espo devs too high after epoch {epoch} / {self.update_epochs}  (last espo_dev : {espo_dev})\n"
+                        )
+                        break
+
+                elif self.target_kl is not None:
                     if np.mean(approx_kl_divs_on_epoch) > self.target_kl:
                         print(
                             "stopping update due to too high kl divergence after epoch",

@@ -5,6 +5,7 @@ from generic.utils import decode_mask
 from psp.description import Description
 import os
 import tqdm
+import torch
 
 
 def solve_instance(problem_description, agent):
@@ -36,6 +37,7 @@ def solve_instance(problem_description, agent):
 
 
 if __name__ == "__main__":
+    torch.set_float32_matmul_precision("high")
     from args import argument_parser, parse_args
 
     parser = argument_parser()
@@ -58,6 +60,7 @@ if __name__ == "__main__":
         train_psps=train_psps,
         test_psps=test_psps,
         seed=args.seed,
+        unload=False,
     )
     agent = Agent.load(args.path, max_n_modes=problem_description.max_n_modes)
 
