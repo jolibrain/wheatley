@@ -34,6 +34,13 @@ class PSPLoader:
         self.generate_bounds = generate_bounds
         self.verbose = verbose
 
+        if verbose and self.generate_bounds is not None:
+            print(
+                "If not present, will generate random duration bounds of ",
+                self.generate_bounds,
+                " %",
+            )
+
     def cleanup(self):
         self.f = None
         self.line = None
@@ -404,12 +411,12 @@ class PSPLoader:
         self.f = open(problem_file, "r")
         self.nextline()
 
-        if self.generate_bounds is not None:
-            print(
-                "If not present, generating random duration bounds of ",
-                self.generate_bounds,
-                " %",
-            )
+        # if self.generate_bounds is not None:
+        #     print(
+        #         "If not present, generating random duration bounds of ",
+        #         self.generate_bounds,
+        #         " %",
+        #     )
         job_info = []
         durations = []
         resources = []

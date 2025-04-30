@@ -47,9 +47,7 @@ from .logger import Logger, configure_logger, monotony, stability
 from functools import partial
 
 
-def create_env(
-    env_cls, problem_description, env_specification, i, generate_duration_bounds
-):
+def create_env(env_cls, problem_description, env_specification, i):
     def _init():
         env = env_cls(
             problem_description,
@@ -57,7 +55,6 @@ def create_env(
             i,
             validate=False,
             pyg=env_specification.pyg,
-            generate_duration_bounds=generate_duration_bounds,
         )
         return env
 
@@ -400,7 +397,6 @@ class PPO:
                         problem_description,
                         env_specification,
                         pbs_per_env[i],
-                        generate_duration_bounds=self.generate_duration_bounds,
                     )
                     for i in range(self.num_envs)
                 ],
@@ -414,7 +410,6 @@ class PPO:
                         problem_description,
                         env_specification,
                         pbs_per_env[i],
-                        generate_duration_bounds=self.generate_duration_bounds,
                     )
                     for i in range(self.num_envs)
                 ],
@@ -430,7 +425,6 @@ class PPO:
                         problem_description,
                         env_specification,
                         pbs_per_env[i],
-                        generate_duration_bounds=self.generate_duration_bounds,
                     )
                     for i in tqdm.tqdm(
                         range(self.num_envs), desc="Creating learning envs"
