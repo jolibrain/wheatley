@@ -44,7 +44,6 @@ class GEnv:
         validate=False,
         pyg=False,
         reset=True,
-        generate_duration_bounds=None,
     ):
         self.problem_description = problem_description
         self.pyg = pyg
@@ -68,7 +67,8 @@ class GEnv:
         self.succ_cache = {}
         if self.problem_description.unload:
             self.psp_loader = PSPLoader(
-                generate_bounds=generate_duration_bounds, verbose=False
+                generate_bounds=problem_description.generate_duration_bounds,
+                verbose=False,
             )
 
         if reset:

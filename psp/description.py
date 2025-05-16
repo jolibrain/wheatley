@@ -31,6 +31,7 @@ class Description:
         transition_model_config,
         reward_model_config,
         deterministic,
+        generate_duration_bounds,
         train_psps,
         test_psps,
         seed,
@@ -41,6 +42,7 @@ class Description:
         self.transition_model_config = transition_model_config
         self.reward_model_config = reward_model_config
         self.deterministic = deterministic
+        self.generate_duration_bounds = generate_duration_bounds
         self.train_psps = train_psps
         self.test_psps = test_psps
         self.seed = seed
@@ -94,6 +96,7 @@ class Description:
             f"Transition model:                 {self.transition_model_config}\n"
             f"Reward model:                     {self.reward_model_config}\n"
             f"Deterministic/Stochastic:         {'Deterministic' if self.deterministic else 'Stochastic'}\n"
+            f"Generate Duration Bounds:         {self.generate_duration_bounds}\n"
             f"Train set size:                   {self.ntrain}\n"
             f"Test set size:                    {self.ntest}\n"
         )

@@ -51,7 +51,7 @@ class GraphTerminalRewardModel:
         if state.succeeded():
             if not self.tardiness:
                 sinks = torch.where(state.types() == 1)[0]
-                sinks_makespans = state.tct(sinks)
+                sinks_makespans = state.tct_real(sinks)
                 max_makespan = torch.max(sinks_makespans)
                 makespan = max_makespan.item()
                 # makespan = state.tct(-1)[0].item() / len(state.job_modes)
