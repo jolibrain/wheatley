@@ -627,6 +627,12 @@ def argument_parser() -> argparse.ArgumentParser:
         default=False,
         help="use two gnn",
     )
+    parser.add_argument(
+        "--expander",
+        type=int,
+        default=None,
+        help="degree of expander graph rewiring",
+    )
 
     # =================================================ENVIRONMENT SPECIFICATION================================================
     parser.add_argument(

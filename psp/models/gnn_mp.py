@@ -68,6 +68,7 @@ class GnnMP(torch.nn.Module):
         tokengt=False,
         checkpoint=1,
         dual_net=False,
+        expander=None,
     ):
         super().__init__()
         self.pyg = pyg
@@ -76,6 +77,8 @@ class GnnMP(torch.nn.Module):
         self.normalize = normalize
         self.max_n_nodes = max_n_nodes
         self.input_dim_features_extractor = input_dim_features_extractor
+        if expander is not None:
+            self.input_dim_features_extractor += 20  # LAPPE
         self.layer_pooling = layer_pooling
         self.rwpe_k = rwpe_k
         if self.rwpe_k == 0:

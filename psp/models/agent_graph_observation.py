@@ -29,6 +29,7 @@ import numpy as np
 
 # from generic.tokengt.utils import get_laplacian_pe_simple
 from psp.utils.utils import compute_resources_graph_torch
+
 import time
 
 
@@ -50,6 +51,7 @@ class AgentGraphObservation:
         "rpoolres": 13,
         "selfpool": 14,
         "selfres": 15,
+        "expander": 16,
     }
 
     @classmethod
@@ -62,28 +64,53 @@ class AgentGraphObservation:
         laplacian_pe_cache=None,
         rwpe_k=0,
         rwpe_cache=None,
+        expander=None,
     ):
-        g.set_ndata(
-            "feat",
-            torch.cat(
-                [
-                    g.ndata("affected").unsqueeze(1),
-                    g.ndata("selectable").unsqueeze(1),
-                    g.ndata("job").unsqueeze(1),
-                    g.ndata("type").unsqueeze(1),
-                    g.ndata("normalized_durations"),
-                    g.ndata("normalized_tct"),
-                    # g.ndata("tardiness"),
-                    g.ndata("normalized_tardiness"),
-                    g.ndata("has_due_date").unsqueeze(1),
-                    # g.ndata("due_date").unsqueeze(1),
-                    g.ndata("normalized_due_dates").unsqueeze(1),
-                    # g.ndata("resources"),
-                    g.ndata("past").unsqueeze(1),
-                ],
-                dim=1,
-            ),
-        )
+        if expander is not None:
+            g.set_ndata(
+                "feat",
+                torch.cat(
+                    [
+                        g.ndata("affected").unsqueeze(1),
+                        g.ndata("selectable").unsqueeze(1),
+                        g.ndata("job").unsqueeze(1),
+                        g.ndata("type").unsqueeze(1),
+                        g.ndata("normalized_durations"),
+                        g.ndata("normalized_tct"),
+                        # g.ndata("tardiness"),
+                        g.ndata("normalized_tardiness"),
+                        g.ndata("has_due_date").unsqueeze(1),
+                        # g.ndata("due_date").unsqueeze(1),
+                        g.ndata("normalized_due_dates").unsqueeze(1),
+                        # g.ndata("resources"),
+                        g.ndata("past").unsqueeze(1),
+                        g.ndata("laplacian_eigenvector_pe"),
+                    ],
+                    dim=1,
+                ),
+            )
+        else:
+            g.set_ndata(
+                "feat",
+                torch.cat(
+                    [
+                        g.ndata("affected").unsqueeze(1),
+                        g.ndata("selectable").unsqueeze(1),
+                        g.ndata("job").unsqueeze(1),
+                        g.ndata("type").unsqueeze(1),
+                        g.ndata("normalized_durations"),
+                        g.ndata("normalized_tct"),
+                        # g.ndata("tardiness"),
+                        g.ndata("normalized_tardiness"),
+                        g.ndata("has_due_date").unsqueeze(1),
+                        # g.ndata("due_date").unsqueeze(1),
+                        g.ndata("normalized_due_dates").unsqueeze(1),
+                        # g.ndata("resources"),
+                        g.ndata("past").unsqueeze(1),
+                    ],
+                    dim=1,
+                ),
+            )
 
         if conflicts == "clique":
             if g.num_edges(etype="rc") == 0:
@@ -104,11 +131,19 @@ class AgentGraphObservation:
                     etype="rc",
                 )
 
-        if bidir:
-            prec_edges = g.edges(etype="prec")
-            g.add_edges(prec_edges[1], prec_edges[0], etype="rprec", data=None)
+        # if expander is not None:
+        #     # TODO compute expander graph of degree
+        #     from psp.utils.expander import add_expander_edges
 
-            if g.num_edges(etype="rp") != 0:
+        #     add_expander_edges(g, expander)
+
+        if bidir:
+            if g.num_edges(etype="rprec") == 0:
+                prec_edges = g.edges(etype="prec")
+
+                g.add_edges(prec_edges[1], prec_edges[0], etype="rprec", data=None)
+
+            if g.num_edges(etype="rp") != 0 and g.num_edges(etype="rrp") == 0:
                 rp_edges = g.edges(etype="rp")
                 g.add_edges(
                     rp_edges[1],
@@ -192,6 +227,7 @@ class AgentGraphObservation:
         rwpe_k=0,
         rwpe_cache=None,
         rewire_internal=False,
+        expander=None,
     ):
         if not isinstance(graph_observation, list):
             graph_observation = [graph_observation]
@@ -233,7 +269,14 @@ class AgentGraphObservation:
                     laplacian_pe_cache,
                     rwpe_k,
                     rwpe_cache,
+                    expander,
                 )
+
+            if expander is not None:
+                from psp.utils.expander import add_expander_edges
+
+                add_expander_edges(g, expander)
+
             self.res_cal_id.append(g.global_data("res_cal"))
             # g = dgl.node_type_subgraph(g, ["n"])
 
