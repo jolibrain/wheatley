@@ -28,6 +28,7 @@ import torch
 
 from .dadapt_adam import DAdaptAdam
 from .lion_pytorch import Lion
+from .vsgd import VSGD
 
 
 class TrainingSpecification:
@@ -120,6 +121,8 @@ class TrainingSpecification:
             self.optimizer_class = DAdaptAdam
         elif optimizer.lower() == "lion":
             self.optimizer_class = Lion
+        elif optimizer.lower() == "vsgd":
+            self.optimizer_class = VSGD
         else:
             raise Exception("Optimizer not recognized")
         self.n_workers = n_workers
