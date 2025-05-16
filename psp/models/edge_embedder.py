@@ -22,6 +22,7 @@
 #
 import torch
 from generic.mlp import MLP
+from psp.models.agent_graph_observation import AgentGraphObservation
 
 
 class PspEdgeEmbedder(torch.nn.Module):
@@ -62,7 +63,7 @@ class PspEdgeEmbedder(torch.nn.Module):
         # for rc edges : type,  rid, rval
         # for rp edges : type, rid , level, criticial, timetype
 
-        self.n_edge_type = 16
+        self.n_edge_type = len(AgentGraphObservation.edgeTypes)
 
         if self.edge_embedding_flavor == "sum":
             # self.resource_id_embedder = torch.nn.Embedding(

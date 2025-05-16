@@ -20,6 +20,7 @@ from psp.graph.graph_factory import GraphFactory
 from psp.graph.graph import Graph
 from queue import PriorityQueue
 import numpy as np
+from torch_geometric.transforms import AddLaplacianEigenvectorPE
 
 
 class GState:
@@ -63,6 +64,7 @@ class GState:
         self.remove_old_resource_info = env_specification.remove_old_resource_info
 
         self.remove_past_prec = env_specification.remove_past_prec
+        self.lappe = AddLaplacianEigenvectorPE(20)
 
         # features :
         # 0: is_affected
@@ -175,6 +177,9 @@ class GState:
             self.device,
             pyg=self.pyg,
         )
+
+        gg = self.lappe(self.graph._graph.to_homogeneous())
+        self.graph.set_ndata("laplacian_eigenvector_pe", gg["laplacian_eigenvector_pe"])
 
         m = 0
         for n, j in enumerate(self.problem.n_modes_per_job):
