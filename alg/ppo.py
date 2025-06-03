@@ -42,6 +42,8 @@ import tqdm
 import math
 from alg.rollout_dataset import RolloutDataset, collate_rollout
 from generic.utils import decode_mask, safe_mean
+from generic.adamw_schedulefree import AdamWScheduleFree
+from generic.radam_schedulefree import RAdamScheduleFree
 
 from .logger import Logger, configure_logger, monotony, stability
 from functools import partial
@@ -474,6 +476,7 @@ class PPO:
         if not skip_initial_eval:
             print("initial validation")
             agent.to(rollout_agent_device)
+            agent.eval()
             self.validator.validate(agent, self)
             print("... done initial validation")
         start_time = time.time()
@@ -498,6 +501,12 @@ class PPO:
                         g["lr"] = lr
 
             agent.to(rollout_agent_device)
+            agent.eval()
+            if (
+                self.optimizer_class == AdamWScheduleFree
+                or self.optimizer_class == RAdamScheduleFree
+            ):
+                self.optimizer.eval()
             rollout_dataset = self.collect_rollouts(
                 agent, envs, env_specification, rollout_data_device, sigma
             )
@@ -521,6 +530,12 @@ class PPO:
                             grad_mean[n] = []
 
             agent.to(train_device)
+            agent.train()
+            if (
+                self.optimizer_class == AdamWScheduleFree
+                or self.optimizer_class == RAdamScheduleFree
+            ):
+                self.optimizer.train()
             for epoch in tqdm.tqdm(
                 range(self.update_epochs), desc="   epochs             "
             ):

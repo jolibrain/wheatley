@@ -160,7 +160,16 @@ def argument_parser() -> argparse.ArgumentParser:
         "--optimizer",
         type=str,
         default="radam",
-        choices=["adam", "sgd", "adamw", "radam", "dadam", "lion"],
+        choices=[
+            "adam",
+            "sgd",
+            "adamw",
+            "radam",
+            "dadam",
+            "lion",
+            "adamw_schedulefree",
+            "radam_schedulefree",
+        ],
         help="Which optimizer to use",
     )
     parser.add_argument(
