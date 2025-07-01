@@ -155,7 +155,7 @@ class Agent(Agent):
     @classmethod
     def load(cls, path, graphobs=True, max_n_modes=None):
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
-        save_data = torch.load(path + "agent.pkl")
+        save_data = torch.load(path + "agent.pkl", weights_only=False)
         agent_specification = save_data["agent_specification"]
         env_specification = save_data["env_specification"]
         if max_n_modes is not None:
