@@ -273,6 +273,7 @@ def main(args, exp_name) -> float:
         shared_conv=args.shared_conv,
         checkpoint=args.checkpoint,
         dual_net=args.dual_net,
+        expander=args.expander,
     )
     agent_specification.print_self()
 

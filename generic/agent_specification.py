@@ -79,6 +79,7 @@ class AgentSpecification:
         shared_conv=False,
         checkpoint=1,
         dual_net=False,
+        expander=None,
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -130,6 +131,7 @@ class AgentSpecification:
         self.shared_conv = shared_conv
         self.checkpoint = checkpoint
         self.dual_net = dual_net
+        self.expander = expander
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -226,6 +228,7 @@ class AgentSpecification:
                 f"Shared conv:                      {self.shared_conv}\n"
                 f"checkpoint:                       {self.checkpoint}\n"
                 f"Dual Net:                         {self.dual_net}\n"
+                f"Expander:                         {self.expander}\n"
                 f"Net shapes:"
             )
             first_features_extractor_shape = (
