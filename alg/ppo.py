@@ -42,6 +42,7 @@ import tqdm
 import math
 from alg.rollout_dataset import RolloutDataset, collate_rollout
 from generic.utils import decode_mask, safe_mean
+from generic.vsgd import VSGD
 
 from .logger import Logger, configure_logger, monotony, stability
 from functools import partial
@@ -448,6 +449,10 @@ class PPO:
                 lr=lr,
                 weight_decay=weight_decay,
                 decoupled_weight_decay=True,
+            )
+        elif self.optimizer_class == VSGD:
+            self.optimizer = self.optimizer_class(
+                agent.parameters(), lr=lr, weight_decay=weight_decay
             )
         else:
             self.optimizer = self.optimizer_class(
