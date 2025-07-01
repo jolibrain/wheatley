@@ -868,6 +868,7 @@ def argument_parser() -> argparse.ArgumentParser:
         default=None,
         help="Load problem in Taillard format (machine numbering starts at 0)",
     )
+    parser.add_argument("--load_sols", type=str, default=None)
     parser.add_argument("--train_dir", type=str, default=None, help="psp train dir")
     parser.add_argument("--test_dir", type=str, default=None, help="psp test dir")
     parser.add_argument(

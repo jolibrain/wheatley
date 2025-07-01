@@ -57,6 +57,7 @@ if __name__ == "__main__":
         transition_model_config=args.transition_model_config,
         reward_model_config=args.criterion,
         deterministic=(args.duration_type == "deterministic"),
+        generate_duration_bounds=args.generate_duration_bounds,
         train_psps=train_psps,
         test_psps=test_psps,
         seed=args.seed,

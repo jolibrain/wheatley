@@ -298,7 +298,7 @@ class GEnv:
         sol = self.state.get_solution()
         if self.problem_description.reward_model_config == "makespan":
             sinks = torch.where(self.state.types() == 1)[0]
-            sinks_makespans = self.state.tct(sinks)
+            sinks_makespans = self.state.tct_real(sinks)
             max_makespan = torch.max(sinks_makespans).item()
             sol._criterion = max_makespan
         elif self.problem_description.reward_model_config == "tardiness":
