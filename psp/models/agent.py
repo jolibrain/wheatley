@@ -120,6 +120,7 @@ class Agent(Agent):
                 if hasattr(agent_specification, "checkpoint")
                 else 1,
                 dual_net=agent_specification.dual_net,
+                expander=agent_specification.expander,
             )
         # elif self.agent_specification.fe_type == "tokengt":
         #     self.gnn = GnnTokenGT(
@@ -252,6 +253,7 @@ class Agent(Agent):
             laplacian_pe_cache=None,
             rwpe_k=self.agent_specification.rwpe_k,
             rwpe_cache=self.rwpe_cache,
+            expander=self.agent_specification.expander,
         )
 
     def _obs_as_tensor_graph(self, obs):
@@ -264,6 +266,7 @@ class Agent(Agent):
                 laplacian_pe_cache=None,
                 rwpe_k=self.agent_specification.rwpe_k,
                 rwpe_cache=self.rwpe_cache,
+                expander=self.agent_specification.expander,
             )
             for o in obs
         ]
@@ -306,6 +309,7 @@ class Agent(Agent):
             rwpe_k=self.agent_specification.rwpe_k,
             rwpe_cache=None,
             rewire_internal=False,
+            expander=self.agent_specification.expander,
         )
         g = observation.graphs
         res_cal_id = observation.res_cal_id
@@ -356,7 +360,9 @@ class Agent(Agent):
             self.agent_specification.conflicts == "node",
             self.agent_specification.vnode,
             batch_size,
-            self.env_specification.n_features,
+            self.env_specification.n_features + 20
+            if self.agent_specification.expander is not None
+            else self.env_specification.n_features,
             self.env_specification.max_n_resources,
             6,
             7,
