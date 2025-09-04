@@ -28,6 +28,8 @@ import torch
 
 from .dadapt_adam import DAdaptAdam
 from .lion_pytorch import Lion
+from .adamw_schedulefree import AdamWScheduleFree
+from .radam_schedulefree import RAdamScheduleFree
 
 
 class TrainingSpecification:
@@ -120,6 +122,10 @@ class TrainingSpecification:
             self.optimizer_class = DAdaptAdam
         elif optimizer.lower() == "lion":
             self.optimizer_class = Lion
+        elif optimizer.lower() == "adamw_schedulefree":
+            self.optimizer_class = AdamWScheduleFree
+        elif optimizer.lower() == "radam_schedulefree":
+            self.optimizer_class = RAdamScheduleFree
         else:
             raise Exception("Optimizer not recognized")
         self.n_workers = n_workers
