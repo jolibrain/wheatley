@@ -36,18 +36,18 @@ from generic.agent_specification import AgentSpecification
 from generic.agent_validator import AgentValidator
 from generic.training_specification import TrainingSpecification
 from psp.description import Description
-from psp.env.env import Env
 from psp.env.env_specification import EnvSpecification
 from psp.env.genv import GEnv
 from psp.models.agent import Agent
 from psp.utils.loaders import PSPLoader
 from psp.utils.taillard_rcpsp import TaillardRcpsp
+from psp.utils.utils import create_train_envs
 from functools import partial
 
 torch.set_float32_matmul_precision("high")
 
 
-def main(args, exp_name) -> float:
+def main(args) -> float:
     exp_name = args.exp_name_appendix
     path = get_path(args.path, exp_name)
     torch.distributions.Distribution.set_default_validate_args(False)
@@ -63,7 +63,9 @@ def main(args, exp_name) -> float:
         args.random_taillard
         ^ (args.load_problem is not None)
         ^ (args.train_dir is not None)
-    ), "Only provide either --random_taillard, --load_problem or --train_dir to specify the training instances."
+    ), (
+        "Only provide either --random_taillard, --load_problem or --train_dir to specify the training instances."
+    )
 
     if args.random_taillard:
         psp = TaillardRcpsp(
@@ -118,7 +120,6 @@ def main(args, exp_name) -> float:
 
     # Define problem and visualize it
     problem_description = Description(
-        transition_model_config=args.transition_model_config,
         reward_model_config=args.criterion,
         deterministic=(args.duration_type == "deterministic"),
         generate_duration_bounds=args.generate_duration_bounds,
@@ -135,6 +136,7 @@ def main(args, exp_name) -> float:
         n_validation_env=len(test_psps),
         fixed_validation=args.fixed_validation,
         fixed_random_validation=args.fixed_random_validation,
+        no_random_validation=args.no_random_validation,
         validation_batch_size=args.validation_batch_size,
         validation_freq=1 if args.validation_freq == -1 else args.validation_freq,
         display_env=exp_name,
@@ -143,7 +145,6 @@ def main(args, exp_name) -> float:
         ortools_strategy=args.ortools_strategy,
         max_time_ortools=args.max_time_ortools,
         scaling_constant_ortools=args.scaling_constant_ortools,
-        vecenv_type=args.vecenv_type,
         validate_on_total_data=args.validate_on_total_data,
         optimizer=args.optimizer,
         n_workers=args.n_workers,
@@ -156,6 +157,7 @@ def main(args, exp_name) -> float:
         batch_size=args.batch_size,
         iter_size=args.iter_size,
         clip_range=args.clip_range,
+        clip_range_high=args.clip_range_high,
         target_kl=args.target_kl,
         freeze_graph=args.freeze_graph,
         lr=args.lr,
@@ -170,15 +172,12 @@ def main(args, exp_name) -> float:
         display_gantt=args.display_gantt,
         max_shared_mem_per_worker=args.max_shared_mem_per_worker,
         espo=args.espo,
+        clip_grad_norm=args.clip_grad_norm,
     )
     training_specification.print_self()
 
     opt_state_dict = None
 
-    if args.conflicts == "clique" and args.precompute_cliques:
-        observe_clique = True
-    else:
-        observe_clique = False
     if args.observe_duration_when_affect:
         observe_real_duration_when_affect = True
     else:
@@ -187,15 +186,12 @@ def main(args, exp_name) -> float:
     env_specification = EnvSpecification(
         problems=problem_description,
         normalize_input=not args.dont_normalize_input,
-        input_list=args.features,
-        max_edges_factor=args.max_edges_upper_bound_factor,
         sample_n_jobs=args.sample_n_jobs,
         chunk_n_jobs=args.chunk_n_jobs,
-        observe_conflicts_as_cliques=observe_clique,
         add_rp_edges=args.add_rp_edges,
         observe_real_duration_when_affect=observe_real_duration_when_affect,
         do_not_observe_updated_bounds=args.do_not_observe_updated_bounds,
-        factored_rp=(args.fe_type == "tokengt" or args.factored_rp),
+        factored_rp=args.factored_rp,
         remove_old_resource_info=args.remove_old_resource_info
         and not args.observe_subgraph,
         remove_past_prec=not args.keep_past_prec and not args.observe_subgraph,
@@ -204,8 +200,6 @@ def main(args, exp_name) -> float:
         fast_forward=args.fast_forward,
         observe_subgraph=args.observe_subgraph,
         random_taillard=args.random_taillard,
-        # pyg=args.pyg or args.hierarchical or args.tokengt,
-        pyg=True,
         max_n_modes=args.max_n_modes,
     )
     env_specification.print_self()
@@ -222,7 +216,6 @@ def main(args, exp_name) -> float:
     else:
         hidden_dim_critic = args.hidden_dim_critic
     agent_specification = AgentSpecification(
-        n_features=env_specification.n_features,
         gconv_type=args.gconv_type,
         graph_has_relu=args.graph_has_relu,
         graph_pooling=args.graph_pooling,
@@ -234,30 +227,20 @@ def main(args, exp_name) -> float:
         n_layers_features_extractor=args.n_layers_features_extractor,
         hidden_dim_features_extractor=args.hidden_dim_features_extractor,
         n_attention_heads=args.n_attention_heads,
-        reverse_adj=args.reverse_adj_in_gnn,
-        residual_gnn=args.residual_gnn,
-        normalize_gnn=args.normalize_gnn,
-        conflicts=args.conflicts,
+        residual_gnn=args.residual_gnn if args.hierarchical else True,
+        normalize_gnn=True if args.hierarchical else args.normalize_gnn,
         n_mlp_layers_actor=args.n_mlp_layers_actor,
         hidden_dim_actor=args.hidden_dim_actor,
         n_mlp_layers_critic=args.n_mlp_layers_critic,
         hidden_dim_critic=hidden_dim_critic,
-        fe_type=args.fe_type,
-        transformer_flavor=args.transformer_flavor,
         dropout=args.dropout,
         cache_lap_node_id=not args.dont_cache_lap_node_id,
         lap_node_id_k=args.lap_node_id_k,
-        edge_embedding_flavor=args.edge_embedding_flavor,
-        performer_nb_features=args.performer_nb_features,
-        performer_feature_redraw_interval=args.performer_redraw_interval,
-        performer_generalized_attention=args.performer_generalized_attention,
-        performer_auto_check_redraw=args.performer_auto_check_redraw,
         vnode=args.vnode,
         update_edge_features=args.update_edge_features,
         update_edge_features_pe=args.update_edge_features_pe,
         ortho_embed=args.ortho_embed,
         no_tct=args.no_tct,
-        mid_in_edges=args.mid_in_edges,
         rwpe_k=args.rwpe_k,
         rwpe_h=args.rwpe_h,
         cache_rwpe=args.cache_rwpe,
@@ -266,13 +249,17 @@ def main(args, exp_name) -> float:
         hl_gauss=args.hl_gauss,
         reward_weights=args.reward_weights,
         sgformer=args.sgformer,
-        # pyg=args.pyg or args.hierarchical or args.tokengt,
-        pyg=True,
         hierarchical=args.hierarchical,
         tokengt=args.tokengt,
         shared_conv=args.shared_conv,
         checkpoint=args.checkpoint,
         dual_net=args.dual_net,
+        bidir=True,
+        self_loops=args.self_loops if args.hierarchical else True,
+        lappe=args.lappe,
+        rwpe=args.rwpe,
+        gconv_activation=args.gconv_activation,
+        g2=args.g2,
     )
     agent_specification.print_self()
 
@@ -296,7 +283,6 @@ def main(args, exp_name) -> float:
         agent = Agent(
             env_specification=env_specification,
             agent_specification=agent_specification,
-            graphobs=args.vecenv_type == "graphgym",
         )
 
     if args.pretrain:
@@ -322,24 +308,38 @@ def main(args, exp_name) -> float:
     # We save every time we hit a min RL / OR-Tools ratio
     # agent.train(problem_description, training_specification)
 
+    env_cls = GEnv
     validator = AgentValidator(
         problem_description,
         env_specification,
         args.device,
-        training_specification,
-        args.disable_visdom,
-        graphobs=args.vecenv_type == "graphgym",
+        env_cls=env_cls,
+        training_specification=training_specification,
+        disable_visdom=args.disable_visdom,
         compute_ortools=not args.disable_ortools,
     )
-    if args.vecenv_type == "graphgym":
-        env_cls = GEnv
-    else:
-        env_cls = Env
-    ppo = PPO(training_specification, env_cls, validator, args.generate_duration_bounds)
+    ppo = PPO(
+        training_specification,
+        validator,
+        generate_duration_bounds=args.generate_duration_bounds,
+    )
+
+    train_envs = create_train_envs(
+        GEnv,
+        problem_description,
+        env_specification,
+        training_specification.n_workers,
+        training_specification.max_shared_mem_per_worker,
+        agent_specification.lappe,
+        agent_specification.rwpe,
+    )
+
     return ppo.train(
         agent,
         problem_description,
         env_specification,
+        train_envs,
+        training_specification.n_workers,
         lr=args.lr,
         weight_decay=args.weight_decay,
         log_interval=1,
@@ -349,6 +349,7 @@ def main(args, exp_name) -> float:
         skip_initial_eval=args.skip_initial_eval,
         skip_model_trace=args.skip_model_trace,
         warmup=args.warmup,
+        laber=args.laber,
     )
 
 
@@ -368,10 +369,10 @@ if __name__ == "__main__":
 
     print("installing cleanup handler")
     parser = argument_parser()
-    args, exp_name = parse_args(parser)
+    args = parse_args(parser)
 
     signal.signal(
         signal.SIGINT, partial(interrupt_handler, args.store_rollouts_on_disk)
     )
 
-    main(args, exp_name)
+    main(args)

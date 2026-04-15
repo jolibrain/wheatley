@@ -29,16 +29,12 @@ class GState:
         problem_description,
         problem,
         deterministic=True,
-        observe_conflicts_as_cliques=True,
         normalize_features=True,
-        pyg=True,
         print_zero_dur_with_ressources=False,
     ):
-        self.pyg = pyg
         # self.tpe = ThreadPoolExecutor()
         self.problem = problem
         self.problem_description = problem_description
-        self.n_features = env_specification.n_features
         self.print_zero_dur_with_ressources = print_zero_dur_with_ressources
         # self.device = torch.device("cuda:2")
         self.device = torch.device("cpu")
@@ -47,9 +43,7 @@ class GState:
         else:
             self.n_nodes = self.problem.n_modes
 
-        # self.features = np.zeros((self.n_nodes, self.n_features), dtype=float)
         self.deterministic = deterministic
-        self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
         self.env_specification = env_specification
         self.resourceModel = ResourceFlowGraph
 
@@ -117,7 +111,6 @@ class GState:
         self.reset_resources()
         self.reset_selectable()
         self.reset_type()
-        self.reset_conflicts_as_cliques()
         self.reset_zero_dur()
         self.no_resource_usage = torch.all(self.all_resources_usage() == 0, 1)
 
@@ -147,33 +140,12 @@ class GState:
     def reset_fresh_nodes(self):
         self.fresh_nodes = list(range(self.n_nodes))
 
-    def reset_conflicts_as_cliques(self):
-        if self.observe_conflicts_as_cliques:
-            (
-                resource_conf_edges,
-                resource_conf_id,
-                resource_conf_val,
-                resource_conf_val_r,
-            ) = compute_resources_graph_torch(self.graph.ndata("resources"))
-            self.graph.add_edges(
-                resource_conf_edges[0],
-                resource_conf_edges[1],
-                data={
-                    "rid": resource_conf_id,
-                    "val": resource_conf_val,
-                    "valr": resource_conf_val_r,
-                },
-                etype="rc",
-            )
-
     def reset_graph(self):
         self.graph = GraphFactory.create_graph(
             self.problem_edges,
             self.n_nodes,
             self.factored_rp,
-            self.observe_conflicts_as_cliques,
             self.device,
-            pyg=self.pyg,
         )
 
         m = 0
@@ -227,7 +199,6 @@ class GState:
         self.reset_resources()
         self.reset_selectable()
         self.reset_type()
-        self.reset_conflicts_as_cliques()
         self.reset_zero_dur()
         self.no_resource_usage = torch.all(self.all_resources_usage() == 0, 1)
 
@@ -634,7 +605,7 @@ class GState:
         for i in range(nres):
             ax[i].set_xlim([-1, max(ends) * 1.2])
             ax[i].set_ylim([0, maxres[i]])
-            ax[i].set_ylabel(f"R {i+1}")
+            ax[i].set_ylabel(f"R {i + 1}")
 
         patches = []
 
@@ -700,9 +671,9 @@ class GState:
 
     def affect_node(self, nodeid):
         # should be selectable
-        assert self.selectable(
-            nodeid
-        ), f"invalid action selected:  {nodeid} ; selectables: {self.selectables() == 1}"
+        assert self.selectable(nodeid), (
+            f"invalid action selected:  {nodeid} ; selectables: {self.selectables() == 1}"
+        )
         # all modes become unselectable
         self.set_unselectable(self.modes(self.jobid(nodeid).item()))
         if self.remove_old_resource_info:
@@ -1135,16 +1106,6 @@ class GState:
 
     def remove_res_frontier(self, nodes_removed_from_frontier):
         self.remove_res(list(nodes_removed_from_frontier))
-        if self.observe_conflicts_as_cliques:
-            rc_edges = self.graph.edges(etype="rc")
-            nrrf = torch.tensor(list(nodes_removed_from_frontier))
-            c1 = torch.eq(rc_edges[0].unsqueeze(1), nrrf.unsqueeze(0))
-            c2 = torch.eq(rc_edges[1].unsqueeze(1), nrrf.unsqueeze(0))
-            # src_in_removed = torch.any(c1, dim=1)
-            # dst_in_removed = torch.any(c2, dim=1)
-            to_remove = torch.where(torch.logical_or(c1, c2))[0]
-            eids = rc_edges[2][to_remove]
-            self.graph.remove_edges(eids, etype="rc")
 
     # def remove_past_edges(self, removed_from_frontier, newly_affected):
     #     nodes_to_remove = removed_from_frontier

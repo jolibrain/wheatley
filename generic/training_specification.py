@@ -39,6 +39,7 @@ class TrainingSpecification:
         n_validation_env,
         fixed_validation,
         fixed_random_validation,
+        no_random_validation,
         validation_batch_size,
         validation_freq,
         display_env,
@@ -47,7 +48,6 @@ class TrainingSpecification:
         ortools_strategy,
         max_time_ortools,
         scaling_constant_ortools,
-        vecenv_type,
         validate_on_total_data,
         optimizer,
         n_workers,
@@ -60,6 +60,7 @@ class TrainingSpecification:
         batch_size,
         iter_size,
         clip_range,
+        clip_range_high,
         target_kl,
         freeze_graph,
         lr,
@@ -74,6 +75,7 @@ class TrainingSpecification:
         display_gantt,
         max_shared_mem_per_worker,
         espo,
+        clip_grad_norm,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -81,6 +83,7 @@ class TrainingSpecification:
         self.n_validation_env = n_validation_env
         self.fixed_validation = fixed_validation
         self.fixed_random_validation = fixed_random_validation
+        self.no_random_validation = no_random_validation
         self.validation_batch_size = validation_batch_size
         self.validation_freq = validation_freq
         self.display_env = display_env
@@ -89,7 +92,6 @@ class TrainingSpecification:
         self.ortools_strategy = ortools_strategy
         self.max_time_ortools = max_time_ortools
         self.scaling_constant_ortools = scaling_constant_ortools
-        self.vecenv_type = vecenv_type
         self.validate_on_total_data = validate_on_total_data
         self.optimizer = optimizer
         self.normalize_advantage = normalize_advantage
@@ -97,6 +99,7 @@ class TrainingSpecification:
         self.batch_size = batch_size
         self.iter_size = iter_size
         self.clip_range = clip_range
+        self.clip_range_high = clip_range_high
         self.target_kl = target_kl
         self.freeze_graph = freeze_graph
         self.rpo = rpo
@@ -109,6 +112,7 @@ class TrainingSpecification:
         self.display_gantt = display_gantt
         self.max_shared_mem_per_worker = max_shared_mem_per_worker
         self.espo = espo
+        self.clip_grad_norm = clip_grad_norm
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -153,6 +157,7 @@ class TrainingSpecification:
             f"Batch size:                       {self.batch_size}\n"
             f"Iter size:                        {self.iter_size}\n"
             f"Clip Range:                       {self.clip_range}\n"
+            f"Clip Range HIGH:                  {self.clip_range_high}\n"
             f"Target KL:                        {self.target_kl}\n"
             f"Freeze graph:                     {self.freeze_graph}\n"
             f"Learning rate:                    {self.lr}\n"
@@ -163,5 +168,6 @@ class TrainingSpecification:
             f"Store rollouts on disk:           {self.store_rollouts_on_disk}\n"
             f"Critic loss:                      {self.critic_loss}\n"
             f"ESPO:                             {self.espo}\n"
+            f"clip grad norm:                   {self.clip_grad_norm}\n"
             f"Ortools strategies                {self.ortools_strategy}\n"
         )

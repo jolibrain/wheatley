@@ -12,37 +12,19 @@ class GraphFactory:
         problem_edges,
         num_nodes,
         factored_rp,
-        observe_conflicts_as_cliques,
         device,
-        pyg=False,
     ):
-        if not pyg:
-            return DGLGraph(
-                problem_edges,
-                num_nodes,
-                factored_rp,
-                observe_conflicts_as_cliques,
-                device,
-            )
-        else:
-            return PYGGraph(
-                problem_edges,
-                num_nodes,
-                factored_rp,
-                observe_conflicts_as_cliques,
-                device,
-            )
+        return PYGGraph(
+            problem_edges,
+            num_nodes,
+            factored_rp,
+            device,
+        )
 
     @classmethod
     def load(cls, fname, pyg=True):
-        if pyg:
-            return PYGGraph.load(fname)
-        else:
-            return DGLGraph.load(fname)
+        return PYGGraph.load(fname)
 
     @classmethod
     def deserialize(cls, bytearr, pyg=True):
-        if pyg:
-            return PYGGraph.deserialize(bytearr)
-        else:
-            raise RuntimeError("not implemented")
+        return PYGGraph.deserialize(bytearr)

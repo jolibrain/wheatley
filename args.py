@@ -27,7 +27,6 @@
 import argparse
 from typing import Tuple
 
-from generic.utils import get_exp_name
 from jssp.dispatching_rules.heuristics import HEURISTICS
 
 
@@ -89,13 +88,6 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--exp_name_appendix", type=str, help="Appendix for the name of the experience"
     )
-    parser.add_argument(
-        "--vecenv_type",
-        type=str,
-        default="graphgym",
-        choices=["subproc", "dummy", "graphgym"],
-        help="everything deprecated but graphgym",
-    )
 
     # =================================================TRAINING SPECIFICATION====================================================
 
@@ -106,13 +98,13 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--total_timesteps",
         type=int,
-        default=int(1e6),
+        default=int(1e9),
         help="Number of training env timesteps",
     )
     parser.add_argument(
         "--n_epochs",
         type=int,
-        default=10,
+        default=3,
         help="Number of epochs for updating the agent's parameters",
     )
     parser.add_argument(
@@ -242,6 +234,12 @@ def argument_parser() -> argparse.ArgumentParser:
         help="Average the random solutions over N random runs, requires --fixed_validation",
     )
     parser.add_argument(
+        "--no_random_validation",
+        action="store_true",
+        help="Deactivate random solutions",
+    )
+
+    parser.add_argument(
         "--validation_freq",
         type=int,
         default=-1,
@@ -274,9 +272,11 @@ def argument_parser() -> argparse.ArgumentParser:
     # =================================================AGENT SPECIFICATION======================================================
     parser.add_argument("--gamma", type=float, default=1.0, help="Discount factor")
     parser.add_argument(
-        "--clip_range", type=float, default=0.25, help="Clipping parameter"
+        "--clip_range", type=float, default=0.2, help="Clipping parameter"
     )
-    # parser.add_argument("--clip_range", type=float, default=None, help="Clipping parameter")
+    parser.add_argument(
+        "--clip_range_high", type=float, default=0.3, help="Clipping parameter (high)"
+    )
 
     parser.add_argument(
         "--target_kl",
@@ -294,8 +294,8 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--critic_loss",
         type=str,
-        choices=["l2", "l1", "l1w", "l1ws"],
-        default="l2",
+        choices=["l2", "l1", "l1w", "l1ws", "sl1", "logcosh"],
+        default="sl1",
         help="critic loss",
     )
     parser.add_argument(
@@ -315,8 +315,24 @@ def argument_parser() -> argparse.ArgumentParser:
         "--gconv_type",
         type=str,
         default="gatv2",
-        choices=["gin", "gatv2", "pna", "dgn", "gcn2", "pdf"],
+        choices=["gin", "gatv2", "pna", "dgn", "gcn2", "pdf", "gatv2gelu"],
         help="Graph convolutional neural network type: gin for GIN, gatv2 for GATV2",
+    )
+    parser.add_argument(
+        "--gconv_activation",
+        type=str,
+        default="geglu",
+        choices=[
+            "swiglu",
+            "gelu",
+            "relu",
+            "silu",
+            "geglu",
+            "glu",
+            "outergeglu",
+            "bothgeglu",
+        ],
+        help="Graph convolutional neural network activation",
     )
     parser.add_argument(
         "--graph_pooling",
@@ -330,20 +346,20 @@ def argument_parser() -> argparse.ArgumentParser:
         type=str,
         default="all",
         choices=["last", "all"],
-        help="use all or only last layer as node value, used only in tokengt",
+        help="use all or only last layer as node value",
     )
     parser.add_argument(
         "--mlp_act_graph",
         type=str,
         default="gelu",
-        choices=["relu", "tanh", "elu", "gelu", "selu", "silu"],
+        choices=["relu", "tanh", "elu", "gelu", "selu", "silu", "swiglu", "geglu"],
         help="agent mlp extractor activation type",
     )
     parser.add_argument(
         "--mlp_act",
         type=str,
         default="gelu",
-        choices=["relu", "tanh", "elu", "gelu", "selu"],
+        choices=["relu", "tanh", "elu", "gelu", "selu", "swiglu", "geglu"],
         help="agent mlp extractor activation type",
     )
     parser.add_argument(
@@ -360,44 +376,6 @@ def argument_parser() -> argparse.ArgumentParser:
         choices=["realistic", "optimistic", "pessimistic", "averagistic"],
         help="ortools durations estimations in pessimistic|optimistic|averagistic|realistic realistic means omiscient, "
         "ie sees the future",
-    )
-    parser.add_argument(
-        "--fe_type",
-        type=str,
-        default="message_passing",
-        help="feature extractor type in [message_passing|tokengt]",
-        choices=["message_passing", "tokengt"],
-    )
-    parser.add_argument(
-        "--transformer_flavor",
-        type=str,
-        default="linear",
-        help="transformer implementation for tokengt",
-        choices=["vanilla", "linear", "performer"],
-    )
-    parser.add_argument(
-        "--performer_nb_features",
-        type=int,
-        default=None,
-        help="number of projections features for performer (for tokengt), default is n.log(n), where n is head dim",
-    )
-    parser.add_argument(
-        "--performer_redraw_interval",
-        type=int,
-        default=1000,
-        help="redraw interval for features basis  for performer (for tokengt)",
-    )
-    parser.add_argument(
-        "--performer_generalized_attention",
-        action="store_true",
-        default=False,
-        help="generalized attention  for performer (for tokengt)",
-    )
-    parser.add_argument(
-        "--performer_auto_check_redraw",
-        default=False,
-        action="store_true",
-        help="auto check redraw for performer (for tokengt)",
     )
 
     parser.add_argument(
@@ -416,7 +394,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_mlp_layers_features_extractor",
         type=int,
-        default=3,
+        default=1,
         help="Number of MLP layers in each GNN",
     )
     parser.add_argument(
@@ -434,24 +412,16 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--n_attention_heads",
         type=int,
-        default=4,
+        default=2,
         help="Number of heads for internal attention",
     )
-    parser.add_argument(
-        "--reverse_adj_in_gnn", action="store_true", help="reverse adj matrix in GNN"
-    )
+
     parser.add_argument(
         "--residual_gnn", action="store_true", help="use residual connection in GNN"
     )
+    parser.add_argument("--g2", action="store_true", help="use gradient gating in GNN")
     parser.add_argument(
         "--normalize_gnn", action="store_true", help="normalize gnn everywhere"
-    )
-    parser.add_argument(
-        "--conflicts",
-        type=str,
-        help="machine conflict encoding in [att|clique|node]",
-        default="clique",
-        choices=["att", "clique", "node"],
     )
     parser.add_argument(
         "--no_tct",
@@ -460,12 +430,6 @@ def argument_parser() -> argparse.ArgumentParser:
         help="do not explicitly compute/use tct before gnn",
     )
 
-    parser.add_argument(
-        "--mid_in_edges",
-        default=False,
-        action="store_true",
-        help="add machine id in edge type",
-    )
     parser.add_argument(
         "--add_rp_edges",
         default="frontier_strict",
@@ -564,13 +528,6 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--hidden_dim_critic", type=int, default=64, help="Hidden dim for critic"
     )
-    parser.add_argument(
-        "--edge_embedding_flavor",
-        type=str,
-        default="sum",
-        choices=["sum", "cat"],
-        help="edge embedding technique for RCPSP",
-    )
 
     parser.add_argument(
         "--rwpe_k",
@@ -647,13 +604,6 @@ def argument_parser() -> argparse.ArgumentParser:
         + "distribution data (given in duration_delta and duration_mode_bounds)",
     )
     parser.add_argument(
-        "--transition_model_config",
-        type=str,
-        default="simple",
-        choices=["simple", "L2D", "SlotLocking"],
-        help="Which transition model to use",
-    )
-    parser.add_argument(
         "--observe_duration_when_affect",
         default=False,
         action="store_true",
@@ -682,26 +632,6 @@ def argument_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--reward_model_config",
-        type=str,
-        default="Sparse",
-        choices=[
-            "L2D",
-            "L2D_optimistic",
-            "L2D_pessimistic",
-            "L2D_averagistic",
-            "Sparse",
-            "Tassel",
-            "Intrinsic",
-            "realistic",
-            "optimistic",
-            "pessimistic",
-            "averagistic",
-        ],
-        help="Which reward model to use, from L2D|Sparse|Tassel|Intrinsic in the deterministic case; "
-        "for uncertainty (stochastic), you can use pessimistic|optimistic|realistic|averagistic|Sparse",
-    )
-    parser.add_argument(
         "--duration_mode_bounds",
         type=int,
         nargs=2,
@@ -726,25 +656,6 @@ def argument_parser() -> argparse.ArgumentParser:
             "slot_locking",
         ],
         help="This defines how the jobs are inserted in the schedule.",
-    )
-    parser.add_argument(
-        "--features",
-        type=str,
-        nargs="+",
-        default=[
-            "duration",
-            # "selectable", is mandatory , no need to put it here
-            # "one_hot_machineid", is also mandatory, no need to put it here
-            # "total_job_time",
-            # "total_machine_time",
-            # "job_completion_percentage",
-            # "machine_completion_percentage",
-            # "mopnr",
-            # "mwkr",
-        ],
-        help="The features we want to have as input of features_extractor. Should be in {duration, one_hot_job_id, "
-        + "one_hot_machine_id, total_job_time, total_machine_time, job_completion_percentage, machine_completion_percentage, "
-        + "mopnr, mwkr",
     )
     parser.add_argument(
         "--dont_normalize_input",
@@ -941,6 +852,48 @@ def argument_parser() -> argparse.ArgumentParser:
         help="Disable ortools solution computation",
     )
 
+    parser.add_argument(
+        "--maze_size_train",
+        type=int,
+        default=5,
+        help="maze size for train",
+    )
+    parser.add_argument(
+        "--maze_size_test",
+        type=int,
+        default=5,
+        help="maze size for test",
+    )
+    parser.add_argument("--lappe", type=int, default=None, help="LapPE size")
+    parser.add_argument("--rwpe", type=int, default=None, help="RWPE size")
+    parser.add_argument("--n_train_mazes", type=int, default=1, help="n train mazes")
+    parser.add_argument("--n_test_mazes", type=int, default=0, help="n test mazes")
+    parser.add_argument("--bidir", action="store_true", help="add reverse edges")
+    parser.add_argument(
+        "--infinite_dataset",
+        action="store_true",
+        help="generate new train pb on the fly",
+    )
+    parser.add_argument(
+        "--laber", type=int, default=None, help="laber weigther subsampling"
+    )
+    parser.add_argument("--no_walls", action="store_true", help="not do add wall edges")
+    parser.add_argument("--self_loops", action="store_true", help="add self_loops")
+    parser.add_argument(
+        "--clip_grad_norm",
+        type=float,
+        # default=0.25,
+        default=0.0,
+        help="clip grad norm (0 disables clipping)",
+    )
+
+    parser.add_argument(
+        "--nonchrono",
+        type=str,
+        default=None,
+        help="non chronological agent: wp, path, order, default is None",
+    )
+
     return parser
 
 
@@ -948,7 +901,6 @@ def parse_args(parser: argparse.ArgumentParser) -> Tuple[argparse.Namespace, str
     # ================================================PARSING, IMPORTS, AND VERIFICATIONS=======================================
     # Parsing
     args = parser.parse_args()
-    exp_name = get_exp_name(args)
     # path = get_path(args.path, exp_name)
 
     if args.eval_n_j is None:
@@ -979,9 +931,6 @@ def parse_args(parser: argparse.ArgumentParser) -> Tuple[argparse.Namespace, str
     if args.sample_n_jobs != -1 and args.chunk_n_jobs != -1:
         raise Exception("--sample_n_jobs and --chunk_n_jobs are incompatible")
 
-    # Sorting the features
-    args.features = sorted(args.features)
-
     if args.custom_heuristic_names is None:
         args.custom_heuristic_names = []
 
@@ -991,4 +940,4 @@ def parse_args(parser: argparse.ArgumentParser) -> Tuple[argparse.Namespace, str
     if args.resume:
         args.skip_initial_eval = True
 
-    return args, exp_name
+    return args

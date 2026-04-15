@@ -30,7 +30,6 @@ import os
 import pickle
 import sys
 import time
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -44,8 +43,6 @@ from jssp.description import Description as JSSPDescription
 from jssp.env.env import Env as JSSPEnv
 from jssp.models.custom_agent import CustomAgent
 from jssp.utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
-from psp.env.env import Env as PSPEnv
-from psp.env.genv import GEnv
 from psp.utils.ortools import get_ortools_criterion_psp
 
 
@@ -57,10 +54,15 @@ class AgentValidator:
         device,
         training_specification,
         disable_visdom,
+        env_cls,
         validation_envs=None,
         verbose=2,
-        graphobs=False,
-        compute_ortools=True,
+        compute_ortools=False,
+        lappe=None,
+        rwpe=None,
+        walls=True,
+        nonchrono=None,
+        env_kwargs=None,
     ):
         super().__init__()
 
@@ -71,29 +73,23 @@ class AgentValidator:
         else:
             self.psp = True
 
-        self.graphobs = graphobs
-
         self.compute_ortools = compute_ortools
 
-        if self.psp:
-            if self.graphobs:
-                self.env_cls = GEnv
-            else:
-                self.env_cls = PSPEnv
-        else:
-            self.env_cls = JSSPEnv
+        self.env_cls = env_cls
         if training_specification.validate_on_total_data:
             self.env_specification = copy.deepcopy(env_specification)
             self.env_specification.sample_n_jobs = -1
         else:
             self.env_specification = env_specification
         self.device = device
+        self.env_kwargs = env_kwargs or {}
 
         self.display_gantt = training_specification.display_gantt
 
         self.n_validation_env = training_specification.n_validation_env
         self.fixed_validation = training_specification.fixed_validation
         self.fixed_random_validation = training_specification.fixed_random_validation
+        self.no_random_validation = training_specification.no_random_validation
         self.vis = visdom.Visdom(
             env=training_specification.display_env,
             log_to_filename="/dev/null",
@@ -104,7 +100,6 @@ class AgentValidator:
         if self.compute_ortools:
             self.ortools_strategies = training_specification.ortools_strategy
 
-        self.transition_model_config = problem_description.transition_model_config
         self.reward_model_config = problem_description.reward_model_config
 
         self.custom_names = training_specification.custom_heuristic_names
@@ -124,11 +119,11 @@ class AgentValidator:
         ]
 
         # Inner variables
-        if hasattr(self.problem_description, "test_psps"):
+        if hasattr(self.problem_description, "test_pbs"):
             if self.problem_description.unload:
-                n_test_pb = len(self.problem_description.test_psps_ids)
+                n_test_pb = len(self.problem_description.test_pbs_ids)
             else:
-                n_test_pb = len(self.problem_description.test_psps)
+                n_test_pb = len(self.problem_description.test_pbs)
 
             if (
                 n_test_pb == self.n_validation_env and self.fixed_random_validation == 0
@@ -136,7 +131,7 @@ class AgentValidator:
                 aff = [[i] for i in range(self.n_validation_env)]
             else:  # TODO: maybe use fixed random validation as number of sample of tests
                 aff = [
-                    list(range(len(self.problem_description.test_psps)))
+                    list(range(len(self.problem_description.test_pbs)))
                 ] * self.fixed_random_validation
                 self.n_validation_env = len(aff)
 
@@ -150,19 +145,19 @@ class AgentValidator:
             for i in tqdm.tqdm(
                 range(self.n_validation_env), desc="Creating validation envs"
             ):
-                problem_description = copy.deepcopy(self.problem_description)
+                # problem_description = copy.deepcopy(self.problem_description)
+                problem_description = copy.copy(self.problem_description)
                 problem_description.rng = np.random.default_rng(
                     self.problem_description.seed + i
                 )
-                self.validation_envs.append(
-                    self.env_cls(
-                        problem_description,
-                        self.env_specification,
-                        aff[i],
-                        validate=True,
-                        pyg=self.env_specification.pyg,
-                    )
+                env = self.env_cls(
+                    problem_description,
+                    self.env_specification,
+                    aff[i],
+                    validate=True,
+                    **self.env_kwargs,
                 )
+                self.validation_envs.append(env)
 
         self.criterion_ratio = 1000
         self.criterions = []
@@ -401,7 +396,7 @@ class AgentValidator:
                 batch_dict.setdefault(key, []).append(value)
         return batch_dict
 
-    def save_csv(self, name, criterion, optimal, schedule, sampled_jobs):
+    def save_csv(self, name, criterion, optimal, sol, sampled_jobs):
         f = open(self.path + name + ".csv", "w")
         writer = csv.writer(f)
         if sampled_jobs is not None:
@@ -414,20 +409,26 @@ class AgentValidator:
             for i in range(self.env_specification.max_n_machines):
                 header.append("task " + str(i) + " start time")
             writer.writerow(header)
-            for i in range(schedule.shape[0]):
-                line = ["job " + str(i)] + schedule[i].tolist()
+            for i in range(sol.shape[0]):
+                line = ["job " + str(i)] + sol[i].tolist()
                 writer.writerow(line)
+        elif hasattr(self.env_specification, "max_n_steps"):
+            if sol is not None:
+                writer.writerow(sol)
+            else:
+                writer.writerow(["NO SOLUTION"])
+
         else:  # PSP case
             # schedule is (job_schedule, mode)
             header = ["all starts"]
             writer.writerow(header)
-            for i in range(len(schedule[0])):
-                writer.writerow([schedule[0][i]])
+            for i in range(len(sol[0])):
+                writer.writerow([sol[0][i]])
             writer.writerow([])
             header = ["all modes"]
             writer.writerow(header)
-            for i in range(len(schedule[0])):
-                writer.writerow([schedule[1][i]])
+            for i in range(len(sol[0])):
+                writer.writerow([sol[1][i]])
         f.close()
 
     def _evaluate_agent(self, agent):
@@ -458,59 +459,76 @@ class AgentValidator:
                         agent.get_obs(all_obs, list(range(i, i + bs))),
                         action_masks=all_masks[i : i + bs],
                         deterministic=True,
+                        # deterministic=False,
                     )
                     all_actions += list(actions)
                 all_obs = []
                 all_masks = []
                 todo_envs = []
                 for env, action in zip(envs, all_actions):
-                    obs, _, done, _, info = env.step(action.long().item())
+                    if isinstance(action, list):
+                        step_action = [int(a) for a in action]
+                    elif torch.is_tensor(action):
+                        if action.dim() == 0:
+                            step_action = int(action.item())
+                        else:
+                            step_action = [int(a.item()) for a in action]
+                    else:
+                        step_action = int(action)
+                    obs, _, done, _, info = env.step(step_action)
                     if done:
                         continue
                     all_obs.append(agent.obs_as_tensor_add_batch_dim(obs))
                     todo_envs.append(env)
-                    all_masks.append(decode_mask(info["mask"]))
+                    all_masks.append(decode_mask([info["mask"]])[0])
                 envs = todo_envs
             print("...done")
 
         solution = []
+
         for i in tqdm.tqdm(range(self.n_validation_env), desc="   evaluating         "):
+            # print('i=', i)
+            agent.eval()
             if self.batch_size == 0:
                 obs, info = self.validation_envs[i].reset(soft=self.fixed_validation)
-                # print("RESET")
-                # print("graph", obs._graph)
-                # print("prec edges", obs.edges("prec"))
-                # print("rp edges", obs.edges("rp"))
-                # print("ndata", obs.ndata())
-                # print("global data", obs.global_data())
                 done = False
+                # step_actions = [] # debug
                 while not done:
-                    action_masks = info["mask"].reshape(1, -1)
-                    action_masks = decode_mask(action_masks)
-                    # print("STEP ", i)
+                    raw_mask = info["mask"].reshape(1, -1)
+                    action_masks = decode_mask(raw_mask)
+
                     obs = agent.obs_as_tensor_add_batch_dim(obs)
-                    # print("graph", obs._graph)
-                    # print("prec edges", obs.edges("prec"))
-                    # print("rp edges", obs.edges("rp"))
-                    # print("ndata", obs.ndata())
-                    # print("global data", obs.global_data())
-                    action = agent.predict(
+                    # action = agent.predict(
+                    #     agent.preprocess(obs),
+                    #     deterministic=True,
+                    #     action_masks=action_masks,
+                    # )
+                    action, _, _, _, _ = agent.get_action_and_value(
                         agent.preprocess(obs),
-                        deterministic=True,
                         action_masks=action_masks,
+                        deterministic=True,
                     )
+                    # print("predict action:", action)
+                    # sys.exit()
+                    action_tensor = action.detach()
+
+                    if action_tensor.device != torch.device("cpu"):
+                        action_tensor = action_tensor.cpu()
+
+                    step_action = action_tensor.reshape(-1).item()
                     obs, reward, done, _, info = self.validation_envs[i].step(
-                        action.long().item()
+                        step_action
                     )
+                    # step_actions.append(step_action) # debug
+
             solution.append(self.validation_envs[i].get_solution())
+
             if solution[i] is not None:
-                schedule = solution[i].schedule
+                sol = solution[i].schedule
                 criterion = solution[i].get_criterion()
 
                 if i == 0 and self.display_gantt:
-                    self.gantt_rl_img = self.validation_envs[i].render_solution(
-                        schedule
-                    )
+                    self.gantt_rl_img = self.validation_envs[i].render_solution(sol)
 
                 if criterion < self.best_criterion_wheatley[i]:
                     self.best_criterion_wheatley[i] = criterion
@@ -518,15 +536,16 @@ class AgentValidator:
                         f"wheatley_{i}",
                         criterion,
                         "unknown",
-                        schedule,
-                        self.validation_envs[i].sampled_jobs,
+                        sol,
+                        self.validation_envs[i].sampled_jobs
+                        if hasattr(self.validation_envs[i], "sampled_jobs")
+                        else None,
                     )
 
                 self.last_ppo_criterions[i] = criterion
 
                 mean_criterion += criterion / self.n_validation_env
             else:
-                schedule = None
                 state = self.validation_envs[i].state
                 self.last_ppo_criterions[i] = state.undoable_criterion
                 mean_criterion += state.undoable_criterion / self.n_validation_env
@@ -579,10 +598,14 @@ class AgentValidator:
                         or_tools_criterion / self.n_validation_env
                     )
 
-            if self.fixed_random_validation:
+            if self.no_random_validation:
+                random_criterion = 0
+            elif self.fixed_random_validation:
                 random_criterion = self.fixed_random[i]
             else:
-                random_criterion = self._get_random_criterion(i)
+                random_criterion = self._get_random_criterion(
+                    i
+                )  # XXX(beniz): deactivate random agent
             random_mean_criterion += random_criterion / self.n_validation_env
 
             for custom_agent in self.custom_agents:
@@ -828,7 +851,7 @@ class AgentValidator:
         self.dpss.append(
             int(
                 alg.n_epochs
-                * alg.num_envs
+                * alg.training_specification.n_workers
                 * alg.num_steps
                 / (time.time() - alg.start_time)
             )

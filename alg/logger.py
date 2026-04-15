@@ -8,7 +8,6 @@ from collections import defaultdict
 from typing import Any, Dict, List, Mapping, Optional, Sequence, TextIO, Tuple, Union
 
 import numpy as np
-import pandas
 import torch as th
 from matplotlib import pyplot as plt
 
@@ -175,9 +174,9 @@ class HumanOutputFormat(KVWriter, SeqWriter):
             self.file = open(filename_or_file, "wt")
             self.own_file = True
         else:
-            assert hasattr(
-                filename_or_file, "write"
-            ), f"Expected file or str, got {filename_or_file}"
+            assert hasattr(filename_or_file, "write"), (
+                f"Expected file or str, got {filename_or_file}"
+            )
             self.file = filename_or_file
             self.own_file = False
 
@@ -432,8 +431,7 @@ class TensorBoardOutputFormat(KVWriter):
 
     def __init__(self, folder: str):
         assert SummaryWriter is not None, (
-            "tensorboard is not installed, you can use "
-            "pip install tensorboard to do so"
+            "tensorboard is not installed, you can use pip install tensorboard to do so"
         )
         self.writer = SummaryWriter(log_dir=folder)
 
@@ -723,28 +721,28 @@ def configure_logger(
 # ================================================================
 
 
-def read_json(filename: str) -> pandas.DataFrame:
-    """
-    read a json file using pandas
+# def read_json(filename: str) -> pandas.DataFrame:
+#     """
+#     read a json file using pandas
 
-    :param filename: the file path to read
-    :return: the data in the json
-    """
-    data = []
-    with open(filename) as file_handler:
-        for line in file_handler:
-            data.append(json.loads(line))
-    return pandas.DataFrame(data)
+#     :param filename: the file path to read
+#     :return: the data in the json
+#     """
+#     data = []
+#     with open(filename) as file_handler:
+#         for line in file_handler:
+#             data.append(json.loads(line))
+#     return pandas.DataFrame(data)
 
 
-def read_csv(filename: str) -> pandas.DataFrame:
-    """
-    read a csv file using pandas
+# def read_csv(filename: str) -> pandas.DataFrame:
+#     """
+#     read a csv file using pandas
 
-    :param filename: the file path to read
-    :return: the data in the csv
-    """
-    return pandas.read_csv(filename, index_col=None, comment="#")
+#     :param filename: the file path to read
+#     :return: the data in the csv
+#     """
+#     return pandas.read_csv(filename, index_col=None, comment="#")
 
 
 # ================================================================
