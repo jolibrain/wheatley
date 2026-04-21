@@ -13,7 +13,6 @@ class PYGGraph(Graph):
         problem_edges,
         num_nodes,
         factored_rp,
-        observe_conflicts_as_cliques,
         device,
     ):
         self._graph = HeteroData()
@@ -22,9 +21,11 @@ class PYGGraph(Graph):
             problem_edges, dtype=torch.int64
         ).t()
 
+        self._graph["n", "rp", "n"].edge_index = torch.empty(2, 0, dtype=torch.int64)
+        self._graph["n", "rp", "n"].r = torch.empty(0, 4, dtype=torch.float)
+
         self._graph.to(device)
         self.factored_rp = factored_rp
-        self.observe_conflicts_as_cliques = observe_conflicts_as_cliques
 
         self.compute_caches()
 
@@ -54,28 +55,38 @@ class PYGGraph(Graph):
         self._outdeg_cache = torch.tensor(self._outdeg_cache)
         self.cache = True
 
-    def ndata(self, featname=None):
+    def ndata(self, featname=None, node_type="n"):
         if isinstance(self._graph, Data):
             if featname is None:
                 return self._graph
             return self._graph[featname]
         if featname is None:
-            return self._graph["n"]
-        return self._graph["n"][featname]
+            return self._graph[node_type]
+        return self._graph[node_type][featname]
 
-    def set_ndata(self, featname, t):
-        self._graph["n"][featname] = t
+    def get_ndata(self, featname, node_type="n", nid=None):
+        if nid is None:
+            return self._graph[node_type][featname]
+        return self._graph[node_type][featname][nid]
 
-    def set_edata(self, etype, featname, data, index=None):
-        if index is None:
-            self._graph["n", etype, "n"][featname] = data
+    def set_ndata(self, featname, t, node_type="n", nid=None):
+        if nid is None:
+            self._graph[node_type][featname] = t
         else:
-            self._graph["n", etype, "n"][featname][:, index] = data
+            self._graph[node_type][featname][nid] = t
 
-    def num_nodes(self):
-        if self._graph["n"].num_nodes is None:
+    def set_edata(
+        self, etype, featname, data, index=None, node_type1="n", node_type2="n"
+    ):
+        if index is None:
+            self._graph[node_type1, etype, node_type2][featname] = data
+        else:
+            self._graph[node_type1, etype, node_type2][featname][:, index] = data
+
+    def num_nodes(self, node_type="n"):
+        if self._graph[node_type].num_nodes is None:
             return 0
-        return self._graph["n"].num_nodes
+        return self._graph[node_type].num_nodes
 
     def predecessors(self, nid):
         if not self.cache:
@@ -116,82 +127,138 @@ class PYGGraph(Graph):
             return self._graph
         return self._graph[featname]
 
-    def edges(self, etype):
-        if self._graph["n", etype, "n"].num_edges == 0:
-            # return torch.empty(0, 3, dtype=torch.int64)
-            return (
-                torch.tensor([], dtype=torch.int64),
-                torch.tensor([], dtype=torch.int64),
-                torch.tensor([], dtype=torch.int64),
-            )
+    def edges(self, etype, node_type1="n", node_type2="n"):
+        if type(etype) is tuple:
+            if self._graph[etype].num_edges == 0:
+                # return torch.empty(0, 3, dtype=torch.int64)
+                return (
+                    torch.tensor([], dtype=torch.int64),
+                    torch.tensor([], dtype=torch.int64),
+                    torch.tensor([], dtype=torch.int64),
+                )
+            else:
+                edges = self._graph[etype].edge_index
+                # return torch.cat(
+                #     [edges, torch.tensor(list(range(edges.shape[1]))).unsqueeze(0)],
+                #     dim=0,
+                # )
+                return (
+                    edges[0],
+                    edges[1],
+                    # torch.tensor(list(range(edges.shape[1])), dtype=torch.int64),
+                    torch.arange(edges.shape[1], dtype=torch.int64),
+                )
         else:
-            edges = self._graph["n", etype, "n"].edge_index
-            # return torch.cat(
-            #     [edges, torch.tensor(list(range(edges.shape[1]))).unsqueeze(0)],
-            #     dim=0,
-            # )
-            return (
-                edges[0],
-                edges[1],
-                # torch.tensor(list(range(edges.shape[1])), dtype=torch.int64),
-                torch.arange(edges.shape[1], dtype=torch.int64),
-            )
+            if self._graph[(node_type1, etype, node_type2)].num_edges == 0:
+                # return torch.empty(0, 3, dtype=torch.int64)
+                return (
+                    torch.tensor([], dtype=torch.int64),
+                    torch.tensor([], dtype=torch.int64),
+                    torch.tensor([], dtype=torch.int64),
+                )
+            else:
+                edges = self._graph[(node_type1, etype, node_type2)].edge_index
+                # return torch.cat(
+                #     [edges, torch.tensor(list(range(edges.shape[1]))).unsqueeze(0)],
+                #     dim=0,
+                # )
+                return (
+                    edges[0],
+                    edges[1],
+                    # torch.tensor(list(range(edges.shape[1])), dtype=torch.int64),
+                    torch.arange(edges.shape[1], dtype=torch.int64),
+                )
 
-    def remove_edges(self, eid, etype):
+    def remove_edges(self, eid, etype, node_type1="n", node_type2="n"):
         if len(eid) == 0:
             return
         # mask = torch.tensor([True] * self._graph["n", etype, "n"].edge_index.shape[1])
         # mask[eid] = False
         mask = torch_geometric.utils.index_to_mask(
-            eid, size=self._graph["n", etype, "n"].num_edges
+            eid, size=self._graph[node_type1, etype, node_type2].num_edges
         )
-        for k in self._graph["n", etype, "n"]:
+        for k in self._graph[node_type1, etype, node_type2]:
             if k == "edge_index":
                 dim = 1
             else:
                 dim = 0
-            self._graph["n", etype, "n"][k] = (
+            self._graph[node_type1, etype, node_type2][k] = (
                 #            self._graph["n", etype, "n"].edge_index[:, mask].clone()
                 torch_geometric.utils.mask_select(
-                    self._graph["n", etype, "n"][k], dim, torch.logical_not(mask)
+                    self._graph[node_type1, etype, node_type2][k],
+                    dim,
+                    torch.logical_not(mask),
                 )
             )
 
-    def add_nodes(self, num_nodes, featname, data):
-        self._graph["n"][featname] = torch.cat([self._graph["n"][featname], data])
+    def remove_edge(self, eid, etype, node_type1="n", node_type2="n"):
+        if isinstance(etype, tuple):
+            edge_store = self._graph[etype]
+        else:
+            edge_store = self._graph[(node_type1, etype, node_type2)]
+
+        edge_ids_device = edge_store.edge_index.device
+
+        if isinstance(eid, torch.Tensor):
+            edge_ids = eid.to(edge_ids_device, dtype=torch.int64).flatten()
+        else:
+            try:
+                edge_ids = torch.tensor(
+                    [int(eid)], dtype=torch.int64, device=edge_ids_device
+                )
+            except (TypeError, ValueError) as exc:
+                raise ValueError("eid must be convertible to an integer") from exc
+
+        if edge_ids.numel() == 0:
+            return
+
+        self.remove_edges(edge_ids, etype, node_type1=node_type1, node_type2=node_type2)
+
+    def add_nodes(self, num_nodes, featname=None, data=None, node_type="n"):
+        if node_type not in self._graph.node_types:
+            self._graph[node_type].num_nodes = num_nodes
+
+        else:
+            try:
+                self._graph[node_type].featname = torch.cat(
+                    [self._graph[node_type].featname, data]
+                )
+            except AttributeError:
+                self._graph[node_type].featname = data
 
     def add_batchinfo(self, batchinfo):
         self._graph["n"]["batch"] = torch.cat([self._graph["n"]["batch"], batchinfo])
 
-    def add_edges(self, sources, destinations, etype, data=None):
+    def add_edges(
+        self, sources, destinations, etype, data=None, node_type1="n", node_type2="n"
+    ):
         new_edges = torch.stack([sources, destinations], dim=0)
-        if self._graph["n", etype, "n"].num_edges == 0:
-            self._graph["n", etype, "n"].edge_index = new_edges
+        if self._graph[node_type1, etype, node_type2].num_edges == 0:
+            self._graph[(node_type1, etype, node_type2)].edge_index = new_edges
             if data is not None:
                 for key, value in data.items():
-                    self._graph["n", etype, "n"][key] = data[key]
-
+                    self._graph[(node_type1, etype, node_type2)][key] = data[key]
         else:
-            self._graph["n", etype, "n"].edge_index = torch.cat(
-                [self._graph["n", etype, "n"].edge_index, new_edges], dim=1
+            self._graph[(node_type1, etype, node_type2)].edge_index = torch.cat(
+                [self._graph[(node_type1, etype, node_type2)].edge_index, new_edges],
+                dim=1,
             )
             if data is not None:
                 for key, value in data.items():
-                    self._graph["n", etype, "n"][key] = torch.cat(
-                        [self._graph["n", etype, "n"][key], data[key]], dim=0
+                    self._graph[(node_type1, etype, node_type2)][key] = torch.cat(
+                        [self._graph[(node_type1, etype, node_type2)][key], data[key]],
+                        dim=0,
                     )
 
-    def num_edges(self, etype):
-        return self._graph["n", etype, "n"].num_edges
-
-    def edata(self, etype, dataid):
-        if isinstance(self._graph, Data):
-            if etype is None:
-                return self._graph[dataid]
-            return self._graph[etype][dataid]
+    def num_edges(self, etype=None, ntype1="n", ntype2="n"):
         if etype is None:
-            return self._graph["n"][dataid]
-        return self._graph["n", etype, "n"][dataid]
+            return self._graph.num_edges
+        return self._graph[ntype1, etype, ntype2].num_edges
+
+    def edata(self, etype, dataid=None):
+        if dataid is None:
+            return self._graph[etype]
+        return self._graph[etype][dataid]
 
     @classmethod
     def batch(cls, graphlist, num_nodes, num_edges):
@@ -215,7 +282,6 @@ class PYGGraph(Graph):
         g = PYGGraph.__new__(PYGGraph)
         g._graph = self._graph.clone()
         g.factored_rp = self.factored_rp
-        g.observe_conflicts_as_cliques = self.observe_conflicts_as_cliques
         g.cache = False
         # g._pred_cache = [t.clone() for t in self._pred_cache]
         # g._suc_cache = [t.clone() for t in self._suc_cache]
@@ -233,7 +299,6 @@ class PYGGraph(Graph):
             # "indeg_cache": self._indeg_cache.tolist(),
             # "outdeg_cache": self._outdeg_cache.tolist(),
             "factored_rp": self.factored_rp,
-            "obs_cliques": self.observe_conflicts_as_cliques,
         }
         torch.save(data, fname, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -248,7 +313,6 @@ class PYGGraph(Graph):
             # "indeg_cache": self._indeg_cache.tolist(),
             # "outdeg_cache": self._outdeg_cache.tolist(),
             "factored_rp": self.factored_rp,
-            "obs_cliques": self.observe_conflicts_as_cliques,
         }
         torch.save(data, buf, pickle_protocol=pickle.HIGHEST_PROTOCOL)
         out = buf.getvalue()
@@ -264,7 +328,6 @@ class PYGGraph(Graph):
         # g._indeg_cache = torch.tensor(d["indeg_cache"])
         # g._outdeg_cache = torch.tensor(d["outdeg_cache"])
         g.factored_rp = d["factored_rp"]
-        g.observe_conflicts_as_cliques = d["obs_cliques"]
         g.cache = False
         return g
 
@@ -278,7 +341,6 @@ class PYGGraph(Graph):
         # g._indeg_cache = torch.tensor(d["indeg_cache"])
         # g._outdeg_cache = torch.tensor(d["outdeg_cache"])
         g.factored_rp = d["factored_rp"]
-        g.observe_conflicts_as_cliques = d["obs_cliques"]
         g.cache = False
         return g
 
@@ -306,7 +368,6 @@ class PYGGraph(Graph):
         g = type(self).__new__(type(self))
         g._graph = self._graph.subgraph({"n": nodes_to_keep})
         g.factored_rp = self.factored_rp
-        g.observe_conflicts_as_cliques = self.observe_conflicts_as_cliques
         g._kept_nodes = nodes_to_keep
         g.compute_caches()
         return g
@@ -316,6 +377,16 @@ class PYGGraph(Graph):
 
     def fullmask_to_submask(self, mask):
         return mask[self._kept_nodes]
+
+    def to_homogeneous(self, ndata=None, edata=None):
+        homo = self._graph.to_homogeneous(
+            ndata, edata, add_node_type=True, add_edge_type=True, dummy_values=True
+        )
+        nn = 0
+        for nt in self._graph.node_types:
+            nn += self._graph[nt].num_nodes
+        homo.num_nodes = nn
+        return homo
 
 
 class PYGBatchGraph(PYGGraph):
@@ -336,10 +407,15 @@ class PYGBatchGraph(PYGGraph):
             [torch.tensor(l, dtype=torch.int64), torch.tensor(l, dtype=torch.int64)]
         )
 
-    def to_homogeneous(self, ndata, edata):
-        self._graph = self._graph.to_homogeneous(
-            ndata, edata, add_node_type=False, add_edge_type=False, dummy_values=False
+    def to_homogeneous(self, ndata=None, edata=None):
+        homo = self._graph.to_homogeneous(
+            ndata, edata, add_node_type=True, add_edge_type=True, dummy_values=True
         )
+        nn = 0
+        for nt in self._graph.node_types:
+            nn += self._graph[nt].num_nodes
+        homo.num_nodes = nn
+        return homo
 
     def to(self, device):
         self._graph = self._graph.to(device)

@@ -27,7 +27,8 @@ import os
 import sys
 from collections import defaultdict
 from typing import List, Optional, Tuple, Union
-
+from generic.graphgym.async_vector_env import AsyncGraphVectorEnv
+import tqdm
 import numpy as np
 import torch
 
@@ -90,3 +91,61 @@ def compute_resources_graph_torch(r_info):
         conflicts_val,
         conflicts_val_r,
     )
+
+
+def create_env(env_cls, problem_description, env_specification, i):
+    def _init():
+        env = env_cls(
+            problem_description,
+            env_specification,
+            i,
+            validate=False,
+        )
+        return env
+
+    return _init
+
+
+def pb_ids(problem_description, num_envs):
+    if not hasattr(problem_description, "train_psps"):
+        return list(range(num_envs))  # simple env id
+    # for psps, we should return a list per env of list of problems for this env
+    if problem_description.unload:
+        return [list(range(len(problem_description.train_psps_ids)))] * num_envs
+    else:
+        return [list(range(len(problem_description.train_psps)))] * num_envs
+
+
+def create_train_envs(
+    env_cls,
+    problem_description,
+    env_specification,
+    num_envs,
+    max_shared_mem_per_worker,
+    lappe,
+    rwpe,
+    env_kwargs=None,
+):
+
+    pbs_per_env = pb_ids(problem_description, num_envs)
+
+    envs = AsyncGraphVectorEnv(
+        [
+            create_env(
+                env_cls,
+                problem_description,
+                env_specification,
+                pbs_per_env[i],
+            )
+            for i in tqdm.tqdm(range(num_envs), desc="Creating learning envs")
+        ],
+        # spwan helps when observation space is huge
+        # and also with torch in subprocesses
+        context="spawn",
+        copy=False,
+        shared_memory=True,
+        disk=False,
+        max_mem_size=max_shared_mem_per_worker,
+    )
+
+    return envs

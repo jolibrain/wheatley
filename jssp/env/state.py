@@ -33,7 +33,6 @@ import cv2
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from pandas import DataFrame as PDDataFrame
 import plotly.figure_factory as ff
 import torch
 

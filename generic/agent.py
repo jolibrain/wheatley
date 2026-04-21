@@ -194,41 +194,91 @@ class Agent(torch.nn.Module):
         value = self.value_net(graph_embedding)
         logits = self.action_net(node_features).squeeze(-1)
 
+        unmasked_distribs = []
+
+        b_ac = []
+        logprobs = []
+        entropy = []
+
         unmasked_distrib = Categorical(logits=logits)
-        if action_masks is not None:
-            # Features are paded to the maximum number of nodes in the actual observation.
-            # `action_masks` can be paded to the maximum number of nodes in the whole rollout,
-            # which can be superior to the number of node in the given batch.
-            current_max_n_nodes = logits.shape[1]
-            action_masks = action_masks[:, :current_max_n_nodes]
+        unmasked_distribs.append(unmasked_distrib)
 
-            mask = torch.as_tensor(action_masks, dtype=torch.bool, device=logits.device)
-            HUGE_NEG = torch.tensor(-1e20, dtype=logits.dtype, device=logits.device)
-            logits = torch.where(mask, logits, HUGE_NEG)
-
-        distrib = Categorical(logits=logits)
-        if action is None:
-            if deterministic == False:
-                action = distrib.sample()
-            else:
-                action = torch.argmax(distrib.probs, dim=1)
-        if action_masks is None:
-            entropy = distrib.entropy()
-        else:
-            nlogits = logits - logits.logsumexp(dim=-1, keepdim=True)
-            p_log_p = nlogits * logits_to_probs(nlogits)
-            p_log_p = torch.where(
-                mask, p_log_p, torch.tensor(0.0, device=logits.device)
+        for b in range(logits.shape[0]):  # iterate over batch size
+            mask = torch.as_tensor(
+                action_masks[b, : logits[b].shape[0]],
+                dtype=torch.bool,
+                device=logits.device,
             )
-            entropy = -p_log_p.sum(-1)
+
+            possible_actions = torch.where(mask)[0]
+            possible_logits = logits[b, possible_actions]
+
+            distrib = Categorical(logits=possible_logits)
+            if action is None:
+                if deterministic is False:
+                    local_action = distrib.sample().unsqueeze(0)
+                else:
+                    local_action = torch.argmax(distrib.probs, dim=0).unsqueeze(0)
+                b_ac.append(possible_actions[local_action])
+            else:
+                local_action_b = action[b]
+                local_action = torch.where(
+                    torch.eq(
+                        possible_actions.to(local_action_b.device),
+                        local_action_b,
+                    )
+                )[0]
+
+            logprobs.append(distrib.log_prob(local_action))
+            entropy.append(distrib.entropy().unsqueeze(0))
+
+        actions = torch.cat(b_ac) if action is None else action
+        log_probs = torch.cat(logprobs)
+        entropies = torch.cat(entropy)
 
         return (
-            action,
-            distrib.log_prob(action),
-            entropy,
+            actions,
+            log_probs,
+            entropies,
             value,
-            unmasked_distrib,
+            unmasked_distribs[0],
         )
+
+        # unmasked_distrib = Categorical(logits=logits)
+        # if action_masks is not None:
+        #     # Features are paded to the maximum number of nodes in the actual observation.
+        #     # `action_masks` can be paded to the maximum number of nodes in the whole rollout,
+        #     # which can be superior to the number of node in the given batch.
+        #     current_max_n_nodes = logits.shape[1]
+        #     action_masks = action_masks[:, :current_max_n_nodes]
+
+        #     mask = torch.as_tensor(action_masks, dtype=torch.bool, device=logits.device)
+        #     HUGE_NEG = torch.tensor(-1e20, dtype=logits.dtype, device=logits.device)
+        #     logits = torch.where(mask, logits, HUGE_NEG)
+
+        # distrib = Categorical(logits=logits)
+        # if action is None:
+        #     if deterministic == False:
+        #         action = distrib.sample()
+        #     else:
+        #         action = torch.argmax(distrib.probs, dim=1)
+        # if action_masks is None:
+        #     entropy = distrib.entropy()
+        # else:
+        #     nlogits = logits - logits.logsumexp(dim=-1, keepdim=True)
+        #     p_log_p = nlogits * logits_to_probs(nlogits)
+        #     p_log_p = torch.where(
+        #         mask, p_log_p, torch.tensor(0.0, device=logits.device)
+        #     )
+        #     entropy = -p_log_p.sum(-1)
+
+        # return (
+        #     action,
+        #     distrib.log_prob(action),
+        #     entropy,
+        #     value,
+        #     unmasked_distrib,
+        # )
 
     def get_action_probs_and_value(self, x, action_masks):
         node_features, graph_feature = self.gnn(x)

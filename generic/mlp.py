@@ -22,6 +22,7 @@
 #
 
 import torch
+from generic.models.geglu import GeGLU
 
 
 class MLP(torch.nn.Module):
@@ -54,7 +55,7 @@ class MLP(torch.nn.Module):
 
         self.layers.append(torch.nn.Linear(last_dim, output_dim))
 
-        if type(activation) == str:
+        if type(activation) is str:
             act_map = {
                 "tanh": torch.nn.Tanh,
                 "relu": torch.nn.LeakyReLU,
@@ -62,10 +63,14 @@ class MLP(torch.nn.Module):
                 "gelu": torch.nn.GELU,
                 "selu": torch.nn.SELU,
                 "silu": torch.nn.SiLU,
+                "geglu": GeGLU,
             }
             activation = act_map[activation]
 
-        self.activation_layer = activation()
+        if activation == GeGLU:
+            self.activation_layer = activation(hidden_dim)
+        else:
+            self.activation_layer = activation()
 
     def forward(self, x):
         for layer in range(self.n_layers - 1):

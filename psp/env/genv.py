@@ -30,7 +30,6 @@ import torch
 from ..utils.taillard_rcpsp import TaillardRcpsp
 from ..utils.loaders import PSPLoader
 from .gstate import GState as State
-from .observation import EnvObservation
 from .reward_models.graph_terminal_reward_model import GraphTerminalRewardModel
 from .transition_models.transition_model import TransitionModel
 
@@ -42,25 +41,16 @@ class GEnv:
         env_specification,
         pb_ids,
         validate=False,
-        pyg=False,
         reset=True,
     ):
         self.problem_description = problem_description
-        self.pyg = pyg
         self.env_specification = env_specification
         self.validate = validate
-        self.transition_model_config = problem_description.transition_model_config
         self._create_transition_model()
         self.reward_model_config = problem_description.reward_model_config
         self._create_reward_model()
-        self.observe_conflicts_as_cliques = (
-            env_specification.observe_conflicts_as_cliques
-        )
         self.observe_subgraph = env_specification.observe_subgraph
         self.deterministic = problem_description.deterministic
-        self.n_features = self.env_specification.n_features
-        self.observation_space = self.env_specification.observation_space
-        self.action_space = self.env_specification.action_space
         self.pb_ids = pb_ids
         random.shuffle(self.pb_ids)
         self.pb_index = -1
@@ -337,8 +327,6 @@ class GEnv:
             self.problem_description,
             self.problem,
             self.deterministic,
-            observe_conflicts_as_cliques=self.observe_conflicts_as_cliques,
-            pyg=self.pyg,
         )
 
     def _create_transition_model(self):

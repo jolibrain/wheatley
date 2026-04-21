@@ -65,37 +65,6 @@ def safe_mean(arr):
     return np.nan if len(arr) == 0 else np.mean(arr)
 
 
-def get_exp_name(args):
-    exp_name = (
-        f"{args.n_j}j{args.n_m}m_D{args.duration_type}_T{args.transition_model_config}_"
-        + f"R{args.reward_model_config}_GNN{args.fe_type}"
-    )
-    if args.fe_type != "tokengt":
-        exp_name += f"_CONV{args.gconv_type}_POOL{args.graph_pooling}"
-    else:
-        exp_name += f"_POOL{args.layer_pooling}_DROP{args.dropout}"
-    exp_name += f"_L{args.n_layers_features_extractor}_HD{args.hidden_dim_features_extractor}_H{args.n_attention_heads}_C{args.conflicts}"
-    if args.dont_normalize_input:
-        exp_name += "_DNI"
-    if args.fixed_problem:
-        exp_name += "_FP"
-    if args.load_problem:
-        exp_name += "_" + args.load_problem.replace(".txt", "").replace("/", "_")
-    if args.freeze_graph:
-        exp_name += "_FG"
-    if args.insertion_mode == "no_forced_insertion":
-        pass
-    elif args.insertion_mode == "full_forced_insertion":
-        exp_name += "_FFI"
-    elif args.insertion_mode == "choose_forced_insertion":
-        exp_name += "_CFI"
-    elif args.insertion_mode == "slot_locking":
-        exp_name += "_SL"
-    if args.exp_name_appendix is not None:
-        exp_name += "_" + args.exp_name_appendix
-    return exp_name
-
-
 def get_path(arg_path, exp_name):
     path = os.path.join(arg_path, exp_name)
     if not path.endswith("/"):
@@ -106,3 +75,11 @@ def get_path(arg_path, exp_name):
     except OSError as error:
         print("save directory", path, " already exists")
     return path
+
+
+def logcosh(source, target, reduction):
+    err = (source - target).cosh().log()
+    if reduction == "none":
+        return err
+    if reduction == "mean":
+        return err.mean()

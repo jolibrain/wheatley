@@ -28,7 +28,6 @@
 class Description:
     def __init__(
         self,
-        transition_model_config,
         reward_model_config,
         deterministic,
         generate_duration_bounds,
@@ -39,7 +38,6 @@ class Description:
     ):
         """ """
 
-        self.transition_model_config = transition_model_config
         self.reward_model_config = reward_model_config
         self.deterministic = deterministic
         self.generate_duration_bounds = generate_duration_bounds
@@ -93,7 +91,6 @@ class Description:
             f"Number of jobs:                   {self.max_n_jobs}\n"
             f"number of modes:                  {self.max_n_modes}\n"
             f"Number of resources:              {self.max_n_resources}\n"
-            f"Transition model:                 {self.transition_model_config}\n"
             f"Reward model:                     {self.reward_model_config}\n"
             f"Deterministic/Stochastic:         {'Deterministic' if self.deterministic else 'Stochastic'}\n"
             f"Generate Duration Bounds:         {self.generate_duration_bounds}\n"

@@ -30,8 +30,6 @@ import os
 import glob
 import pickle
 
-import gymnasium as gym
-from psp.env.graphgym.async_vector_env import AsyncGraphVectorEnv
 from generic.agent import calc_twohot, symexp, symlog
 import numpy as np
 import torch
@@ -41,33 +39,19 @@ import torchinfo
 import tqdm
 import math
 from alg.rollout_dataset import RolloutDataset, collate_rollout
-from generic.utils import decode_mask, safe_mean
+from generic.utils import decode_mask, safe_mean, logcosh
 from generic.adamw_schedulefree import AdamWScheduleFree
 from generic.radam_schedulefree import RAdamScheduleFree
 
 from .logger import Logger, configure_logger, monotony, stability
-from functools import partial
 
-
-def create_env(env_cls, problem_description, env_specification, i):
-    def _init():
-        env = env_cls(
-            problem_description,
-            env_specification,
-            i,
-            validate=False,
-            pyg=env_specification.pyg,
-        )
-        return env
-
-    return _init
+import sys
 
 
 class PPO:
     def __init__(
         self,
         training_specification,
-        env_cls,
         validator=None,
         discard_incomplete_trials=True,
         generate_duration_bounds=None,
@@ -76,10 +60,10 @@ class PPO:
         self.logger = configure_logger(
             folder=training_specification.path, format_strings=["json"]
         )
-        self.env_cls = env_cls
         self.generate_duration_bounds = generate_duration_bounds
 
-        self.num_envs = training_specification.n_workers
+        self.training_specification = training_specification
+
         self.gamma = training_specification.gamma
         self.update_epochs = training_specification.n_epochs
         self.norm_adv = training_specification.normalize_advantage
@@ -88,65 +72,72 @@ class PPO:
         self.gae_lambda = training_specification.gae_lambda
         self.clip_vloss = False
         self.clip_coef = training_specification.clip_range
+        self.clip_coef_high = training_specification.clip_range_high
         self.vf_coef = training_specification.vf_coef
         self.target_kl = training_specification.target_kl
-        self.max_grad_norm = 0.5  # SB3 default
         self.minibatch_size = training_specification.batch_size
         self.iter_size = training_specification.iter_size
         self.validator = validator
-        self.vecenv_type = training_specification.vecenv_type
         self.total_timesteps = training_specification.total_timesteps
         self.validation_freq = training_specification.validation_freq
         self.return_based_scaling = training_specification.return_based_scaling
         self.obs_on_disk = training_specification.store_rollouts_on_disk
-        self.critic_loss = training_specification.critic_loss
+        if training_specification.critic_loss == "l1":
+            self.critic_loss = torch.nn.functional.l1_loss
+        elif training_specification.critic_loss == "l2":
+            self.critic_loss = torch.nn.functional.mse_loss
+        elif training_specification.critic_loss == "sl1":
+            self.critic_loss = torch.nn.functional.smooth_l1_loss
+        elif training_specification.critic_loss == "logcosh":
+            self.critic_loss = logcosh
         self.debug_net = training_specification.debug_net
         self.discard_incomplete_trials = discard_incomplete_trials
         self.max_shared_mem_per_worker = (
             training_specification.max_shared_mem_per_worker
         )
 
+        self.max_grad_norm = training_specification.clip_grad_norm
+
         # in case of resume
         self._num_timesteps_at_start = 0
-        self.ep_info_buffer = deque(maxlen=100)
+        self.ep_info_buffer = []
         self.espo = training_specification.espo
 
         if self.espo:
             self.clip_coef = None
 
-    def keep_only(self, obs, to_keep):
-        kobs = {}
-        for key in obs:
-            kobs[key] = obs[key][to_keep]
-        return kobs
-
-    def collect_rollouts(self, agent, envs, env_specification, data_device, sigma=1.0):
+    def collect_rollouts(
+        self, agent, envs, num_envs, env_specification, data_device, sigma=1.0
+    ):
         # ALGO Logic: Storage setup
         obs = []
-        actions = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        logprobs = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        rewards = torch.zeros((self.num_steps, self.num_envs, agent.reward_dim)).to(
+
+        actions = torch.zeros(
+            (self.num_steps, num_envs), dtype=torch.long, device=data_device
+        )
+        logprobs = torch.zeros((self.num_steps, num_envs)).to(data_device)
+        rewards = torch.zeros((self.num_steps, num_envs, agent.reward_dim)).to(
             data_device
         )
-        dones = torch.zeros((self.num_steps, self.num_envs)).to(data_device)
-        values = torch.zeros((self.num_steps, self.num_envs, agent.reward_dim)).to(
+        dones = torch.zeros((self.num_steps, num_envs)).to(data_device)
+        values = torch.zeros((self.num_steps, num_envs, agent.reward_dim)).to(
             data_device
         )
         action_masks = list()
 
         if self.discard_incomplete_trials:
-            to_keep = [[] for i in range(self.num_envs)]
-            to_keep_candidate = [[] for i in range(self.num_envs)]
+            to_keep = [[] for i in range(num_envs)]
+            to_keep_candidate = [[] for i in range(num_envs)]
 
         # buffer filling
         o, info = envs.reset()
         # next obs is a list of dicts
         next_obs = agent.obs_as_tensor(o)
         action_mask = decode_mask(info["mask"])
-        next_done = torch.zeros(self.num_envs).to(data_device)
+        next_done = torch.zeros(num_envs).to(data_device)
 
-        self.ep_info_buffer = deque(maxlen=100)
-        self.global_step += self.num_envs * self.num_steps
+        self.ep_info_buffer = []
+        self.global_step += num_envs * self.num_steps
 
         if self.obs_on_disk is not None:
             for f in glob.glob(
@@ -156,38 +147,25 @@ class PPO:
 
         for step in tqdm.tqdm(range(0, self.num_steps), desc="   collecting rollouts"):
             if self.obs_on_disk:
-                if agent.graphobs:
-                    for i, o in enumerate(next_obs):
-                        fname = (
-                            self.obs_on_disk
-                            + "/wheatley_"
-                            + str(os.getpid())
-                            + "_"
-                            + str(step * self.num_envs + i)
-                            + ".obs"
-                        )
-                        o.save(fname)
-                        obs.append(fname)
-                else:
-                    list_obs = [dict(zip(next_obs, t)) for t in zip(*next_obs.values())]
-                    for i, o in enumerate(list_obs):
-                        fname = (
-                            self.obs_on_disk
-                            + "/wheatley_pkl_"
-                            + str(os.getpid())
-                            + "_"
-                            + str(step * self.num_envs + i)
-                            + ".obs"
-                        )
-                        pickle.dump(o, open(fname, "wb"))
-                        obs.append(fname)
+                for i, o in enumerate(next_obs):
+                    fname = (
+                        self.obs_on_disk
+                        + "/wheatley_"
+                        + str(os.getpid())
+                        + "_"
+                        + str(step * num_envs + i)
+                        + ".obs"
+                    )
+                    o.save(fname)
+                    obs.append(fname)
             else:
                 obs.append(next_obs)
-            action_masks.append(torch.tensor(action_mask))
+            current_mask = torch.as_tensor(action_mask, dtype=torch.bool)
+            action_masks.append(current_mask)
             dones[step] = next_done
 
             if self.discard_incomplete_trials:
-                for i in range(self.num_envs):
+                for i in range(num_envs):
                     if dones[step][i] == 1:
                         to_keep[i].extend(to_keep_candidate[i])
                         to_keep_candidate[i].clear()
@@ -195,13 +173,17 @@ class PPO:
 
             with torch.no_grad():
                 action, logprob, _, value, _ = agent.get_action_and_value(
-                    agent.preprocess(next_obs), action_masks=action_mask
+                    agent.preprocess(next_obs),
+                    action_masks=current_mask,
+                    deterministic=False,
                 )
                 value = agent.get_value_from_logits(value)
 
-            values[step] = value.view(-1, agent.reward_dim)
-            actions[step] = action
-            logprobs[step] = logprob
+            values[step] = value.view(-1, agent.reward_dim).to(data_device)
+            # print('logprob shape=', logprob.shape)
+            # print('logprobs shape=', logprobs.shape)
+            logprobs[step] = logprob.squeeze(-1)  # .to(data_device)
+            actions[step] = action.squeeze(-1)  # .to(data_device)
 
             next_obs, reward, done, _, info = envs.step(action.cpu().numpy())
             action_mask = decode_mask(info["mask"])
@@ -222,7 +204,7 @@ class PPO:
             next_done = torch.Tensor(done).to(data_device)
 
         if self.discard_incomplete_trials:
-            for i in range(self.num_envs):
+            for i in range(num_envs):
                 if next_done[i] == 1:
                     to_keep[i].extend(to_keep_candidate[i])
 
@@ -262,7 +244,7 @@ class PPO:
                 returns = advantages + values
                 n_dones = int(torch.sum(dones).item())
                 gamma = torch.tensor(
-                    [self.gamma] * (self.num_steps * self.num_envs - n_dones)
+                    [self.gamma] * (self.num_steps * num_envs - n_dones)
                     + [0.0] * n_dones,
                     dtype=torch.float,
                 )
@@ -300,6 +282,7 @@ class PPO:
 
         # Pad the action masks
         max_n_nodes = max(mask.shape[1] for mask in action_masks)
+
         action_masks = [
             torch.concat(
                 (
@@ -319,23 +302,18 @@ class PPO:
         # flatten the batch
         b_obs = agent.rebatch_obs(obs)
         b_logprobs = logprobs.reshape(-1)
-        if agent.graphobs:
-            b_actions = actions.reshape((-1))
-        else:
-            b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
+        b_actions = actions.reshape(-1)
         b_advantages = advantages.reshape(-1, agent.reward_dim)
+
         b_returns = returns.reshape(-1, agent.reward_dim)
         b_values = values.reshape(-1, agent.reward_dim)
         b_action_masks = action_masks.reshape(-1, max_n_nodes)
 
         if self.discard_incomplete_trials:
             to_keep_b = [
-                j + i * self.num_steps for i in range(self.num_envs) for j in to_keep[i]
+                j + i * self.num_steps for i in range(num_envs) for j in to_keep[i]
             ]
-            if agent.graphobs or self.obs_on_disk:
-                bobs_tokeep = list(b_obs[i] for i in to_keep_b)
-            else:
-                bobs_tokeep = self.keep_only(b_obs, to_keep_b)
+            bobs_tokeep = list(b_obs[i] for i in to_keep_b)
             return RolloutDataset(
                 agent,
                 bobs_tokeep,
@@ -359,22 +337,13 @@ class PPO:
             sigma,
         )
 
-    def pb_ids(self, problem_description):
-        if not hasattr(problem_description, "train_psps"):
-            return list(range(self.num_envs))  # simple env id
-        # for psps, we should return a list per env of list of problems for this env
-        if problem_description.unload:
-            return [
-                list(range(len(problem_description.train_psps_ids)))
-            ] * self.num_envs
-        else:
-            return [list(range(len(problem_description.train_psps)))] * self.num_envs
-
     def train(
         self,
         agent,
         problem_description,
         env_specification,
+        train_envs,
+        num_envs,
         lr,
         weight_decay,
         log_interval=1,
@@ -385,64 +354,14 @@ class PPO:
         skip_initial_eval=False,
         skip_model_trace=False,
         warmup=0,
+        laber=None,
     ) -> float:
         # env setup
-        batch_size = self.num_envs * self.num_steps
-        classVecEnv = gym.vector.AsyncVectorEnv
+        batch_size = num_envs * self.num_steps
         # print("creating environments")
-        pbs_per_env = self.pb_ids(problem_description)
-        if self.vecenv_type == "dummy":
-            envs = gym.vector.SyncVectorEnv(
-                [
-                    create_env(
-                        self.env_cls,
-                        problem_description,
-                        env_specification,
-                        pbs_per_env[i],
-                    )
-                    for i in range(self.num_envs)
-                ],
-            )
-        elif self.vecenv_type == "subproc":
-            print("self.env_cls", self.env_cls)
-            envs = gym.vector.AsyncVectorEnv(
-                [
-                    create_env(
-                        self.env_cls,
-                        problem_description,
-                        env_specification,
-                        pbs_per_env[i],
-                    )
-                    for i in range(self.num_envs)
-                ],
-                # spwan helps when observation space is huge
-                # context="spawn",
-                copy=False,
-            )
-        elif self.vecenv_type == "graphgym":
-            envs = AsyncGraphVectorEnv(
-                [
-                    create_env(
-                        self.env_cls,
-                        problem_description,
-                        env_specification,
-                        pbs_per_env[i],
-                    )
-                    for i in tqdm.tqdm(
-                        range(self.num_envs), desc="Creating learning envs"
-                    )
-                ],
-                # spwan helps when observation space is huge
-                # and also with torch in subprocesses
-                context="spawn",
-                copy=False,
-                shared_memory=True,
-                disk=not env_specification.pyg,
-                pyg=env_specification.pyg,
-                max_mem_size=self.max_shared_mem_per_worker,
-            )
 
         print("... done creating environments")
+        envs = train_envs
 
         if self.optimizer_class == torch.optim.RAdam:
             self.optimizer = self.optimizer_class(
@@ -467,10 +386,7 @@ class PPO:
         if not skip_model_trace:
             obs, info = self.validator.validation_envs[0].reset(soft=True)
             obs = agent.obs_as_tensor_add_batch_dim(obs)
-            if agent.graphobs:
-                torchinfo.summary(agent, depth=3, verbose=1)
-            else:
-                torchinfo.summary(agent, input_data=(obs,), depth=3, verbose=1)
+            torchinfo.summary(agent, depth=3, verbose=1)
 
         self.global_step = 0
         if not skip_initial_eval:
@@ -479,7 +395,7 @@ class PPO:
             agent.eval()
             self.validator.validate(agent, self)
             print("... done initial validation")
-        start_time = time.time()
+
         num_updates = self.total_timesteps // batch_size
 
         self.n_epochs = 0
@@ -489,8 +405,6 @@ class PPO:
         else:
             sigma = 1.0
         start = -warmup + 1 if warmup != 0 else 1
-        if warmup > 0:
-            warmup_nb = 0
         for update in range(start, num_updates + 1):
             if update < 1:
                 print("WARMUP", update + warmup)
@@ -508,7 +422,7 @@ class PPO:
             ):
                 self.optimizer.eval()
             rollout_dataset = self.collect_rollouts(
-                agent, envs, env_specification, rollout_data_device, sigma
+                agent, envs, num_envs, env_specification, rollout_data_device, sigma
             )
 
             clipfracs = []
@@ -543,7 +457,11 @@ class PPO:
                 self.optimizer.zero_grad()
                 iter_it = 0
 
+                clipped = 0
+                unclipped = 0
+
                 approx_kl_divs_on_epoch = []
+
                 dataloader = torch.utils.data.DataLoader(
                     rollout_dataset,
                     batch_size=self.minibatch_size,
@@ -551,7 +469,6 @@ class PPO:
                     collate_fn=partial(collate_rollout, agent=agent),
                     num_workers=6,
                     pin_memory=True,
-                    pin_memory_device=train_device,
                 )
                 for (
                     batched_obs,
@@ -566,29 +483,44 @@ class PPO:
                     desc="   minibatches        ",
                     leave=False,
                 ):
-                    if update < 1:
-                        warmup_nb += 1
-                        warmup_lr = lr * math.sqrt(1 - math.pow(0.999, warmup_nb))
-                        for g in self.optimizer.param_groups:
-                            g["lr"] = warmup_lr
+                    # if update < 1:
+                    #     warmup_nb += 1
+                    # warmup_lr = lr * math.sqrt(1 - math.pow(0.999, warmup_nb))
+                    # for g in self.optimizer.param_groups:
+                    #     g["lr"] = warmup_lr
 
+                    # print('batched_actions=', batched_actions)
+                    baction = batched_actions.long().to(train_device)
                     _, newlogprob, entropy, newvalue, unmasked_distrib = (
                         agent.get_action_and_value(
                             batched_obs,
-                            action=batched_actions.long().to(train_device),
+                            action=baction,
                             action_masks=batched_actions_masks,
                         )
                     )
+                    # print('newlogprob shape=', newlogprob.shape)
+                    # print('batched_logprobs shape=', batched_logprobs.shape)
+                    # XXX: bug single agent
+                    # sys.exit()
                     logratio = newlogprob - batched_logprobs.to(train_device)
-                    ratio = logratio.exp()
+                    # print('logratio shape=', logratio.shape)
+                    ratio = logratio.exp()  # .squeeze(-1) #XXX(beniz): squeeze
 
                     with torch.no_grad():
                         # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                        approx_kl = ((ratio - 1) - logratio).mean()
+                        approx_kl = (
+                            (ratio - 1) - logratio
+                        ).mean()  # TODO: maybe use the max instead
                         approx_kl_divs.append(approx_kl.item())
                         if self.clip_coef is not None:
                             clipfracs += [
-                                ((ratio - 1.0).abs() > self.clip_coef)
+                                # ((ratio - 1.0).abs() > self.clip_coef)
+                                (
+                                    torch.logical_or(
+                                        (ratio - 1.0) < -self.clip_coef,
+                                        (ratio - 1.0) > self.clip_coef_high,
+                                    )
+                                )
                                 .float()
                                 .mean()
                                 .item()
@@ -604,13 +536,13 @@ class PPO:
                             mb_advantages.std() + 1e-8
                         )
 
-                    # Policy loss
-                    pg_loss1 = -mb_advantages * ratio
+                    mba = -mb_advantages
+                    pg_loss1 = mba * ratio
                     if self.clip_coef is not None:
-                        pg_loss2 = -mb_advantages * torch.clamp(
+                        pg_loss2 = mba * torch.clamp(
                             ratio,
-                            1 - self.clip_coef,
-                            1 + self.clip_coef,
+                            1.0 - self.clip_coef,
+                            1.0 + self.clip_coef_high,
                         )
                         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
                     else:
@@ -620,7 +552,7 @@ class PPO:
                         pg_loss = pg_loss1.mean()
 
                     # Value loss
-                    newvalue = newvalue.view(-1, 1)
+                    # newvalue = newvalue.view(-1, 1)
                     if (
                         agent.agent_specification.two_hot is None
                         and agent.agent_specification.hl_gauss is None
@@ -629,16 +561,33 @@ class PPO:
                             target = symlog(batched_returns).to(train_device)
                         else:
                             target = batched_returns.to(train_device)
-                        if self.critic_loss == "l2":
-                            v_loss_unclipped = torch.nn.functional.mse_loss(
+                        if laber is not None:
+                            with torch.no_grad():
+                                td_errors = (newvalue - target).abs().flatten()
+                                priorities = torch.minimum(
+                                    td_errors, torch.tensor([1]).to(td_errors.device)
+                                )
+                                indices = td_errors.multinomial(
+                                    int(newvalue.shape[0] / laber), replacement=False
+                                )
+                                prios_for_indices = priorities[indices]
+                                loss_weights = (
+                                    1.0 / prios_for_indices
+                                ) * priorities.mean()
+                            newvalue = newvalue[indices]
+                            target = target[indices]
+                        else:
+                            loss_weights = 1
+
+                        v_loss_unclipped = (
+                            loss_weights
+                            * self.critic_loss(
                                 newvalue,
                                 target,
+                                reduction="none",
                             )
+                        ).mean()
 
-                        elif self.critic_loss == "l1":
-                            v_loss_unclipped = torch.nn.functional.l1_loss(
-                                newvalue, target
-                            )
                     elif agent.agent_specification.two_hot is not None:
                         with torch.no_grad():
                             if agent.agent_specification.symlog:
@@ -690,18 +639,19 @@ class PPO:
                         else:
                             v_loss = v_loss_unclipped
                     entropy_loss = entropy.mean()
-                    if update <= 1:
-                        target_distrib = torch.ones_like(
-                            unmasked_distrib.probs, device=unmasked_distrib.probs.device
-                        )
-                        target_distrib /= unmasked_distrib.probs.shape[1]
-                        uniform_loss = torch.nn.functional.l1_loss(
-                            unmasked_distrib.probs, target_distrib, reduction="sum"
-                        )
+                    # if update <= -1:
+                    #     target_distrib = torch.ones_like(
+                    #         unmasked_distrib.probs, device=unmasked_distrib.probs.device
+                    #     )
+                    #     target_distrib /= unmasked_distrib.probs.shape[1]
+                    #     uniform_loss = torch.nn.functional.l1_loss(
+                    #         unmasked_distrib.probs, target_distrib, reduction="sum"
+                    #     )
                     loss = (
                         (pg_loss - self.ent_coef * entropy_loss + v_loss * self.vf_coef)
                         if update > 0
-                        else v_loss + 0.1 * uniform_loss
+                        # else v_loss + 0.1 * uniform_loss
+                        else v_loss
                     )
 
                     losses.append(loss.item())
@@ -722,14 +672,34 @@ class PPO:
 
                     iter_it += 1
                     if iter_it == self.iter_size:
-                        # nn.utils.clip_grad_norm_(agent.parameters(), self.max_grad_norm)
-                        self.optimizer.step()
+                        if self.max_grad_norm != 0.0:
+                            unclipped_norm = nn.utils.clip_grad_norm_(
+                                agent.parameters(), self.max_grad_norm
+                            )
+                            was_clipped_global = unclipped_norm > self.max_grad_norm
+                            # global_clip_coef = min(
+                            #     1.0, (self.max_grad_norm / unclipped_norm + 1e-6)
+                            # )
+                            # print(f"unclipped_norm : {unclipped_norm}")
+                            # if was_clipped_global:
+                            #     print(f"clip coef {global_clip_coef}")
+                            # if not was_clipped_global or update < 3:
+                            if not was_clipped_global:
+                                unclipped += 1
+                            else:
+                                self.optimizer.step()
+                                clipped += 1
+                            # self.optimizer.step()
+                        else:
+                            self.optimizer.step()
                         self.optimizer.zero_grad()
                         iter_it = 0
 
                     # if self.clip_coef is None:
                     #     if espo_devs > 0.25:
                     #         break
+
+                # print(f"unclipped {unclipped}  clipped {clipped}")
 
                 if self.clip_coef is None:
                     if max_espo_dev > 0.25:
@@ -741,10 +711,7 @@ class PPO:
                 elif self.target_kl is not None:
                     if np.mean(approx_kl_divs_on_epoch) > self.target_kl:
                         print(
-                            "stopping update due to too high kl divergence after epoch",
-                            epoch,
-                            " / ",
-                            self.update_epochs,
+                            f"stopping update due to too high kl divergence after epoch {epoch} / {self.update_epochs}  kl = {np.mean(approx_kl_divs_on_epoch)} > {self.target_kl}"
                         )
                         break
 
@@ -793,7 +760,7 @@ class PPO:
                     "time/dps",
                     int(
                         self.n_epochs
-                        * self.num_envs
+                        * num_envs
                         * self.num_steps
                         / (time.time() - self.start_time)
                     ),
