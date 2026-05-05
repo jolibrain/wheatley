@@ -35,6 +35,8 @@ class GnnFlat(torch.nn.Module):
         if self.g2:
             self.g2_layers = torch.nn.ModuleList()
 
+        self.edge_reembed = torch.nn.ModuleList()
+
         if self.normalize:
             self.norms = torch.nn.ModuleList()
         if self.dropout:
@@ -83,11 +85,15 @@ class GnnFlat(torch.nn.Module):
                             ),
                         )
                     )
+                self.edge_reembed.append(
+                    torch.nn.Linear(self.hidden_dim, self.hidden_dim)
+                )
 
             else:
                 self.features_extractors.append(self.features_extractors[0])
                 if self.g2:
                     self.g2_layers.append(self.g2_layers[0])
+                self.edge_reembed.append(self.edge_reembed[0])
 
     # @torch.autocast(device_type="cuda")
     def forward(self, g, features, edge_features, norm_mask=None):
@@ -122,7 +128,7 @@ class GnnFlat(torch.nn.Module):
                 features = self.features_extractors[layer](
                     g,
                     features,
-                    edge_features,
+                    self.edge_reembed[layer](edge_features),
                 )
 
             # if self.layer_pooling == "all" and not self.g2:
@@ -143,7 +149,7 @@ class GnnFlat(torch.nn.Module):
                     features_before,
                     features,
                     g.edge_index,
-                    edge_features,
+                    self.edge_reembed[layer](edge_features),
                 )
 
                 # if self.layer_pooling != "all":

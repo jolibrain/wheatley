@@ -40,18 +40,37 @@ def decode_mask(info_mask):
     The padding is set to False, which means that this extra pad
     is masked as well.
     """
-    max_size = max(len(mask_) for mask_ in info_mask)
-    info_mask = [
-        np.concatenate(
-            (
-                mask_,
-                np.zeros(max_size - len(mask_), dtype=bool),
+    if isinstance(info_mask, np.ndarray):
+        info_mask = [row for row in info_mask]
+
+    masks = []
+    for mask_ in info_mask:
+        arr = np.asarray(mask_, dtype=bool)
+        if arr.ndim == 0:
+            arr = arr.reshape(1, 1)
+        elif arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        masks.append(arr)
+
+    has_multi_agent = any(mask.shape[0] > 1 for mask in masks)
+    max_nodes = max(mask.shape[-1] for mask in masks)
+
+    if not has_multi_agent:
+        padded = [
+            np.concatenate(
+                (mask.squeeze(0), np.zeros(max_nodes - mask.shape[-1], dtype=bool))
             )
-        )
-        for mask_ in info_mask
-    ]
-    info_mask = np.stack(info_mask)
-    return info_mask
+            for mask in masks
+        ]
+        return np.stack(padded)
+
+    max_agents = max(mask.shape[0] for mask in masks)
+    padded = []
+    for mask in masks:
+        pad = np.zeros((max_agents, max_nodes), dtype=bool)
+        pad[: mask.shape[0], : mask.shape[-1]] = mask
+        padded.append(pad)
+    return np.stack(padded)
 
 
 def safe_mean(arr):

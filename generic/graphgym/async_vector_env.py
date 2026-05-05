@@ -13,7 +13,7 @@ import contextlib
 import torch.multiprocessing as mp
 
 # import pathos.multiprocessing as mp
-from psp.graph.graph_factory import GraphFactory as PSPGraphFactory
+
 import numpy as np
 import time
 import torch
@@ -70,10 +70,10 @@ def create_shared_memory(maxsize, n, ctx, disk):
         return ([ctx.Array("B", maxsize) for i in range(n)], ctx.Array("Q", n))
 
 
-def read_from_shared_memory(shared_memory, n, disk, graph_type):
+def read_from_shared_memory(shared_memory, n, disk, graph_factory):
     if disk:
         # return [dgl.load_graphs(shared_memory[i])[0][0] for i in range(n)]
-        return [PSPGraphFactory.load(shared_memory[i]) for i in range(n)]
+        return [graph_factory.load(shared_memory[i]) for i in range(n)]
     else:
         # return [
         #     torch.load(
@@ -82,7 +82,7 @@ def read_from_shared_memory(shared_memory, n, disk, graph_type):
         #     for i in range(n)
         # ]
         return [
-            PSPGraphFactory.deserialize(
+            graph_factory.deserialize(
                 bytearray(shared_memory[0][i][: shared_memory[1][i]])
             )
             for i in range(n)
@@ -130,7 +130,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         daemon: bool = True,
         worker: Optional[Callable] = None,
         disk=True,
-        graph_type="psp",
+        graph_factory=None,
         max_mem_size=2000000,
     ):
         super().__init__(
@@ -145,7 +145,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         dummy_env = env_fns[0]()
         dummy_env.close()
         del dummy_env
-        self.graph_type = graph_type
+        self.graph_factory = graph_factory
 
         if self.shared_memory:
             self._obs_buffer = create_shared_memory(
@@ -256,7 +256,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                 self._obs_buffer,
                 n=self.num_envs,
                 disk=self.disk,
-                graph_type=self.graph_type,
+                graph_factory=self.graph_factory,
             )
 
         return (deepcopy(self.observations) if self.copy else self.observations), infos
@@ -311,7 +311,7 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
                 self._obs_buffer,
                 n=self.num_envs,
                 disk=self.disk,
-                graph_type=self.graph_type,
+                graph_factory=self.graph_factory,
             )
 
         return (

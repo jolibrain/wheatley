@@ -42,6 +42,7 @@ class GEnv:
         pb_ids,
         validate=False,
         reset=True,
+        **kwargs,
     ):
         self.problem_description = problem_description
         self.env_specification = env_specification
@@ -147,6 +148,7 @@ class GEnv:
 
     def step(self, action):
         # Running the transition model on the current action
+        action = action.item()
         node_id = self.action_to_node_id(action)
         n_actions = self.transition_model.run(self.state, node_id)
 

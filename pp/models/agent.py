@@ -1,6 +1,5 @@
-#
 # Wheatley
-# Copyright (c) 2026 Jolibrain
+# Copyright (c) 2023 Jolibrain
 # Authors:
 #    Guillaume Infantes <guillaume.infantes@jolibrain.com>
 #
@@ -30,42 +29,26 @@ from generic.models.gnn_mp import GnnMP
 
 # from .gnn_tokengt import GnnTokenGT
 from generic.mlp import MLP
+from pp.graph.graph_factory import GraphFactory
 from functools import partial
 import numpy as np
 
+# from .agent_observation import AgentObservation
 import copy
 from tqdm.contrib.concurrent import process_map
 from generic.agent_obs import AgentObservation, AgentObservationBatch
-from psp.models.node_embedders import (
+from pp.models.node_embedders import (
     SimpleNodeEmbedder,
+    SimpleNodeEmbedderNonChrono,
     PoolNodeEmbedder,
-    ResNodeEmbedder,
+    MASimpleNodeEmbedder,
 )
-from psp.models.edge_embedder import SimpleEdgeEmbedder, RPEdgeEmbedder, UseEdgeEmbedder
-from psp.models.rewirer import PspRewirer
-from psp.graph.pyg_graph import PYGGraph
+from pp.models.edge_embedder import EdgeEmbedder
+from pp.models.path_action import PathAction
+from pp.graph.pyg_graph import PYGGraph
 
 
 class Agent(Agent):
-    edgeTypes = {
-        "self": 0,
-        "prec": 1,
-        "rprec": 2,
-        "rc": 3,
-        "rp": 4,
-        "rrp": 5,
-        "pool": 6,
-        "rpool": 7,
-        "vnode": 8,
-        "rvnode": 9,
-        "nodeconf": 10,
-        "rnodeconf": 11,
-        "poolres": 12,
-        "rpoolres": 13,
-        "selfpool": 14,
-        "selfres": 15,
-    }
-
     def __init__(
         self,
         env_specification,
@@ -73,6 +56,7 @@ class Agent(Agent):
         value_net=None,
         action_net=None,
         agent_specification=None,
+        do_compile=False,
     ):
         """
         There are 2 ways to init an Agent:
@@ -87,9 +71,18 @@ class Agent(Agent):
             agent_specification,
         )
 
+        self.do_compile = do_compile
+        pp_agent_types = agent_specification.agent_types
+        if pp_agent_types is None:
+            pp_agent_types = [0]
+        self.nonchrono = agent_specification.nonchrono
+        if self.nonchrono == "path":
+            self.action_dim = env_specification.max_n_nodes
+        self.pp_agent_types = list(pp_agent_types)
+        self.num_agents = len(self.pp_agent_types)
         self.graph_pooling = agent_specification.graph_pooling
+        self.graphobs = True
         self.env_specification = env_specification
-        self.psp_rewirer = PspRewirer()
         self.rewire_params = {
             "bidir": self.agent_specification.bidir,
             "graph_pooling": None
@@ -98,6 +91,7 @@ class Agent(Agent):
             "vnoding": False,
             "self_loops": self.agent_specification.self_loops,
         }
+
         # If a model is provided, we simply load the existing model.
         if gnn is not None and value_net is not None and action_net is not None:
             self.gnn = gnn
@@ -106,90 +100,69 @@ class Agent(Agent):
                 self.action_nets = action_net
             else:
                 self.action_nets = torch.nn.ModuleList([action_net])
-            # self.action_net = self.action_nets[0]
             return
-        node_embedder_type = SimpleNodeEmbedder
+
+        multi_agent = self.pp_agent_types is not None and len(self.pp_agent_types) > 1
+
+        if self.nonchrono is not None:
+            node_embedder_type = SimpleNodeEmbedderNonChrono
+        else:
+            node_embedder_type = (
+                MASimpleNodeEmbedder if multi_agent else SimpleNodeEmbedder
+            )
         node_embedders = {
             "n": {
                 "class": node_embedder_type,
                 "kwargs": {
-                    # "n_layers": self.agent_specification.n_layers_features_extractor,
                     "n_layers": 2,
-                    # "activation": self.agent_specification.gconv_activation,
                     "activation": "gelu",
                     "lappe": self.agent_specification.lappe,
                     "rwpe": self.agent_specification.rwpe,
                 },
             },
         }
+        if self.nonchrono is not None:
+            node_embedders["n"]["kwargs"]["nonchrono"] = self.nonchrono
         if (
             self.graph_pooling in ["learn", "learninv"]
             and not self.agent_specification.hierarchical
         ):
             node_embedders["poolnode"] = {"class": PoolNodeEmbedder, "kwargs": {}}
-        node_embedders["resource"] = {
-            "class": ResNodeEmbedder,
-            "kwargs": {"max_n_resources": self.env_specification.max_n_resources},
-        }
 
         edge_embedders = {
-            ("n", "prec", "n"): {
-                "class": SimpleEdgeEmbedder,
+            ("n", "free", "n"): {
+                "class": EdgeEmbedder,
                 "kwargs": {},
             },
-            ("n", "rprec", "n"): {
-                "class": SimpleEdgeEmbedder,
+            ("n", "wall", "n"): {
+                "class": EdgeEmbedder,
                 "kwargs": {},
-            },
-            ("n", "rp", "n"): {
-                "class": RPEdgeEmbedder,
-                "kwargs": {
-                    "n_layers": 1,
-                    "activation": "gelu",
-                },
-            },
-            ("n", "rrp", "n"): {
-                "class": RPEdgeEmbedder,
-                "kwargs": {
-                    "n_layers": 1,
-                    "activation": "gelu",
-                },
-            },
-            ("n", "uses", "resource"): {
-                "class": UseEdgeEmbedder,
-                "kwargs": {
-                    "n_layers": 1,
-                    "activation": "gelu",
-                },
-            },
-            ("resource", "ruses", "n"): {
-                "class": UseEdgeEmbedder,
-                "kwargs": {
-                    "n_layers": 1,
-                    "activation": "gelu",
-                },
             },
             ("n", "self_n", "n"): {
-                "class": SimpleEdgeEmbedder,
-                "kwargs": {},
-            },
-            ("resource", "self_resource", "resource"): {
-                "class": SimpleEdgeEmbedder,
+                "class": EdgeEmbedder,
                 "kwargs": {},
             },
             ("poolnode", "selfpool", "poolnode"): {
-                "class": SimpleEdgeEmbedder,
+                "class": EdgeEmbedder,
+                "kwargs": {},
+            },
+            ("n", "path_graph", "n"): {
+                "class": EdgeEmbedder,
+                "kwargs": {},
+            },
+            ("n", "path_graph_inv", "n"): {
+                "class": EdgeEmbedder,
                 "kwargs": {},
             },
         }
         if agent_specification.graph_pooling in ["learn", "learninv"]:
             edge_embedders[("n", "pool", "poolnode")] = {
-                "class": SimpleEdgeEmbedder,
+                "class": EdgeEmbedder,
                 "kwargs": {},
             }
         if agent_specification.graph_pooling == "learninv":
             edge_embedders[("poolnode", "rpool", "n")] = {
-                "class": SimpleEdgeEmbedder,
+                "class": EdgeEmbedder,
                 "kwargs": {},
             }
 
@@ -213,13 +186,13 @@ class Agent(Agent):
             gconv_activation=agent_specification.gconv_activation,
             shared_layers=agent_specification.shared_conv,
             g2=agent_specification.g2,
-            num_node_types=3,  # tasks, poolnode, resnode
+            do_compile=do_compile,
         )
 
         self.init_heads()
 
     @classmethod
-    def load(cls, path, max_n_modes=None, pp_agent_types=None, nonchrono=None):
+    def load(cls, path, max_n_modes=None):
         """Loading an agent corresponds to loading his model and a few args to specify how the model is working"""
         save_data = torch.load(path + "agent.pkl", weights_only=False)
         agent_specification = save_data["agent_specification"]
@@ -228,14 +201,9 @@ class Agent(Agent):
             env_specification.max_n_modes = max_n_modes
             env_specification.max_n_nodes = max_n_modes
             env_specification.max_n_jobs = max_n_modes
-        if pp_agent_types is None:
-            pp_agent_types = save_data.get("pp_agent_types")
-        agent = cls(
-            env_specification,
-            agent_specification=agent_specification,
-            pp_agent_types=pp_agent_types,
-            nonchrono=nonchrono,
-        )
+        if agent_specification.agent_types is None:
+            agent_specification.agent_types = save_data.get("pp_agent_types")
+        agent = cls(env_specification, agent_specification=agent_specification)
 
         # constructors init weight!!!
         agent.gnn.load_state_dict(save_data["gnn"])
@@ -277,24 +245,44 @@ class Agent(Agent):
             self.agent_specification.activation_fn,
             #            "gelu",
         )
-        self.value_net = torch.compile(self.value_net, dynamic=True)
-        self.action_net = MLP(
-            len(self.agent_specification.net_arch["pi"]),
-            self.gnn.features_dim,
-            self.agent_specification.net_arch["pi"][0],
-            1,
-            False,
-            self.agent_specification.activation_fn,
-            #            "gelu",
-        )
-        self.action_net = torch.compile(self.action_net, dynamic=True)
+        if self.do_compile:
+            self.value_net = torch.compile(self.value_net, dynamic=True)
+        self.action_nets = torch.nn.ModuleList()
+        for _ in range(self.num_agents):
+            if self.nonchrono == "path":
+                head = PathAction(
+                    len(self.agent_specification.net_arch["pi"]),
+                    self.gnn.features_dim,
+                    self.agent_specification.net_arch["pi"][0],
+                    2,
+                    False,
+                    self.agent_specification.activation_fn,
+                )
+            else:
+                head = MLP(
+                    len(self.agent_specification.net_arch["pi"]),
+                    self.gnn.features_dim,
+                    self.agent_specification.net_arch["pi"][0],
+                    1,
+                    False,
+                    self.agent_specification.activation_fn,
+                )
+
+            if self.do_compile:
+                head = torch.compile(head, dynamic=True)
+            self.action_nets.append(head)
+        if self.num_agents == 1:
+            self.action_net = self.action_nets[0]
+
+        self.value_net.to(device)
+        for head in self.action_nets:
+            head.to(device)
 
     def obs_as_tensor_add_batch_dim(self, obs):
         cobs = obs.clone()
         return AgentObservation(
             cobs,
             self.rewire_params,
-            self.psp_rewirer,
         )
 
     def obs_as_tensor(self, obs):
@@ -303,7 +291,6 @@ class Agent(Agent):
             AgentObservation(
                 o,
                 self.rewire_params,
-                self.psp_rewirer,
             )
             for o in obs
         ]
@@ -316,14 +303,55 @@ class Agent(Agent):
 
     def get_obs(self, b_obs, mb_ind):
         if isinstance(b_obs[0], str):
-            # return [dgl.load_graphs(b_obs[i])[0][0] for i in mb_ind]
-            # bobsi = [b_obs[i] for i in mb_ind]
-            # return process_map(
-            #     GraphFactory.load, bobsi, max_workers=16, chunksize=1, disable=True
-            # )
-            return [
-                # GraphFactory.load(b_obs[i], self.env_specification.pyg) for i in mb_ind
-                AgentObservation.load(b_obs[i], PYGGraph)
-                for i in mb_ind
-            ]
+            return [AgentObservation.load(b_obs[i], PYGGraph) for i in mb_ind]
         return list(b_obs[i] for i in mb_ind)
+
+    def get_action_and_value_nonchrono2(self, nfeats, bactions, deterministic):
+        actions = []
+        logprobs = []
+        entropies = []
+        for idx, head in enumerate(self.action_nets):
+            logits = head(nfeats)
+            distribs = torch.distributions.normal.Normal(logits[..., 0], logits[..., 1])
+            if bactions is None:
+                if deterministic is False:
+                    unclipped_actions = distribs.sample()
+                else:
+                    unclipped_actions = distribs.mean
+            else:
+                unclipped_actions = bactions[..., idx]
+
+            # clipped_actions = torch.clamp(unclipped_actions, min=-1.0, max=1.0)
+            # logprobs.append(distribs.log_prob(clipped_actions))
+            logprobs.append(distribs.log_prob(unclipped_actions))
+            entropies.append(distribs.entropy())
+            # if bactions is None:
+            #     actions.append(clipped_actions)
+            if bactions is None:
+                actions.append(unclipped_actions)
+        if bactions is None:
+            return (
+                torch.stack(actions, dim=-1),
+                torch.stack(logprobs, dim=-1),
+                torch.stack(entropies, dim=-1),
+            )
+        return (
+            bactions,
+            torch.stack(logprobs, dim=-1),
+            torch.stack(entropies, dim=-1),
+        )
+
+    def get_action_and_value(
+        self, x, action=None, action_masks=None, deterministic=False
+    ):
+        if self.nonchrono != "path" and self.num_agents == 1:
+            return super().get_action_and_value(x, action, action_masks, deterministic)
+
+        node_features, graph_embedding = self.gnn(x)
+        value = self.value_net(graph_embedding)
+
+        if self.nonchrono == "path":
+            actions, logprobs, entropies = self.get_action_and_value_nonchrono2(
+                node_features, action, deterministic
+            )
+            return actions, logprobs, entropies, value, None

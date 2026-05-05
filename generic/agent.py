@@ -29,6 +29,7 @@ import torch
 import math
 from torch.distributions.categorical import Categorical
 from torch.distributions.utils import logits_to_probs
+from generic.agent_obs import AgentObservation, AgentObservationBatch
 
 
 def symlog(x):
@@ -114,6 +115,8 @@ class Agent(torch.nn.Module):
         self.reward_weights = torch.tensor(self.agent_specification.reward_weights)
         self.reward_dim = len(self.agent_specification.reward_weights)
         self.max_weight = max(self.agent_specification.reward_weights)
+        self.action_dim = 1
+        self.num_agents = 1
 
         if (
             self.agent_specification.two_hot is not None
@@ -190,6 +193,10 @@ class Agent(torch.nn.Module):
     def get_action_and_value(
         self, x, action=None, action_masks=None, deterministic=False
     ):
+        if action is not None:
+            action = action.squeeze(-1).squeeze(-1)
+        if action_masks is not None and action_masks.ndim == 3:
+            action_masks = action_masks.squeeze(1)
         node_features, graph_embedding = self.gnn(x)
         value = self.value_net(graph_embedding)
         logits = self.action_net(node_features).squeeze(-1)
@@ -237,8 +244,8 @@ class Agent(torch.nn.Module):
         entropies = torch.cat(entropy)
 
         return (
-            actions,
-            log_probs,
+            actions.unsqueeze(-1).unsqueeze(-1),
+            log_probs.unsqueeze(-1).unsqueeze(-1),
             entropies,
             value,
             unmasked_distribs[0],
@@ -375,3 +382,34 @@ class Agent(torch.nn.Module):
         for i in range(self.reward_dim):
             r += reward[i] * self.reward_weights[i].item()
         return r
+
+    def preprocess(self, obs):
+        # works for batches or simple graphs
+        # do external rewiring + homogeneous_edges
+        observation = AgentObservationBatch.from_aos(obs)
+        (
+            g,
+            batch_size,
+            total_num_nodes,
+            total_num_edges,
+            num_nodes,
+            num_edges,
+            nodesid,
+            edgesid,
+        ) = observation.homogeneous()
+
+        node_types_map = observation.node_types_map
+        edge_types_map = observation.edge_types_map
+
+        return (
+            g,
+            batch_size,
+            total_num_nodes,
+            total_num_edges,
+            num_nodes,
+            num_edges,
+            nodesid,
+            edgesid,
+            node_types_map,
+            edge_types_map,
+        )

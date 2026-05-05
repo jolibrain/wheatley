@@ -84,6 +84,7 @@ class Solution:
         self.mode_schedule = np.array(mode_schedule)
         self.real_durations = np.array(real_durations, dtype=np.float32)
         self.schedule = (self.job_schedule, self.modes)
+        self.sol = self.schedule
         self._criterion = criterion
         if schedule_stoch is not None:
             self.schedule_stoch = schedule_stoch.tolist()

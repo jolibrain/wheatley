@@ -29,6 +29,9 @@ import torch
 
 
 class RandomAgent:
+    def __init__(self, nonchrono):
+        self.nonchrono = nonchrono
+
     def predict(self, env):
         # soft reset to evaluate the same sampled problem as PPO
         observation, info = env.reset(soft=True)
@@ -42,9 +45,29 @@ class RandomAgent:
         return solution
 
     def select_action(self, env, action_masks):
+        if self.nonchrono == "path":
+            return (torch.rand(env.problem.ncells) * 2 - 1.0).unsqueeze(-1)
+        if self.nonchrono == "order":
+            return (
+                (torch.rand(env.env_specification.max_order) * env.problem.ncells)
+                .int()
+                .unsqueeze(-1)
+            )
+
         if isinstance(action_masks, torch.Tensor):
-            possible_actions = torch.nonzero(action_masks, as_tuple=True)[0].numpy()
+            mask = action_masks.detach().cpu().numpy()
         else:
-            possible_actions = np.nonzero(action_masks)[0]
-        action = np.random.choice(possible_actions)
-        return action
+            mask = np.asarray(action_masks)
+
+        if mask.ndim == 1:
+            possible_actions = np.nonzero(mask)[0]
+            return np.random.choice(possible_actions)
+
+        actions = []
+        for agent_mask in mask:
+            possible_actions = np.nonzero(agent_mask)[0]
+            if len(possible_actions) == 0:
+                actions.append(0)
+            else:
+                actions.append(int(np.random.choice(possible_actions)))
+        return np.array(actions)
