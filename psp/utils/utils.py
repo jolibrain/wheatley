@@ -28,6 +28,7 @@ import sys
 from collections import defaultdict
 from typing import List, Optional, Tuple, Union
 from generic.graphgym.async_vector_env import AsyncGraphVectorEnv
+from psp.graph.graph_factory import GraphFactory
 import tqdm
 import numpy as np
 import torch
@@ -146,6 +147,7 @@ def create_train_envs(
         shared_memory=True,
         disk=False,
         max_mem_size=max_shared_mem_per_worker,
+        graph_factory=GraphFactory,
     )
 
     return envs

@@ -35,13 +35,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchinfo
 import tqdm
 import math
 from alg.rollout_dataset import RolloutDataset, collate_rollout
 from generic.utils import decode_mask, safe_mean, logcosh
 from generic.adamw_schedulefree import AdamWScheduleFree
 from generic.radam_schedulefree import RAdamScheduleFree
+from generic.anon import Anon
 
 from .logger import Logger, configure_logger, monotony, stability
 
@@ -64,6 +64,7 @@ class PPO:
 
         self.training_specification = training_specification
 
+        self.anon_gamma = training_specification.anon_gamma
         self.gamma = training_specification.gamma
         self.update_epochs = training_specification.n_epochs
         self.norm_adv = training_specification.normalize_advantage
@@ -113,9 +114,13 @@ class PPO:
         obs = []
 
         actions = torch.zeros(
-            (self.num_steps, num_envs), dtype=torch.long, device=data_device
+            (self.num_steps, num_envs, agent.action_dim, agent.num_agents),
+            # dtype=torch.long,
+            device=data_device,
         )
-        logprobs = torch.zeros((self.num_steps, num_envs)).to(data_device)
+        logprobs = torch.zeros(
+            (self.num_steps, num_envs, agent.action_dim, agent.num_agents)
+        ).to(data_device)
         rewards = torch.zeros((self.num_steps, num_envs, agent.reward_dim)).to(
             data_device
         )
@@ -182,8 +187,8 @@ class PPO:
             values[step] = value.view(-1, agent.reward_dim).to(data_device)
             # print('logprob shape=', logprob.shape)
             # print('logprobs shape=', logprobs.shape)
-            logprobs[step] = logprob.squeeze(-1)  # .to(data_device)
-            actions[step] = action.squeeze(-1)  # .to(data_device)
+            logprobs[step] = logprob  # .to(data_device)
+            actions[step] = action  # .to(data_device)
 
             next_obs, reward, done, _, info = envs.step(action.cpu().numpy())
             action_mask = decode_mask(info["mask"])
@@ -301,13 +306,13 @@ class PPO:
 
         # flatten the batch
         b_obs = agent.rebatch_obs(obs)
-        b_logprobs = logprobs.reshape(-1)
-        b_actions = actions.reshape(-1)
+        b_logprobs = logprobs.reshape(-1, agent.action_dim, agent.num_agents)
+        b_actions = actions.reshape(-1, agent.action_dim, agent.num_agents)
         b_advantages = advantages.reshape(-1, agent.reward_dim)
 
         b_returns = returns.reshape(-1, agent.reward_dim)
         b_values = values.reshape(-1, agent.reward_dim)
-        b_action_masks = action_masks.reshape(-1, max_n_nodes)
+        b_action_masks = action_masks.reshape(-1, agent.num_agents, max_n_nodes)
 
         if self.discard_incomplete_trials:
             to_keep_b = [
@@ -352,7 +357,6 @@ class PPO:
         train_device=torch.device("cpu"),
         opt_state_dict=None,
         skip_initial_eval=False,
-        skip_model_trace=False,
         warmup=0,
         laber=None,
     ) -> float:
@@ -370,6 +374,14 @@ class PPO:
                 weight_decay=weight_decay,
                 decoupled_weight_decay=True,
             )
+        elif self.optimizer_class == Anon:
+            self.optimizer = self.optimizer_class(
+                agent.parameters(),
+                gamma=self.anon_gamma,
+                lr=lr,
+                weight_decay=weight_decay,
+                weight_decouple=True,
+            )
         else:
             self.optimizer = self.optimizer_class(
                 agent.parameters(), lr=lr, weight_decay=weight_decay
@@ -382,11 +394,6 @@ class PPO:
         print("collecting rollouts using", rollout_agent_device)
         print("storing rollouts on", rollout_data_device)
         print("learning on", train_device)
-
-        if not skip_model_trace:
-            obs, info = self.validator.validation_envs[0].reset(soft=True)
-            obs = agent.obs_as_tensor_add_batch_dim(obs)
-            torchinfo.summary(agent, depth=3, verbose=1)
 
         self.global_step = 0
         if not skip_initial_eval:
@@ -483,14 +490,7 @@ class PPO:
                     desc="   minibatches        ",
                     leave=False,
                 ):
-                    # if update < 1:
-                    #     warmup_nb += 1
-                    # warmup_lr = lr * math.sqrt(1 - math.pow(0.999, warmup_nb))
-                    # for g in self.optimizer.param_groups:
-                    #     g["lr"] = warmup_lr
-
-                    # print('batched_actions=', batched_actions)
-                    baction = batched_actions.long().to(train_device)
+                    baction = batched_actions.to(train_device)
                     _, newlogprob, entropy, newvalue, unmasked_distrib = (
                         agent.get_action_and_value(
                             batched_obs,
@@ -498,12 +498,7 @@ class PPO:
                             action_masks=batched_actions_masks,
                         )
                     )
-                    # print('newlogprob shape=', newlogprob.shape)
-                    # print('batched_logprobs shape=', batched_logprobs.shape)
-                    # XXX: bug single agent
-                    # sys.exit()
                     logratio = newlogprob - batched_logprobs.to(train_device)
-                    # print('logratio shape=', logratio.shape)
                     ratio = logratio.exp()  # .squeeze(-1) #XXX(beniz): squeeze
 
                     with torch.no_grad():
@@ -511,6 +506,7 @@ class PPO:
                         approx_kl = (
                             (ratio - 1) - logratio
                         ).mean()  # TODO: maybe use the max instead
+                        # approx_kl /= agent.action_dim
                         approx_kl_divs.append(approx_kl.item())
                         if self.clip_coef is not None:
                             clipfracs += [
@@ -536,7 +532,8 @@ class PPO:
                             mb_advantages.std() + 1e-8
                         )
 
-                    mba = -mb_advantages
+                    # add dim for number of agents and for action_dim
+                    mba = -mb_advantages.unsqueeze(-1).unsqueeze(-1)
                     pg_loss1 = mba * ratio
                     if self.clip_coef is not None:
                         pg_loss2 = mba * torch.clamp(

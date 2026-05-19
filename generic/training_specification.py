@@ -28,6 +28,7 @@ import torch
 
 from .dadapt_adam import DAdaptAdam
 from .lion_pytorch import Lion
+from .anon import Anon
 from .adamw_schedulefree import AdamWScheduleFree
 from .radam_schedulefree import RAdamScheduleFree
 
@@ -76,6 +77,7 @@ class TrainingSpecification:
         max_shared_mem_per_worker,
         espo,
         clip_grad_norm,
+        anon_gamma=1.0,
     ):
         self.lr = lr
         self.fe_lr = fe_lr
@@ -113,6 +115,7 @@ class TrainingSpecification:
         self.max_shared_mem_per_worker = max_shared_mem_per_worker
         self.espo = espo
         self.clip_grad_norm = clip_grad_norm
+        self.anon_gamma = anon_gamma
 
         if optimizer.lower() == "adam":
             self.optimizer_class = torch.optim.Adam
@@ -130,6 +133,8 @@ class TrainingSpecification:
             self.optimizer_class = AdamWScheduleFree
         elif optimizer.lower() == "radam_schedulefree":
             self.optimizer_class = RAdamScheduleFree
+        elif optimizer.lower() == "anon":
+            self.optimizer_class = Anon
         else:
             raise Exception("Optimizer not recognized")
         self.n_workers = n_workers

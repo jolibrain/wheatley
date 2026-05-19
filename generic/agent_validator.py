@@ -39,10 +39,7 @@ from PIL import Image
 
 from generic.random_agent import RandomAgent
 from generic.utils import decode_mask, safe_mean
-from jssp.description import Description as JSSPDescription
-from jssp.env.env import Env as JSSPEnv
 from jssp.models.custom_agent import CustomAgent
-from jssp.utils.ortools import get_ortools_makespan as get_ortools_makespan_jssp
 from psp.utils.ortools import get_ortools_criterion_psp
 
 
@@ -60,18 +57,23 @@ class AgentValidator:
         compute_ortools=False,
         lappe=None,
         rwpe=None,
-        walls=True,
-        nonchrono=None,
         env_kwargs=None,
     ):
         super().__init__()
 
         # Parameters
         self.problem_description = problem_description
-        if isinstance(problem_description, JSSPDescription):
-            self.psp = False
-        else:
+        self.psp = False
+        self.maze = False
+        self.navigation = False
+        if env_kwargs["domain_name"] == "psp":
             self.psp = True
+        elif env_kwargs["domain_name"] == "maze":
+            self.maze = True
+        elif env_kwargs["domain_name"] == "navigation":
+            self.navigation = True
+        else:
+            raise RuntimeError("Could not find env flavor in validator")
 
         self.compute_ortools = compute_ortools
 
@@ -112,7 +114,7 @@ class AgentValidator:
         self.debug_net = training_specification.debug_net
 
         # Comparative agents
-        self.random_agent = RandomAgent()
+        self.random_agent = RandomAgent(env_kwargs["nonchrono"] if self.maze else None)
         self.custom_agents = [
             CustomAgent(rule, stochasticity_strategy="averagistic")
             for rule in self.custom_names
@@ -161,6 +163,9 @@ class AgentValidator:
 
         self.criterion_ratio = 1000
         self.criterions = []
+        if self.maze:
+            self.optimal_criterion = []
+
         if self.compute_ortools:
             self.ortools_criterions = {
                 ortools_strategy: [] for ortools_strategy in self.ortools_strategies
@@ -329,23 +334,13 @@ class AgentValidator:
         if previous_ortools_solution is not None:
             return previous_ortools_solution
 
-        if self.psp:
-            criterion_value, schedule, optimal = get_ortools_criterion_psp(
-                self.validation_envs[i],
-                self.max_time_ortools,
-                self.scaling_constant_ortools,
-                ortools_strategy,
-                criterion,
-            )
-        else:
-            criterion_value, schedule, optimal = get_ortools_makespan_jssp(
-                self.validation_envs[i].state.affectations,
-                self.validation_envs[i].state.original_durations,
-                self.env_specification.n_features,
-                self.max_time_ortools,
-                self.scaling_constant_ortools,
-                ortools_strategy,
-            )
+        criterion_value, schedule, optimal = get_ortools_criterion_psp(
+            self.validation_envs[i],
+            self.max_time_ortools,
+            self.scaling_constant_ortools,
+            ortools_strategy,
+            criterion,
+        )
 
         self._ortools_save_solution(
             save_path, problem, (criterion_value, schedule, optimal)
@@ -433,6 +428,11 @@ class AgentValidator:
 
     def _evaluate_agent(self, agent):
         mean_criterion = 0
+        if self.maze:
+            optimal_criterion = 0
+        if self.maze or self.navigation:
+            self.maze_solution = []
+
         if self.compute_ortools:
             ortools_mean_criterion = {
                 ortools_strategy: 0 for ortools_strategy in self.ortools_strategies
@@ -494,38 +494,38 @@ class AgentValidator:
                 done = False
                 # step_actions = [] # debug
                 while not done:
-                    raw_mask = info["mask"].reshape(1, -1)
-                    action_masks = decode_mask(raw_mask)
+                    action_masks = decode_mask([info["mask"]])
 
                     obs = agent.obs_as_tensor_add_batch_dim(obs)
-                    # action = agent.predict(
-                    #     agent.preprocess(obs),
-                    #     deterministic=True,
-                    #     action_masks=action_masks,
-                    # )
                     action, _, _, _, _ = agent.get_action_and_value(
                         agent.preprocess(obs),
                         action_masks=action_masks,
                         deterministic=True,
                     )
-                    # print("predict action:", action)
-                    # sys.exit()
-                    action_tensor = action.detach()
+                    action_tensor = action[0].detach()
 
-                    if action_tensor.device != torch.device("cpu"):
-                        action_tensor = action_tensor.cpu()
-
-                    step_action = action_tensor.reshape(-1).item()
+                    step_action = action_tensor.cpu().numpy()
                     obs, reward, done, _, info = self.validation_envs[i].step(
                         step_action
                     )
-                    # step_actions.append(step_action) # debug
 
-            solution.append(self.validation_envs[i].get_solution())
+            if hasattr(self.validation_envs[i], "states"):
+                agent_solutions = [
+                    self.validation_envs[i].get_solution(agent_idx)
+                    for agent_idx in range(len(self.validation_envs[i].states))
+                ]
+            else:
+                agent_solutions = [self.validation_envs[i].get_solution()]
 
-            if solution[i] is not None:
-                sol = solution[i].schedule
-                criterion = solution[i].get_criterion()
+            solution.append(agent_solutions[0] if agent_solutions else None)
+            valid_solutions = [sol for sol in agent_solutions if sol is not None]
+
+            if valid_solutions:
+                sol = valid_solutions[0].sol if valid_solutions[0] is not None else None
+                # criterion = solution[i].get_criterion()
+                criterion = sum(
+                    sol_.get_criterion() for sol_ in valid_solutions
+                )  # XXX: summing across agent, not forcely necessary
 
                 if i == 0 and self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_solution(sol)
@@ -545,12 +545,26 @@ class AgentValidator:
                 self.last_ppo_criterions[i] = criterion
 
                 mean_criterion += criterion / self.n_validation_env
+                if self.maze:
+                    optimal_criterion += (
+                        sum(sol_.get_optimal_criterion() for sol_ in valid_solutions)
+                        / self.n_validation_env
+                    )
+                if self.maze or self.navigation:
+                    agent_paths = [
+                        sol_.get_native_sol() if sol_ is not None else []
+                        for sol_ in agent_solutions
+                    ]
+                    self.maze_solution.append(agent_paths)
+
             else:
                 state = self.validation_envs[i].state
                 self.last_ppo_criterions[i] = state.undoable_criterion
                 mean_criterion += state.undoable_criterion / self.n_validation_env
                 if self.display_gantt:
                     self.gantt_rl_img = self.validation_envs[i].render_fail()
+                if self.maze or self.navigation:
+                    self.maze_solution.append([])
 
             if self.compute_ortools:
                 for ortools_strategy in self.ortools_strategies:
@@ -631,6 +645,8 @@ class AgentValidator:
         print("--- mean_criterion=", mean_criterion, " ---")
         print("--- eval time=", time.time() - start_eval, "  ---")
         self.criterions.append(mean_criterion)
+        if self.maze:
+            self.optimal_criterion.append(optimal_criterion)
         if self.compute_ortools:
             for ortools_strategy in self.ortools_strategies:
                 self.ortools_criterions[ortools_strategy].append(
@@ -654,11 +670,19 @@ class AgentValidator:
         self.vis.text(html, win="html", opts={"width": 372, "height": 336})
 
         X = list(range(len(self.criterions)))
-        Y_list = [self.criterions, self.random_criterions]
+        Y_list = (
+            [self.criterions, self.optimal_criterion, self.random_criterions]
+            if self.maze
+            else [self.criterions, self.random_criterions]
+        )
         opts = {
             "title": "Validation criterion",
-            "legend": ["Wheatley", "Random"],
-            "linecolor": [[31, 119, 180], [255, 127, 14]],
+            "legend": ["Wheatley", "Optimal", "Random"]
+            if self.maze
+            else ["Wheatley", "Random"],
+            "linecolor": [[31, 119, 180], [42, 152, 42], [255, 127, 14]]
+            if self.maze
+            else [[31, 119, 180], [255, 127, 14]],
         }
         if self.compute_ortools:
             Y2_list = [
@@ -800,6 +824,25 @@ class AgentValidator:
                 image,
                 win="ortools-ppo-cactus",
                 opts={"caption": "OR-Tools vs Wheatley"},
+            )
+
+        if self.maze:
+            from pp.utils.maze_plotting import plot_maze_solutions
+
+            plot_maze_solutions(
+                validation_envs=self.validation_envs,
+                maze_solution=self.maze_solution,
+                vis=self.vis,
+            )
+        elif self.navigation:
+            from pp.domains.navigation.generators.navigation_plotting import (
+                plot_navigation_solutions,
+            )
+
+            plot_navigation_solutions(
+                validation_envs=self.validation_envs,
+                nav_solution=self.maze_solution,
+                vis=self.vis,
             )
 
         if self.first_callback:

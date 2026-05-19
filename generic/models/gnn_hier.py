@@ -757,7 +757,7 @@ class GnnHier(torch.nn.Module):
                 elif self.sum_res is False:
                     self.merge_up.append(
                         MLP(
-                            n_layers=3,
+                            n_layers=2,
                             input_dim=self.hidden_dim * 2,
                             hidden_dim=self.hidden_dim * 2,
                             output_dim=self.hidden_dim,

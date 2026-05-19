@@ -55,7 +55,7 @@ class GraphTerminalRewardModel:
                 max_makespan = torch.max(sinks_makespans)
                 makespan = max_makespan.item()
                 # makespan = state.tct(-1)[0].item() / len(state.job_modes)
-                return -makespan / len(state.job_modes)
+                return -makespan / len(state.job_modes) / state.max_duration
             else:
                 # wdd_tct = state.tct(self.with_due_dates)
                 # tardy = wdd_tct - self.due_dates.unsqueeze(-1)

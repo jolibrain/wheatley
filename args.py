@@ -159,10 +159,14 @@ def argument_parser() -> argparse.ArgumentParser:
             "radam",
             "dadam",
             "lion",
+            "anon",
             "adamw_schedulefree",
             "radam_schedulefree",
         ],
         help="Which optimizer to use",
+    )
+    parser.add_argument(
+        "--anon_gamma", type=float, default=1.0, help="gamma param for Anon optimizer"
     )
     parser.add_argument(
         "--weight_decay",
@@ -891,7 +895,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--nonchrono",
         type=str,
         default=None,
-        help="non chronological agent: wp, path, order, default is None",
+        help="non chronological agent: wp, path, default is None",
     )
 
     return parser

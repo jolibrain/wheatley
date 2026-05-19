@@ -317,6 +317,7 @@ def main(args) -> float:
         training_specification=training_specification,
         disable_visdom=args.disable_visdom,
         compute_ortools=not args.disable_ortools,
+        env_kwargs={"domain_name": "psp"},
     )
     ppo = PPO(
         training_specification,

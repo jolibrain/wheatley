@@ -76,6 +76,8 @@ class AgentSpecification:
         self_loops=False,
         gconv_activation="swiglu",
         g2=False,
+        nonchrono=None,
+        agent_types=None,
     ):
         self.gconv_type = gconv_type
         self.gconv_activation = gconv_activation
@@ -121,6 +123,8 @@ class AgentSpecification:
         self.bidir = bidir
         self.self_loops = self_loops
         self.g2 = g2
+        self.nonchrono = nonchrono
+        self.agent_types = agent_types
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -202,6 +206,8 @@ class AgentSpecification:
             f"self_loops:                       {self.self_loops}\n"
             f"normalize:                        {self.normalize_gnn}\n"
             f"Gradient Gating:                  {self.g2}\n"
+            f"NonChrono:                        {self.nonchrono}\n"
+            f"Types:                            {self.agent_types}\n"
             f"Net shapes:"
         )
         first_features_extractor_shape = (

@@ -70,6 +70,8 @@ class GnnMP(torch.nn.Module):
         self.shared_layers = shared_layers
 
         self.node_type_size = num_node_types
+        if do_compile:
+            torch._dynamo.config.capture_scalar_outputs = True
 
         if layer_pooling == "all":
             if self.hierarchical:
@@ -93,16 +95,22 @@ class GnnMP(torch.nn.Module):
 
         self.node_embedders = torch.nn.ModuleDict()
         for netype, nedata in node_embedders_spec.items():
-            self.node_embedders[netype] = nedata["class"](
+            ne = nedata["class"](
                 hidden_dim_features_extractor,
                 **nedata["kwargs"],
             )
+            if do_compile:
+                ne = torch.compile(ne, dynamic=True)
+            self.node_embedders[netype] = ne
         self.edge_embedders = torch.nn.ModuleDict()
         for eetype, eedata in edge_embedders_spec.items():
-            self.edge_embedders[eetype_to_strtype(eetype)] = eedata["class"](
+            ee = eedata["class"](
                 hidden_dim_features_extractor,
                 **eedata["kwargs"],
             )
+            if do_compile:
+                ee = torch.compile(ee, dynamic=True)
+            self.edge_embedders[eetype_to_strtype(eetype)] = ee
 
         if self.hierarchical:
             self.gnn = GnnHier(
@@ -137,7 +145,6 @@ class GnnMP(torch.nn.Module):
                 g2=g2,
             )
             if do_compile:
-                torch._dynamo.config.capture_scalar_outputs = True
                 self.gnn = torch.compile(self.gnn, dynamic=True)
 
     def reset_egat(self):
@@ -145,7 +152,18 @@ class GnnMP(torch.nn.Module):
             egat.reset_parameters()
 
     def forward(self, obs):
-        (g, batch_size, num_nodes, num_edges, n_nodes, n_edges, nodesid, edgesid) = obs
+        (
+            g,
+            batch_size,
+            num_nodes,
+            num_edges,
+            n_nodes,
+            n_edges,
+            nodesid,
+            edgesid,
+            nodes_types_map,
+            edges_types_map,
+        ) = obs
 
         device = next(self.parameters()).device
         g = g.to(device)
@@ -167,6 +185,7 @@ class GnnMP(torch.nn.Module):
                     g, edgesid[etype].to(device)
                 )
                 edge_embedded[edgesid[etype]] = True
+
         assert torch.all(edge_embedded)
 
         orig_features = features
