@@ -56,7 +56,7 @@ class Agent(Agent):
         value_net=None,
         action_net=None,
         agent_specification=None,
-        do_compile=False,
+        do_compile=True,
     ):
         """
         There are 2 ways to init an Agent:

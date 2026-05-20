@@ -90,7 +90,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--pp_maze_gen",
         choices=("dfs", "dfs_percolation", "maze_hard"),
-        default="dfs",
+        default="dfs_percolation",
         help="Maze generator to use when sampling training/test mazes.",
     )
     # parser.add_argument(

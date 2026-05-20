@@ -5,6 +5,7 @@ import json
 from maze_dataset.maze import SolvedMaze
 from maze_dataset.plotting import MazePlot
 from pp.domains.maze.problem import PathPlanningProblem
+import matplotlib
 
 CHARSET = "# SGo"
 
@@ -50,6 +51,12 @@ def conn_list_from_hard(maze):
                     connection_list[0, x, y] = True
                 if maze[x, y + 1] != 1:
                     connection_list[1, x, y] = True
+    for y in range(29):
+        if maze[29, y] != 1 and maze[29, y + 1] != 1:
+            connection_list[1, 29, y] = True
+    for x in range(29):
+        if maze[x, 29] != 1 and maze[x + 1, 29] != 1:
+            connection_list[0, x, 29] = True
     return connection_list
 
 
@@ -70,14 +77,15 @@ def rebuild_path(start, end, path_list):
     return clist
 
 
-def preprocess_maze_hard(set_name, aug=True, output_dir="."):
+def preprocess_maze_hard(set_name, aug=True, save_img=False):
     # Read CSV
     all_chars = set()
     grid_size = None
     inputs = []
     labels = []
 
-    with open(f"{set_name}.csv", newline="") as csvfile:  # type: ignore
+    print(f"fname ./data/maze_hard/{set_name}.csv")
+    with open(f"./data/maze_hard/{set_name}.csv", newline="") as csvfile:  # type: ignore
         reader = csv.reader(csvfile)
         next(reader)  # Skip header
         for source, q, a, rating in reader:
@@ -154,7 +162,7 @@ def preprocess_maze_hard(set_name, aug=True, output_dir="."):
     }
 
     pbs = []
-    for s in results["labels"]:
+    for i, s in enumerate(results["labels"]):
         conn_list = conn_list_from_hard(s)
         m = s.reshape(30, 30)
         sp = np.array(np.where(m == 3)).squeeze(-1)
@@ -166,6 +174,13 @@ def preprocess_maze_hard(set_name, aug=True, output_dir="."):
             connection_list=conn_list, solution=sol, start_pos=sp, end_pos=ep
         )
         pbs.append(PathPlanningProblem(sm))
+
+        if save_img:
+            plot = MazePlot(sm)
+            plot.plot()
+            plot.fig.savefig(f"hard_test_{i}.png", format="png")
+            matplotlib.pyplot.close()
+
     return pbs
 
     # Metadata
@@ -198,4 +213,4 @@ def preprocess_maze_hard(set_name, aug=True, output_dir="."):
 
 
 if __name__ == "__main__":
-    preprocess_maze_hard("train", aug=False)
+    preprocess_maze_hard("test", aug=False, save_img=True)
