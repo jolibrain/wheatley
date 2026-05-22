@@ -61,36 +61,45 @@ class State:
         self.just_reached_goal = False
         self.step_cost_multiplier = 1.0
         self.n_neigh = 0
-        if self.nonchrono == "wp":
+        if self.nonchrono in ["wp", "wpr"]:
             self.path = None
-            self.mask = torch.ones(self.n_nodes, dtype=torch.bool)
-            self.selected = torch.tensor([0.0] * self.n_nodes)
+            # self.mask = torch.ones(self.n_nodes, dtype=torch.bool)
+            self.mask = self.env.accessible.clone()
+            self.selected = torch.zeros(self.n_nodes)
             self.selected[self.start] = 1
+            self.visited = torch.zeros(self.n_nodes)
+            self.visited[self.start] = 1
             if self.goal is not None:
                 self.selected[self.goal] = 1
                 self.mask[self.goal] = False
+
             self.mask[self.start] = False
         elif self.nonchrono == "path":
             self.mask = torch.ones(self.n_nodes, dtype=torch.bool)
             self.mask[self.start] = False
-            # self.selected = torch.tensor([0.0] * self.n_nodes)
+            # below codex idea:
+            # coords = self.env.graph.get_ndata("norm_coord").float()
+            # s = coords[self.start]
+            # g = coords[self.goal]
+            # direction = g - s
+            # proj = (coords - s) @ direction / (direction.dot(direction) + 1e-6)
+            # self.selected = 5.0 - 4.0 * proj + 0.1 * torch.randn(self.n_nodes)
+            # end of codex idaa
             self.selected = torch.tensor([-1.0] * self.n_nodes)
-            # self.selected = torch.rand(self.n_nodes) * 2.0 - 1.0
-            self.selected[self.start] = math.sqrt(self.n_nodes)
-            # self.selected[self.start] = 0.0
-            # self.selected[self.start] = 1.0
+            self.selected[self.start] = 5.0
             if self.goal is not None:
                 self.selected[self.goal] = 1.0
-                # self.selected[self.goal] = 0.0
-                # self.selected[self.goal] = 0.5
                 self.mask[self.goal] = False
+            self.selected = (self.selected - self.selected.mean()) / (
+                self.selected.std() + 1e-6
+            )
             self.update_partial_sol()
         else:
             self.pos = self.start
             self.path = []
-            self.visited = torch.tensor([0.0] * self.n_nodes)
+            self.visited = torch.zeros(self.n_nodes)
             self.visited[self.pos] = 1
-            self.cur_pos = torch.tensor([0.0] * self.n_nodes)
+            self.cur_pos = torch.zeros(self.n_nodes)
             self.cur_pos[self.pos] = 1
 
     def compute_path_nonchrono2(self):
@@ -151,6 +160,7 @@ class State:
                     node_in_path_between[n] = 1
                 if sol_path is not None:
                     sol_path.append(n)
+            #    path_graph_between.append([prev, n])
             else:
                 sol_path = None
                 break
@@ -204,24 +214,25 @@ class State:
         )
 
     def compute_solution_path(self):
+        # choose randomly among least visisted in order to avoid failure
         pos = self.start
-        visited = torch.tensor([False] * self.n_nodes)
-        visited[pos] = True
+        self.visited = torch.zeros(self.n_nodes)
+        self.visited[pos] = 1
         path = []
         while True:
             neigh = self.env.pos_neigh_nodes(pos)
             suc = []
             # TODO parallelize
             for n in neigh:
-                if not visited[n] and self.selected[n]:
+                if not self.visited[n] and self.selected[n]:
                     suc.append(n)
             if len(suc) == 1:
                 path.append(suc[0])
-                if not self.goal is None:
+                if self.goal is not None:
                     if suc[0] == self.goal:
                         return path
                 pos = suc[0]
-                visited[suc[0]] = True
+                self.visited[suc[0]] = 1
                 continue
             if len(suc) == 0:
                 return None
@@ -232,9 +243,7 @@ class State:
         return self.mask
 
     def succeeded(self):
-        if self.nonchrono == "wp":
-            return self.path is not None
-        elif self.nonchrono == "path":
+        if self.nonchrono is not None:
             return self.path is not None
         else:
             return bool(getattr(self.env, "all_goals_consumed", lambda: False)())
@@ -243,13 +252,13 @@ class State:
         n_forced = 0
         for nt in torch.where(torch.logical_not(self.selected))[0]:
             if self.selected[self.env.pos_neigh_nodes(nt.item())].sum() == 2:
-                self.selected[nt] = True
+                self.selected[nt] = 1
                 n_forced += 1
         return n_forced
 
     def compute_mask(self):
-        selected = torch.where(self.selected)[0]
-        mask = torch.ones(self.n_nodes, dtype=torch.bool)
+        selected = torch.where(self.selected == 1.0)[0]
+        mask = self.env.accessible.clone()
         # cannot select multiple times
         mask[selected] = False
         for nt in selected:
@@ -276,10 +285,15 @@ class State:
             # print('mask sum==0 in failed(): ', self.mask.sum() == 0, ' / path is None=', self.path is None)
 
             return self.mask.sum() == 0 and self.path is None
-        elif self.nonchrono == "path":
+        elif self.nonchrono in ["wpr", "path"]:
             return self.n_steps == self.max_n_steps and self.path is None
         else:
-            return self.n_steps == self.max_n_steps
+            if self.pos == self.goal:
+                return False
+            return (
+                self.n_steps == self.max_n_steps
+                or self.env.transition_model.get_mask(self).sum() == 0
+            )
 
     def done(self):
         return self.failed() or self.succeeded()
@@ -291,7 +305,7 @@ class State:
         self.cur_pos[self.pos] = 0
         self.pos = nid
         self.path.append(nid)
-        self.visited[self.pos] = 1
+        self.visited[self.pos] += 1
         self.cur_pos[self.pos] = 1
 
     def set_goal_status(self, goal_status):
@@ -313,6 +327,16 @@ class State:
         self.selected[nid] = 1
         # self.n_forced = self.force_select()
         self.mask = self.compute_mask()
+        self.path = self.compute_solution_path()
+
+    def select_wpr(self, nid):
+        self.n_steps += 1
+        if self.selected[nid] == 1:
+            self.selected[nid] = 0
+        else:
+            self.selected[nid] = 1
+            self.n_forced = self.force_select()
+        # self.mask = self.compute_mask()
         self.path = self.compute_solution_path()
 
     def update_partial_sol(self):
@@ -348,7 +372,22 @@ class State:
         # self.selected += nvals
         # SIMPLE => do not work
 
-        self.selected += nvals
+        self.selected += nvals[: self.n_nodes]
+        # self.selected = (self.selected - self.selected.mean()) / (
+        #     self.selected.std() + 1e-6
+        # )
+        # self.selected += nvals / (nvals.std() + 1e-6)
+        # self.selected[self.start] = 5.0
+        # self.selected[self.goal] = 1.0
+        # max_v = self.selected.max()
+        # min_v = self.selected.min()
+        # self.selected -= min_v
+        # self.selected /= max_v - min_v
+        # self.selected *= 6
+        # self.selected -= 1
+        # self.selected = ((self.selected - min_v) / (max_v - min_v)) * 8 - 1
+        # self.selected[self.start] = 5.0
+        # self.selected[self.goal] = 1.0
 
         # self.selected[self.start] = 0.0
         # if self.goal is not None:

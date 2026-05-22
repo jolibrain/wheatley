@@ -36,7 +36,7 @@ class SimpleNodeEmbedder(torch.nn.Module):
         x[:, 1] = g.start[nid]
         x[:, 2] = g.goal[nid]
         x[:, 3] = g.degree[nid]
-        x[:, 4] = self._get_agent_feature(g, nid, "n_breaks")
+        x[:, 4] = self._get_agent_feature(g, nid, "visited")
         danger = getattr(g, "danger", None)
         if danger is not None:
             x[:, 5] = danger[nid].to(x.device).float()
@@ -106,14 +106,15 @@ class SimpleNodeEmbedderNonChrono(torch.nn.Module):
         if self.nonchrono == "path":
             x[:, 2] = g.in_path[nid]
         else:
-            x[:, 2] = 0
+            x[:, 2] = self._get_agent_feature(g, nid, "visited")
+        x[:, 5] = 0.0
         x[:, 3] = g.degree[nid]
         x[:, 4] = self._get_agent_feature(g, nid, "selected")
-        danger = getattr(g, "danger", None)
-        if danger is not None:
-            x[:, 5] = danger[nid].to(x.device).float()
-        else:
-            x[:, 5] = 0.0
+        # danger = getattr(g, "danger", None)
+        # if danger is not None:
+        #     x[:, 5] = danger[nid].to(x.device).float()
+        # else:
+        #     x[:, 5] = 0.0
         x[:, 6 : self.nfeats] = g.norm_coord[nid]
 
         # vanilla below

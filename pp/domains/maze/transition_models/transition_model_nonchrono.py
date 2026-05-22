@@ -5,7 +5,7 @@ import torch
 class MazeTransitionModel:
     def __init__(self, env, nonchrono):
         self.env = env
-        self.nonchrono = nonchrono  # "wp" or "path"
+        self.nonchrono = nonchrono  # "wp", "wpr" or "path"
 
     def get_mask(self, state):
         mask = state.get_mask()
@@ -19,6 +19,8 @@ class MazeTransitionModel:
             else:
                 print(f"invalid selection of {nid}")
                 raise InvalidSelectionException(nid)
+        elif self.nonchrono == "wpr":
+            state.select_wpr(nid)
         else:
             state.update_path(nid)
 

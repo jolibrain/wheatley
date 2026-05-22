@@ -271,6 +271,14 @@ class Env:
             access[1].extend([n2, n1])
             access_cache[n1, n2] = 1  # no wall
             access_cache[n2, n1] = 1
+
+        self.accessible = torch.tensor([True] * self.problem.ncells)
+        for n in range(self.problem.ncells):
+            coord = self.nid_to_coord(n)
+            neigh = self.problem.neigh_of(coord)
+            if len(neigh) == 0:
+                self.accessible[n] = False
+
         edge_index["free"] = torch.tensor(access)
         if self.walls:
             edge_index["wall"] = torch.tensor(np.array(np.nonzero(access_cache == 2)))
@@ -307,6 +315,11 @@ class Env:
             subgh = subg.to_homogeneous()
             subgh = addRWPE(subgh)
             self.graph._graph["n"].random_walk_pe = subgh.random_walk_pe
+
+        nn = []
+        for i in range(self.problem.ncells):
+            nn.append(len(self.pos_neigh_nodes(i)))
+        self.n_neigh = torch.tensor(nn)
 
     def _neigh(self, n1, n2):
         c1 = self.nid_to_coord(n1)
@@ -570,13 +583,13 @@ class Env:
         # Getting the reward associated with the current action
         # get origin node from self.state, to get edge
         # only needed if world has been modified by agent action
-        if self.nonchrono is None:
-            curr_pos = self.states[agent_id].pos
-            danger_multiplier = self._danger_cost_multiplier(curr_pos)
-            self.states[agent_id].step_cost_multiplier = danger_multiplier
-            eid = self.graph.find_edge("wall", curr_pos, action)
-        else:
-            eid = None
+        # if self.nonchrono is None:
+        #     curr_pos = self.states[agent_id].pos
+        #     danger_multiplier = self._danger_cost_multiplier(curr_pos)
+        #     self.states[agent_id].step_cost_multiplier = danger_multiplier
+        # eid = self.graph.find_edge("wall", curr_pos, action)
+        # else:
+        #     eid = None
 
         prev_state_data_for_reward = self.reward_model.get_data_for_reward(
             self.states[agent_id]
@@ -586,25 +599,25 @@ class Env:
         self.transition_model.run(self.states[agent_id], action)
 
         # remove a wall edge if it was destroyed by agent action
-        if eid is not None:
-            self.graph.remove_edge(eid, "wall")
-            eid_back = self.graph.find_edge(
-                "wall", action, curr_pos
-            )  # here since removal modifies edge id
-            self.graph.remove_edge(eid_back, "wall")
+        # if eid is not None:
+        #     self.graph.remove_edge(eid, "wall")
+        #     eid_back = self.graph.find_edge(
+        #         "wall", action, curr_pos
+        #     )  # here since removal modifies edge id
+        #     self.graph.remove_edge(eid_back, "wall")
 
-            # call add_edges to put the free edge
-            # print('added free edge between:', self.nid_to_coord(curr_pos), self.nid_to_coord(action))
-            self.graph.add_edge(curr_pos, action, "free")
-            self.graph.add_edge(action, curr_pos, "free")
+        #     # call add_edges to put the free edge
+        #     # print('added free edge between:', self.nid_to_coord(curr_pos), self.nid_to_coord(action))
+        #     self.graph.add_edge(curr_pos, action, "free")
+        #     self.graph.add_edge(action, curr_pos, "free")
 
-            # update degree
+        #     # update degree
 
-            # keep maze-dataset representation in sync for other agents
-            self.problem.break_wall(
-                self.nid_to_coord(curr_pos),
-                self.nid_to_coord(action),
-            )
+        #     # keep maze-dataset representation in sync for other agents
+        #     self.problem.break_wall(
+        #         self.nid_to_coord(curr_pos),
+        #         self.nid_to_coord(action),
+        #     )
 
         obs = self.process_obs(self.observe(agent_id))
         reward = self.reward_model.evaluate(
@@ -635,7 +648,11 @@ class Env:
                 self._agent_start_coords[agent_id],
             ] + [self.nid_to_coord(c) for c in self.states[agent_id].path]
         return Solution(
-            self.states[agent_id].path, self.reward_model, self.optimal, sol_native
+            self.states[agent_id].path,
+            self.reward_model,
+            self.optimal,
+            sol_native,
+            self.states[agent_id].failed(),
         )
 
     def _create_transition_model(self):
@@ -670,6 +687,10 @@ class Env:
                     self.graph.clear_edges("path_graph_inv")
 
                 self.graph.set_ndata("in_path", self.states[agent_id].node_in_path)
+            elif self.nonchrono in ["wp", "wpr"]:
+                self.graph.set_ndata(
+                    f"{agent_prefix}visited", self.states[agent_id].visited
+                )
 
         else:
             self.graph.set_global_data(

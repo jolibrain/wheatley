@@ -5,6 +5,8 @@ from torch_geometric.nn.conv import GATv2Conv
 from generic.gatv3_conv import GATv3Conv
 from generic.mlp import MLP
 from generic.models.gatv2_act import GATv2ActConv
+
+# from generic.models.gate import GATE
 from generic.models.swiglu import SwiGLU
 from generic.models.geglu import GeGLU
 from generic.models.glu import GLU
@@ -29,6 +31,7 @@ class GraphConv(torch.nn.Module):
         super().__init__()
         self.naive = True
         self.gatv3 = False
+        #        self.gate = True
         if gconv_activation == "swiglu":
             GATactivation = SwiGLU
         elif gconv_activation == "gelu":
@@ -115,7 +118,7 @@ class GraphConv(torch.nn.Module):
                 x = self.mlp[i](x)
         return x
 
-    def forward_nog(self, node_feats, edge_index, edge_feats, edge_efeats=None):
+    def forward_nog(self, node_feats, edge_index, edge_feats=None, edge_efeats=None):
         x = node_feats
         for i in range(self.n_messages):
             x = self.conv[i](x, edge_index, edge_feats)

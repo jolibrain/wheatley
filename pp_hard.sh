@@ -1,0 +1,2 @@
+python -m pp.train_pp --batch_size $2 --exp_name_appendix pp_BENCH_chrono_30_12L_g2_HARD_VISITEDATTR --n_layers_features_extractor 12 --fixed_validation --maze_size_train 30 --maze_size_test 30 --n_epochs 3 --n_steps_episode 10000 --n_workers 10 --path /data1/infantes/networks/bench  --device cuda:$1  --n_train_mazes 100 --n_test_mazes 25  --pp_agent_types 0  --gae_lambda 0.95 --store_rollouts_on_disk /data1/infantes/rollouts --g2 --iter_size 4 --pp_maze_gen maze_hard --infinite_dataset
+

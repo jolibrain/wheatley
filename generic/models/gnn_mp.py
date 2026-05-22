@@ -27,6 +27,7 @@ import torch
 
 from .gnn_flat import GnnFlat
 from .gnn_hier import GnnHier
+# from .gnn_tgp import GnnTGP
 
 
 def eetype_to_strtype(eetype):
@@ -73,17 +74,11 @@ class GnnMP(torch.nn.Module):
         if do_compile:
             torch._dynamo.config.capture_scalar_outputs = True
 
-        if layer_pooling == "all":
-            if self.hierarchical:
-                self.features_dim = hidden_dim_features_extractor * (
-                    n_layers_features_extractor * 2 + 3
-                )
-
-            else:
-                self.features_dim = hidden_dim_features_extractor * (
-                    n_layers_features_extractor + 1
-                )
-
+        if layer_pooling == "all" and self.hierarchical:
+            # self.features_dim = hidden_dim_features_extractor * (
+            #     n_layers_features_extractor * 2 + 3
+            # )
+            self.features_dim = hidden_dim_features_extractor
         else:
             self.features_dim = hidden_dim_features_extractor
 
@@ -114,6 +109,7 @@ class GnnMP(torch.nn.Module):
 
         if self.hierarchical:
             self.gnn = GnnHier(
+                # self.gnn = GnnTGP(
                 hidden_dim=hidden_dim_features_extractor,
                 n_layers=n_layers_features_extractor,
                 n_mlp_layers=n_mlp_layers_features_extractor,
@@ -188,16 +184,16 @@ class GnnMP(torch.nn.Module):
 
         assert torch.all(edge_embedded)
 
-        orig_features = features
+        #        orig_features = features
 
         features, poolnodes_features = self.gnn(
             g, features, edge_features, nodesid["n"]
         )
 
-        if self.layer_pooling == "all":
-            features = torch.cat([orig_features] + features, dim=-1)
-            if poolnodes_features is not None:
-                poolnodes_features = torch.cat(poolnodes_features, dim=-1)
+        # if self.layer_pooling == "all":
+        #     features = torch.cat([orig_features] + features, dim=-1)
+        #     if poolnodes_features is not None:
+        #         poolnodes_features = torch.cat(poolnodes_features, dim=-1)
 
         node_features = features[nodesid["n"], :]
 

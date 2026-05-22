@@ -78,7 +78,9 @@ class TrainingSpecification:
         espo,
         clip_grad_norm,
         anon_gamma=1.0,
+        spo=False,
     ):
+        self.spo = spo
         self.lr = lr
         self.fe_lr = fe_lr
         self.total_timesteps = total_timesteps
@@ -173,6 +175,7 @@ class TrainingSpecification:
             f"Store rollouts on disk:           {self.store_rollouts_on_disk}\n"
             f"Critic loss:                      {self.critic_loss}\n"
             f"ESPO:                             {self.espo}\n"
+            f"SPO:                              {self.spo}\n"
             f"clip grad norm:                   {self.clip_grad_norm}\n"
             f"Ortools strategies                {self.ortools_strategy}\n"
         )

@@ -1,0 +1,2 @@
+python -m pp.train_pp --batch_size $3 --exp_name_appendix pp_BENCH_WPR_$2 --n_layers_features_extractor 8 --fixed_validation --maze_size_train $2 --maze_size_test $2 --n_epochs 3 --n_steps_episode 5000 --n_workers 10 --path /data1/infantes/networks/bench  --device cuda:$1  --n_train_mazes 1 --n_test_mazes 25 --infinite_dataset     --pp_agent_types 0  --gae_lambda 0.95 --nonchrono wpr --store_rollouts_on_disk /data1/infantes/rollouts --g2 --layer_pooling all --shared_conv
+
