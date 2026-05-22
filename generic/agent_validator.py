@@ -268,13 +268,13 @@ class AgentValidator:
                     criterions.append(self._get_random_criterion(i))
                 self.fixed_random.append(sum(criterions) / len(criterions))
 
-    def validate(self, agent, alg):
+    def validate(self, agent, alg, niter):
         solutions = self._evaluate_agent(agent)
         self._visdom_metrics(agent, alg)
-        self._save_if_best_model(agent, alg, solutions)
+        self._save_if_best_model(agent, alg, solutions, niter)
         return True
 
-    def _save_if_best_model(self, agent, alg, solutions):
+    def _save_if_best_model(self, agent, alg, solutions, niter):
         # cur_ratio = np.mean(
         #     np.array(self.criterions[-4 : len(self.criterions)])
         #     / np.array(self.ortools_criterions[-4 : len(self.ortools_criterions)])
@@ -310,6 +310,7 @@ class AgentValidator:
                     sol.save(self.path + f"sol_{i}.txt")
 
             print("Saving agent", self.path + "agent.pkl")
+            agent.save(self.path + f"agent_{niter}.pkl")
             agent.save(self.path + "agent.pkl")
             torch.save(alg.optimizer.state_dict(), self.path + "optimizer.pkl")
             self.save_state(self.path + "validator.pkl")

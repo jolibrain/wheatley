@@ -400,7 +400,7 @@ class PPO:
             print("initial validation")
             agent.to(rollout_agent_device)
             agent.eval()
-            self.validator.validate(agent, self)
+            self.validator.validate(agent, self, 0)
             print("... done initial validation")
 
         num_updates = self.total_timesteps // batch_size
@@ -794,7 +794,7 @@ class PPO:
                 and iteration % self.validation_freq == 0
                 and self.validator is not None
             ):
-                self.validator.validate(agent, self)
+                self.validator.validate(agent, self, update)
 
                 # Statistics from the agent validator.
                 self.logger.record(
