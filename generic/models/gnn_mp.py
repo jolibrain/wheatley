@@ -27,6 +27,10 @@ import torch
 
 from .gnn_flat import GnnFlat
 from .gnn_hier import GnnHier
+<<<<<<< Updated upstream
+=======
+from .gnn_tgp import GnnTGP
+>>>>>>> Stashed changes
 
 
 def eetype_to_strtype(eetype):
@@ -113,7 +117,12 @@ class GnnMP(torch.nn.Module):
             self.edge_embedders[eetype_to_strtype(eetype)] = ee
 
         if self.hierarchical:
+<<<<<<< Updated upstream
             self.gnn = GnnHier(
+=======
+            # self.gnn = GnnHier(
+            self.gnn = GnnTGP(
+>>>>>>> Stashed changes
                 hidden_dim=hidden_dim_features_extractor,
                 n_layers=n_layers_features_extractor,
                 n_mlp_layers=n_mlp_layers_features_extractor,
