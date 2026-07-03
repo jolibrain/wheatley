@@ -108,8 +108,8 @@ class GnnMP(torch.nn.Module):
             self.edge_embedders[eetype_to_strtype(eetype)] = ee
 
         if self.hierarchical:
-            self.gnn = GnnHier(
-                # self.gnn = GnnTGP(
+            # self.gnn = GnnHier(
+            self.gnn = GnnTGP(
                 hidden_dim=hidden_dim_features_extractor,
                 n_layers=n_layers_features_extractor,
                 n_mlp_layers=n_mlp_layers_features_extractor,
