@@ -201,12 +201,21 @@ class Agent(Agent):
             env_specification.max_n_modes = max_n_modes
             env_specification.max_n_nodes = max_n_modes
             env_specification.max_n_jobs = max_n_modes
+            env_specification.max_n_steps = max_n_modes
         if agent_specification.agent_types is None:
             agent_specification.agent_types = save_data.get("pp_agent_types")
         agent = cls(env_specification, agent_specification=agent_specification)
 
         # constructors init weight!!!
-        agent.gnn.load_state_dict(save_data["gnn"])
+        try:
+            agent.gnn.load_state_dict(save_data["gnn"])
+        except RuntimeError:
+            agent = cls(
+                env_specification,
+                agent_specification=agent_specification,
+                do_compile=False,
+            )
+            agent.gnn.load_state_dict(save_data["gnn"])
         agent.value_net.load_state_dict(save_data["value_net"])
         action_state = save_data["action_net"]
         if isinstance(action_state, list):
@@ -342,10 +351,12 @@ class Agent(Agent):
         )
 
     def get_action_and_value(
-        self, x, action=None, action_masks=None, deterministic=False
+        self, x, action=None, action_masks=None, deterministic=False, temperature=1.0
     ):
         if self.nonchrono != "path" and self.num_agents == 1:
-            return super().get_action_and_value(x, action, action_masks, deterministic)
+            return super().get_action_and_value(
+                x, action, action_masks, deterministic, temperature
+            )
 
         node_features, graph_embedding = self.gnn(x)
         value = self.value_net(graph_embedding)

@@ -15,9 +15,22 @@ from torch_sparse import SparseTensor, remove_diag
 from torch.distributions.bernoulli import Bernoulli
 from generic.models.g2 import G2Merge
 
+from generic.models.all_pooler import AllPooler2
 
 Scorer = Callable[[Tensor, Adj, OptTensor, OptTensor], Tensor]
 torch._dynamo.config.capture_scalar_outputs = True
+
+
+def check_consistency(adj, batch):
+    if isinstance(adj, SparseTensor):
+        row, col, _ = adj.coo()
+    else:
+        row = adj[0]
+        col = adj[1]
+
+    for i in range(row.shape[0]):
+        if batch[row[i]] != batch[col[i]]:
+            print("INCONSISTENCY at elt ", i)
 
 
 class ScoreAggr(torch.nn.Module):
@@ -45,9 +58,10 @@ class NodeAggr(torch.nn.Module):
             activation=activation,
             gconv_activation=gconv_activation,
             n_mlp_layers=n_mlp_layers,
+            add_self_loops=True,
         )
 
-    def forward(self, x, index, dim_size):
+    def forward(self, x, index, mis):
         # below merge nodes into pool node
         # pool_nodes_data = self.emb(torch.tensor([0] * dim_size, device=x.device))
         # x2 = torch.cat([pool_nodes_data, x])
@@ -63,11 +77,32 @@ class NodeAggr(torch.nn.Module):
         # y = self.gc.forward_nog(x2, new_index, None, None)
         # return y[:dim_size]
 
-        # below merge nodes into cluster center
+        # new_index = torch.stack(
+        #     [torch.tensor(list(range(x.shape[0])), device=x.device), index]
+        # )
+        # y = self.gc.forward_nog(x, new_index, None, None)
+        # return y[:dim_size]
+        dim_size = mis.sum()
+
+        # SCATTER
+        # cluster_x = scatter(x, index, dim=0, dim_size=dim_size, reduce="mean")
+        # newx = torch.cat([cluster_x, x], dim=0)
+        # new_index = torch.stack(
+        #     [torch.arange(x.size(0), device=x.device) + dim_size, index]
+        # )
+
+        # BELOW MERGE ONLY DISCARDED, SOURCE CLUSTER CENTERS as SELFLOOPS
+        cluster_x = x[mis]
+        discarded_x = x[torch.logical_not(mis)]
+        newx = torch.cat([cluster_x, discarded_x], dim=0)
+
         new_index = torch.stack(
-            [torch.tensor(list(range(x.shape[0])), device=x.device), index]
+            [
+                torch.arange(discarded_x.size(0), device=x.device) + dim_size,
+                index[torch.logical_not(mis)],
+            ]
         )
-        y = self.gc.forward_nog(x, new_index, None, None)
+        y = self.gc.forward_nog(newx, new_index, None, None)
         return y[:dim_size]
 
 
@@ -257,7 +292,7 @@ def maximal_independent_set(
 
 
 def maximal_independent_set_cluster(
-    edge_index: Adj, k: int = 1, perm: OptTensor = None
+    edge_index_for_mis: Adj, edge_index_for_cluster, k: int = 1, perm: OptTensor = None
 ) -> PairTensor:
     r"""Computes the Maximal :math:`k`-Independent Set (:math:`k`-MIS)
     clustering of a graph, as defined in `"Generalizing Downsampling from
@@ -275,12 +310,12 @@ def maximal_independent_set_cluster(
             :obj:`(n,)` (defaults to :obj:`None`).
     :rtype: (:class:`ByteTensor`, :class:`LongTensor`)
     """
-    mis = maximal_independent_set(edge_index=edge_index, k=k, perm=perm)
+    mis = maximal_independent_set(edge_index=edge_index_for_mis, k=k, perm=perm)
     n, device = mis.size(0), mis.device
-    if isinstance(edge_index, SparseTensor):
-        row, col, _ = edge_index.coo()
+    if isinstance(edge_index_for_cluster, SparseTensor):
+        row, col, _ = edge_index_for_cluster.coo()
     else:
-        row, col = edge_index[0], edge_index[1]
+        row, col = edge_index_for_cluster[0], edge_index_for_cluster[1]
     if perm is None:
         rank = torch.arange(n, dtype=torch.long, device=device)
     else:
@@ -293,6 +328,8 @@ def maximal_independent_set_cluster(
         min_neigh = torch.full_like(min_rank, fill_value=n)
         scatter_min(min_rank[row], col, out=min_neigh)
         torch.minimum(min_neigh, min_rank, out=min_rank)
+        # BELOW FOR SPECIAL ADJ
+        min_rank[mis] = rank_mis
     _, clusters = torch.unique(min_rank, return_inverse=True)
     perm = torch.argsort(rank_mis)
     return mis, perm[clusters]
@@ -353,7 +390,10 @@ class KMISPooling(torch.nn.Module):
         self.update_edges = True
         self.bernoulli = False
         self.learnable_distance = True
-        self.update_nodes = True
+        self.update_nodes = False
+        # self.cluster_with_orig_adj = False
+        # BELOW SPECIAL ADJ
+        self.cluster_with_orig_adj = True
 
         if self.update_nodes:
             self.gc = node_updater
@@ -422,6 +462,9 @@ class KMISPooling(torch.nn.Module):
         """"""
 
         adj, n = edge_index, features.size(0)
+
+        # check_consistency(adj, batch)
+
         if not isinstance(edge_index, SparseTensor):
             adj = SparseTensor.from_edge_index(edge_index, edge_features, (n, n))
 
@@ -442,8 +485,6 @@ class KMISPooling(torch.nn.Module):
             features = self.gc.forward_nog(features, edge_index, new_edge_features)
 
         if self.learnable_distance:
-            # edge_score = self.edge_score(new_edge_features).squeeze(-1)
-
             if self.bernoulli:
                 distrib = Bernoulli(edge_score.sigmoid())
                 to_keep = distrib.sample().to(torch.bool)
@@ -465,7 +506,15 @@ class KMISPooling(torch.nn.Module):
         updated_score = self._apply_heuristic(score, adj_for_mis)
         perm = torch.argsort(updated_score.view(-1), 0, descending=True)
 
-        mis, cluster = maximal_independent_set_cluster(adj_for_mis, self.k, perm)
+        if self.cluster_with_orig_adj:
+            adj_for_cluster = adj
+        else:
+            adj_for_cluster = adj_for_mis
+
+        # check_consistency(adj_for_mis, batch)
+        mis, cluster = maximal_independent_set_cluster(
+            adj_for_mis, adj_for_cluster, self.k, perm
+        )
 
         row, col, val = adj.coo()
         # row, col, val = adj_for_mis.fill_diag(0).coo()
@@ -474,6 +523,8 @@ class KMISPooling(torch.nn.Module):
             print("val is none!!!!")
             val = torch.ones_like(row, dtype=torch.float)
         if isinstance(self.aggr_edge, EdgeAggr):
+            # check_consistency(edge_index, batch)
+
             edge_index, edge_attr = self.aggr_edge(
                 val, cluster[row], cluster[col], c, batch
             )
@@ -481,6 +532,8 @@ class KMISPooling(torch.nn.Module):
             # edge_index, edge_attr = torch_geometric.utils.remove_self_loops(
             #     edge_index, edge_attr
             # )
+            # check_consistency(edge_index, batch[mis])
+
         else:
             adj = SparseTensor(
                 row=cluster[row],
@@ -500,7 +553,7 @@ class KMISPooling(torch.nn.Module):
         elif isinstance(self.aggr_x, str):
             x = scatter(x, cluster, dim=0, dim_size=mis.sum(), reduce=self.aggr_x)
         else:
-            x = self.aggr_x(x, cluster, dim_size=c)
+            x = self.aggr_x(x, cluster, mis)
         if self.score_passthrough == "after":
             x = self.aggr_score(x, score[mis])
         # if isinstance(edge_index, SparseTensor):
@@ -542,12 +595,12 @@ class GnnHier(torch.nn.Module):
 
         self.g2 = g2
         self.hidden_dim = hidden_dim
-        self.layer_pooling = layer_pooling
-        self.n_layers_features_extractor = n_layers
+        self.layer_pooling = "all"
+        self.n_layers = n_layers
         self.sum_res = residual
         self.n_attention_heads = n_attention_heads
         self.checkpoint = checkpoint
-        self.learned_pool = graph_pooling in ["learn", "learninv"]
+        self.learned_pool = True  # graph_pooling in ["learn", "learninv"]
         self.gconv_activation = gconv_activation
         self.n_messages = 1
 
@@ -580,8 +633,26 @@ class GnnHier(torch.nn.Module):
 
         self.node_updater = torch.nn.ModuleList()
 
+        if self.layer_pooling == "all":
+            self.all_pooler_graph = AllPooler2(
+                False,
+                self.hidden_dim,
+                n_attention_heads,
+                activation,
+                n_mlp_layers,
+                gconv_activation,
+            )
+            self.all_pooler_nodes = AllPooler2(
+                False,
+                self.hidden_dim,
+                n_attention_heads,
+                activation,
+                n_mlp_layers,
+                gconv_activation,
+            )
+
         self.edge_embedder = torch.nn.Linear(self.hidden_dim, self.hidden_dim)
-        for i in range(self.n_layers_features_extractor):
+        for i in range(self.n_layers):
             if i == 0 or not self.shared_layers:
                 self.node_updater.append(
                     GraphConv(
@@ -593,13 +664,10 @@ class GnnHier(torch.nn.Module):
                         n_mlp_layers=n_mlp_layers,
                     )
                 )
-            else:
-                self.node_updater.append(self.node_updater[0])
 
             if i == 0 or not self.shared_layers:
                 self.score_aggr.append(ScoreAggr(hidden_dim=self.hidden_dim))
-            else:
-                self.score_aggr.append(self.score_aggr[0])
+
             if i == 0 or not self.shared_layers:
                 self.x_aggr.append(
                     NodeAggr(
@@ -610,8 +678,7 @@ class GnnHier(torch.nn.Module):
                         gconv_activation=self.gconv_activation,
                     )
                 )
-            else:
-                self.x_aggr.append(self.x_aggr[0])
+
             if i == 0 or not self.shared_layers:
                 self.edge_aggr.append(
                     EdgeAggr(
@@ -638,17 +705,11 @@ class GnnHier(torch.nn.Module):
                 )
                 self.edge_score.append(EdgeScorer(self.hidden_dim))
 
-            else:
-                self.edge_aggr.append(self.edge_aggr[0])
-                self.edge_pre_score.append(self.edge_pre_score[0])
-                self.edge_post_score.append(self.edge_post_score[0])
-                self.edge_score.append(self.edge_score[0])
-
             if i == 0 or not self.shared_layers:
                 self.pools.append(
                     KMISPooling(
                         self.hidden_dim,
-                        # k=1 if i < self.n_layers_features_extractor - 1 else 2,
+                        # k=1 if i < self.n_layers - 1 else 2,
                         k=1,
                         aggr_x=self.x_aggr[i],
                         aggr_score=self.score_aggr[i],
@@ -665,8 +726,6 @@ class GnnHier(torch.nn.Module):
                         node_updater=self.node_updater[i],
                     )
                 )
-            else:
-                self.pools.append(self.pools[0])
 
         self.norm_feat = torch_geometric.nn.norm.LayerNorm(
             self.hidden_dim, mode="graph", affine=True
@@ -693,7 +752,7 @@ class GnnHier(torch.nn.Module):
                 )
             )
 
-        for i in range(self.n_layers_features_extractor + 1):
+        for i in range(self.n_layers + 1):
             if self.normalize_down:
                 if i == 0 or not self.shared_layers:
                     self.norms_down.append(
@@ -701,8 +760,6 @@ class GnnHier(torch.nn.Module):
                             self.hidden_dim, mode="graph", affine=False
                         )
                     )
-                else:
-                    self.norms_down.append(self.norms_down[0])
 
             if self.normalize_up:
                 if i == 0 or not self.shared_layers:
@@ -711,8 +768,6 @@ class GnnHier(torch.nn.Module):
                             self.hidden_dim, mode="graph", affine=False
                         )
                     )
-                else:
-                    self.norms_up.append(self.norms_up[0])
             if i == 0 or not self.shared_layers:
                 self.down_convs.append(
                     GraphConv(
@@ -725,8 +780,6 @@ class GnnHier(torch.nn.Module):
                         gconv_activation=self.gconv_activation,
                     )
                 )
-            else:
-                self.down_convs.append(self.down_convs[0])
             if i == 0 or not self.shared_layers:
                 self.up_convs.append(
                     GraphConv(
@@ -765,14 +818,10 @@ class GnnHier(torch.nn.Module):
                             activation="geglu",
                         )
                     )
-            else:
-                self.up_convs.append(self.up_convs[0])
-                if self.sum_res is False or self.g2:
-                    self.merge_up.append(self.merge_up[0])
 
         if self.learned_pool:
             if self.layer_pooling == "all":
-                for i in range(self.n_layers_features_extractor * 2 + 2):
+                for i in range(self.n_layers * 2 + 2):
                     if i == 0 or not self.shared_layers:
                         self.graph_pool.append(
                             GraphPool(
@@ -783,8 +832,6 @@ class GnnHier(torch.nn.Module):
                                 n_mlp_layers=n_mlp_layers,
                             )
                         )
-                    else:
-                        self.graph_pool.append(self.graph_pool[0])
             else:
                 self.graph_pool = GraphPool(
                     self.hidden_dim,
@@ -793,9 +840,6 @@ class GnnHier(torch.nn.Module):
                     gconv_activation=self.gconv_activation,
                     n_mlp_layers=n_mlp_layers,
                 )
-                #     ,
-                #     dynamic=True,
-                # )
 
     def forward(self, g, features, edge_features, nodesid_n):
         edge_features = self.edge_embedder(edge_features)
@@ -804,6 +848,7 @@ class GnnHier(torch.nn.Module):
 
         x = features
         batch = g.batch
+        gpfeats = self.graph_pool[0](x, batch)
         x = self.norm_feat(x, batch=batch)
 
         if self.learned_pool and self.layer_pooling == "all":
@@ -820,23 +865,28 @@ class GnnHier(torch.nn.Module):
         x = self.down_convs[0](g, x, edge_features)
 
         if self.learned_pool and self.layer_pooling == "all":
-            gpdata = self.graph_pool[1](x, batch)
+            gpdata = (
+                self.graph_pool[0](x, batch)
+                if self.shared_layers
+                else self.graph_pool[1](x, batch)
+            )
             graph_pools.append(gpdata)
         xs = [x]
         edge_indices = [edge_index]
         all_edge_features = [edge_features]
         mises = []
+        clusters = []
         batches = [batch]
         if self.layer_pooling == "all":
             pooled_layers = [x]
             pooled_layers.extend(
-                [torch.zeros_like(x)] * (self.n_layers_features_extractor * 2 + 1)
+                [torch.zeros_like(x) for _ in range((self.n_layers * 2 + 1))]
             )
-        for i in range(1, self.n_layers_features_extractor + 1):
+        for i in range(1, self.n_layers + 1):
             if i % self.checkpoint:
                 x, edge_index, edge_features, batch, mis, cluster, perm = (
                     torch.utils.checkpoint.checkpoint(
-                        self.pools[i - 1],
+                        self.pools[0] if self.shared_layers else self.pools[i - 1],
                         x,
                         edge_index,
                         edge_features,
@@ -844,22 +894,34 @@ class GnnHier(torch.nn.Module):
                         use_reentrant=False,
                     )
                 )
+                to_call = 0 if self.shared_layers else i
+                if self.normalize_down:
+                    x = self.norms_down[to_call](x, batch=batch)
                 x = torch.utils.checkpoint.checkpoint(
-                    self.down_convs[i].forward_nog, x, edge_index, edge_features
+                    self.down_convs[to_call].forward_nog,
+                    x,
+                    edge_index,
+                    edge_features,
+                    use_reentrant=False,
                 )
             else:
                 x, edge_index, edge_features, batch, mis, cluster, perm = self.pools[
-                    i - 1
+                    0 if self.shared_layers else i - 1
                 ](x, edge_index, edge_features, batch)
+                to_call = 0 if self.shared_layers else i
                 if self.normalize_down:
-                    x = self.norms_down[i](x, batch=batch)
-                x = self.down_convs[i].forward_nog(x, edge_index, edge_features)
-                batches.append(batch)
+                    x = self.norms_down[to_call](x, batch=batch)
+                x = self.down_convs[to_call].forward_nog(x, edge_index, edge_features)
+            batches.append(batch)
+            clusters.append(cluster)
 
             if self.learned_pool and self.layer_pooling == "all":
-                gpdata = self.graph_pool[i + 1](x, batch)
-                # graph_pools.append(gpdata)
-                graph_pools.append(torch.zeros_like(gpdata, device=gpdata.device))
+                if self.shared_layers:
+                    gpdata = self.graph_pool[0](x, batch)
+                else:
+                    gpdata = self.graph_pool[i + 1](x, batch)
+                graph_pools.append(gpdata)
+                # graph_pools.append(torch.zeros_like(gpdata, device=gpdata.device))
 
             mises.append(mis)
 
@@ -867,59 +929,66 @@ class GnnHier(torch.nn.Module):
                 target = torch.arange(x0.shape[0], device=mises[0].device)
                 for k in range(i):
                     target = target[mises[k]]
-                # pooled_layers[i][target] = x
-                pooled_layers[i][target] = torch.zeros_like(x, device=x.device)
+                pooled_layers[i][target] = x
+                # pooled_layers[i][target] = torch.zeros_like(x, device=x.device)
 
-            if i < self.n_layers_features_extractor:
+            if i < self.n_layers:
                 xs.append(x)
             edge_indices.append(edge_index)
             all_edge_features.append(edge_features)
 
-        for i in range(self.n_layers_features_extractor):
-            j = self.n_layers_features_extractor - 1 - i
+        for i in range(self.n_layers):
+            j = self.n_layers - 1 - i
             res = xs[j]
-            up = torch.zeros_like(res)
-            mis = mises[j]
-            up[mis] = x
+            # BELOW CODEX SUGGESTION
+            up = x[clusters[j]]
+            # BELOW USUAL FORMULATION
+            # up = torch.zeros_like(res)
+            # up[mises[j]] = x
 
+            to_call = 0 if self.shared_layers else i
             if self.sum_res:
                 x = res + up
             elif self.g2:
-                x = self.merge_up[i](res, up, edge_indices[j], all_edge_features[j])
+                x = self.merge_up[to_call](
+                    res, up, edge_indices[j], all_edge_features[j]
+                )
             else:
-                x = self.merge_up[i](torch.cat([res, up], dim=-1))
+                x = self.merge_up[to_call](torch.cat([res, up], dim=-1))
+            if self.normalize_up:
+                x = self.norms_up[to_call](x, batch=batches[j])
             if i % self.checkpoint:
                 x = torch.utils.checkpoint.checkpoint(
-                    self.up_convs[i].forward_nog,
+                    self.up_convs[to_call].forward_nog,
                     x,
                     edge_indices[j],
                     all_edge_features[j],
+                    use_reentrant=False,
                 )
             else:
-                if self.normalize_up:
-                    x = self.norms_up[i](x, batch=batches[j])
-                x = self.up_convs[i].forward_nog(
+                x = self.up_convs[to_call].forward_nog(
                     x, edge_indices[j], all_edge_features[j]
                 )
 
             if self.learned_pool and self.layer_pooling == "all":
-                gpdata = self.graph_pool[self.n_layers_features_extractor + i + 2](
-                    x, batches[j]
-                )
+                if self.shared_layers:
+                    gpdata = self.graph_pool[0](x, batches[j])
+                else:
+                    gpdata = self.graph_pool[self.n_layers + i + 2](x, batches[j])
                 graph_pools.append(gpdata)
 
             if self.layer_pooling == "all":
                 target = torch.arange(x0.shape[0], device=mises[0].device)
                 for k in range(j):
                     target = target[mises[k]]
-                pooled_layers[self.n_layers_features_extractor + i + 1][target] = x
+                pooled_layers[self.n_layers + i + 1][target] = x
 
         if self.normalize_up:
             x = self.norms_up[-1](x, batch=batches[0])
         if self.sum_res:
             x = x + x0
         elif self.g2:
-            x = self.merge_up[i](x0, x, edge_indices[0], all_edge_features[0])
+            x = self.merge_up[-1](x0, x, edge_indices[0], all_edge_features[0])
         else:
             x = self.merge_up[-1](torch.cat((x0, x), dim=-1))
         # x = self.norm_last(x, batch=batches[0])
@@ -927,13 +996,17 @@ class GnnHier(torch.nn.Module):
 
         if self.layer_pooling == "all":
             pooled_layers[-1] = x
-            if self.learned_pool:
-                gpdata = self.graph_pool[-1](x, batches[0])
-                graph_pools.append(gpdata)
-                return pooled_layers, graph_pools
+            gpdata = self.graph_pool[-1](x, batches[0])
+            graph_pools.append(gpdata)
+            pn = self.all_pooler_nodes(
+                torch.stack(pooled_layers, dim=0),
+                features,
+            )
+            pg = self.all_pooler_graph(torch.stack(graph_pools, dim=0), gpfeats)
+            return pn, pg
+            # return pooled_layers, graph_pools
         else:
-            if self.learned_pool:
-                gpdata = self.graph_pool(x, batches[0])
-                return x, gpdata
+            gpdata = self.graph_pool(x, batches[0])
+            return x, gpdata
 
         return x, None

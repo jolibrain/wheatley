@@ -23,7 +23,7 @@
 
 import os
 
-
+import torch
 import random
 import glob
 
@@ -42,6 +42,7 @@ from pp.domains.registry import get_domain_definition
 from pp.models.agent import Agent
 from pp.utils.utils import create_train_envs
 import torchinfo
+from functools import partial
 
 
 torch.set_float32_matmul_precision("high")
@@ -123,6 +124,7 @@ def main(args) -> float:
         espo=args.espo,
         clip_grad_norm=args.clip_grad_norm,
         anon_gamma=args.anon_gamma,
+        spo=args.spo,
     )
     training_specification.print_self()
 
@@ -144,8 +146,8 @@ def main(args) -> float:
         hidden_dim_features_extractor=args.hidden_dim_features_extractor,
         n_attention_heads=args.n_attention_heads,
         residual_gnn=args.residual_gnn if args.hierarchical else True,
-        normalize_gnn=True if args.hierarchical else args.normalize_gnn,
-        # normalize_gnn=args.normalize_gnn,
+        # normalize_gnn=True if args.hierarchical else args.normalize_gnn,
+        normalize_gnn=args.normalize_gnn,
         n_mlp_layers_actor=args.n_mlp_layers_actor,
         hidden_dim_actor=args.hidden_dim_actor,
         n_mlp_layers_critic=args.n_mlp_layers_critic,
@@ -184,13 +186,19 @@ def main(args) -> float:
 
     opt_state_dict = None
     if (
-        args.resume
-        and os.path.exists(path + "agent.pkl")
-        and os.path.exists(path + "optimizer.pkl")
+        args.resume is not None
+        and os.path.exists(args.resume + "/agent.pkl")
+        and os.path.exists(args.resume + "/optimizer.pkl")
     ):
         print("Resuming a training\n")
-        agent = Agent.load(path, pp_agent_types=args.pp_agent_types)
-        opt_state_dict = torch.load(path + "optimizer.pkl")
+        agent = Agent.load(
+            args.resume + "/", max_n_modes=args.maze_size_train * args.maze_size_train
+        )
+        agent.gnn.to(torch.device(args.device))
+        agent.value_net.to(torch.device(args.device))
+        for head in agent.action_nets:
+            head.to(torch.device(args.device))
+        opt_state_dict = torch.load(args.resume + "/optimizer.pkl")
         agent.env_specification = env_specification
         agent.agent_specification = agent_specification
     else:
@@ -244,9 +252,9 @@ def main(args) -> float:
         rwpe=agent_specification.rwpe,
         env_kwargs=pp_env_kwargs,
     )
-    if args.resume and os.path.exists(path + "validator.pkl"):
-        validator = validator.reload_state(path + "validator.pkl")
-        print("Validator reloaded.")
+    # if args.resume is not None and os.path.exists(path + "validator.pkl"):
+    #     validator = validator.reload_state(path + "validator.pkl")
+    #     print("Validator reloaded.")
     ppo = PPO(training_specification, validator)
 
     train_envs = create_train_envs(
@@ -279,15 +287,27 @@ def main(args) -> float:
     )
 
 
+def interrupt_handler(path, signum, frame):
+    if path is not None:
+        files = glob.glob(path + "/wheatley_" + str(os.getpid()) + "_*.obs")
+        print("cleaning observations ")
+        for f in files:
+            os.remove(f)
+            print(".", end="")
+    print()
+    exit()
+
+
 if __name__ == "__main__":
     from pp.args_pp import argument_parser, parse_args
 
     parser = argument_parser()
     args = parse_args(parser)
 
-    # print("installing cleanup handler")
-    # signal.signal(
-    #     signal.SIGINT, partial(interrupt_handler, args.store_rollouts_on_disk)
-    # )
+    if args.store_rollouts_on_disk is not None:
+        print("Installing cleanup handler for rollouts on disk")
+        signal.signal(
+            signal.SIGINT, partial(interrupt_handler, args.store_rollouts_on_disk)
+        )
 
     main(args)

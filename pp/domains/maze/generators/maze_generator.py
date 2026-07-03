@@ -35,8 +35,8 @@ def generate_mazes(
     if maze_gen == "maze_hard":
         if not hasattr(generate_mazes, "hard_mazes"):
             generate_mazes.hard_mazes = {
-                "train": preprocess_maze_hard("./data/maze_hard/train"),
-                "test": preprocess_maze_hard("./data/maze_hard/test", aug=False),
+                "train": preprocess_maze_hard("train"),
+                "test": preprocess_maze_hard("test", aug=False),
             }
         train_pbs = []
         for i in range(n_mazes_train):

@@ -46,7 +46,7 @@ class RandomAgent:
 
     def select_action(self, env, action_masks):
         if self.nonchrono == "path":
-            return (torch.rand(env.problem.ncells) * 2 - 1.0).unsqueeze(-1)
+            return (torch.rand(env.problem.ncells) * 10 - 1.0).unsqueeze(-1)
         if self.nonchrono == "order":
             return (
                 (torch.rand(env.env_specification.max_order) * env.problem.ncells)

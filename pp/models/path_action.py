@@ -19,5 +19,4 @@ class PathAction(torch.nn.Module):
         x = self.mlp(x)
         var = torch.nn.functional.sigmoid(x[..., 1])
         mean = torch.tanh(x[..., 0])
-        # mean = x[..., 0]
         return torch.stack([mean, var], dim=-1)

@@ -194,9 +194,9 @@ def argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--resume",
-        default=False,
-        action="store_true",
-        help='Resume a previous training. The script will look for trained model named "agent.pkl" in the directory experiment.',
+        default=None,
+        type=str,
+        help='Resume a previous training. The script will look for trained model named "agent.pkl" in the given directory.',
     )
     parser.add_argument(
         "--reinit_head_before_ppo",
@@ -881,6 +881,9 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--laber", type=int, default=None, help="laber weigther subsampling"
     )
+    parser.add_argument(
+        "--spo", action="store_true", default=None, help="Simple policy Optimization"
+    )
     parser.add_argument("--no_walls", action="store_true", help="not do add wall edges")
     parser.add_argument("--self_loops", action="store_true", help="add self_loops")
     parser.add_argument(
@@ -895,7 +898,7 @@ def argument_parser() -> argparse.ArgumentParser:
         "--nonchrono",
         type=str,
         default=None,
-        help="non chronological agent: wp, path, default is None",
+        help="non chronological agent: wp, wpr, path, default is None",
     )
 
     return parser

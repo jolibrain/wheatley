@@ -24,7 +24,10 @@ class MazeTransitionModel:
         else:
             allowed_nodes = self.allow_neighbor1_nodes(state)
         mask = torch.zeros(state.n_nodes, dtype=torch.bool)
+
         mask[allowed_nodes] = True  # True means allowed atm
+
+        # mask = torch.logical_and(mask, state.visited == 0)
         if getattr(self.env, "allow_stay", False):
             # allow noop by selecting the current position
             mask[state.pos] = True

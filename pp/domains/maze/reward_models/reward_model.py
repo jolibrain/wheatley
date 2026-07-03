@@ -1,4 +1,5 @@
 import torch
+import math
 
 
 class ShortestPathRewardModel:
@@ -10,6 +11,7 @@ class ShortestPathRewardModel:
         self.unit_cost = 1.0 / (env_specification.max_n_nodes * 1)
         self.move_cost = 1.0 / env_specification.max_n_nodes
         self.step_cost = 1.0 / env_specification.max_n_steps
+        self.reward_shaping_rew = 1.0 / math.sqrt(env_specification.max_n_nodes)
         self.goal_reward = float(goal_reward)
         if self.reward_shaping:
             self.fail_cost = 2.0
@@ -36,27 +38,33 @@ class ShortestPathRewardModel:
             #     f"succeded\n start = {state.selected[state.start]}\n goal = {state.selected[state.goal]}\n path = {state.selected[state.path]}\n nopath = {state.selected[not_in_path]}\n nsteps = {state.n_steps}\n sol : {state.env.problem.solvedMaze.solution} {state.env.problem.solvedMaze.solution.shape[0]}"
             # )
             state.step_cost_multiplier = 1.0
-            if self.nonchrono == "path":
+            if self.nonchrono in ["path", "wpr"]:
                 if self.reward_shaping:
                     return (
                         -len(state.path) * self.move_cost
-                        - data_from_previous_state * self.move_cost
+                        - data_from_previous_state * self.reward_shaping_rew
                     )
                 else:
                     return -len(state.path) * self.move_cost
             return 0.0
         if state.failed():
             state.step_cost_multiplier = 1.0
-            if self.nonchrono == "path":
+            if self.nonchrono in ["path"]:
                 if self.reward_shaping:
-                    return -self.fail_cost - data_from_previous_state * self.move_cost
+                    return (
+                        -self.fail_cost
+                        - data_from_previous_state * self.reward_shaping_rew
+                    )
                 else:
                     return -self.fail_cost + state.n_neigh * self.move_cost
             return -self.fail_cost  # - current_reward
         cost = -self.step_cost * getattr(state, "step_cost_multiplier", 1.0)
         state.step_cost_multiplier = 1.0
         if self.reward_shaping:
-            return cost + (state.n_neigh - data_from_previous_state) * self.move_cost
+            return (
+                cost
+                + (state.n_neigh - data_from_previous_state) * self.reward_shaping_rew
+            )
         else:
             return cost
 

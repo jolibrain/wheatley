@@ -7,6 +7,10 @@ from torch import Tensor
 from torch.nn import Parameter
 
 from torch_geometric.nn.conv import MessagePassing
+
+# GATE
+# from .msgpass import MessagePassing
+# END GATE
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.nn.inits import glorot, zeros
 from torch_geometric.typing import (
@@ -159,13 +163,18 @@ class GATv2ActConv(MessagePassing):
     ):
         super().__init__(node_dim=0, **kwargs)
 
+        # GATE
+        # self.gate = True
+        # self.add_self_loops = True if self.gate else add_self_loops
+        # END GATE
+
+        self.add_self_loops = add_self_loops
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.heads = heads
         self.concat = concat
         self.negative_slope = negative_slope
         self.dropout = dropout
-        self.add_self_loops = add_self_loops
         self.edge_dim = edge_dim
         self.fill_value = fill_value
         self.residual = residual
@@ -210,6 +219,29 @@ class GATv2ActConv(MessagePassing):
                     bias=bias,
                     weight_initializer="glorot",
                 )
+
+        # GATE
+        # if self.gate:
+        #     self.lin_s = Linear(
+        #         in_channels,
+        #         heads * out_channels,
+        #         bias=bias,
+        #         weight_initializer="glorot",
+        #     )
+        #     self.lin_rAP = Linear(
+        #         in_channels,
+        #         heads * out_channels,
+        #         bias=bias,
+        #         weight_initializer="glorot",
+        #     )
+        #     self.lin_lAP = Linear(
+        #         in_channels,
+        #         heads * out_channels,
+        #         bias=bias,
+        #         weight_initializer="glorot",
+        #     )
+        #     self.att2 = Parameter(torch.empty(1, heads, out_channels))
+        # END GATE
 
         if self.kan:
             self.att_kan = make_kans(
@@ -266,8 +298,7 @@ class GATv2ActConv(MessagePassing):
 
     def reset_parameters(self):
         super().reset_parameters()
-        self.lin_l.reset_parameters()
-        self.lin_r.reset_parameters()
+
         if self.lin_edge is not None:
             self.lin_edge.reset_parameters()
         if self.res is not None:
@@ -277,6 +308,24 @@ class GATv2ActConv(MessagePassing):
         if self.kan:
             self.att_kan.reset_parameters()
             self.att_edge_kan.reset_parameters()
+        # GATE
+        # if self.gate:
+        #     # self.lin_s.reset_parameters()
+        #     # self.lin_lAP.reset_parameters()
+        #     # self.lin_rAP.reset_parameters()
+        #     glorot(self.att2)
+        #     torch.nn.init.orthogonal_(self.lin_s.weight)
+        #     torch.nn.init.orthogonal_(self.lin_lAP.weight)
+        #     torch.nn.init.orthogonal_(self.lin_rAP.weight)
+        #     torch.nn.init.orthogonal_(self.lin_l.weight)
+        #     torch.nn.init.orthogonal_(self.lin_r.weight)
+        # else:
+        #     self.lin_l.reset_parameters()
+        #     self.lin_r.reset_parameters()
+        # END GATE
+
+        self.lin_l.reset_parameters()
+        self.lin_r.reset_parameters()
 
     @overload
     def forward(
@@ -363,6 +412,13 @@ class GATv2ActConv(MessagePassing):
         assert x_l is not None
         assert x_r is not None
 
+        # GATE
+        # if self.gate:
+        #     x_s = self.lin_s(x).view(-1, H, C)
+        #     x_lAP = self.lin_lAP(x).view(-1, H, C)
+        #     x_rAP = self.lin_rAP(x).view(-1, H, C)
+        # END GATE
+
         if self.add_self_loops:
             if isinstance(edge_index, Tensor):
                 num_nodes = x_l.size(0)
@@ -385,10 +441,24 @@ class GATv2ActConv(MessagePassing):
                         "'edge_index' in a 'SparseTensor' form"
                     )
 
-        # edge_updater_type: (x: PairTensor, edge_attr: OptTensor)
-        alpha = self.edge_updater(edge_index, x=(x_l, x_r), edge_attr=edge_attr)
+        # GATE
+        # if self.gate:
+        #     out = self.propagate(
+        #         edge_index,
+        #         x=(x_l, x_r),
+        #         alpha=None,
+        #         edge_attr=edge_attr,
+        #         size=None,
+        #         edgeIndex=edge_index,
+        #         xAP=(x_lAP, x_rAP),
+        #         x_s=x_s,
+        #     )
+        # else:
+        #     alpha = self.edge_updater(edge_index, x=(x_l, x_r), edge_attr=edge_attr)
+        #     out = self.propagate(edge_index, x=(x_l, x_r), alpha=alpha)
+        # END GATE
 
-        # propagate_type: (x: PairTensor, alpha: Tensor)
+        alpha = self.edge_updater(edge_index, x=(x_l, x_r), edge_attr=edge_attr)
         out = self.propagate(edge_index, x=(x_l, x_r), alpha=alpha)
 
         if self.concat:
@@ -456,8 +526,62 @@ class GATv2ActConv(MessagePassing):
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
         return alpha
 
-    def message(self, x_j: Tensor, alpha: Tensor) -> Tensor:
+    def message(
+        self,
+        x_j: Tensor,
+        alpha: Tensor,
+        # GATE
+        # edge_attr: OptTensor,
+        # index: Tensor,
+        # ptr: OptTensor,
+        # size_i: Optional[int],
+        # edgeIndex: OptTensor,
+        # xAP_lAP: Tensor,
+        # xAP_rAP: Tensor,
+        # x_s: Tensor,
+        # END GATE
+    ) -> Tensor:
         return x_j * alpha.unsqueeze(-1)
+
+    # GATE
+    # if self.gate:
+    #     x = xAP_lAP + xAP_rAP
+
+    #     if edge_attr is not None:
+    #         if edge_attr.dim() == 1:
+    #             edge_attr = edge_attr.view(-1, 1)
+    #             assert self.lin_edge is not None
+    #             edge_attr = self.lin_edge(edge_attr)
+    #             edge_attr = edge_attr.view(-1, self.heads, self.out_channels)
+    #             x = x + edge_attr
+
+    #     x = F.relu(x)  # , self.negative_slope)
+    #     # x = F.leaky_relu(x, self.negative_slope)
+
+    #     alpha1 = (x * self.att).sum(dim=-1)
+    #     ijNotEq = torch.tensor(
+    #         edgeIndex[0] != edgeIndex[1], dtype=torch.float
+    #     ).unsqueeze(-1)
+    #     ijEq = torch.tensor(
+    #         edgeIndex[0] == edgeIndex[1], dtype=torch.float
+    #     ).unsqueeze(-1)  # .unsqueeze(-1)
+    #     alpha1 = alpha1 * ijNotEq
+    #     alpha2 = (x * self.att2).sum(dim=-1)
+    #     alpha2 = alpha2 * ijEq
+    #     alpha = alpha1 + alpha2
+
+    #     alpha = softmax(alpha, index, ptr, size_i)
+
+    #     self._alpha = alpha
+    #     alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+
+    #     x_j = (x_j * ijNotEq.unsqueeze(-1)) + (x_s * ijEq.unsqueeze(-1))
+
+    #     return x_j * alpha.unsqueeze(-1)
+
+    # else:
+    #     return x_j * alpha.unsqueeze(-1)
+    # END GATE
 
     def __repr__(self) -> str:
         return (

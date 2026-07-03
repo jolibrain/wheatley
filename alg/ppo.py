@@ -64,6 +64,7 @@ class PPO:
 
         self.training_specification = training_specification
 
+        self.spo = training_specification.spo
         self.anon_gamma = training_specification.anon_gamma
         self.gamma = training_specification.gamma
         self.update_epochs = training_specification.n_epochs
@@ -114,7 +115,12 @@ class PPO:
         obs = []
 
         actions = torch.zeros(
-            (self.num_steps, num_envs, agent.action_dim, agent.num_agents),
+            (
+                self.num_steps,
+                num_envs,
+                agent.action_dim,
+                agent.num_agents,
+            ),
             # dtype=torch.long,
             device=data_device,
         )
@@ -307,7 +313,11 @@ class PPO:
         # flatten the batch
         b_obs = agent.rebatch_obs(obs)
         b_logprobs = logprobs.reshape(-1, agent.action_dim, agent.num_agents)
-        b_actions = actions.reshape(-1, agent.action_dim, agent.num_agents)
+        b_actions = actions.reshape(
+            -1,
+            agent.action_dim,
+            agent.num_agents,
+        )
         b_advantages = advantages.reshape(-1, agent.reward_dim)
 
         b_returns = returns.reshape(-1, agent.reward_dim)
@@ -534,8 +544,14 @@ class PPO:
 
                     # add dim for number of agents and for action_dim
                     mba = -mb_advantages.unsqueeze(-1).unsqueeze(-1)
-                    pg_loss1 = mba * ratio
-                    if self.clip_coef is not None:
+                    if self.spo:
+                        spo_eps = 0.2  # as per  2401.16025
+                        pg_loss = (
+                            mba * ratio
+                            + torch.abs(mba) * torch.pow(ratio - 1, 2) / (2 * spo_eps)
+                        ).mean()
+                    elif self.clip_coef is not None:
+                        pg_loss1 = mba * ratio
                         pg_loss2 = mba * torch.clamp(
                             ratio,
                             1.0 - self.clip_coef,
@@ -543,6 +559,7 @@ class PPO:
                         )
                         pg_loss = torch.max(pg_loss1, pg_loss2).mean()
                     else:
+                        pg_loss1 = mba * ratio
                         espo_dev = (ratio - 1).abs().mean()
                         if max_espo_dev < espo_dev:
                             max_espo_dev = espo_dev

@@ -191,7 +191,7 @@ class Agent(torch.nn.Module):
         return self.value_net(graph_embedding)
 
     def get_action_and_value(
-        self, x, action=None, action_masks=None, deterministic=False
+        self, x, action=None, action_masks=None, deterministic=False, temperature=1.0
     ):
         if action is not None:
             action = action.squeeze(-1).squeeze(-1)
@@ -220,7 +220,7 @@ class Agent(torch.nn.Module):
             possible_actions = torch.where(mask)[0]
             possible_logits = logits[b, possible_actions]
 
-            distrib = Categorical(logits=possible_logits)
+            distrib = Categorical(logits=possible_logits / temperature)
             if action is None:
                 if deterministic is False:
                     local_action = distrib.sample().unsqueeze(0)
