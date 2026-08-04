@@ -29,8 +29,11 @@ import torch
 
 
 class RandomAgent:
-    def __init__(self, nonchrono):
-        self.nonchrono = nonchrono
+    def __init__(self, nonchrono=None):
+        if nonchrono is not None:
+            self.nonchrono = nonchrono
+        else:
+            self.nonchrono = "dummy"
 
     def predict(self, env):
         # soft reset to evaluate the same sampled problem as PPO
