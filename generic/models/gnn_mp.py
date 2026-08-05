@@ -61,6 +61,7 @@ class GnnMP(torch.nn.Module):
         gconv_activation="swiglu",
         shared_layers=False,
         g2=False,
+        decision_nodes="n",
     ):
         super().__init__()
         self.residual = residual
@@ -69,6 +70,7 @@ class GnnMP(torch.nn.Module):
         self.layer_pooling = layer_pooling
         self.hierarchical = hierarchical
         self.shared_layers = shared_layers
+        self.decision_nodes = decision_nodes
 
         self.node_type_size = num_node_types
         if do_compile:
@@ -168,8 +170,9 @@ class GnnMP(torch.nn.Module):
         embeded = torch.zeros(num_nodes, dtype=bool)
 
         for ntype, nembedder in self.node_embedders.items():
-            features[nodesid[ntype], :] = nembedder(g, nodesid[ntype].to(device))
-            embeded[nodesid[ntype]] = True
+            if ntype in nodesid:
+                features[nodesid[ntype], :] = nembedder(g, nodesid[ntype].to(device))
+                embeded[nodesid[ntype]] = True
         assert torch.all(embeded)
 
         edge_features = torch.empty((num_edges, self.hidden_dim), device=device)
@@ -187,7 +190,7 @@ class GnnMP(torch.nn.Module):
         #        orig_features = features
 
         features, poolnodes_features = self.gnn(
-            g, features, edge_features, nodesid["n"]
+            g, features, edge_features, nodesid[self.decision_nodes]
         )
 
         # if self.layer_pooling == "all":
@@ -195,7 +198,7 @@ class GnnMP(torch.nn.Module):
         #     if poolnodes_features is not None:
         #         poolnodes_features = torch.cat(poolnodes_features, dim=-1)
 
-        node_features = features[nodesid["n"], :]
+        node_features = features[nodesid[self.decision_nodes], :]
 
         if batch_size != 1:
             if self.graph_pooling == "max":

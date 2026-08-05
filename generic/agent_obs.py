@@ -15,6 +15,10 @@ class AgentObservation:
         else:
             self.g = simg
         self.generic_rewire()
+
+        self.node_types = (
+            rewire_params["node_types"] if "node_types" in rewire_params else "n"
+        )
         # if lappe is not None:
         # subg = self.g._graph.edge_type_subgraph(
         #     [("n", "free", "n"), ("n", "rfree", "n"), ("n", "pool", "poolnode")]
@@ -42,12 +46,13 @@ class AgentObservation:
 
     def sloops(self):
         for ntype in self.g._graph.node_types:
-            nnodes = self.g._graph[ntype].num_nodes
-            e0 = torch.arange(nnodes)
-            e1 = torch.arange(nnodes)
-            self.g.add_edges(
-                e0, e1, etype="self_" + ntype, node_type1=ntype, node_type2=ntype
-            )
+            nnodes = self.g.num_nodes(ntype)
+            if nnodes != 0:
+                e0 = torch.arange(nnodes)
+                e1 = torch.arange(nnodes)
+                self.g.add_edges(
+                    e0, e1, etype="self_" + ntype, node_type1=ntype, node_type2=ntype
+                )
 
     def generic_rewire(self):
         if self.do_bidir:
@@ -69,24 +74,28 @@ class AgentObservation:
     ):
         self.g.add_nodes(1, node_type="poolnode")
 
-        ei0 = list(range(self.g.num_nodes()))
-        ei1 = [0] * self.g.num_nodes()
+        for nt in self.g._graph.node_types:
+            if nt == "poolnode":
+                continue
+            if self.g.num_nodes(nt) != 0:
+                ei0 = list(range(self.g.num_nodes(nt)))
+                ei1 = [0] * self.g.num_nodes(nt)
 
-        self.g.add_edges(
-            torch.tensor(ei0, dtype=torch.int64),
-            torch.tensor(ei1, dtype=torch.int64),
-            etype="pool",
-            node_type1="n",
-            node_type2="poolnode",
-        )
-        if inverse_pooling:
-            self.g.add_edges(
-                torch.tensor(ei1),
-                torch.tensor(ei0),
-                etype="rpool",
-                node_type1="poolnode",
-                node_type2="n",
-            )
+                self.g.add_edges(
+                    torch.tensor(ei0, dtype=torch.int64),
+                    torch.tensor(ei1, dtype=torch.int64),
+                    etype="pool",
+                    node_type1=nt,
+                    node_type2="poolnode",
+                )
+                if inverse_pooling:
+                    self.g.add_edges(
+                        torch.tensor(ei1),
+                        torch.tensor(ei0),
+                        etype="rpool",
+                        node_type1="poolnode",
+                        node_type2=nt,
+                    )
 
         # self loops
         if self.self_loops:
@@ -100,18 +109,24 @@ class AgentObservation:
 
     def vnode(self):
         self.g.add_nodes(1, node_type="vnode")
-        ei0 = list(range(self.g.num_nodes()))
-        ei1 = [0]
+        for nt in self.node_types:
+            if self.g.num_nodes(nt) != 0:
+                ei0 = list(range(self.g.num_nodes(nt)))
+                ei1 = [0]
 
-        self.g.add_edges(ei0, ei1, etype="vnode", node_type1="n", node_type2="vnode")
-        self.g.add_edges(ei1, ei0, etype="rvnode", node_type1="vnode", node_type2="n")
-        self.g.add_edges(
-            torch.tensor([0], dtype=torch.int64),
-            torch.tensor([0], dtype=torch.int64),
-            etype="selfvnode",
-            node_type1="vnode",
-            node_type2="vnode",
-        )
+                self.g.add_edges(
+                    ei0, ei1, etype="vnode", node_type1=nt, node_type2="vnode"
+                )
+                self.g.add_edges(
+                    ei1, ei0, etype="rvnode", node_type1="vnode", node_type2=nt
+                )
+                self.g.add_edges(
+                    torch.tensor([0], dtype=torch.int64),
+                    torch.tensor([0], dtype=torch.int64),
+                    etype="selfvnode",
+                    node_type1="vnode",
+                    node_type2="vnode",
+                )
 
     def bidir(self):
         for fet in self.g._graph.edge_types:
@@ -159,7 +174,12 @@ class AgentObservationBatch:
         for ao in aos:
             # glist.append(ao.g)
             hlist.append(ao.homo)
-            num_nodes_list.append(ao.g.num_nodes())
+            nn = ao.g.num_nodes()
+            if ao.learned_graph_pooling in ["learn", "learninv"]:
+                nn -= 1
+            if ao.vnoding:
+                nn -= 1
+            num_nodes_list.append(nn)
             num_edges_list.append(ao.g.num_edges())
         # pygbatch = PYGBatchGraph(glist)
         pygbatch_homo = Batch.from_data_list(hlist)
