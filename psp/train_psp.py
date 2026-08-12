@@ -348,7 +348,6 @@ def main(args) -> float:
         rollout_agent_device=args.device,
         opt_state_dict=None,
         skip_initial_eval=args.skip_initial_eval,
-        skip_model_trace=args.skip_model_trace,
         warmup=args.warmup,
         laber=args.laber,
     )

@@ -27,6 +27,7 @@ class RolloutDataset(torch.utils.data.Dataset):
         values,
         actions_masks,
         sigma,
+        obstype,
     ):
         self.agent = agent
         self.obs = obs
@@ -37,13 +38,14 @@ class RolloutDataset(torch.utils.data.Dataset):
         self.values = values
         self.actions_masks = actions_masks
         self.sigma = sigma
+        self.obstype = obstype
 
     def __len__(self):
         return self.logprobs.shape[0]
 
     def __getitem__(self, idx):
         return (
-            self.agent.get_obs(self.obs, [idx])[0],
+            self.agent.get_obs(self.obs, [idx], self.obstype)[0],
             self.logprobs[idx],
             self.actions[idx],
             self.advantages[idx],

@@ -30,7 +30,15 @@ class AgentObservation:
         self.homo = self.g.to_homogeneous()
 
     def save(self, fname):
-        data = {"g": self.g._graph.to_dict(), "homo": self.homo.to_dict()}
+        data = {
+            "g": self.g._graph.to_dict(),
+            "homo": self.homo.to_dict(),
+            "learned_graph_pooling": self.learned_graph_pooling,
+            "do_bidir": self.do_bidir,
+            "vnoding": self.vnoding,
+            "self_loops": self.self_loops,
+            "node_types": self.node_types,
+        }
         torch.save(data, fname, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
     @classmethod
@@ -42,6 +50,11 @@ class AgentObservation:
         o.g._graph = HeteroData.from_dict(d["g"])
         o.g.cache = False
         o.homo = Data.from_dict(d["homo"])
+        o.learned_graph_pooling = d["learned_graph_pooling"]
+        o.do_bidir = d["do_bidir"]
+        o.vnoding = d["vnoding"]
+        o.self_loops = d["self_loops"]
+        o.node_types = d["node_types"]
         return o
 
     def sloops(self):
@@ -144,9 +157,12 @@ class AgentObservation:
 
 
 class AgentObservationBatch:
-    def __init__(self, pygbatch_homo, node_types, edge_types, num_nodes, num_edges):
+    def __init__(
+        self, pygbatch_homo, aos, node_types, edge_types, num_nodes, num_edges
+    ):
         # self.graphs = pygbatch
         self.homo_graphs = pygbatch_homo
+        self.aos = aos
         # self.n_graphs = self.graphs._graph.num_graphs
         self.n_graphs = pygbatch_homo.num_graphs
         # self.total_num_nodes = self.graphs._graph.num_nodes
@@ -185,6 +201,7 @@ class AgentObservationBatch:
         pygbatch_homo = Batch.from_data_list(hlist)
         return cls(
             pygbatch_homo,
+            aos,
             aos[0].g._graph.node_types,
             aos[0].g._graph.edge_types,
             num_nodes_list,
@@ -203,6 +220,7 @@ class AgentObservationBatch:
 
         return (
             homo,
+            self.aos,
             # self.graphs._graph.num_graphs,
             homo.num_graphs,
             self.total_num_nodes,

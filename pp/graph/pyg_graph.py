@@ -74,10 +74,15 @@ class PYGGraph(Graph):
         else:
             self._graph[node_type, etype, node_type][featname][:, index] = data
 
-    def num_nodes(self, node_type="n"):
-        if self._graph[node_type].num_nodes is None:
-            return 0
-        return self._graph[node_type].num_nodes
+    def num_nodes(self, node_type=None):
+        if node_type is None:
+            s = 0
+            for nt in self._graph.node_types:
+                s += self._graph[nt].num_nodes
+            return s
+        if node_type in self._graph.node_types:
+            return self._graph[node_type].num_nodes
+        return 0
 
     # def predecessors(self, nid):
     #     if not self.cache:

@@ -199,7 +199,10 @@ class Agent(torch.nn.Module):
             action_masks = action_masks.squeeze(1)
         node_features, graph_embedding = self.gnn(x)
         value = self.value_net(graph_embedding)
-        logits = self.action_net(node_features).squeeze(-1)
+        logits = []
+        for nf in node_features:
+            logits.append(self.action_net(nf).squeeze(-1))
+        # logits = self.action_net(node_features).squeeze(-1)
 
         unmasked_distribs = []
 
@@ -207,18 +210,20 @@ class Agent(torch.nn.Module):
         logprobs = []
         entropy = []
 
-        unmasked_distrib = Categorical(logits=logits)
-        unmasked_distribs.append(unmasked_distrib)
+        for b in range(len(logits)):  # iterate over batch size
+            unmasked_distrib = Categorical(logits=logits[b])
+            unmasked_distribs.append(unmasked_distrib)
 
-        for b in range(logits.shape[0]):  # iterate over batch size
+        # for b in range(logits.shape[0]):  # iterate over batch size
+        for b in range(len(logits)):  # iterate over batch size
             mask = torch.as_tensor(
                 action_masks[b, : logits[b].shape[0]],
                 dtype=torch.bool,
-                device=logits.device,
+                device=logits[0].device,
             )
 
             possible_actions = torch.where(mask)[0]
-            possible_logits = logits[b, possible_actions]
+            possible_logits = logits[b][possible_actions]
 
             distrib = Categorical(logits=possible_logits / temperature)
             if action is None:
@@ -389,6 +394,7 @@ class Agent(torch.nn.Module):
         observation = AgentObservationBatch.from_aos(obs)
         (
             g,
+            native_aos,
             batch_size,
             total_num_nodes,
             total_num_edges,
@@ -403,6 +409,7 @@ class Agent(torch.nn.Module):
 
         return (
             g,
+            native_aos,
             batch_size,
             total_num_nodes,
             total_num_edges,
@@ -437,7 +444,7 @@ class Agent(torch.nn.Module):
             return obs
         return sum(obs, [])
 
-    def get_obs(self, b_obs, mb_ind):
+    def get_obs(self, b_obs, mb_ind, obstype):
         if isinstance(b_obs[0], str):
-            return [AgentObservation.load(b_obs[i]) for i in mb_ind]
+            return [AgentObservation.load(b_obs[i], obstype) for i in mb_ind]
         return list(b_obs[i] for i in mb_ind)

@@ -43,6 +43,7 @@ from pp.models.agent import Agent
 from pp.utils.utils import create_train_envs
 import torchinfo
 from functools import partial
+from pp.graph.pyg_graph import PYGGraph
 
 
 torch.set_float32_matmul_precision("high")
@@ -255,7 +256,7 @@ def main(args) -> float:
     # if args.resume is not None and os.path.exists(path + "validator.pkl"):
     #     validator = validator.reload_state(path + "validator.pkl")
     #     print("Validator reloaded.")
-    ppo = PPO(training_specification, validator)
+    ppo = PPO(training_specification, validator, obstype=PYGGraph)
 
     train_envs = create_train_envs(
         env_cls=domain_def.env_cls,
