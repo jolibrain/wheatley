@@ -181,7 +181,7 @@ class GnnTGP(torch.nn.Module):
                     edge_weight=self.edge_weighter(edge_features)
                     if i == 0
                     else pool_out[i - 1].edge_weight,
-                    batch=batch if i == 0 else pool_out[i - 1].batch,
+                    batch=batch.clone() if i == 0 else pool_out[i - 1].batch,
                 )
             )
             x = self.conv_pool.forward_nog(
@@ -208,7 +208,7 @@ class GnnTGP(torch.nn.Module):
 
             xs.append(x)
 
-        for i in range(self.n_layers - 1, 1, -1):
+        for i in range(self.n_layers - 1, 0, -1):
             res = xs[i]
             up = self.pool(x=x, so=pool_out[i].so, lifting=True).squeeze(0)
             if self.sum_res:
@@ -232,22 +232,22 @@ class GnnTGP(torch.nn.Module):
 
             if self.layer_pooling == "all":
                 xp = x
-                for k in range(i):
-                    xp = self.pool(x=xp, so=pool_out[i - k - 1].so, lifting=True)
-                if xp.dim() == 3:
-                    xp = x.squeeze(0)
+                for k in range(i - 1):
+                    xp = self.pool(
+                        x=xp, so=pool_out[i - k - 1].so, lifting=True
+                    ).squeeze(0)
                 pooled_layers.append(x)
 
         res = x0
-        up = self.pool(x=x, so=pool_out[1].so, lifting=True)
+        up = self.pool(x=x, so=pool_out[0].so, lifting=True).squeeze(0)
         if self.sum_res:
             x = res + up
         elif self.g2:
             x = self.merge_up(
                 res,
                 up,
-                pool_out[i - 1].edge_index,
-                self.edge_unweighter(pool_out[i - 1].edge_weight).unsqueeze(-1),
+                edge_index0,
+                edge_features0,
             )
 
         x = self.conv_dec.forward_nog(
