@@ -17,7 +17,6 @@ import cv2
 import torch
 import bisect
 from psp.graph.graph_factory import GraphFactory
-from psp.graph.graph import Graph
 from queue import PriorityQueue
 import numpy as np
 

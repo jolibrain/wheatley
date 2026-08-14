@@ -55,6 +55,7 @@ class PPO:
         validator=None,
         discard_incomplete_trials=True,
         generate_duration_bounds=None,
+        obstype=None,
     ):
         self.optimizer_class = training_specification.optimizer_class
         self.logger = configure_logger(
@@ -63,6 +64,7 @@ class PPO:
         self.generate_duration_bounds = generate_duration_bounds
 
         self.training_specification = training_specification
+        self.obstype = obstype
 
         self.spo = training_specification.spo
         self.anon_gamma = training_specification.anon_gamma
@@ -339,6 +341,7 @@ class PPO:
                 b_values[to_keep_b],
                 b_action_masks[to_keep_b],
                 sigma,
+                self.obstype,
             )
         return RolloutDataset(
             agent,
@@ -350,6 +353,7 @@ class PPO:
             b_values,
             b_action_masks,
             sigma,
+            self.obstype,
         )
 
     def train(
@@ -814,20 +818,20 @@ class PPO:
                 self.validator.validate(agent, self, update)
 
                 # Statistics from the agent validator.
-                self.logger.record(
-                    "validation/ppo_criterion",
-                    self.validator.criterions[-1],
-                )
-                if self.validator.compute_ortools:
-                    for ortools_strategy in self.validator.ortools_strategies:
-                        self.logger.record(
-                            f"validation/ortools_{ortools_strategy}_criterion",
-                            self.validator.ortools_criterions[ortools_strategy][-1],
-                        )
-                self.logger.record(
-                    "validation/random_makepsan",
-                    self.validator.random_criterions[-1],
-                )
+                # self.logger.record(
+                #     "validation/ppo_criterion",
+                #     self.validator.criterions[-1],
+                # )
+                # if self.validator.compute_ortools:
+                #     for ortools_strategy in self.validator.ortools_strategies:
+                #         self.logger.record(
+                #             f"validation/ortools_{ortools_strategy}_criterion",
+                #             self.validator.ortools_criterions[ortools_strategy][-1],
+                #         )
+                # self.logger.record(
+                #     "validation/random_makepsan",
+                #     self.validator.random_criterions[-1],
+                # )
 
                 if self.validator.compute_ortools:
                     self.logger.record(
@@ -863,14 +867,14 @@ class PPO:
 
         envs.close()
 
-        ppo_criterions = np.array(self.validator.criterions)
-        if self.validator.compute_ortools:
-            ortools_criterions = np.array(
-                self.validator.ortools_criterions[
-                    self.validator.default_ortools_strategy
-                ]
-            )
-            ratios = ppo_criterions / ortools_criterions
-        else:
-            ratios = ppo_criterions / ppo_criterions[0]
-        return np.min(ratios)
+        # ppo_criterions = np.array(self.validator.criterions)
+        # if self.validator.compute_ortools:
+        #     ortools_criterions = np.array(
+        #         self.validator.ortools_criterions[
+        #             self.validator.default_ortools_strategy
+        #         ]
+        #     )
+        #     ratios = ppo_criterions / ortools_criterions
+        # else:
+        #     ratios = ppo_criterions / ppo_criterions[0]
+        # return np.min(ratios)

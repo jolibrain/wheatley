@@ -187,6 +187,12 @@ class Agent(Agent):
                 "class": SimpleEdgeEmbedder,
                 "kwargs": {},
             }
+
+            edge_embedders[("resource", "pool", "poolnode")] = {
+                "class": SimpleEdgeEmbedder,
+                "kwargs": {},
+            }
+
         if agent_specification.graph_pooling == "learninv":
             edge_embedders[("poolnode", "rpool", "n")] = {
                 "class": SimpleEdgeEmbedder,
@@ -288,42 +294,3 @@ class Agent(Agent):
             #            "gelu",
         )
         self.action_net = torch.compile(self.action_net, dynamic=True)
-
-    def obs_as_tensor_add_batch_dim(self, obs):
-        cobs = obs.clone()
-        return AgentObservation(
-            cobs,
-            self.rewire_params,
-            self.psp_rewirer,
-        )
-
-    def obs_as_tensor(self, obs):
-        # create agentObs from graph from output data from env
-        return [
-            AgentObservation(
-                o,
-                self.rewire_params,
-                self.psp_rewirer,
-            )
-            for o in obs
-        ]
-
-    def rebatch_obs(self, obs):
-        # we need to flatten a list of list into a single list
-        if isinstance(obs[0], str):
-            return obs
-        return sum(obs, [])
-
-    def get_obs(self, b_obs, mb_ind):
-        if isinstance(b_obs[0], str):
-            # return [dgl.load_graphs(b_obs[i])[0][0] for i in mb_ind]
-            # bobsi = [b_obs[i] for i in mb_ind]
-            # return process_map(
-            #     GraphFactory.load, bobsi, max_workers=16, chunksize=1, disable=True
-            # )
-            return [
-                # GraphFactory.load(b_obs[i], self.env_specification.pyg) for i in mb_ind
-                AgentObservation.load(b_obs[i], PYGGraph)
-                for i in mb_ind
-            ]
-        return list(b_obs[i] for i in mb_ind)
