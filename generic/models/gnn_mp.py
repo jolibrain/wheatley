@@ -152,6 +152,7 @@ class GnnMP(torch.nn.Module):
     def forward(self, obs):
         (
             g,
+            native_aos,
             batch_size,
             num_nodes,
             num_edges,
@@ -173,7 +174,16 @@ class GnnMP(torch.nn.Module):
             if ntype in nodesid:
                 features[nodesid[ntype], :] = nembedder(g, nodesid[ntype].to(device))
                 embeded[nodesid[ntype]] = True
-        assert torch.all(embeded)
+        if not torch.all(embeded):
+            not_embedded = torch.where(torch.logical_not(embeded))[0]
+            types_not_embedded = g.node_type[not_embedded]
+            uniques_types = torch.unique(types_not_embedded)
+            for i in uniques_types:
+                typeid = i.item()
+                for nt in nodes_types_map:
+                    if nodes_types_map[nt] == typeid:
+                        print(f"node type not embedded : {nt}")
+            exit(1)
 
         edge_features = torch.empty((num_edges, self.hidden_dim), device=device)
         edge_embedded = torch.zeros(num_edges, dtype=bool)
@@ -185,7 +195,16 @@ class GnnMP(torch.nn.Module):
                 )
                 edge_embedded[edgesid[etype]] = True
 
-        assert torch.all(edge_embedded)
+        if not torch.all(edge_embedded):
+            not_embedded = torch.where(torch.logical_not(edge_embedded))[0]
+            types_not_embedded = g.edge_type[not_embedded]
+            uniques_types = torch.unique(types_not_embedded)
+            for i in uniques_types:
+                typeid = i.item()
+                for et in edges_types_map:
+                    if edges_types_map[et] == typeid:
+                        print(f"edge type not embedded : {et}")
+            exit(1)
 
         #        orig_features = features
 
@@ -201,26 +220,18 @@ class GnnMP(torch.nn.Module):
         node_features = features[nodesid[self.decision_nodes], :]
 
         if batch_size != 1:
+            node_features = self.unbatch(node_features, native_aos)
             if self.graph_pooling == "max":
                 graph_embedding = []
-                startelt = 0
-                for i in range(batch_size):
-                    nn = n_nodes[i]
-                    graph_embedding.append(
-                        torch.max(node_features[startelt : startelt + nn], dim=0)[0]
-                    )
-                    startelt += nn
+                for nf in node_features:
+                    graph_embedding.append(torch.max(nf, dim=0)[0])
                 graph_embedding = torch.stack(graph_embedding)
             elif self.graph_pooling == "avg":
                 graph_embedding = []
-                startelt = 0
-                for i in range(batch_size):
-                    nn = n_nodes[i]
+                for nf in node_features:
+                    nn = nf.shape[0]
                     gp = torch.ones(nn, device=node_features.device) / nn
-                    graph_embedding.append(
-                        torch.matmul(gp, node_features[startelt : startelt + nn])
-                    )
-                    startelt += nn
+                    graph_embedding.append(torch.matmul(gp, nf))
                 graph_embedding = torch.stack(graph_embedding)
             elif self.graph_pooling in ["learn", "learninv"]:
                 if poolnodes_features is None:
@@ -228,30 +239,16 @@ class GnnMP(torch.nn.Module):
                 else:
                     graph_embedding = poolnodes_features
 
-            nnf = []
-            startelt = 0
-            for i in range(batch_size):
-                nn = n_nodes[i]
-                nnf.append(
-                    torch.nn.functional.pad(
-                        node_features[startelt : startelt + nn],
-                        (0, 0, 0, self.max_n_nodes - nn),
-                        mode="constant",
-                        value=0.0,
-                    )
-                )
-                startelt += nn
-            node_features = torch.stack(nnf)
-
         else:
-            node_features = node_features.reshape(batch_size, n_nodes[0], -1)
+            node_features = self.unbatch(node_features, native_aos)
 
             if self.graph_pooling == "max":
-                max_elts, _ = torch.max(node_features, dim=1)
+                max_elts, _ = torch.max(node_features[0], dim=1)
                 graph_embedding = max_elts
             elif self.graph_pooling == "avg":
+                n_nodes = node_features[0].shape[0]
                 graph_pooling = (
-                    torch.ones(n_nodes, device=node_features.device) / n_nodes
+                    torch.ones(n_nodes, device=node_features[0].device) / n_nodes
                 )
                 graph_embedding = torch.matmul(graph_pooling, node_features)
             elif self.graph_pooling == "gap":
@@ -266,13 +263,15 @@ class GnnMP(torch.nn.Module):
                     f"Graph pooling {self.graph_pooling} not recognized. Only accepted pooling are max and avg"
                 )
 
-            node_features = torch.nn.functional.pad(
-                node_features,
-                (0, 0, 0, self.max_n_nodes - node_features.shape[1]),
-                mode="constant",
-                value=0.0,
-            )
-
         graph_embedding = graph_embedding.reshape(batch_size, -1)
 
         return node_features, graph_embedding
+
+    def unbatch(self, nf, aos):
+        start = 0
+        nnf = []
+        for ao in aos:
+            ndn = ao.g.num_nodes(self.decision_nodes)
+            nnf.append(nf[start : start + ndn])
+            start += ndn
+        return nnf

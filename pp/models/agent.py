@@ -287,34 +287,6 @@ class Agent(Agent):
         for head in self.action_nets:
             head.to(device)
 
-    def obs_as_tensor_add_batch_dim(self, obs):
-        cobs = obs.clone()
-        return AgentObservation(
-            cobs,
-            self.rewire_params,
-        )
-
-    def obs_as_tensor(self, obs):
-        # create agentObs from graph from output data from env
-        return [
-            AgentObservation(
-                o,
-                self.rewire_params,
-            )
-            for o in obs
-        ]
-
-    def rebatch_obs(self, obs):
-        # we need to flatten a list of list into a single list
-        if isinstance(obs[0], str):
-            return obs
-        return sum(obs, [])
-
-    def get_obs(self, b_obs, mb_ind):
-        if isinstance(b_obs[0], str):
-            return [AgentObservation.load(b_obs[i], PYGGraph) for i in mb_ind]
-        return list(b_obs[i] for i in mb_ind)
-
     def get_action_and_value_nonchrono2(self, nfeats, bactions, deterministic):
         actions = []
         logprobs = []
