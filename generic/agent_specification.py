@@ -72,6 +72,8 @@ class AgentSpecification:
         symlog,
         reward_weights,
         sgformer,
+        transformer_weight_sharing="shared",
+        transformer_encoder_version="td_transformer_v1",
     ):
         self.n_features = n_features
         self.gconv_type = gconv_type
@@ -116,6 +118,8 @@ class AgentSpecification:
         self.symlog = symlog
         self.reward_weights = reward_weights
         self.sgformer = sgformer
+        self.transformer_weight_sharing = transformer_weight_sharing
+        self.transformer_encoder_version = transformer_encoder_version
 
         if mlp_act.lower() == "relu":
             self.activation_fn = torch.nn.LeakyReLU
@@ -157,7 +161,18 @@ class AgentSpecification:
             f"Ortho embed:                      {self.ortho_embed}\n"
             f"Remove tct:                       {self.no_tct}\n"
         )
-        if self.fe_type == "tokengt":
+        if self.fe_type == "transformer":
+            print(
+                f"TD transformer: {self.transformer_encoder_version}\n"
+                f"Width / heads / depth: {self.hidden_dim_features_extractor} / "
+                f"{self.n_attention_heads} / {self.n_layers_features_extractor}\n"
+                f"Weight sharing: {self.transformer_weight_sharing}\n"
+                f"Pooling: {self.graph_pooling}; activation: {self.mlp_act_graph}\n"
+                f"Input MLP layers: {self.n_mlp_layers_features_extractor}; "
+                f"FFN width: {4 * self.hidden_dim_features_extractor}\n"
+                "Pre-LayerNorm and residuals enabled; final-layer readout.\n"
+            )
+        elif self.fe_type == "tokengt":
             print(f"Net shapes:")
             shape = f"{self.n_features} -> ( {self.hidden_dim_features_extractor} / {self.n_attention_heads} ) x {self.n_layers_features_extractor}"
 

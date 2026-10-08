@@ -31,7 +31,7 @@ from generic.utils import get_exp_name, get_path
 from jssp.dispatching_rules.heuristics import HEURISTICS
 
 
-def argument_parser() -> argparse.ArgumentParser:
+def argument_parser(extra_feature_extractors=()) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="These args can be used with train.py, test.py and benchmark/run_taillard.py. They specify how the training"
         "(or testing) is going to be performed"
@@ -340,8 +340,8 @@ def argument_parser() -> argparse.ArgumentParser:
         "--fe_type",
         type=str,
         default="dgl",
-        help="feature extractor type in [dgl|tokengt]",
-        choices=["dgl", "tokengt"],
+        help="feature extractor type",
+        choices=["dgl", "tokengt", *extra_feature_extractors],
     )
     parser.add_argument(
         "--transformer_flavor",
