@@ -163,7 +163,7 @@ class AgentSpecification:
         )
         if self.fe_type == "transformer":
             print(
-                f"TD transformer: {self.transformer_encoder_version}\n"
+                f"STN transformer: {self.transformer_encoder_version}\n"
                 f"Width / heads / depth: {self.hidden_dim_features_extractor} / "
                 f"{self.n_attention_heads} / {self.n_layers_features_extractor}\n"
                 f"Weight sharing: {self.transformer_weight_sharing}\n"
