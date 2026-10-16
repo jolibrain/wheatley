@@ -35,9 +35,9 @@ class RandomAgent:
         else:
             self.nonchrono = "dummy"
 
-    def predict(self, env):
+    def predict(self, env, **kwargs):
         # soft reset to evaluate the same sampled problem as PPO
-        observation, info = env.reset(soft=True)
+        observation, info = env.reset(soft=True, **kwargs)
         action_mask = info["mask"]
         done = False
         while not done:
