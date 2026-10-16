@@ -299,7 +299,7 @@ class PPO:
         action_masks = [
             torch.concat(
                 (
-                    mask,
+                    mask.to(data_device),
                     torch.zeros(
                         (mask.shape[0], max_n_nodes - mask.shape[1]),
                         dtype=torch.bool,
@@ -705,9 +705,8 @@ class PPO:
                             if not was_clipped_global:
                                 unclipped += 1
                             else:
-                                self.optimizer.step()
                                 clipped += 1
-                            # self.optimizer.step()
+                            self.optimizer.step()
                         else:
                             self.optimizer.step()
                         self.optimizer.zero_grad()
@@ -735,9 +734,7 @@ class PPO:
 
             y_pred, y_true = batched_values.cpu().numpy(), batched_returns.cpu().numpy()
             var_y = np.var(y_true)
-            explained_var = (
-                np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-            )
+            explained_var = 0 if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
             iteration = update + self._num_timesteps_at_start
             if log_interval is not None and iteration % log_interval == 0:
