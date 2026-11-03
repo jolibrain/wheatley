@@ -26,6 +26,7 @@ import torch
 import visdom
 from torch.distributions.categorical import Categorical
 from tqdm import tqdm
+import numpy as np
 
 from generic.training_specification import TrainingSpecification
 from jssp.utils.ortools import get_ortools_trajectory_and_past_actions
@@ -64,11 +65,13 @@ class Pretrainer:
         self.train_losses = {
             "actor": [],
             "critic": [],
+            "entropy": [],
             "total": [],
         }
         self.eval_losses = {
             "actor": [],
             "critic": [],
+            "entropy": [],
             "total": [],
         }
 
@@ -97,6 +100,72 @@ class Pretrainer:
                 r[a] = real_prob
             l[n] = r
         return l
+
+    def get_target_probs_uniform(self, all_masks, mb_inds):
+        masks = all_masks[mb_inds]
+
+        # p = torch.where(masks, 1, 0)
+        l = torch.empty(masks.shape)
+        for n, i in enumerate(mb_inds):
+            # sum_non_masked = p[n].sum()
+            sum_non_masked = masks.shape[1]
+            prob = 1.0 / sum_non_masked
+            # r = torch.where(p[n] == 1, prob, 0)
+            r = prob
+            l[n] = r
+        return l
+
+    def generate_random_dataset_(self, num_envs: int, agent, validate=False) -> tuple:
+        all_obs = []
+        all_masks = []
+        all_actions = []
+        all_past_actions = []
+        all_makespans = []
+        if validate:
+            ids = list(range(len(self.problem_description.test_psps)))
+        else:
+            ids = list(range(len(self.problem_description.train_psps)))
+        env = self.env_cls(
+            self.problem_description,
+            self.env_specification,
+            ids,
+            pyg=True,
+            validate=validate,
+        )
+
+        if validate:
+            msg = "Generating random validation trajectories"
+        else:
+            msg = "Generating random train trajectories"
+        for e in tqdm(range(num_envs), desc=msg, leave=False):
+            obs, info = env.reset()
+            action_mask = info["mask"]
+            done = False
+            nsteps = 0
+            while not done:
+                all_obs.append(agent.obs_as_tensor_add_batch_dim(obs))
+                all_masks.append(action_mask)
+                if isinstance(action_mask, torch.Tensor):
+                    possible_actions = torch.nonzero(action_mask, as_tuple=True)[
+                        0
+                    ].numpy()
+                else:
+                    possible_actions = np.nonzero(action_mask)[0]
+                action = np.random.choice(possible_actions)
+
+                obs, reward, done, _, info = env.step(action)
+                action_mask = info["mask"]
+                all_actions.append(action)
+                nsteps += 1
+
+            all_makespans.extend([reward] * nsteps)
+
+        # all_obs = rebatch_obs(all_obs)
+        all_masks = torch.tensor(np.array(all_masks))
+        all_actions = torch.tensor(all_actions)
+        all_makespans = torch.tensor(all_makespans)
+
+        return all_obs, all_masks, all_actions, all_makespans
 
     def generate_dataset_(self, num_envs: int, trajectories: int) -> tuple:
         """Generate new dataset by using OR-Tools to solve the envs.
@@ -159,8 +228,8 @@ class Pretrainer:
         num_epochs,
         minibatch_size,
         lr=0.0002,
-        vf_coeff: float = 0.01,
-        weight_decay: float = 1e-1,
+        vf_coeff: float = None,
+        weight_decay=0.0,
     ):
         optimizer = self.training_specification.optimizer_class(
             agent.parameters(),
@@ -168,27 +237,19 @@ class Pretrainer:
             weight_decay=weight_decay,
         )
 
-        (
-            eval_obs,
-            eval_masks,
-            eval_actions,
-            eval_past_actions,
-            eval_pa_to_a,
-            eval_makespans,
-        ) = self.generate_dataset_(self.num_eval_envs, max(self.trajectories // 10, 1))
-
-        if self.dataset_generation_strategy == "offline":
+        if self.prob != 0:
             (
-                train_obs,
-                train_masks,
-                train_actions,
-                train_past_actions,
-                train_pa_to_a,
-                train_makespans,
-            ) = self.generate_dataset_(self.num_envs, self.trajectories)
+                eval_obs,
+                eval_masks,
+                eval_actions,
+                eval_past_actions,
+                eval_pa_to_a,
+                eval_makespans,
+            ) = self.generate_dataset_(
+                self.num_eval_envs, max(self.trajectories // 10, 1)
+            )
 
-        for _ in tqdm(range(num_epochs), desc="Pretrain"):
-            if self.dataset_generation_strategy == "online":
+            if self.dataset_generation_strategy == "offline":
                 (
                     train_obs,
                     train_masks,
@@ -196,7 +257,33 @@ class Pretrainer:
                     train_past_actions,
                     train_pa_to_a,
                     train_makespans,
-                ) = self.generate_dataset_(self.num_envs, self.trajectories)
+                ) = self.generate_dataset_(self.num_eval_envs, self.trajectories)
+        else:
+            (
+                eval_obs,
+                eval_masks,
+                eval_actions,
+                eval_makespans,
+            ) = self.generate_random_dataset_(self.num_eval_envs, agent, validate=True)
+
+        for _ in tqdm(range(num_epochs), desc="Pretrain", leave=True):
+            if self.dataset_generation_strategy == "online":
+                if self.prob != 0:
+                    (
+                        train_obs,
+                        train_masks,
+                        train_actions,
+                        train_past_actions,
+                        train_pa_to_a,
+                        train_makespans,
+                    ) = self.generate_dataset_(self.num_envs, self.trajectories)
+                else:
+                    (
+                        train_obs,
+                        train_masks,
+                        train_actions,
+                        train_makespans,
+                    ) = self.generate_random_dataset_(self.num_envs, agent)
 
             b_inds = np.arange(len(train_actions))
             np.random.shuffle(b_inds)
@@ -204,6 +291,7 @@ class Pretrainer:
             a_loss = 0
             c_loss = 0
             t_loss = 0
+            e_loss = 0
             for start in tqdm(
                 range(0, len(train_actions), minibatch_size),
                 desc="Batches",
@@ -212,58 +300,90 @@ class Pretrainer:
                 end = min(start + minibatch_size, len(train_actions))
                 mb_inds = b_inds[start:end]
 
-                action_probs, values = agent.get_action_probs_and_value(
-                    agent.get_obs(train_obs, mb_inds), train_masks[mb_inds]
+                action_probs, entropy, values = agent.get_action_probs_and_value(
+                    # agent.get_obs(train_obs, mb_inds), train_masks[mb_inds]
+                    agent.get_obs(train_obs, mb_inds),
+                    None,
                 )
-                target_probs = self.get_target_probs(
-                    train_masks, train_past_actions, train_pa_to_a, mb_inds
-                ).to(action_probs.device)
-                loss_actor = torch.nn.functional.mse_loss(
+                if self.prob != 0:
+                    target_probs = self.get_target_probs(
+                        train_masks, train_past_actions, train_pa_to_a, mb_inds
+                    ).to(action_probs.device)
+                else:
+                    target_probs = self.get_target_probs_uniform(train_masks, mb_inds)
+
+                loss_actor = torch.nn.functional.l1_loss(
                     action_probs,
-                    target_probs,
+                    target_probs.to(action_probs.device),
                     reduction="none",
                 )
-                loss_critic = torch.nn.functional.mse_loss(
+                loss_critic = torch.nn.functional.l1_loss(
                     values.flatten(),
                     train_makespans[mb_inds].to(values.device).float(),
                     reduction="none",
                 )
+                if vf_coeff is None:
+                    vf_coeff = (
+                        loss_actor.mean().item() / loss_critic.mean().item() * 0.2
+                    )
 
-                loss = loss_actor.mean() + vf_coeff * loss_critic.mean()
+                if self.prob != 0:
+                    loss = loss_actor.mean() + vf_coeff * loss_critic.mean()
+                else:
+                    # loss = -entropy.mean() + vf_coeff * loss_critic.mean()
+                    loss = loss_actor.mean() + vf_coeff * loss_critic.mean()
                 loss.backward()
                 optimizer.step()
 
+                e_loss += entropy.sum().item()
                 a_loss += loss_actor.sum().item()
                 c_loss += loss_critic.sum().item()
                 t_loss += loss_actor.sum().item() + vf_coeff * loss_critic.sum().item()
 
             self.train_losses["actor"].append(a_loss / len(train_actions))
+            self.train_losses["entropy"].append(e_loss / len(train_actions))
+            self.train_losses["critic"].append(c_loss / len(train_actions))
             if vf_coeff != 0:
-                self.train_losses["critic"].append(c_loss / len(train_actions))
                 self.train_losses["total"].append(t_loss / len(train_actions))
 
             a_loss = 0
             c_loss = 0
             t_loss = 0
+            e_loss = 0
             with torch.inference_mode():
-                for start in range(0, len(eval_actions), minibatch_size):
+                for start in tqdm(
+                    range(0, len(eval_actions), minibatch_size),
+                    desc="evaluation",
+                    leave=False,
+                ):
                     end = min(start + minibatch_size, len(eval_actions))
                     mb_inds = np.arange(start, end)
 
-                    action_probs, values = agent.get_action_probs_and_value(
-                        agent.get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
+                    action_probs, entropy, values = agent.get_action_probs_and_value(
+                        # agent.get_obs(eval_obs, mb_inds), eval_masks[mb_inds]
+                        agent.get_obs(eval_obs, mb_inds),
+                        None,
                     )
-                    target_probs = self.get_target_probs(
-                        eval_masks, eval_past_actions, eval_pa_to_a, mb_inds
-                    ).to(action_probs.device)
-                    loss_actor = torch.nn.functional.mse_loss(
+                    if self.prob != 0:
+                        target_probs = self.get_target_probs(
+                            eval_masks, eval_past_actions, eval_pa_to_a, mb_inds
+                        ).to(action_probs.device)
+                    else:
+                        target_probs = self.get_target_probs_uniform(
+                            eval_masks, mb_inds
+                        ).to(action_probs.device)
+
+                    loss_actor = torch.nn.functional.l1_loss(
                         action_probs, target_probs, reduction="sum"
                     )
-                    loss_critic = torch.nn.functional.mse_loss(
+                    loss_critic = torch.nn.functional.l1_loss(
                         values.flatten(),
                         eval_makespans[mb_inds].to(values.device).float(),
                         reduction="sum",
                     )
+                    loss_entropy = entropy.sum()
+
+                    e_loss += loss_entropy.item()
                     a_loss += loss_actor.item()
                     c_loss += loss_critic.item()
                     t_loss += loss_actor.item() + vf_coeff * loss_critic.item()
@@ -275,8 +395,9 @@ class Pretrainer:
                 agent.save(pretrain_model_path)
 
             self.eval_losses["actor"].append(a_loss / len(eval_actions))
+            self.eval_losses["entropy"].append(e_loss / len(eval_actions))
+            self.eval_losses["critic"].append(c_loss / len(eval_actions))
             if vf_coeff != 0:
-                self.eval_losses["critic"].append(c_loss / len(eval_actions))
                 self.eval_losses["total"].append(t_loss / len(eval_actions))
 
             for loss_name in self.train_losses.keys():

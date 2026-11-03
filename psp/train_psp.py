@@ -291,15 +291,15 @@ def main(args) -> float:
             problem_description,
             env_specification,
             training_specification,
-            Env,
+            GEnv,
             num_envs=args.pretrain_num_envs,
+            num_eval_envs=len(problem_description.test_psps),
             prob=args.pretrain_prob,
         )
         pretrainer.pretrain(
             agent,
             args.pretrain_epochs,
             args.pretrain_batch_size,
-            args.pretrain_n_steps_episode,
             lr=args.pretrain_lr,
         )
 
