@@ -142,9 +142,9 @@ class AsyncGraphVectorEnv(GraphVectorEnv):
         self.shared_memory = shared_memory
         self.disk = disk
         self.copy = copy
-        dummy_env = env_fns[0]()
-        dummy_env.close()
-        del dummy_env
+        # dummy_env = env_fns[0]()
+        # dummy_env.close()
+        # del dummy_env
         self.graph_factory = graph_factory
 
         if self.shared_memory:
@@ -518,8 +518,8 @@ def _worker(index, env_fn, pipe, parent_pipe, shared_memory, disk, error_queue):
     except (KeyboardInterrupt, Exception):
         error_queue.put((index,) + sys.exc_info()[:2])
         pipe.send((None, False))
-    finally:
-        env.close()
+    # finally:
+    #     env.close()
 
 
 def _worker_shared_memory(
@@ -608,6 +608,6 @@ def _worker_shared_memory(
     except (KeyboardInterrupt, Exception):
         error_queue.put((index,) + sys.exc_info()[:2])
         pipe.send((None, False))
-    finally:
-        # tracemalloc.stop()
-        env.close()
+    # finally:
+    #     # tracemalloc.stop()
+    #     #env.close()
